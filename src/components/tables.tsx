@@ -1,7 +1,8 @@
 import React, { type ReactNode } from 'react';
 import { KOMP, DOK_PAAKREVD, AV_LUKKET } from '../lib/catalog';
 import { S, canEdit } from '../lib/store';
-import { kostNaa, kostTip, nok } from '../lib/utils';
+import { kostNaa, kostTip, kostJustert, nok, YEAR } from '../lib/utils';
+const justTip = (a: any) => { const y = Math.max(compYear(a) || YEAR, YEAR); return `${kostTip(a)}. Prisjustert med KPI til utskiftingsåret ${y}.`; };
 import { aNavn, byId, compRest, compYear, dUntil, docCoverage, eNavn, fd, intTxt, knok, lNavn, openAvvik, pad, pliktStatus, sortBy, tfmKomp, tfmSys, type Rec } from '../lib/utils';
 import { editAnlegg, editAvvik, editDok, editKomponent, toggleDokNA, utfor, visOppgave } from '../lib/actions';
 import { enhetStatus } from '../lib/oppslag';
@@ -66,12 +67,12 @@ export function DokTable({ list, showE = true }: { list: Rec[]; showE?: boolean 
 export function AnleggTable({ list, showE = false }: { list: Rec[]; showE?: boolean }) {
   if (!list.length) return <Wrap><Empty t="Ingen systemer eller bygningsdeler registrert" /></Wrap>;
   const L = sortBy(list, a => (KOMP[a.type]?.g || '') + '|' + aNavn(a.id)); const ok = canEdit();
-  return <Wrap><table><thead><tr><th>System / bygningsdel</th>{showE && <th>Eiendom</th>}<th className="num">Installert år</th><th className="num">Levetid</th><th className="num">Planlagt utskifting</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}<th>Kontroller</th></tr></thead><tbody>
+  return <Wrap><table><thead><tr><th>System / bygningsdel</th>{showE && <th>Eiendom</th>}<th className="num">Installert år</th><th className="num">Levetid</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}<th>Kontroller</th></tr></thead><tbody>
     {L.map(a => { const k = KOMP[a.type] || ({} as any); const r = compRest(a); const n = S.oppgaver.filter(o => o.anleggId === a.id && o.aktiv !== false); const due = n.filter(o => (dUntil(o.nesteFrist) as number) < 0).length;
       return <tr key={a.id} className="click" onClick={() => editAnlegg(a.id)}>
         <td>{a.tfmSys && <span className="mono small">{tfmSys(a)} </span>}<b style={{ fontWeight: 500 }}>{a.navn || k.n}</b><div className="small muted">{a.navn ? k.n : k.g}{a.fabrikat ? ' · ' + a.fabrikat : ''}</div></td>
         {showE && <td>{eNavn(a.eiendomId)}</td>}<td className="num">{a.aar || '–'}</td><td className="num">{a.levetid || k.l || '–'}</td><td className="num">{compYear(a) || '–'}</td>
-        <td>{r === null ? <span className="muted small">Mangler år</span> : <RestChip r={r} />}</td><td><TgChip t={a.tg} /></td>{ok && <td className="num" data-tip={a.kost ? kostTip(a) : undefined}>{a.kost ? nok(kostNaa(a)) : '–'}</td>}
+        <td>{r === null ? <span className="muted small">Mangler år</span> : <RestChip r={r} />}</td><td><TgChip t={a.tg} /></td>{ok && <td className="num" data-tip={a.kost ? kostTip(a) : undefined}>{a.kost ? nok(kostNaa(a)) : '–'}</td>}{ok && <td className="num" data-tip={a.kost ? justTip(a) : undefined}>{a.kost && compYear(a) ? nok(kostJustert(a)) : '–'}</td>}
         <td className="small">{n.length ? <>{n.length} stk{due > 0 && <> · <span style={{ color: 'var(--red)' }}>{due} forfalt</span></>}</> : <span className="muted">–</span>}</td></tr>; })}
   </tbody></table></Wrap>;
 }
@@ -90,18 +91,18 @@ export function TfmTree({ list, q, onNewKomp }: { list: Rec[]; q: string; onNewK
     const kl = qq && !sysTxt.includes(qq) ? km : ks;
     rows.push(<tr key={a.id} className="click sysrow" onClick={() => editAnlegg(a.id)}>
       <td className="mono" style={{ fontWeight: 600 }}>{tfmSys(a) || '–'}</td>
-      <td><b style={{ fontWeight: 600 }}>{a.navn || k.n}</b><div className="small muted">{a.navn ? k.n : k.g}</div></td>
-      <td className="small">{a.fabrikat}</td><td className="num">{a.aar || '–'}</td><td className="num">{compYear(a) || '–'}{a.planAar ? <div className="small muted">overstyrt</div> : null}</td><td><RestChip r={compRest(a)} /></td><td><TgChip t={a.tg} /></td>
-      {ok && <td className="num" data-tip={a.kost ? kostTip(a) : undefined}>{a.kost ? nok(kostNaa(a)) : '–'}</td>}
+      <td><b style={{ fontWeight: 600 }}>{a.navn || k.n}</b><div className="small muted">{[a.navn ? k.n : k.g, a.fabrikat].filter(Boolean).join(' · ')}</div></td>
+      <td className="num">{a.aar || '–'}</td><td className="num">{compYear(a) || '–'}{a.planAar ? <div className="small muted">overstyrt</div> : null}</td><td><RestChip r={compRest(a)} /></td><td><TgChip t={a.tg} /></td>
+      {ok && <td className="num" data-tip={a.kost ? kostTip(a) : undefined}>{a.kost ? nok(kostNaa(a)) : '–'}</td>}{ok && <td className="num" data-tip={a.kost ? justTip(a) : undefined}>{a.kost && compYear(a) ? nok(kostJustert(a)) : '–'}</td>}
       <td className="small">{n.length ? <>{n.length} kontr.{due > 0 && <> · <span style={{ color: 'var(--red)' }}>{due} forfalt</span></>}</> : <span className="muted">–</span>}</td>
       <td style={{ whiteSpace: 'nowrap' }}>{ok && onNewKomp && <button className="btn sm" onClick={e => { stop(e); onNewKomp(a.id); }}>+ Komponent</button>}</td></tr>);
     kl.forEach(c => rows.push(<tr key={c.id} className="click" onClick={() => editKomponent(c.id)}>
       <td className="mono small" style={{ paddingLeft: 26 }}>{'-' + (c.kode || '') + pad(c.lop) + (c.typekode ? '%' + c.typekode : '')}</td>
-      <td>{c.navn}<div className="small muted">{[c.plassering, c.serienr ? 's/n ' + c.serienr : ''].filter(Boolean).join(' · ')}</div></td>
-      <td className="small">{c.fabrikat}</td><td className="num">{c.aar || '–'}</td><td className="num">{compYear(c) || '–'}</td><td>{c.levetid || c.planAar ? <RestChip r={compRest(c)} /> : <span className="muted small">–</span>}</td><td><TgChip t={c.tg} /></td>
-      {ok && <td className="num" data-tip={c.kost ? kostTip(c) : undefined}>{c.kost ? nok(kostNaa(c)) : '–'}</td>}<td /><td /></tr>));
+      <td>{c.navn}<div className="small muted">{[c.fabrikat, c.plassering, c.serienr ? 's/n ' + c.serienr : ''].filter(Boolean).join(' · ')}</div></td>
+      <td className="num">{c.aar || '–'}</td><td className="num">{compYear(c) || '–'}</td><td>{c.levetid || c.planAar ? <RestChip r={compRest(c)} /> : <span className="muted small">–</span>}</td><td><TgChip t={c.tg} /></td>
+      {ok && <td className="num" data-tip={c.kost ? kostTip(c) : undefined}>{c.kost ? nok(kostNaa(c)) : '–'}</td>}{ok && <td className="num" data-tip={c.kost ? justTip(c) : undefined}>{c.kost && compYear(c) ? nok(kostJustert(c)) : '–'}</td>}<td /><td /></tr>));
   });
-  return <Wrap><table><thead><tr><th>TFM-kode</th><th>System / komponent</th><th>Fabrikat</th><th className="num">Installert år</th><th className="num">Planlagt utskifting</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}<th>Kontroller</th><th /></tr></thead>
+  return <Wrap><table><thead><tr><th>TFM-kode</th><th>System / komponent</th><th className="num">Installert år</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}<th>Kontroller</th><th /></tr></thead>
     <tbody>{rows.length ? rows : <tr><td colSpan={10} className="muted">Ingen treff.</td></tr>}</tbody></table></Wrap>;
 }
 
