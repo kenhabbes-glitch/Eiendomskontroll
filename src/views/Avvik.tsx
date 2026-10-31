@@ -2,7 +2,7 @@ import React from 'react';
 import { AV_ALV, AV_KILDE, AV_LUKKET, AV_STATUS } from '../lib/catalog';
 import { S, useStore } from '../lib/store';
 import { dUntil, openAvvik } from '../lib/utils';
-import { editAvvik } from '../lib/actions';
+import { editAvvik, UTBEDRER } from '../lib/actions';
 import { AvvikTable } from '../components/tables';
 import { Search, Sel, eiendomOpts, useFilter } from './common';
 
@@ -19,7 +19,7 @@ export function AvvikView() {
     <div className="toolbar"><Search value={f.q} onChange={q => setF({ q })} />
       <Sel value={f.st} onChange={st => setF({ st })} opts={[['apne', 'Alle åpne'], ['alle', 'Alle'], ...AV_STATUS.map(s => [s, `${s} (${cnt(s)})`] as [string, string])]} />
       <Sel value={f.e} onChange={e => setF({ e })} opts={eiendomOpts()} empty="Alle eiendommer" /><Sel value={f.a} onChange={a => setF({ a })} opts={AV_ALV} empty="All alvorlighet" />
-      <Sel value={f.k} onChange={k => setF({ k })} opts={AV_KILDE} empty="Alle kilder" /><Sel value={f.an} onChange={an => setF({ an })} opts={['Eier', 'Leietaker', 'Leverandør/entreprenør']} empty="Alle ansvarlige" />
+      <Sel value={f.k} onChange={k => setF({ k })} opts={AV_KILDE} empty="Alle kilder" /><Sel value={f.an} onChange={an => setF({ an })} opts={UTBEDRER} empty="Alle ansvarlige" />
       <span className="muted small">{L.length} avvik</span></div>
     <AvvikTable list={L} />
   </>;

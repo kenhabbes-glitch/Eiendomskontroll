@@ -217,3 +217,7 @@ th.num{white-space:normal;max-width:110px;line-height:1.25}
 .arow{display:flex;gap:8px;margin-bottom:6px;align-items:center}
 .fld .arow input{flex:1 1 auto;width:auto!important;min-width:0}
 .fld .arow select{flex:0 0 auto;width:auto!important;max-width:170px}
+.avrad{border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px;background:var(--surface2)}
+.avrad .arow{margin-bottom:0}
+.avrad .arow.sub{margin-top:6px;flex-wrap:wrap}
+.fld .arow.sub select,.fld .arow.sub input{flex:0 1 auto;width:auto!important;max-width:220px}

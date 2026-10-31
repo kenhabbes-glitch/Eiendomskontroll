@@ -46,7 +46,7 @@ export function AvvikTable({ list, showE = true }: { list: Rec[]; showE?: boolea
         <td><AlvChip a={a.alv} /></td>
         <td><StChip s={a.status} />{a.status === 'Utsatt' && a.planlagt && <div className="small muted">til {fd(a.planlagt)}</div>}</td>
         <td>{closed ? <span className="small muted">{a.lukket ? 'Lukket ' + fd(a.lukket) : '–'}</span> : <DueChip s={a.frist} />}</td>
-        <td className="small">{a.ansvar || 'Eier'}{a.leietakerId && lNavn(a.leietakerId) && <div className="muted">{lNavn(a.leietakerId)}</div>}</td>
+        <td className="small">{a.ansvar === 'Leverandør/entreprenør' ? 'Leverandør' : a.ansvar === 'Leietaker' ? 'Leietaker' : 'Eier / drift'}{a.ansvar === 'Leietaker' && a.leietakerId && lNavn(a.leietakerId) && <div className="muted">{lNavn(a.leietakerId)}</div>}{a.ansvar === 'Leverandør/entreprenør' && a.utbedresAv && <div className="muted">{a.utbedresAv}</div>}</td>
         <td className="small muted">{a.kilde}</td></tr>; })}
   </tbody></table></Wrap>;
 }

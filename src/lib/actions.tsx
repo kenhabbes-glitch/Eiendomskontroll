@@ -11,6 +11,7 @@ import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip
 
 const go = (p: string) => { location.hash = '#/' + p; };
 const eOpts = () => sortBy(S.eiendommer, e => e.navn).map(e => [e.id, e.navn] as [string, string]);
+export const UTBEDRER: [string, string][] = [['Eier', 'Eier / drift (felles)'], ['Leietaker', 'Leietaker'], ['Leverandør/entreprenør', 'Serviceselskap / leverandør']];
 const TG_OPTS: [string, string][] = [['', 'Ikke vurdert'], ['TG0', 'TG0 – ingen symptomer'], ['TG1', 'TG1 – svake symptomer'], ['TG2', 'TG2 – middels kraftige symptomer'], ['TG3', 'TG3 – kraftige symptomer']];
 
 // ================= EIENDOM =================
@@ -234,16 +235,26 @@ export function editOppgave(id?: string, preset: any = {}) {
 }
 export function utfor(id: string) {
   const o = byId('oppgaver', id); if (!o) return;
+  const lt = sortBy(S.leietakere.filter(l => l.eiendomId === o.eiendomId), l => l.navn);
+  const nyRad = () => ({ t: '', a: 'Middels', k: '', an: o.ansvar === 'Leietaker' ? 'Leietaker' : 'Eier', l: o.leietakerId || (lt.length === 1 ? lt[0].id : ''), u: o.ansvar === 'Leietaker' ? '' : '' });
   const fields: Field[] = [
     { k: 'dato', label: 'Utført dato', type: 'date', def: today(), req: true, half: true }, { k: 'av', label: 'Utført av', def: o.utfores && state.me?.rolle !== 'tekniker' ? o.utfores : (state.me?.navn || o.utfores || ''), half: true },
     { k: 'res', label: 'Resultat', type: 'select', options: ['OK – ingen avvik', 'Avvik funnet', 'Ikke utført / utsatt'], def: 'OK – ingen avvik', half: true },
     { k: 'nyFrist', label: 'Ny frist (beregnes automatisk)', type: 'date', half: true, hint: 'La stå tom for automatisk beregning ut fra intervallet' },
-    { k: 'avs', type: 'custom', label: 'Avvik fra kontrollen – ett avvik per linje', show: x => x.res === 'Avvik funnet', def: [{ t: '', a: 'Middels', k: '' }], hint: 'Hver linje blir et eget avvik i avvikslisten, med kobling til denne kontrollen. Bruk kommentarfeltet bare til utfyllende informasjon.',
+    { k: 'avs', type: 'custom', label: 'Avvik fra kontrollen – ett avvik per linje', show: x => x.res === 'Avvik funnet', def: [nyRad()], hint: 'Hver linje blir et eget avvik i avvikslisten, med kobling til denne kontrollen. Velg hvem som skal rette avviket. Bruk kommentarfeltet bare til utfyllende informasjon.',
       render: (v, set) => { const L: any[] = v.avs || []; const kc = S.komponenter.filter(k => o.anleggId && k.anleggId === o.anleggId); const upd = (i: number, p: any) => set({ avs: L.map((x, j) => j === i ? { ...x, ...p } : x) });
-        return <>{L.map((r, i) => <div className="arow" key={i}><input placeholder={`Avvik ${i + 1}: beskriv hva som er feil`} value={r.t} autoFocus={i === L.length - 1 && i > 0} onChange={e => upd(i, { t: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px' }} />
-          {kc.length > 0 && <select value={r.k} onChange={e => upd(i, { k: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: 7, maxWidth: 150 }}><option value="">Komponent –</option>{kc.map(k => <option key={k.id} value={k.id}>{'-' + k.kode + pad(k.lop)} {k.navn}</option>)}</select>}
-          <select value={r.a} onChange={e => upd(i, { a: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: 7 }}>{AV_ALV.map(a => <option key={a}>{a}</option>)}</select></div>)}
-          <button type="button" className="btn sm" onClick={() => set({ avs: [...L, { t: '', a: 'Middels', k: '' }] })}>+ Legg til avvik</button></>; } },
+        const sel = { border: '1px solid var(--line2)', borderRadius: 8, padding: 7 } as React.CSSProperties;
+        return <>{L.map((r, i) => <div key={i} className="avrad">
+          <div className="arow"><input placeholder={`Avvik ${i + 1}: beskriv hva som er feil`} value={r.t} autoFocus={i === L.length - 1 && i > 0} onChange={e => upd(i, { t: e.target.value })} />
+            <select value={r.a} onChange={e => upd(i, { a: e.target.value })} title="Alvorlighet">{AV_ALV.map(a => <option key={a}>{a}</option>)}</select>
+            {L.length > 1 && <button type="button" className="btn ghost sm" title="Fjern linjen" onClick={() => set({ avs: L.filter((_, j) => j !== i) })}>✕</button>}</div>
+          <div className="arow sub"><span className="small muted">Utbedres av</span>
+            <select value={r.an} onChange={e => upd(i, { an: e.target.value })}>{UTBEDRER.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+            {r.an === 'Leietaker' && lt.length > 0 && <select value={r.l} onChange={e => upd(i, { l: e.target.value })}><option value="">– velg leietaker –</option>{lt.map(l => <option key={l.id} value={l.id}>{l.navn}</option>)}</select>}
+            {r.an === 'Leverandør/entreprenør' && <input placeholder="Firma (f.eks. servicefirmaet)" value={r.u} onChange={e => upd(i, { u: e.target.value })} />}
+            {kc.length > 0 && <select value={r.k} onChange={e => upd(i, { k: e.target.value })} title="Komponent"><option value="">Komponent –</option>{kc.map(k => <option key={k.id} value={k.id}>{'-' + k.kode + pad(k.lop)} {k.navn}</option>)}</select>}
+          </div></div>)}
+          <button type="button" className="btn sm" onClick={() => set({ avs: [...L, nyRad()] })}>+ Legg til avvik</button></>; } },
     { k: 'komm', label: 'Kommentar', type: 'textarea' },
     { k: 'fil', label: 'Rapport / sjekkliste', type: 'file' },
   ];
@@ -251,11 +262,12 @@ export function utfor(id: string) {
     title: 'Registrer utført: ' + o.navn, fields, saveTxt: 'Registrer',
     onSave: async x => {
       const avs = x.res === 'Avvik funnet' ? (x.avs || []).filter((a: any) => a.t.trim()) : [];
+      if (avs.some((a: any) => a.an === 'Leietaker' && lt.length > 0 && !a.l)) { toast('Velg hvilken leietaker som skal rette avviket'); return false; }
       if (x.res === 'Avvik funnet' && !avs.length) { toast('Skriv inn avvikene i feltene under «Avvik fra kontrollen» – én linje per avvik'); return false; }
       let dokId = '';
       if (x.fil) { const f = await uploadFile(x.fil, o.eiendomId); if (f) dokId = await save('dokumenter', { eiendomId: o.eiendomId, leietakerId: '', type: o.type === 'Egenkontroll' ? 'Egenkontrollskjema' : 'Servicerapport', tittel: o.navn + ' – ' + fd(x.dato), dato: x.dato, fil: f, oppgaveId: o.id }); }
       const ids: string[] = [];
-      for (const a of avs) ids.push(await save('avvik', { tittel: a.t.trim(), eiendomId: o.eiendomId, anleggId: o.anleggId || '', komponentId: a.k || '', alv: a.a, status: 'Ny', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, ansvar: o.ansvar || 'Eier', leietakerId: o.leietakerId || '', oppdaget: x.dato, frist: addDays(x.dato, AV_FRIST[a.a]), logg: [{ t: new Date().toISOString(), s: 'Ny', k: 'Registrert fra kontroll: ' + o.navn, av: state.me?.navn }] }));
+      for (const a of avs) ids.push(await save('avvik', { tittel: a.t.trim(), eiendomId: o.eiendomId, anleggId: o.anleggId || '', komponentId: a.k || '', alv: a.a, status: 'Ny', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, ansvar: a.an || 'Eier', leietakerId: a.an === 'Leietaker' ? (a.l || '') : '', utbedresAv: a.an === 'Leverandør/entreprenør' ? (a.u || '') : '', oppdaget: x.dato, frist: addDays(x.dato, AV_FRIST[a.a]), logg: [{ t: new Date().toISOString(), s: 'Ny', k: 'Registrert fra kontroll: ' + o.navn, av: state.me?.navn }] }));
       const h = [{ dato: x.dato, av: x.av, res: x.res, komm: x.komm, dokId, avvik: ids, regAv: state.me?.id }, ...(o.historikk || [])].slice(0, 80);
       const upd: Rec = { ...o, historikk: h };
       if (x.res !== 'Ikke utført / utsatt') { upd.sistUtfort = x.dato; upd.nesteFrist = x.nyFrist || addInt(x.dato, o.intervall); } else if (x.nyFrist) upd.nesteFrist = x.nyFrist;
@@ -283,7 +295,8 @@ export function editAvvik(id?: string, preset: any = {}) {
     { k: 'komponentId', label: 'Komponent (TFM)', type: 'select', options: () => sortBy(S.komponenter, c => kNavn(c.id)).map(c => [c.id, eNavn(c.eiendomId) + ' – ' + kNavn(c.id)] as [string, string]), empty: '–' },
     { k: 'alv', label: 'Alvorlighet', type: 'select', options: AV_ALV, half: true }, { k: 'status', label: 'Status', type: 'select', options: AV_STATUS, half: true },
     { k: 'kilde', label: 'Kilde', type: 'select', options: AV_KILDE, half: true }, { k: 'meldtAv', label: 'Meldt av / referanse', half: true, ph: 'Navn, rapportnr., tilsynsref.' },
-    { k: 'ansvar', label: 'Ansvarlig for utbedring', type: 'select', options: ['Eier', 'Leietaker', 'Leverandør/entreprenør'], half: true },
+    { k: 'ansvar', label: 'Ansvarlig for utbedring', type: 'select', options: UTBEDRER, half: true },
+    { k: 'utbedresAv', label: 'Serviceselskap / leverandør', half: true, show: x => x.ansvar === 'Leverandør/entreprenør', ph: 'Firma som skal rette avviket' },
     ...(canEdit() ? [{ k: 'leietakerId', label: 'Leietaker', type: 'select', options: () => S.leietakere.map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true } as Field] : []),
     { k: 'oppdaget', label: 'Oppdaget dato', type: 'date', half: true }, { k: 'frist', label: 'Frist for utbedring', type: 'date', half: true, hint: id ? '' : 'Tom = foreslått frist ut fra alvorlighet' },
     { k: 'planlagt', label: 'Planlagt utbedret', type: 'date', half: true, show: x => ['Planlagt', 'Under utbedring', 'Utsatt'].includes(x.status) },
