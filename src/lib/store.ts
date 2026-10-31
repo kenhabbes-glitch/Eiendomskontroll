@@ -37,8 +37,8 @@ export const TABLES = {
 export type Col = keyof typeof TABLES;
 export const COLS = Object.keys(TABLES) as Col[];
 
-export const S: Record<Col, any[]> & { profiles: any[]; tilganger: any[] } = {
-  eiendommer: [], leietakere: [], anlegg: [], komponenter: [], oppgaver: [], avvik: [], dokumenter: [], tegninger: [], profiles: [], tilganger: [],
+export const S: Record<Col, any[]> & { profiles: any[]; tilganger: any[]; innst: Record<string, any>; innstMangler: boolean } = {
+  eiendommer: [], leietakere: [], anlegg: [], komponenter: [], oppgaver: [], avvik: [], dokumenter: [], tegninger: [], profiles: [], tilganger: [], innst: {}, innstMangler: false,
 };
 
 export type Me = { id: string; epost: string; navn: string; rolle: Rolle; leietakerId?: string | null; aktiv: boolean };
@@ -108,11 +108,22 @@ async function loadAll(table: string) {
   return out;
 }
 let channel: any = null;
+async function loadInnst() {
+  const { data, error } = await sb.from('innstillinger').select('*');
+  if (error) { S.innstMangler = true; S.innst = {}; return; }
+  S.innstMangler = false; S.innst = Object.fromEntries((data || []).map((r: any) => [r.nokkel, r.data]));
+}
+export async function saveInnst(nokkel: string, data: any) {
+  const { error } = await sb.from('innstillinger').upsert({ nokkel, data });
+  if (error) { toast('Lagring feilet: ' + feiltekst(error)); throw error; }
+  S.innst[nokkel] = data; bump();
+}
 export async function loadData() {
   state.loading = true; state.error = ''; bump();
   try {
     await Promise.all(COLS.map(async c => { S[c] = (await loadAll(TABLES[c].table)).map(r => fromRow(c, r)); }));
     if (state.me && state.me.rolle !== 'leietaker') {
+      await loadInnst();
       S.profiles = await loadAll('profiles');
       S.tilganger = await loadAll('eiendom_tilgang');
     }
@@ -127,6 +138,7 @@ export async function loadData() {
     if (p.eventType === 'DELETE') apply('profiles', 'delete', { id: p.old.id }); else { apply('profiles', 'upsert', p.new); if (p.new.id === state.me?.id) setMe(p.new); }
   });
   channel.on('postgres_changes', { event: '*', schema: 'public', table: 'eiendom_tilgang' }, () => { reloadTilgang(); });
+  if (!S.innstMangler) channel.on('postgres_changes', { event: '*', schema: 'public', table: 'innstillinger' }, (p: any) => { if (p.new?.nokkel) { S.innst[p.new.nokkel] = p.new.data; bump(); } });
   channel.subscribe();
 }
 let tilgT: any = 0;

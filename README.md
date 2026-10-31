@@ -21,7 +21,7 @@ Tilgangen håndheves i databasen med Row Level Security (`supabase/migrations/00
 
 ### 1. Supabase
 1. Opprett prosjekt på [supabase.com](https://supabase.com) (velg region **Stockholm (eu-north-1)** eller Frankfurt).
-2. **SQL Editor → New query**: lim inn hele innholdet i `supabase/migrations/001_schema.sql` og trykk **Run**.
+2. **SQL Editor → New query**: lim inn hele innholdet i `supabase/migrations/001_schema.sql` og trykk **Run**. Gjør det samme med `002_innstillinger.sql` (KPI-innstillinger).
 3. **Project Settings → API**: noter
    - *Project URL*
    - *anon public* key

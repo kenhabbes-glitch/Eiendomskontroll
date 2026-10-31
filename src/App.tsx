@@ -15,6 +15,7 @@ import { Regelverk } from './views/Regelverk';
 import { Brukere, DataAdmin } from './views/Brukere';
 import { Portal } from './views/Portal';
 import { Profil } from './views/Profil';
+import { Innstillinger } from './views/Innstillinger';
 
 export function go(path: string) { if (location.hash === '#/' + path) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = '#/' + path; }
 function useRoute() {
@@ -37,6 +38,7 @@ const I: Record<string, string> = {
   regelverk: 'M4 19.5A2.5 2.5 0 016.5 17H20V2H6.5A2.5 2.5 0 004 4.5zM4 19.5A2.5 2.5 0 006.5 22H20v-5',
   brukere: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z',
   portal: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z',
+  innstillinger: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
   data: 'M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
 };
 
@@ -47,6 +49,7 @@ function navFor(): [string, string][] {
   n.push(['tfm', 'TFM-register'], ['arealer', 'Tegninger og arealer'], ['dokumenter', 'Dokumenter']);
   if (canEdit()) n.push(['vedlikehold', 'Vedlikeholdsplan']);
   n.push(['regelverk', 'Regelverk og plikter']);
+  if (canEdit()) n.push(['innstillinger', 'Innstillinger']);
   if (isAdmin()) n.push(['brukere', 'Brukere og roller'], ['data', 'Import og eksport']);
   return n;
 }
@@ -91,6 +94,7 @@ export default function App() {
     case 'data': body = <DataAdmin />; break;
     case 'portal': body = <Portal />; break;
     case 'profil': body = <Profil />; break;
+    case 'innstillinger': body = <Innstillinger />; break;
   }
   return <div id="app">
     <aside id="side">

@@ -51,6 +51,16 @@ export function nextKompLop(aid: string, kode: string, skip?: string) { const l 
 export const activeTasks = () => S.oppgaver.filter(o => o.aktiv !== false);
 export const openAvvik = () => S.avvik.filter(a => !AV_LUKKET.includes(a.status));
 export function compYear(a: Rec): number | null { if (a.planAar) return +a.planAar; const b = +a.aar || 0; const l = +a.levetid || KOMP[a.type]?.l || 0; return b && l ? b + l : null; }
+// ---- KPI / prisjustering (innstilling «kpi»: { modus: 'fast' | 'aar', fast: 3, aar: { '2027': 2.8, ... } })
+export const KPI_STANDARD = 3;
+export function kpiInnst() { const k = S.innst?.kpi || {}; return { modus: k.modus === 'aar' ? 'aar' : 'fast', fast: k.fast === '' || k.fast == null || isNaN(+k.fast) ? KPI_STANDARD : +k.fast, aar: (k.aar || {}) as Record<string, number> }; }
+export function kpiFor(y: number) { const k = kpiInnst(); if (k.modus === 'aar') { const v = k.aar[String(y)]; if (v !== undefined && v !== null && String(v) !== '' && !isNaN(+v)) return +v; } return k.fast; }
+/** Faktor for å prisjustere fra prisnivå i år «fra» til år «til» */
+export function kpiFaktor(fra: number, til: number) { let f = 1; for (let y = fra + 1; y <= til; y++) f *= 1 + kpiFor(y) / 100; return f; }
+export const kostAarFor = (a: Rec) => +a.kostAar || YEAR;
+/** Prisjustert kostnad i utskiftingsåret (etterslep regnes til inneværende år) */
+export function kostJustert(a: Rec, aar?: number | null) { const k = +a.kost || 0; if (!k) return 0; const y = Math.max(aar ?? compYear(a) ?? YEAR, YEAR); return k * kpiFaktor(kostAarFor(a), y); }
+export function beregnetAar(a: Rec) { const b = +a.aar || 0; const l = +a.levetid || KOMP[a.type]?.l || 0; return b && l ? b + l : null; }
 export function compRest(a: Rec) { const y = compYear(a); return y === null ? null : y - YEAR; }
 export function pliktStatus(p: Rec): { c: string; t: string; o: number; nx?: string } {
   if (p.ikkeRelevant) return { c: '', t: 'Ikke relevant', o: 0 };

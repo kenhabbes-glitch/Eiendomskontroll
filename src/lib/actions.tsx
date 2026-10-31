@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state } from './store';
+import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok } from './utils';
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
 import { adresseFelter, brregData, enhetStatus, seEiendomUrl, virksomhetFraNaering, rensOrgnr } from './oppslag';
@@ -52,6 +53,17 @@ export function editEiendom(id?: string) {
 }
 
 // ================= SYSTEM / BYGNINGSDEL =================
+// Viser beregnet utskiftingsår og prisjustert kostnad live i skjemaet
+function UtskiftNote({ v, typeLevetid }: { v: any; typeLevetid?: number }) {
+  const lev = +v.levetid || typeLevetid || 0; const ber = +v.aar && lev ? +v.aar + lev : null;
+  const aar = +v.planAar || ber; const k = kpiInnst();
+  return <div className="note small" style={{ color: 'var(--ink)' }}>
+    {ber ? <>Beregnet utskiftingsår: <b className="mono">{ber}</b> <span className="muted">({v.aar} + {lev} år{!v.levetid && typeLevetid ? ', veiledende levetid' : ''})</span>{+v.planAar && +v.planAar !== ber ? <> · <b>overstyrt til {v.planAar}</b></> : null}</>
+      : +v.planAar ? <>Utskiftingsår: <b className="mono">{v.planAar}</b> (satt manuelt)</> : <span className="muted">Fyll inn installert år og levetid, så beregnes utskiftingsåret.</span>}
+    {+v.kost > 0 && aar && <><br />Prisjustert kostnad i {Math.max(aar, YEAR)}: <b className="mono">{nok(kostJustert(v, aar))}</b> <span className="muted">(fra {nok(v.kost)} i {+v.kostAar || YEAR}-kroner, KPI {k.modus === 'fast' ? k.fast.toLocaleString('nb-NO') + ' %/år' : 'per år fra innstillinger'}{aar < YEAR ? ' · etterslep regnet til i år' : ''})</span></>}
+  </div>;
+}
+
 const kompGroups = () => { const g: Record<string, [string, string][]> = {}; Object.entries(KOMP).forEach(([k, v]) => { (g[v.g] = g[v.g] || []).push([k, v.n]); }); return Object.entries(g) as [string, [string, string][]][]; };
 export function editAnlegg(id?: string, eiendomId?: string) {
   const a: Rec = id ? byId('anlegg', id)! : { eiendomId: eiendomId || S.eiendommer[0]?.id, type: 'ventilasjon', ansvar: 'Eier' } as any;
@@ -66,8 +78,9 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'prev', type: 'custom', render: v => { const e = byId('eiendommer', v.eiendomId); return <div className="note mono" style={{ fontSize: 14, color: 'var(--ink)' }}>{v.tfmSys ? `${e?.tfmBygg ? '+' + e.tfmBygg : ''}=${v.tfmSys}.${pad(v.tfmLop || 1)}` : '(ingen TFM-kode)'}</div>; } },
     { k: 'navn', label: 'Betegnelse / plassering', half: true, ph: 'F.eks. Ventilasjon kontorfløy' }, { k: 'fabrikat', label: 'Fabrikat / modell', half: true },
     { k: 'aar', label: 'Installert/utskiftet år', type: 'number', half: true }, { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Tomt = veiledende levetid for typen' },
-    { k: 'planAar', label: 'Planlagt utskiftingsår (overstyr)', type: 'number', half: true }, { k: 'tg', label: 'Tilstandsgrad (NS 3424)', type: 'select', options: TG_OPTS, half: true },
-    ...(isStaff() && canEdit() ? [{ k: 'kost', label: 'Estimert utskiftingskostnad (kr)', type: 'number', half: true } as Field] : []),
+    { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true, hint: 'La stå tom for å bruke beregnet år' }, { k: 'tg', label: 'Tilstandsgrad (NS 3424)', type: 'select', options: TG_OPTS, half: true },
+    ...(isStaff() && canEdit() ? [{ k: 'kost', label: 'Estimert utskiftingskostnad (kr)', type: 'number', half: true } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR, hint: 'Året beløpet er anslått i' } as Field] : []),
+    { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} typeLevetid={KOMP[v.type]?.l} /> },
     { k: 'ansvar', label: 'Ansvar for vedlikehold', type: 'select', options: ['Eier', 'Leietaker', 'Delt'], half: true },
     { k: 'leverandor', label: 'Serviceleverandør / avtale', half: true }, { k: 'tgdato', label: 'Tilstand vurdert dato', type: 'date', half: true },
     { k: 'notat', label: 'Notater', type: 'textarea' },
@@ -89,7 +102,8 @@ export function editAnlegg(id?: string, eiendomId?: string) {
       if (await confirmBox(`Slette systemet${kc.length ? ` og ${kc.length} komponenter` : ''}? Tilknyttede kontroller beholdes, men mister koblingen.`)) { await removeDoc('anlegg', id); close(); }
     }}>Slett</button> : null,
     onSave: async v => {
-      const mk: string[] = v.mk || []; const forste = v.forste || today(); delete v.mk; delete v.forste; delete v.prev;
+      const mk: string[] = v.mk || []; const forste = v.forste || today(); delete v.mk; delete v.forste; delete v.prev; delete v.beregn;
+      if (v.kost && !v.kostAar) v.kostAar = YEAR;
       v.tfmSys = String(v.tfmSys || '').replace(/\D/g, ''); v.tfmLop = v.tfmSys ? pad(String(v.tfmLop || '1').replace(/\D/g, '') || 1) : '';
       const dup = v.tfmSys && S.anlegg.find(x => x.id !== id && x.eiendomId === v.eiendomId && x.tfmSys === v.tfmSys && pad(x.tfmLop) === v.tfmLop);
       if (dup) { toast(`TFM-koden =${v.tfmSys}.${v.tfmLop} er allerede brukt på «${dup.navn || KOMP[dup.type]?.n}»`); return false; }
@@ -112,16 +126,17 @@ export function editKomponent(id?: string, anleggId?: string) {
     { k: 'prev', type: 'custom', render: v => { const a = byId('anlegg', v.anleggId); return <div className="note mono" style={{ fontSize: 14, color: 'var(--ink)' }}>{`${a ? tfmSys(a, true) : ''}-${String(v.kode || '').toUpperCase()}${pad(v.lop || 1)}${v.typekode ? '%' + v.typekode : ''}`}</div>; } },
     { k: 'plassering', label: 'Plassering (rom/etasje)', half: true }, { k: 'fabrikat', label: 'Fabrikat / modell', half: true },
     { k: 'serienr', label: 'Serienummer', half: true }, { k: 'aar', label: 'Installert år', type: 'number', half: true },
-    { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Fyll ut for å ta med komponenten i vedlikeholdsplanen' }, { k: 'planAar', label: 'Planlagt utskiftingsår', type: 'number', half: true },
+    { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Fyll ut for å ta med komponenten i vedlikeholdsplanen' }, { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true },
     { k: 'tg', label: 'Tilstandsgrad', type: 'select', options: TG_OPTS, half: true },
-    ...(canEdit() ? [{ k: 'kost', label: 'Utskiftingskostnad (kr)', type: 'number', half: true } as Field] : []),
+    ...(canEdit() ? [{ k: 'kost', label: 'Utskiftingskostnad (kr)', type: 'number', half: true } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR } as Field] : []),
+    { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} /> },
     { k: 'notat', label: 'Notater', type: 'textarea' }];
   formModal({
     title: ro ? kNavn(id) : id ? 'Rediger komponent' : 'Ny komponent', fields, values: k, readOnly: ro,
     onChange: (key, v) => { if (key === 'lop') touched.lop = true; if ((key === 'kode' || key === 'anleggId') && !touched.lop && !id) return { lop: nextKompLop(v.anleggId, v.kode) }; },
     extraFoot: close => id && !ro ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette komponenten?')) { await removeDoc('komponenter', id); close(); } }}>Slett</button> : null,
     onSave: async x => {
-      delete x.prev; x.kode = String(x.kode || '').toUpperCase().replace(/[^A-ZÆØÅ]/g, ''); x.lop = pad(String(x.lop || '1').replace(/\D/g, '') || 1);
+      delete x.prev; delete x.beregn; if (x.kost && !x.kostAar) x.kostAar = YEAR; x.kode = String(x.kode || '').toUpperCase().replace(/[^A-ZÆØÅ]/g, ''); x.lop = pad(String(x.lop || '1').replace(/\D/g, '') || 1);
       if (!x.navn) x.navn = TFM_KODER.find(c => c[0] === x.kode)?.[1] || '';
       const dup = S.komponenter.find(z => z.id !== id && z.anleggId === x.anleggId && String(z.kode || '').toUpperCase() === x.kode && pad(z.lop) === x.lop);
       if (dup) { toast('Komponentkoden er allerede brukt i dette systemet'); return false; }
