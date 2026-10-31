@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { S, isAdmin, saveInnst, toast, useStore } from '../lib/store';
+import { S, aoApi, isAdmin, saveInnst, toast, useStore } from '../lib/store';
 import { KPI_STANDARD, RENTE_STANDARD, YEAR, kpiFaktor, kpiInnst, nok, renteInnst } from '../lib/utils';
 
 const SQL_URL = 'https://github.com/kenhabbes-glitch/Eiendomskontroll/blob/main/supabase/migrations/002_innstillinger.sql';
@@ -46,6 +46,7 @@ export function Innstillinger() {
       {!ro ? <div style={{ marginTop: 14 }}><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? 'Lagrer …' : 'Lagre KPI-innstillinger'}</button></div> : <p className="small muted">Bare administrator kan endre innstillingene.</p>}
     </div>
     <RenteKort ro={ro} />
+    {isAdmin() && <EpostKort />}
   </>;
 }
 
@@ -62,5 +63,47 @@ function RenteKort({ ro }: { ro: boolean }) {
     <div className="form" style={{ maxWidth: 420 }}><div className="fld half"><label>Kalkulasjonsrente (% per år)</label><input value={v} readOnly={ro} onChange={e => setV(e.target.value)} inputMode="decimal" placeholder={String(RENTE_STANDARD)} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px' }} /></div></div>
     {!isNaN(r) && <div className="note small">Eksempel: 1 000 000 kr som må betales om 10 år har nåverdi {nok(1e6 / Math.pow(1 + r / 100, 10))}, om 20 år {nok(1e6 / Math.pow(1 + r / 100, 20))}.</div>}
     {!ro && <div style={{ marginTop: 14 }}><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? 'Lagrer …' : 'Lagre kalkulasjonsrente'}</button></div>}
+  </div>;
+}
+
+const PRESET: Record<string, [string, number, string]> = {
+  gmail: ['smtp.gmail.com', 465, 'Gmail: bruk app-passord (myaccount.google.com/apppasswords). Avsenderadressen må være Gmail-adressen.'],
+  m365: ['smtp.office365.com', 587, 'Microsoft 365/Outlook: SMTP AUTH må være slått på for postkassen hos kunden.'],
+  domeneshop: ['smtp.domeneshop.no', 587, 'Domeneshop: brukernavn og passord for e-postkontoen.'],
+  annen: ['', 587, 'Annen e-postleverandør: se leverandørens SMTP-innstillinger.'],
+};
+function EpostKort() {
+  const [d, setD] = useState<any>(null); const [har, setHar] = useState(false); const [aktiv, setAktiv] = useState<any>(null); const [hem, setHem] = useState(''); const [busy, setBusy] = useState(''); const [feil, setFeil] = useState(''); const [lev, setLev] = useState('gmail');
+  const last = async () => { try { const r = await aoApi({ action: 'epost_hent' }); setD({ metode: 'smtp', smtpHost: 'smtp.gmail.com', smtpPort: 465, ...r.data }); setHar(r.harHemmelig); setAktiv(r.aktiv); const h = r.data?.smtpHost || 'smtp.gmail.com'; setLev(Object.keys(PRESET).find(k => PRESET[k][0] === h) || 'annen'); } catch (e: any) { setFeil(e.message); setD({ metode: 'smtp', smtpHost: 'smtp.gmail.com', smtpPort: 465 }); } };
+  useEffect(() => { last(); }, []);
+  if (!d) return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}><h2>E-post for arbeidsordre</h2><p className="muted small">Laster …</p></div>;
+  const set = (x: any) => setD({ ...d, ...x });
+  const inp = { border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px', width: '100%' } as any;
+  const lagre = async () => { setBusy('Lagrer …'); try { await aoApi({ action: 'epost_lagre', data: d, hemmelig: hem }); setHem(''); toast('E-postoppsett lagret'); await last(); } catch (e: any) { toast(e.message); } setBusy(''); };
+  const test = async () => { setBusy('Sender test …'); try { const r = await aoApi({ action: 'epost_test' }); toast(r.sendt ? 'Testmelding sendt til ' + r.til : r.grunn); } catch (e: any) { toast(e.message); } setBusy(''); };
+  return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}>
+    <h2>E-post for arbeidsordre</h2>
+    <p className="small muted" style={{ marginTop: -4 }}>Arbeidsordre og varsler sendes fra denne avsenderen, slik at e-posten ser ut til å komme fra dere. Passord og nøkler lagres på serveren, kan ikke leses av noen brukere i appen og vises aldri igjen etter lagring.</p>
+    {feil && <div className="banner">{feil}</div>}
+    {aktiv && <p className="small">{aktiv.metode ? <>Aktiv nå: <b>{aktiv.metode === 'smtp' ? 'SMTP' : 'Resend'}</b> fra <b>{aktiv.fra}</b> {aktiv.kilde === 'netlify' && <span className="muted">(fra miljøvariabler i Netlify – det du lagrer her overstyrer dem)</span>}</> : <span style={{ color: 'var(--amber)' }}>Ingen e-posttjeneste er satt opp. Arbeidsordre åpnes i brukerens eget e-postprogram.</span>}</p>}
+    <div className="form" style={{ maxWidth: 640 }}>
+      <div className="fld half"><label>Avsendernavn</label><input style={inp} value={d.fraNavn || ''} onChange={e => set({ fraNavn: e.target.value })} placeholder="F.eks. Havnespeilet Eiendom AS" /></div>
+      <div className="fld half"><label>Svar går til (valgfritt)</label><input style={inp} value={d.svarTil || ''} onChange={e => set({ svarTil: e.target.value })} placeholder="Tom = den som sendte arbeidsordren" /></div>
+      <div className="fld half"><label>Sendemetode</label><select style={inp} value={d.metode || ''} onChange={e => set({ metode: e.target.value })}><option value="smtp">SMTP (egen e-postkonto)</option><option value="resend">Resend (eget domene)</option><option value="">Av – bruk eget e-postprogram</option></select></div>
+      {d.metode === 'smtp' && <>
+        <div className="fld half"><label>E-postleverandør</label><select style={inp} value={lev} onChange={e => { const k = e.target.value; setLev(k); if (k !== 'annen') set({ smtpHost: PRESET[k][0], smtpPort: PRESET[k][1] }); }}>{[['gmail', 'Gmail'], ['m365', 'Microsoft 365 / Outlook'], ['domeneshop', 'Domeneshop'], ['annen', 'Annen']].map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+        <div className="fld" style={{ marginTop: -4 }}><div className="hint">{PRESET[lev][2]}</div></div>
+        {lev === 'annen' && <><div className="fld half"><label>SMTP-server</label><input style={inp} value={d.smtpHost || ''} onChange={e => set({ smtpHost: e.target.value })} /></div><div className="fld half"><label>Port</label><input style={inp} type="number" value={d.smtpPort || ''} onChange={e => set({ smtpPort: +e.target.value })} /></div></>}
+        <div className="fld half"><label>Brukernavn (e-postadressen)</label><input style={inp} value={d.smtpUser || ''} onChange={e => set({ smtpUser: e.target.value, fraEpost: !d.fraEpost || d.fraEpost === d.smtpUser ? e.target.value : d.fraEpost })} /></div>
+        <div className="fld half"><label>Passord / app-passord</label><input style={inp} type="password" value={hem} onChange={e => setHem(e.target.value)} placeholder={har ? '•••••••• (lagret – fyll ut for å bytte)' : ''} autoComplete="new-password" /></div>
+        <div className="fld half"><label>Avsenderadresse</label><input style={inp} value={d.fraEpost || ''} onChange={e => set({ fraEpost: e.target.value })} /><div className="hint">Normalt samme som brukernavnet.</div></div>
+      </>}
+      {d.metode === 'resend' && <>
+        <div className="fld half"><label>Avsenderadresse</label><input style={inp} value={d.fraEpost || ''} onChange={e => set({ fraEpost: e.target.value })} placeholder="arbeidsordre@varsel.firma.no" /><div className="hint">Må være på et domene verifisert i Resend.</div></div>
+        <div className="fld half"><label>Resend API-nøkkel</label><input style={inp} type="password" value={hem} onChange={e => setHem(e.target.value)} placeholder={har ? '•••••••• (lagret – fyll ut for å bytte)' : 're_…'} autoComplete="new-password" /></div>
+      </>}
+    </div>
+    <p className="small muted">Mottakeren ser: <b>{d.fraNavn || 'Eiendomskontroll'}</b> &lt;{d.fraEpost || d.smtpUser || '…'}&gt;</p>
+    <div style={{ display: 'flex', gap: 8 }}><button className="btn pri" disabled={!!busy} onClick={lagre}>{busy || 'Lagre e-postoppsett'}</button><button className="btn" disabled={!!busy} onClick={test}>Send test til meg</button></div>
   </div>;
 }

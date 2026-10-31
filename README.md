@@ -109,3 +109,6 @@ Filer lagres i den private bøtten `filer` med sti `{eiendom_id}/felles/...` ell
    Uten dette åpnes arbeidsordren i brukerens eget e-postprogram i stedet (PDF må da legges ved manuelt).
 
 Flyt: avvik → «Plasser på tegning» → «Tildel» (intern bruker) eller «Send på e-post» (hvem som helst). Mottakeren åpner lenken, oppretter bruker eller logger inn, ser plasseringen, starter jobben, laster opp bilder/filer og kvitterer ut. Avviket går til «Utført – til kontroll», og forvalter godkjenner og lukker eller sender tilbake.
+
+### E-postoppsett i appen
+Kjør `supabase/migrations/004_epost.sql`. Deretter setter administrator avsendernavn, avsenderadresse, svar-til og SMTP (Gmail, Microsoft 365, Domeneshop, annen) eller Resend under **Innstillinger → E-post for arbeidsordre**. Passord/nøkler lagres i tabellen `epost_oppsett`, som bare serverfunksjonen kan lese. Oppsettet i appen overstyrer miljøvariablene i Netlify.

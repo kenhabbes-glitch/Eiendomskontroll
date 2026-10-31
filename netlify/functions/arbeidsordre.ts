@@ -32,26 +32,59 @@ export default async (req: Request) => {
   const leggTilAvvikLogg = async (a: any, k: string, av: string) => { const d = a.data || {}; const l = [...(d.logg || []), { t: new Date().toISOString(), s: d.status, k, av }]; await admin.from('avvik').update({ data: { ...d, logg: l } }).eq('id', a.id); };
   const hentAvvik = async (id: string) => { const { data } = await admin.from('avvik').select('*').eq('id', id).single(); return data; };
 
-  // E-post: SMTP (f.eks. Gmail eller kundens e-postserver) brukes hvis SMTP_* er satt, ellers Resend, ellers ingen.
-  const sendEpost = async (til: string, emne: string, html: string, tekst: string, vedlegg?: { navn: string; base64: string }, svarTil?: string) => {
+  // E-postoppsett: fra appens Innstillinger (tabellen epost_oppsett), ellers miljøvariabler i Netlify.
+  type Oppsett = { metode: 'smtp' | 'resend' | ''; fraNavn: string; fraEpost: string; svarTil: string; smtpHost: string; smtpPort: number; smtpUser: string; passord: string; kilde: string };
+  const hentOppsett = async (): Promise<Oppsett> => {
     const env = (k: string) => (process.env[k] || '').trim();
-    const replyTo = env('EPOST_SVAR') || svarTil || undefined;
-    if (env('SMTP_USER') && env('SMTP_PASS')) {
-      const port = +(env('SMTP_PORT') || 465);
-      const fra = env('EPOST_FRA') || `Eiendomskontroll <${env('SMTP_USER')}>`;
+    const { data: r } = await admin.from('epost_oppsett').select('*').eq('id', 1).maybeSingle();
+    const d = r?.data || {};
+    if (d.metode && r?.hemmelig) return { metode: d.metode, fraNavn: d.fraNavn || '', fraEpost: d.fraEpost || d.smtpUser || '', svarTil: d.svarTil || '', smtpHost: d.smtpHost || 'smtp.gmail.com', smtpPort: +d.smtpPort || 465, smtpUser: d.smtpUser || '', passord: r.hemmelig, kilde: 'app' };
+    const parse = (f: string) => { const m = f.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>\s*$/); return m ? [m[1].trim(), m[2].trim()] : ['', f.trim()]; };
+    const [n, e] = parse(env('EPOST_FRA'));
+    if (env('SMTP_USER') && env('SMTP_PASS')) return { metode: 'smtp', fraNavn: d.fraNavn || n || 'Eiendomskontroll', fraEpost: e || env('SMTP_USER'), svarTil: d.svarTil || env('EPOST_SVAR'), smtpHost: env('SMTP_HOST') || 'smtp.gmail.com', smtpPort: +(env('SMTP_PORT') || 465), smtpUser: env('SMTP_USER'), passord: env('SMTP_PASS'), kilde: 'netlify' };
+    if (env('RESEND_API_KEY')) return { metode: 'resend', fraNavn: d.fraNavn || n || 'Eiendomskontroll', fraEpost: e || 'onboarding@resend.dev', svarTil: d.svarTil || env('EPOST_SVAR'), smtpHost: '', smtpPort: 0, smtpUser: '', passord: env('RESEND_API_KEY'), kilde: 'netlify' };
+    return { metode: '', fraNavn: d.fraNavn || '', fraEpost: '', svarTil: d.svarTil || '', smtpHost: '', smtpPort: 0, smtpUser: '', passord: '', kilde: '' };
+  };
+  const sendEpost = async (til: string, emne: string, html: string, tekst: string, vedlegg?: { navn: string; base64: string }, svarTil?: string, o0?: Oppsett) => {
+    const o = o0 || await hentOppsett();
+    if (!o.metode) return { sendt: false, grunn: 'E-post er ikke satt opp (Innstillinger → E-post for arbeidsordre)' };
+    const fra = o.fraNavn ? `"${o.fraNavn.replace(/"/g, '')}" <${o.fraEpost}>` : o.fraEpost; const replyTo = o.svarTil || svarTil || undefined;
+    if (o.metode === 'smtp') {
       try {
-        const t = nodemailer.createTransport({ host: env('SMTP_HOST') || 'smtp.gmail.com', port, secure: port === 465, auth: { user: env('SMTP_USER'), pass: env('SMTP_PASS').replace(/\s+/g, '') } });
+        const t = nodemailer.createTransport({ host: o.smtpHost, port: o.smtpPort, secure: o.smtpPort === 465, auth: { user: o.smtpUser, pass: o.passord.replace(/\s+/g, '') } });
         await t.sendMail({ from: fra, to: til, replyTo, subject: emne, text: tekst, html, attachments: vedlegg ? [{ filename: vedlegg.navn, content: vedlegg.base64, encoding: 'base64', contentType: 'application/pdf' }] : undefined });
         return { sendt: true };
       } catch (e: any) { return { sendt: false, grunn: 'E-post feilet (SMTP): ' + (e?.response || e?.message || e) }; }
     }
-    const rk = env('RESEND_API_KEY'); const fra = env('EPOST_FRA') || 'Eiendomskontroll <onboarding@resend.dev>';
-    if (!rk) return { sendt: false, grunn: 'E-posttjeneste er ikke satt opp (SMTP_USER/SMTP_PASS eller RESEND_API_KEY mangler)' };
-    const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + rk, 'Content-Type': 'application/json' },
+    const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + o.passord, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: fra, to: [til], subject: emne, html, text: tekst, ...(replyTo ? { reply_to: replyTo } : {}), ...(vedlegg ? { attachments: [{ filename: vedlegg.navn, content: vedlegg.base64 }] } : {}) }) });
-    if (!r.ok) { const j = await r.json().catch(() => ({})); return { sendt: false, grunn: 'E-post feilet: ' + (j.message || r.status) }; }
+    if (!r.ok) { const j = await r.json().catch(() => ({})); return { sendt: false, grunn: 'E-post feilet (Resend): ' + (j.message || r.status) }; }
     return { sendt: true };
   };
+
+  // ---------- E-postoppsett (bare administrator)
+  if (body.action === 'epost_hent' || body.action === 'epost_lagre' || body.action === 'epost_test') {
+    const p = await hvem(); if (!p || p.rolle !== 'admin' || !p.aktiv) return json(403, { error: 'Bare administrator kan endre e-postoppsettet' });
+    if (body.action === 'epost_hent') {
+      const { data: r, error } = await admin.from('epost_oppsett').select('*').eq('id', 1).maybeSingle();
+      if (error) return json(500, { error: 'Tabellen epost_oppsett mangler – kjør 004_epost.sql i Supabase' });
+      const o = await hentOppsett();
+      return json(200, { data: r?.data || {}, harHemmelig: !!r?.hemmelig, aktiv: { metode: o.metode, kilde: o.kilde, fra: o.fraEpost } });
+    }
+    if (body.action === 'epost_lagre') {
+      const d = body.data || {}; const ren = { metode: ['smtp', 'resend'].includes(d.metode) ? d.metode : '', fraNavn: String(d.fraNavn || '').slice(0, 120), fraEpost: String(d.fraEpost || '').trim().slice(0, 200), svarTil: String(d.svarTil || '').trim().slice(0, 200), smtpHost: String(d.smtpHost || '').trim(), smtpPort: +d.smtpPort || 465, smtpUser: String(d.smtpUser || '').trim() };
+      const { data: gml } = await admin.from('epost_oppsett').select('hemmelig').eq('id', 1).maybeSingle();
+      const hemmelig = typeof body.hemmelig === 'string' && body.hemmelig.trim() ? body.hemmelig.trim() : body.slettHemmelig ? null : gml?.hemmelig ?? null;
+      const { error } = await admin.from('epost_oppsett').upsert({ id: 1, data: ren, hemmelig, endret: new Date().toISOString(), endret_av: p.id });
+      if (error) return json(500, { error: 'Kunne ikke lagre: ' + error.message });
+      await admin.from('hendelseslogg').insert({ bruker_id: p.id, bruker: p.navn || p.epost, tabell: 'hendelse', handling: 'innstilling', tekst: `E-postoppsett endret (${ren.metode || 'av'}, avsender ${ren.fraNavn} <${ren.fraEpost}>)${typeof body.hemmelig === 'string' && body.hemmelig.trim() ? ', nytt passord/nøkkel' : ''}` });
+      return json(200, { ok: true });
+    }
+    const o = await hentOppsett();
+    const r = await sendEpost(p.epost, 'Test fra Eiendomskontroll', `<p>Dette er en test av e-postoppsettet.</p><p>Avsender: ${esc(o.fraNavn)} &lt;${esc(o.fraEpost)}&gt;<br>Svar går til: ${esc(o.svarTil || p.epost)}</p>`, `Dette er en test av e-postoppsettet.\nAvsender: ${o.fraNavn} <${o.fraEpost}>`, undefined, p.epost, o);
+    return json(200, { ...r, til: p.epost });
+  }
+
   const aoTekst = (a: any, lenke: string, melding: string, avsender: string) => {
     const d = a.data || {}; const ao = d.ao || {};
     const linjer = [
