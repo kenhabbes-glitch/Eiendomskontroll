@@ -3,7 +3,8 @@ import { DOK_PAAKREVD } from '../lib/catalog';
 import { S, canEdit, isAdmin, state, useStore } from '../lib/store';
 import { activeTasks, compRest, docCoverage, dUntil, eNavn, fd, openAvvik, pliktStatus, sortBy, today } from '../lib/utils';
 import { editAvvik, editEiendom, visOppgave } from '../lib/actions';
-import { AlvChip, DueChip } from '../components/ui';
+import { AlvChip, Chip, DueChip } from '../components/ui';
+import { enhetStatus } from '../lib/oppslag';
 
 const go = (p: string) => { location.hash = '#/' + p; };
 
@@ -32,6 +33,7 @@ export function Oversikt() {
   const actions = [
     ...forf.map(o => ({ d: o.nesteFrist, el: <div key={o.id} className="li" onClick={() => visOppgave(o.id)}><DueChip s={o.nesteFrist} /><div className="grow"><div className="lt">{o.navn}</div><div className="ls">{eNavn(o.eiendomId)} · {o.type}</div></div></div> })),
     ...OA.filter(a => a.alv === 'Kritisk' || (a.frist && (dUntil(a.frist) as number) < 0)).map(a => ({ d: a.frist || '0', el: <div key={a.id} className="li" onClick={() => editAvvik(a.id)}><AlvChip a={a.alv} /><div className="grow"><div className="lt">#{a.nr} {a.tittel}</div><div className="ls">{eNavn(a.eiendomId)} · {a.status} · frist {fd(a.frist)}</div></div></div> })),
+    ...(ed ? S.leietakere.filter(l => l.brreg && enhetStatus(l.brreg).c !== 'green').map(l => ({ d: '0', el: <div key={'b' + l.id} className="li" onClick={() => go('leietaker/' + l.id)}><Chip c={enhetStatus(l.brreg).c}>{enhetStatus(l.brreg).t}</Chip><div className="grow"><div className="lt">{l.navn}</div><div className="ls">{eNavn(l.eiendomId)} · status i Brønnøysundregistrene per {fd(l.brreg.sjekket)}</div></div></div> })) : []),
   ].sort((a, b) => String(a.d).localeCompare(String(b.d)));
 
   return <>

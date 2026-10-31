@@ -7,6 +7,22 @@ import { AvvikTable, DokTable, LeieTable, TaskTable } from '../components/tables
 import { Chip, Empty, FileLink } from '../components/ui';
 import { Search, Sel, eiendomOpts, useFilter } from './common';
 import { inviter } from './Brukere';
+import { brregData, enhetStatus, rensOrgnr } from '../lib/oppslag';
+import { save, toast, canEdit } from '../lib/store';
+import { confirmBox } from '../components/ui';
+
+async function oppdaterBrreg(l: any, stille = false) {
+  if (rensOrgnr(l.orgnr || '').length !== 9) { if (!stille) toast('Leietakeren mangler gyldig org.nr.'); return null; }
+  const b = await brregData(l.orgnr).catch(() => null);
+  if (!b) { if (!stille) toast('Fant ikke org.nr. i Enhetsregisteret'); return null; }
+  await save('leietakere', { ...l, brreg: b }); if (!stille) toast('Oppdatert fra Brønnøysundregistrene'); return b;
+}
+async function sjekkAlle(L: any[]) {
+  const med = L.filter(l => rensOrgnr(l.orgnr || '').length === 9); if (!med.length) { toast('Ingen leietakere har org.nr.'); return; }
+  if (!await confirmBox(`Sjekke ${med.length} leietakere mot Brønnøysundregistrene?`, 'Sjekk')) return;
+  let varsler = 0; for (const l of med) { const b = await oppdaterBrreg(l, true); if (b && enhetStatus(b).c !== 'green') varsler++; await new Promise(r => setTimeout(r, 250)); }
+  toast(varsler ? `${varsler} leietaker(e) har avvikende status – se listen` : 'Alle leietakere er aktive i Enhetsregisteret');
+}
 
 export function Leietakere() {
   useStore();
@@ -14,7 +30,7 @@ export function Leietakere() {
   let L = S.leietakere.slice(); if (f.e) L = L.filter(l => l.eiendomId === f.e);
   if (f.q) { const q = f.q.toLowerCase(); L = L.filter(l => (l.navn + ' ' + (l.orgnr || '') + ' ' + (l.kontakt || '')).toLowerCase().includes(q)); }
   return <>
-    <div className="head"><div className="grow"><h1>Leietakere</h1><p className="sub">Leieavtaler, vedlikeholdsansvar og oppfølging av leietakers internkontroll</p></div><button className="btn pri" onClick={() => editLeietaker()}>+ Ny leietaker</button></div>
+    <div className="head"><div className="grow"><h1>Leietakere</h1><p className="sub">Leieavtaler, vedlikeholdsansvar og oppfølging av leietakers internkontroll</p></div><button className="btn" onClick={() => sjekkAlle(L)}>Sjekk status i Brønnøysund</button><button className="btn pri" onClick={() => editLeietaker()}>+ Ny leietaker</button></div>
     <div className="toolbar"><Search value={f.q} onChange={q => setF({ q })} /><Sel value={f.e} onChange={e => setF({ e })} opts={eiendomOpts()} empty="Alle eiendommer" /></div>
     <LeieTable list={L} />
   </>;
@@ -45,6 +61,11 @@ export function LeietakerView({ id }: { id: string }) {
         {users.length ? <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>{users.map(u => <li key={u.id}>{u.navn || u.epost} <span className="muted">· {u.epost}{u.aktiv ? '' : ' · deaktivert'}</span></li>)}</ul> : <p className="small muted" style={{ margin: 0 }}>Ingen brukere. Leietakeren kan få egen innlogging for å melde avvik og bekrefte plikter.</p>}
         {isAdmin() && <button className="btn sm" style={{ marginTop: 8 }} onClick={() => inviter({ rolle: 'leietaker', leietaker_id: id, epost: l.epost || '', navn: l.kontakt || '' })}>+ Inviter bruker for leietakeren</button>}
       </div>
+      <div className="card"><div className="toolbar" style={{ marginBottom: 6 }}><h2 style={{ margin: 0, flex: 1 }}>Brønnøysundregistrene</h2><button className="btn sm" onClick={() => oppdaterBrreg(l)}>{l.brreg ? 'Oppdater' : 'Hent opplysninger'}</button></div>
+        {l.brreg ? (() => { const b = l.brreg; const st = enhetStatus(b); return <><p style={{ margin: '0 0 8px' }}><Chip c={st.c}>{st.t}</Chip> <span className="small muted">sjekket {fd(b.sjekket)}</span></p>
+          <dl className="dl">{([['Org.nr.', b.orgnr], ['Organisasjonsform', b.orgform], ['Næring', b.naering], ['Ansatte', b.ansatte != null ? String(b.ansatte) : ''], ['Forretningsadresse', b.adresse], ['Daglig leder', b.dagligLeder], ['Styreleder', b.styreleder], ['Stiftet', b.stiftet ? fd(b.stiftet) : ''], ['Kontakt', [b.epost, b.telefon].filter(Boolean).join(' · ')]] as [string, string][]).filter(x => x[1]).map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl>
+          <p className="small" style={{ marginBottom: 0 }}><a href={`https://virksomhet.brreg.no/nb/oppslag/enheter/${b.orgnr}`} target="_blank" rel="noopener noreferrer">Se i Brønnøysundregistrene</a></p></>; })()
+          : <p className="small muted" style={{ margin: 0 }}>{rensOrgnr(l.orgnr || '').length === 9 ? 'Ikke hentet ennå.' : 'Legg inn org.nr. for å hente opplysninger og overvåke status (konkurs, avvikling).'}</p>}</div>
       <div className="card"><h2>Vedlikeholdsansvar etter leieavtalen</h2><table className="small"><tbody>{cats.map(k => <tr key={k}><td style={{ padding: '5px 8px 5px 0' }}>{k}</td><td style={{ padding: '4px 0', width: 120 }}>
         <select value={mx[k] || 'Eier'} onChange={e => setMatrise(id, k, e.target.value)} style={{ border: '1px solid var(--line2)', borderRadius: 6, padding: '3px 6px', width: '100%' }}>{['Eier', 'Leietaker', 'Delt', 'Ikke aktuelt'].map(o => <option key={o}>{o}</option>)}</select></td></tr>)}</tbody></table></div>
     </div>

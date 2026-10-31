@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state } from './store';
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, type Rec } from './utils';
+import { AdresseSok, EnhetSok } from '../components/Oppslag';
+import { adresseFelter, brregData, enhetStatus, seEiendomUrl, virksomhetFraNaering, rensOrgnr } from './oppslag';
 import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip, DueChip, type Field } from '../components/ui';
 
 const go = (p: string) => { location.hash = '#/' + p; };
@@ -13,9 +15,11 @@ const TG_OPTS: [string, string][] = [['', 'Ikke vurdert'], ['TG0', 'TG0 – inge
 export function editEiendom(id?: string) {
   const e = id ? byId('eiendommer', id)! : {} as Rec;
   const fields: Field[] = [
+    { k: 'sokAdr', type: 'custom', label: 'Hent fra Kartverket', render: (v, set) => <AdresseSok onPick={a => set({ ...adresseFelter(a), navn: v.navn || a.adressetekst })} /> },
     { k: 'navn', label: 'Navn på eiendom/bygg', req: true },
     { k: 'adresse', label: 'Adresse', half: true }, { k: 'poststed', label: 'Postnr. og sted', half: true },
-    { k: 'kommune', label: 'Kommune', half: true }, { k: 'gnrbnr', label: 'Gnr./bnr. (snr.)', half: true, ph: '12/345' },
+    { k: 'kommune', label: 'Kommune', half: true }, { k: 'gnrbnr', label: 'Gnr./bnr. (/fnr/snr)', half: true, ph: '12/345' },
+    { k: 'matInfo', type: 'custom', show: v => !!v.kommunenummer, render: v => <div className="small muted">Kommunenr. {v.kommunenummer}{v.matrikkelSjekket ? ` · hentet fra matrikkelen ${fd(v.matrikkelSjekket)}` : ''}{seEiendomUrl(v) && <> · <a href={seEiendomUrl(v)} target="_blank" rel="noopener noreferrer">Åpne i Se eiendom</a></>}</div> },
     { k: 'tfmBygg', label: 'TFM byggnummer / lokaliseringskode', half: true, mono: true, ph: '01', hint: 'Brukes som +kode foran systemkoden, f.eks. +01=360.001' },
     { k: 'kategori', label: 'Kategori', type: 'select', options: KATEGORIER, half: true, empty: '–' },
     { k: 'bta', label: 'BTA (m²)', type: 'number', half: true }, { k: 'byggeaar', label: 'Byggeår', type: 'number', half: true },
@@ -24,6 +28,11 @@ export function editEiendom(id?: string) {
     { k: 'brannklasse', label: 'Brannklasse', type: 'select', options: ['', '1', '2', '3', '4'], half: true },
     { k: 'energimerke', label: 'Energikarakter', type: 'select', options: ['', 'A', 'B', 'C', 'D', 'E', 'F', 'G'], half: true },
     { k: 'tilsyn', label: 'Tilsynsobjekt hos brannvesenet', type: 'select', options: ['', 'Ja', 'Nei', 'Ukjent'], half: true },
+    { k: 's0', label: 'Eier (hjemmelshaver)', type: 'sec' },
+    { k: 'sokEier', type: 'custom', render: (v, set) => <EnhetSok ph="Søk eierselskap (navn eller org.nr.) i Brønnøysund" onPick={async en => { set({ eierNavn: en.navn, eierOrgnr: en.orgnr, eierAdresse: en.adresse || '' }); const b = await brregData(en.orgnr).catch(() => null); if (b) set({ eierBrreg: b }); }} /> },
+    { k: 'eierNavn', label: 'Eier / hjemmelshaver', half: true }, { k: 'eierOrgnr', label: 'Eiers org.nr.', half: true, mono: true },
+    { k: 'eierInfo', type: 'custom', render: v => <div className="small muted">{v.eierBrreg ? <>{[v.eierBrreg.orgform, v.eierBrreg.adresse, v.eierBrreg.dagligLeder ? 'Daglig leder: ' + v.eierBrreg.dagligLeder : '', v.eierBrreg.styreleder ? 'Styreleder: ' + v.eierBrreg.styreleder : ''].filter(Boolean).join(' · ')}. </> : null}
+      Tinglyst hjemmelshaver finnes ikke i noe åpent API{seEiendomUrl(v) ? <> – kontroller den i <a href={seEiendomUrl(v)} target="_blank" rel="noopener noreferrer">Se eiendom</a> (innlogging med ID-porten).</> : ' – søk opp adressen over for å få lenke til Se eiendom.'}</div> },
     { k: 's1', label: 'Ansvar og kontakter', type: 'sec' },
     { k: 'driftsansvarlig', label: 'Driftsansvarlig / vaktmester', half: true }, { k: 'brannansvarlig', label: 'Eiers ansvarlige for brannsikkerhet', half: true },
     { k: 'forsikring', label: 'Forsikringsselskap / polise', half: true }, { k: 'kontaktLeietaker', label: 'Kontakt for leietakere (navn, tlf, e-post)', half: true },
@@ -33,7 +42,12 @@ export function editEiendom(id?: string) {
     extraFoot: close => id && state.me?.rolle === 'admin' ? <button className="btn danger" onClick={async () => {
       if (await confirmBox(`Slette «${e.navn}» med ALLE tilknyttede systemer, kontroller, avvik, dokumenter, leietakere og tegninger? Dette kan ikke angres.`)) { await removeDoc('eiendommer', id); close(); go('eiendommer'); }
     }}>Slett</button> : null,
-    onSave: async v => { const nid = await save('eiendommer', { ...e, ...v }); toast('Eiendom lagret'); if (!id) { go('eiendom/' + nid); setTimeout(() => generatePlan(nid, true), 300); } },
+    onSave: async v => {
+      delete v.sokAdr; delete v.sokEier; delete v.matInfo; delete v.eierInfo;
+      const m = String(v.gnrbnr || '').match(/^\s*(\d+)\s*\/\s*(\d+)(?:\s*\/\s*(\d+))?(?:\s*\/\s*(\d+))?/);
+      if (m) Object.assign(v, { gnr: +m[1], bnr: +m[2], fnr: m[3] ? +m[3] : '', snr: m[4] ? +m[4] : '' });
+      if (v.eierOrgnr && rensOrgnr(v.eierOrgnr).length === 9 && v.eierBrreg?.orgnr !== rensOrgnr(v.eierOrgnr)) { const b = await brregData(v.eierOrgnr).catch(() => null); if (b) { v.eierBrreg = b; if (!v.eierNavn) v.eierNavn = b.navn; } }
+      const nid = await save('eiendommer', { ...e, ...v }); toast('Eiendom lagret'); if (!id) { go('eiendom/' + nid); setTimeout(() => generatePlan(nid, true), 300); } },
   });
 }
 
@@ -316,7 +330,11 @@ export async function toggleDokNA(eid: string, type: string) { const e = byId('e
 export function editLeietaker(id?: string, preset: any = {}) {
   const l: Rec = id ? byId('leietakere', id)! : { varsel: 12, eiendomId: S.eiendommer[0]?.id, ...preset } as any;
   const fields: Field[] = [
-    { k: 'navn', label: 'Leietaker (firma)', req: true, half: true }, { k: 'orgnr', label: 'Org.nr.', half: true },
+    { k: 'sokLt', type: 'custom', label: 'Hent fra Brønnøysundregistrene', render: (v, set) => <EnhetSok onPick={async en => {
+      set({ navn: en.navn, orgnr: en.orgnr, virksomhet: v.virksomhet || virksomhetFraNaering(en.naeringKode), epost: v.epost || en.epost || '', tlf: v.tlf || en.telefon || '' });
+      const b = await brregData(en.orgnr).catch(() => null); if (b) set({ brreg: b, ...(!v.kontakt && b.dagligLeder ? { kontakt: b.dagligLeder } : {}) }); }} /> },
+    { k: 'brregInfo', type: 'custom', show: v => !!v.brreg, render: v => { const st = enhetStatus(v.brreg); return <div className="note small"><b>{v.brreg.navn}</b> {st.t && <span style={{ color: st.c === 'green' ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>· {st.t}</span>}<br />{[v.brreg.orgform, v.brreg.naering, v.brreg.ansatte != null ? v.brreg.ansatte + ' ansatte' : '', v.brreg.adresse].filter(Boolean).join(' · ')}{v.brreg.dagligLeder && <><br />Daglig leder: {v.brreg.dagligLeder}{v.brreg.styreleder ? ' · Styreleder: ' + v.brreg.styreleder : ''}</>}</div>; } },
+    { k: 'navn', label: 'Leietaker (firma)', req: true, half: true }, { k: 'orgnr', label: 'Org.nr.', half: true, mono: true },
     { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true }, { k: 'lokale', label: 'Leieobjekt / etasje', half: true },
     { k: 'areal', label: 'Areal (m²)', type: 'number', half: true },
     { k: 'virksomhet', label: 'Type virksomhet', type: 'select', options: ['Kontor', 'Butikk/handel', 'Servering', 'Lager/logistikk', 'Industri/verksted', 'Helse/omsorg', 'Undervisning', 'Annet'], empty: '–', half: true },
@@ -332,6 +350,8 @@ export function editLeietaker(id?: string, preset: any = {}) {
     title: id ? 'Rediger leietaker' : 'Ny leietaker', fields, values: l,
     extraFoot: close => id ? <button className="btn danger" onClick={async () => { if (await confirmBox(`Slette leietaker «${l.navn}»? Brukere koblet til leietakeren mister tilgangen.`)) { await removeDoc('leietakere', id); close(); go('leietakere'); } }}>Slett</button> : null,
     onSave: async x => {
+      delete x.sokLt; delete x.brregInfo;
+      if (x.orgnr && rensOrgnr(x.orgnr).length === 9 && x.brreg?.orgnr !== rensOrgnr(x.orgnr)) { const b = await brregData(x.orgnr).catch(() => null); if (b) { x.brreg = b; if (!x.virksomhet) x.virksomhet = virksomhetFraNaering(b.naeringKode); } }
       const o: Rec = { ...l, ...x };
       if (!id) {
         const keys = STD_PLIKTER.slice(); if (x.virksomhet === 'Servering') keys.push('fett', 'fgass_egen'); if (x.virksomhet === 'Butikk/handel') keys.push('fgass_egen');

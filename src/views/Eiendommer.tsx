@@ -6,6 +6,7 @@ import { autoTfm, editAnlegg, editAvvik, editDok, editEiendom, editKomponent, ed
 import { AvvikTable, CoverageTable, DokTable, LeieTable, TaskTable, TfmTree } from '../components/tables';
 import { Chip, DueChip, Empty } from '../components/ui';
 import { ArealSection } from './Arealer';
+import { kartUrl, seEiendomUrl, enhetStatus } from '../lib/oppslag';
 
 const go = (p: string) => { location.hash = '#/' + p; };
 
@@ -37,7 +38,8 @@ export function Eiendom({ id }: { id: string }) {
   const cur = tabs.some(t => t[0] === tab) ? tab : 'info';
   let c: React.ReactNode = null;
   if (cur === 'info') {
-    const dl: [string, any][] = ([['Adresse', [e.adresse, e.poststed].filter(Boolean).join(', ')], ['Kommune', e.kommune], ['Gnr./bnr.', e.gnrbnr], ['TFM byggnummer', e.tfmBygg ? '+' + e.tfmBygg : ''], ['Kategori', e.kategori], ['Byggeår', e.byggeaar], ['Rehabilitert', e.rehabaar], ['BTA', e.bta ? e.bta + ' m²' : ''], ['Etasjer', e.etasjer], ['Risikoklasse', e.risikoklasse], ['Brannklasse', e.brannklasse], ['Energikarakter', e.energimerke], ['Tilsynsobjekt brann', e.tilsyn], ['Driftsansvarlig', e.driftsansvarlig], ['Brannansvarlig (eier)', e.brannansvarlig], ['Forsikring', ed ? e.forsikring : ''], ['Kontakt for leietakere', e.kontaktLeietaker]] as [string, any][]).filter(x => x[1]);
+    const dl: [string, any][] = ([['Adresse', [e.adresse, e.poststed].filter(Boolean).join(', ')], ['Kommune', e.kommune], ['Gnr./bnr.', e.gnrbnr ? <>{e.gnrbnr}{e.kommunenummer ? <span className="muted"> · knr. {e.kommunenummer}</span> : null}{seEiendomUrl(e) && <> · <a href={seEiendomUrl(e)} target="_blank" rel="noopener noreferrer">Se eiendom</a></>}{kartUrl(e) && <> · <a href={kartUrl(e)} target="_blank" rel="noopener noreferrer">Kart</a></>}</> : ''],
+      ['Eier', e.eierNavn ? <>{e.eierNavn}{e.eierOrgnr ? <span className="muted mono small"> {e.eierOrgnr}</span> : null}{e.eierBrreg && enhetStatus(e.eierBrreg).c !== 'green' && <> <Chip c="red">{enhetStatus(e.eierBrreg).t}</Chip></>}</> : ''], ['TFM byggnummer', e.tfmBygg ? '+' + e.tfmBygg : ''], ['Kategori', e.kategori], ['Byggeår', e.byggeaar], ['Rehabilitert', e.rehabaar], ['BTA', e.bta ? e.bta + ' m²' : ''], ['Etasjer', e.etasjer], ['Risikoklasse', e.risikoklasse], ['Brannklasse', e.brannklasse], ['Energikarakter', e.energimerke], ['Tilsynsobjekt brann', e.tilsyn], ['Driftsansvarlig', e.driftsansvarlig], ['Brannansvarlig (eier)', e.brannansvarlig], ['Forsikring', ed ? e.forsikring : ''], ['Kontakt for leietakere', e.kontaktLeietaker]] as [string, any][]).filter(x => x[1]);
     const f = T.filter(o => o.aktiv !== false && (dUntil(o.nesteFrist) as number) < 0); const nx = sortBy(T.filter(o => o.aktiv !== false && (dUntil(o.nesteFrist) as number) >= 0), o => o.nesteFrist).slice(0, 6);
     const staff = S.profiles.filter(p => S.tilganger.some(t => t.user_id === p.id && t.eiendom_id === id));
     c = <><div className="grid g2">

@@ -3,6 +3,7 @@ import { KOMP, DOK_PAAKREVD, AV_LUKKET } from '../lib/catalog';
 import { S, canEdit } from '../lib/store';
 import { aNavn, byId, compRest, compYear, dUntil, docCoverage, eNavn, fd, intTxt, knok, lNavn, openAvvik, pad, pliktStatus, sortBy, tfmKomp, tfmSys, type Rec } from '../lib/utils';
 import { editAnlegg, editAvvik, editDok, editKomponent, toggleDokNA, utfor, visOppgave } from '../lib/actions';
+import { enhetStatus } from '../lib/oppslag';
 import { AlvChip, Chip, DueChip, Empty, FileLink, RestChip, StChip, TgChip } from './ui';
 
 const go = (p: string) => { location.hash = '#/' + p; };
@@ -122,7 +123,7 @@ export function LeieTable({ list, showE = true }: { list: Rec[]; showE?: boolean
     {sortBy(list, l => l.navn).map(l => { const ps = (l.plikter || []).map(pliktStatus).filter((s: any) => s.t !== 'Ikke relevant'); const bad = ps.filter((s: any) => s.o >= 2).length; const d = l.slutt ? dUntil(l.slutt)! : null; const varsel = (+l.varsel || 12) * 30.5;
       const users = S.profiles.filter(p => p.leietaker_id === l.id && p.rolle === 'leietaker').length;
       return <tr key={l.id} className="click" onClick={() => go('leietaker/' + l.id)}>
-        <td><b style={{ fontWeight: 500 }}>{l.navn}</b><div className="small muted">{l.virksomhet}</div></td>{showE && <td>{eNavn(l.eiendomId)}</td>}
+        <td><b style={{ fontWeight: 500 }}>{l.navn}</b>{l.brreg && enhetStatus(l.brreg).c !== 'green' && <> <Chip c={enhetStatus(l.brreg).c}>{enhetStatus(l.brreg).t}</Chip></>}<div className="small muted">{l.virksomhet}{l.orgnr ? ' · ' + l.orgnr : ''}</div></td>{showE && <td>{eNavn(l.eiendomId)}</td>}
         <td className="small">{l.lokale || '–'}</td><td className="num">{l.areal ? l.areal + ' m²' : '–'}</td>
         <td>{d === null ? <span className="muted">–</span> : d < 0 ? <Chip c="red">Utløpt {fd(l.slutt)}</Chip> : d <= varsel ? <Chip c="amber">{fd(l.slutt)}</Chip> : <span className="small">{fd(l.slutt)}</span>}</td>
         <td>{ps.length ? (bad ? <Chip c="red">{bad} av {ps.length} mangler</Chip> : <Chip c="green">{ps.length} av {ps.length} OK</Chip>) : <span className="muted">–</span>}</td>
