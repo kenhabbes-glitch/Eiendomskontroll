@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
-import { bump, fileUrl, toast, toasts, useStore, type Fil } from '../lib/store';
+import { bump, feiltekst, fileUrl, toast, toasts, useStore, type Fil } from '../lib/store';
 import { dUntil, fd } from '../lib/utils';
 
 // ---------------- små komponenter
@@ -97,14 +97,14 @@ export type FormOpts = {
 function FormBody({ o, close }: { o: FormOpts; close: () => void }) {
   const init = () => { const v: any = {}; o.fields.forEach(f => { if (f.type === 'sec') return; const x = o.values?.[f.k]; v[f.k] = x ?? f.def ?? (f.type === 'checkbox' ? false : f.type === 'file' ? null : ''); }); return { ...(o.values || {}), ...v }; };
   const [v, setV] = useState<any>(init);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false); const [feil, setFeil] = useState('');
   const vRef = useRef(v); vRef.current = v;
   const set = (patch: any) => setV((prev: any) => { let n = { ...prev, ...patch }; if (o.onChange) for (const k of Object.keys(patch)) { const p = o.onChange(k, n, prev); if (p) n = { ...n, ...p }; } return n; });
   const submit = async () => {
     const miss = o.fields.filter(f => f.req && (!f.show || f.show(v)) && (v[f.k] === '' || v[f.k] == null));
     if (miss.length) { toast('Fyll ut: ' + miss.map(f => f.label).join(', ')); return; }
-    setBusy(true);
-    try { const r = await o.onSave(vRef.current, close); if (r !== false) close(); } catch (e) { console.error(e); } finally { setBusy(false); }
+    setBusy(true); setFeil('');
+    try { const r = await o.onSave(vRef.current, close); if (r !== false) close(); } catch (e: any) { console.error(e); setFeil(feiltekst(e)); } finally { setBusy(false); }
   };
   return <>
     <div className="mh"><h2>{o.title}</h2><button className="btn ghost sm" onClick={close} aria-label="Lukk">✕</button></div>
@@ -137,6 +137,7 @@ function FormBody({ o, close }: { o: FormOpts; close: () => void }) {
       </form>
       {o.bottom?.(v)}
     </div>
+    {feil && <div className="banner" style={{ margin: '0 20px 10px', background: 'var(--redbg)', color: 'var(--red)', borderColor: '#f3c1bb' }}>Noe gikk galt, og ingenting eller bare deler ble lagret: {feil}</div>}
     <div className="mf">{o.extraFoot?.(close, v)}<span className="grow" />
       <button className="btn" onClick={close}>{o.readOnly ? 'Lukk' : 'Avbryt'}</button>
       {!o.readOnly && <button className="btn pri" disabled={busy} onClick={submit}>{busy ? 'Lagrer …' : (o.saveTxt || 'Lagre')}</button>}
