@@ -1,0 +1,392 @@
+// Skjemaer og handlinger (opprett/rediger/slett) som brukes fra flere visninger.
+import React, { useState } from 'react';
+import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
+import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state } from './store';
+import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, type Rec } from './utils';
+import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip, DueChip, type Field } from '../components/ui';
+
+const go = (p: string) => { location.hash = '#/' + p; };
+const eOpts = () => sortBy(S.eiendommer, e => e.navn).map(e => [e.id, e.navn] as [string, string]);
+const TG_OPTS: [string, string][] = [['', 'Ikke vurdert'], ['TG0', 'TG0 – ingen symptomer'], ['TG1', 'TG1 – svake symptomer'], ['TG2', 'TG2 – middels kraftige symptomer'], ['TG3', 'TG3 – kraftige symptomer']];
+
+// ================= EIENDOM =================
+export function editEiendom(id?: string) {
+  const e = id ? byId('eiendommer', id)! : {} as Rec;
+  const fields: Field[] = [
+    { k: 'navn', label: 'Navn på eiendom/bygg', req: true },
+    { k: 'adresse', label: 'Adresse', half: true }, { k: 'poststed', label: 'Postnr. og sted', half: true },
+    { k: 'kommune', label: 'Kommune', half: true }, { k: 'gnrbnr', label: 'Gnr./bnr. (snr.)', half: true, ph: '12/345' },
+    { k: 'tfmBygg', label: 'TFM byggnummer / lokaliseringskode', half: true, mono: true, ph: '01', hint: 'Brukes som +kode foran systemkoden, f.eks. +01=360.001' },
+    { k: 'kategori', label: 'Kategori', type: 'select', options: KATEGORIER, half: true, empty: '–' },
+    { k: 'bta', label: 'BTA (m²)', type: 'number', half: true }, { k: 'byggeaar', label: 'Byggeår', type: 'number', half: true },
+    { k: 'rehabaar', label: 'Sist totalrehabilitert (år)', type: 'number', half: true }, { k: 'etasjer', label: 'Antall etasjer', type: 'number', half: true },
+    { k: 'risikoklasse', label: 'Risikoklasse (TEK)', type: 'select', options: ['', '1', '2', '3', '4', '5', '6'], half: true },
+    { k: 'brannklasse', label: 'Brannklasse', type: 'select', options: ['', '1', '2', '3', '4'], half: true },
+    { k: 'energimerke', label: 'Energikarakter', type: 'select', options: ['', 'A', 'B', 'C', 'D', 'E', 'F', 'G'], half: true },
+    { k: 'tilsyn', label: 'Tilsynsobjekt hos brannvesenet', type: 'select', options: ['', 'Ja', 'Nei', 'Ukjent'], half: true },
+    { k: 's1', label: 'Ansvar og kontakter', type: 'sec' },
+    { k: 'driftsansvarlig', label: 'Driftsansvarlig / vaktmester', half: true }, { k: 'brannansvarlig', label: 'Eiers ansvarlige for brannsikkerhet', half: true },
+    { k: 'forsikring', label: 'Forsikringsselskap / polise', half: true }, { k: 'kontaktLeietaker', label: 'Kontakt for leietakere (navn, tlf, e-post)', half: true },
+    { k: 'notat', label: 'Notater', type: 'textarea' }];
+  formModal({
+    title: id ? 'Rediger eiendom' : 'Ny eiendom', fields, values: e,
+    extraFoot: close => id && state.me?.rolle === 'admin' ? <button className="btn danger" onClick={async () => {
+      if (await confirmBox(`Slette «${e.navn}» med ALLE tilknyttede systemer, kontroller, avvik, dokumenter, leietakere og tegninger? Dette kan ikke angres.`)) { await removeDoc('eiendommer', id); close(); go('eiendommer'); }
+    }}>Slett</button> : null,
+    onSave: async v => { const nid = await save('eiendommer', { ...e, ...v }); toast('Eiendom lagret'); if (!id) { go('eiendom/' + nid); setTimeout(() => generatePlan(nid, true), 300); } },
+  });
+}
+
+// ================= SYSTEM / BYGNINGSDEL =================
+const kompGroups = () => { const g: Record<string, [string, string][]> = {}; Object.entries(KOMP).forEach(([k, v]) => { (g[v.g] = g[v.g] || []).push([k, v.n]); }); return Object.entries(g) as [string, [string, string][]][]; };
+export function editAnlegg(id?: string, eiendomId?: string) {
+  const a: Rec = id ? byId('anlegg', id)! : { eiendomId: eiendomId || S.eiendommer[0]?.id, type: 'ventilasjon', ansvar: 'Eier' } as any;
+  const ro = !canEdit();
+  if (!id) { a.tfmSys = TFM_DEF[a.type][0]; a.tfmLop = nextSysLop(a.eiendomId, a.tfmSys); a.mk = KOMP[a.type]?.m || []; a.forste = addDays(today(), 30); }
+  const touched: Record<string, boolean> = {};
+  const fields: Field[] = [
+    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true },
+    { k: 'type', label: 'Type system / bygningsdel', type: 'select', groups: kompGroups },
+    { k: 'tfmSys', label: 'TFM systemkode (NS 3451)', half: true, mono: true, dl: NS3451, ph: '360', hint: '3 siffer etter NS 3451' },
+    { k: 'tfmLop', label: 'Systemløpenummer', half: true, mono: true, ph: '001' },
+    { k: 'prev', type: 'custom', render: v => { const e = byId('eiendommer', v.eiendomId); return <div className="note mono" style={{ fontSize: 14, color: 'var(--ink)' }}>{v.tfmSys ? `${e?.tfmBygg ? '+' + e.tfmBygg : ''}=${v.tfmSys}.${pad(v.tfmLop || 1)}` : '(ingen TFM-kode)'}</div>; } },
+    { k: 'navn', label: 'Betegnelse / plassering', half: true, ph: 'F.eks. Ventilasjon kontorfløy' }, { k: 'fabrikat', label: 'Fabrikat / modell', half: true },
+    { k: 'aar', label: 'Installert/utskiftet år', type: 'number', half: true }, { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Tomt = veiledende levetid for typen' },
+    { k: 'planAar', label: 'Planlagt utskiftingsår (overstyr)', type: 'number', half: true }, { k: 'tg', label: 'Tilstandsgrad (NS 3424)', type: 'select', options: TG_OPTS, half: true },
+    ...(isStaff() && canEdit() ? [{ k: 'kost', label: 'Estimert utskiftingskostnad (kr)', type: 'number', half: true } as Field] : []),
+    { k: 'ansvar', label: 'Ansvar for vedlikehold', type: 'select', options: ['Eier', 'Leietaker', 'Delt'], half: true },
+    { k: 'leverandor', label: 'Serviceleverandør / avtale', half: true }, { k: 'tgdato', label: 'Tilstand vurdert dato', type: 'date', half: true },
+    { k: 'notat', label: 'Notater', type: 'textarea' },
+  ];
+  if (!id) fields.push(
+    { k: 'mk', type: 'custom', label: 'Kontroller som opprettes for dette systemet', hint: 'Du kan justere hver kontroll senere.', render: (v, set) => { const ms = KOMP[v.type]?.m || []; return ms.length ? <div className="checks">{ms.map(k => <label key={k}><input type="checkbox" checked={(v.mk || []).includes(k)} onChange={e => set({ mk: e.target.checked ? [...(v.mk || []), k] : (v.mk || []).filter((x: string) => x !== k) })} /><span><span className="ct">{MALER[k].n}</span><br /><span className="cs">{MALER[k].t} · {intTxt({ n: MALER[k].i[0], enhet: MALER[k].i[1] })} · {MALER[k].h}</span></span></label>)}</div> : <div className="muted small">Ingen standardkontroller for denne typen.</div>; } },
+    { k: 'forste', label: 'Første frist for nye kontroller', type: 'date', half: true });
+  formModal({
+    title: ro ? aNavn(id) : id ? 'Rediger system / bygningsdel' : 'Nytt system / bygningsdel', fields, values: a, readOnly: ro,
+    onChange: (k, v, prev) => {
+      if (k === 'tfmSys') touched.sys = true; if (k === 'tfmLop') touched.lop = true;
+      const p: any = {};
+      if (k === 'type' && !id) { if (!touched.sys) p.tfmSys = TFM_DEF[v.type]?.[0] || ''; p.mk = KOMP[v.type]?.m || []; }
+      if ((k === 'type' || k === 'tfmSys' || k === 'eiendomId') && !touched.lop && !id) p.tfmLop = nextSysLop(v.eiendomId, p.tfmSys ?? v.tfmSys);
+      return p;
+    },
+    extraFoot: close => id && !ro ? <button className="btn danger" onClick={async () => {
+      const kc = S.komponenter.filter(k => k.anleggId === id);
+      if (await confirmBox(`Slette systemet${kc.length ? ` og ${kc.length} komponenter` : ''}? Tilknyttede kontroller beholdes, men mister koblingen.`)) { await removeDoc('anlegg', id); close(); }
+    }}>Slett</button> : null,
+    onSave: async v => {
+      const mk: string[] = v.mk || []; const forste = v.forste || today(); delete v.mk; delete v.forste; delete v.prev;
+      v.tfmSys = String(v.tfmSys || '').replace(/\D/g, ''); v.tfmLop = v.tfmSys ? pad(String(v.tfmLop || '1').replace(/\D/g, '') || 1) : '';
+      const dup = v.tfmSys && S.anlegg.find(x => x.id !== id && x.eiendomId === v.eiendomId && x.tfmSys === v.tfmSys && pad(x.tfmLop) === v.tfmLop);
+      if (dup) { toast(`TFM-koden =${v.tfmSys}.${v.tfmLop} er allerede brukt på «${dup.navn || KOMP[dup.type]?.n}»`); return false; }
+      const nid = await save('anlegg', { ...a, ...v, mk: undefined, forste: undefined });
+      for (const k of mk) await save('oppgaver', taskFromMal(k, MALER, v.eiendomId, nid, forste));
+      toast(mk.length ? `Lagret og opprettet ${mk.length} kontroller` : 'Lagret');
+    },
+  });
+}
+export function editKomponent(id?: string, anleggId?: string) {
+  const k: Rec = id ? byId('komponenter', id)! : { anleggId } as any;
+  const sys = byId('anlegg', k.anleggId) || ({} as Rec); const ro = !canEdit();
+  if (!id) { k.kode = TFM_DEF[sys.type]?.[1] || ''; k.lop = nextKompLop(k.anleggId, k.kode); k.eiendomId = sys.eiendomId; }
+  const touched: Record<string, boolean> = {};
+  const fields: Field[] = [
+    { k: 'anleggId', label: 'System', type: 'select', options: () => sortBy(S.anlegg.filter(a => a.eiendomId === sys.eiendomId), a => aNavn(a.id)).map(a => [a.id, aNavn(a.id)] as [string, string]), req: true },
+    { k: 'kode', label: 'TFM komponentkode', half: true, mono: true, dl: TFM_KODER, ph: 'JV', req: true, hint: '2 bokstaver, f.eks. JV vifte, JP pumpe, RT temperaturgiver' },
+    { k: 'lop', label: 'Komponentløpenummer', half: true, mono: true, ph: '001' },
+    { k: 'typekode', label: 'Typekode (valgfritt, etter %)', half: true, mono: true }, { k: 'navn', label: 'Betegnelse', half: true, ph: 'F.eks. Tilluftsvifte' },
+    { k: 'prev', type: 'custom', render: v => { const a = byId('anlegg', v.anleggId); return <div className="note mono" style={{ fontSize: 14, color: 'var(--ink)' }}>{`${a ? tfmSys(a, true) : ''}-${String(v.kode || '').toUpperCase()}${pad(v.lop || 1)}${v.typekode ? '%' + v.typekode : ''}`}</div>; } },
+    { k: 'plassering', label: 'Plassering (rom/etasje)', half: true }, { k: 'fabrikat', label: 'Fabrikat / modell', half: true },
+    { k: 'serienr', label: 'Serienummer', half: true }, { k: 'aar', label: 'Installert år', type: 'number', half: true },
+    { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Fyll ut for å ta med komponenten i vedlikeholdsplanen' }, { k: 'planAar', label: 'Planlagt utskiftingsår', type: 'number', half: true },
+    { k: 'tg', label: 'Tilstandsgrad', type: 'select', options: TG_OPTS, half: true },
+    ...(canEdit() ? [{ k: 'kost', label: 'Utskiftingskostnad (kr)', type: 'number', half: true } as Field] : []),
+    { k: 'notat', label: 'Notater', type: 'textarea' }];
+  formModal({
+    title: ro ? kNavn(id) : id ? 'Rediger komponent' : 'Ny komponent', fields, values: k, readOnly: ro,
+    onChange: (key, v) => { if (key === 'lop') touched.lop = true; if ((key === 'kode' || key === 'anleggId') && !touched.lop && !id) return { lop: nextKompLop(v.anleggId, v.kode) }; },
+    extraFoot: close => id && !ro ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette komponenten?')) { await removeDoc('komponenter', id); close(); } }}>Slett</button> : null,
+    onSave: async x => {
+      delete x.prev; x.kode = String(x.kode || '').toUpperCase().replace(/[^A-ZÆØÅ]/g, ''); x.lop = pad(String(x.lop || '1').replace(/\D/g, '') || 1);
+      if (!x.navn) x.navn = TFM_KODER.find(c => c[0] === x.kode)?.[1] || '';
+      const dup = S.komponenter.find(z => z.id !== id && z.anleggId === x.anleggId && String(z.kode || '').toUpperCase() === x.kode && pad(z.lop) === x.lop);
+      if (dup) { toast('Komponentkoden er allerede brukt i dette systemet'); return false; }
+      const a = byId('anlegg', x.anleggId); await save('komponenter', { ...k, ...x, eiendomId: a ? a.eiendomId : k.eiendomId }); toast('Komponent lagret');
+    },
+  });
+}
+export async function autoTfm(eid: string) {
+  const L = S.anlegg.filter(a => a.eiendomId === eid && !a.tfmSys); const used: Record<string, number> = {};
+  for (const a of L) { const sys = TFM_DEF[a.type]?.[0]; if (!sys) continue; const base = +nextSysLop(eid, sys) - 1; used[sys] = (used[sys] ?? base) + 1; await save('anlegg', { ...a, tfmSys: sys, tfmLop: pad(used[sys]) }); }
+  toast('TFM-koder tildelt');
+}
+const TFM_RE = /^\s*(?:\+([A-Za-z0-9]+))?\s*=\s*(\d{2,4})\.(\d{1,4})(?:\s*[-–]\s*([A-Za-zÆØÅæøå]{2,3})\s*(\d{1,4}))?(?:\s*%\s*(\S+))?\s*[;\t,]?\s*(.*)$/;
+function parseTfm(txt: string) {
+  const out: any[] = []; let bad = 0;
+  txt.split(/\r?\n/).forEach(l => { if (!l.trim()) return; const x = l.match(TFM_RE); if (!x) { bad++; return; } const rest = x[7].split(/[;\t]/).map(z => z.trim()); out.push({ sys: x[2], lop: pad(x[3]), kode: x[4] ? x[4].toUpperCase() : '', klop: x[5] ? pad(x[5]) : '', type: x[6] || '', navn: rest[0] || '', fab: rest[1] || '', aar: +rest[2] || '' }); });
+  return { out, bad };
+}
+function ImportTfmBody({ eid, close }: { eid: string; close: () => void }) {
+  const [t, setT] = useState(''); const [busy, setBusy] = useState(''); const p = parseTfm(t);
+  const sy = new Set(p.out.map(x => x.sys + '.' + x.lop));
+  const run = async () => {
+    setBusy('Importerer …'); let ns = 0, nk = 0; const map: Record<string, string> = {};
+    S.anlegg.filter(a => a.eiendomId === eid && a.tfmSys).forEach(a => map[a.tfmSys + '.' + pad(a.tfmLop)] = a.id);
+    for (const r of p.out) {
+      const key = r.sys + '.' + r.lop;
+      if (!map[key]) {
+        const type = (Object.entries(TFM_DEF).find(([, v]) => v[0] === r.sys) || Object.entries(TFM_DEF).find(([, v]) => v[0] && v[0].slice(0, 2) === r.sys.slice(0, 2)) || ['annet'])[0];
+        const grp = (NS3451.find(g => g[0] === r.sys) || NS3451.find(g => g[0] === r.sys.slice(0, 2)) || ['', ''])[1];
+        map[key] = await save('anlegg', { eiendomId: eid, type, tfmSys: r.sys, tfmLop: r.lop, navn: r.kode ? grp : (r.navn || grp), fabrikat: r.kode ? '' : r.fab, aar: r.kode ? '' : r.aar, ansvar: 'Eier' }); ns++;
+      } else if (!r.kode && r.navn) { const a = byId('anlegg', map[key]); if (a && !a.navn) await save('anlegg', { ...a, navn: r.navn }); }
+      if (r.kode) {
+        const ex = S.komponenter.find(k => k.anleggId === map[key] && k.kode === r.kode && pad(k.lop) === r.klop);
+        await save('komponenter', { ...(ex || {}), anleggId: map[key], eiendomId: eid, kode: r.kode, lop: r.klop, typekode: r.type, navn: r.navn || TFM_KODER.find(c => c[0] === r.kode)?.[1] || '', fabrikat: r.fab || ex?.fabrikat || '', aar: r.aar || ex?.aar || '' }); nk++;
+      }
+      setBusy(`Importerer … ${ns + nk}`);
+    }
+    close(); toast(`Importert: ${ns} nye systemer, ${nk} komponenter. Bruk «Generer kontrollplan» for kontroller.`);
+  };
+  return <>
+    <div className="mh"><h2>Importer TFM-liste – {eNavn(eid)}</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
+    <div className="mb"><p className="small" style={{ marginTop: 0 }}>Lim inn en liste fra FDV-dokumentasjon, merkeliste eller regneark – én kode per linje. Etter koden kan du ha <b>betegnelse; fabrikat; installert år</b> skilt med semikolon eller tabulator.</p>
+      <pre className="letter small" style={{ marginBottom: 10 }}>{'=360.001 Ventilasjon kontorfløy; Systemair; 2012\n=360.001-JV001 Tilluftsvifte; Systemair; 2012\n+01=360.001-LX001 Roterende gjenvinner\n=542.001-OS001 Brannsentral; Autronica; 2016'}</pre>
+      <textarea className="codebox" style={{ minHeight: 180 }} value={t} onChange={e => setT(e.target.value)} />
+      <div className="small muted" style={{ marginTop: 6 }}>{p.out.length ? `Fant ${sy.size} systemer og ${p.out.filter(x => x.kode).length} komponenter${p.bad ? ` · ${p.bad} linjer uten gyldig TFM-kode hoppes over` : ''}.` : p.bad ? `${p.bad} linjer uten gyldig TFM-kode.` : ''}</div></div>
+    <div className="mf"><button className="btn" onClick={close}>Avbryt</button><button className="btn pri" disabled={!p.out.length || !!busy} onClick={run}>{busy || 'Importer'}</button></div>
+  </>;
+}
+export function importTfm(eid: string) { openModal({ wide: true, render: close => <ImportTfmBody eid={eid} close={close} /> }); }
+
+// ================= KONTROLLPLAN =================
+function GenPlanBody({ eid, isNew, close }: { eid: string; isNew?: boolean; close: () => void }) {
+  const e = byId('eiendommer', eid) || ({} as Rec); const ex = S.oppgaver.filter(o => o.eiendomId === eid);
+  const has = (k: string, a: string) => ex.some(o => o.malKey === k && (o.anleggId || '') === (a || ''));
+  const rows: { k: string; a: string; def: boolean }[] = [];
+  PROP_MALER.forEach(k => { if (!has(k, '')) rows.push({ k, a: '', def: !(k === 'energiattest' && +e.bta && +e.bta < 1000) && k !== 'radon' }); });
+  S.anlegg.filter(a => a.eiendomId === eid).forEach(a => (KOMP[a.type]?.m || []).forEach(k => { if (!has(k, a.id)) rows.push({ k, a: a.id, def: true }); }));
+  const [sel, setSel] = useState(() => rows.map(r => r.def)); const [d, setD] = useState(addDays(today(), 30)); const [busy, setBusy] = useState(false);
+  const run = async () => { setBusy(true); const L = rows.filter((_, i) => sel[i]); for (const r of L) await save('oppgaver', taskFromMal(r.k, MALER, eid, r.a, d || today())); close(); toast(`${L.length} kontroller opprettet`); };
+  return <>
+    <div className="mh"><h2>Kontrollplan – {e.navn}</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
+    <div className="mb">
+      <p className="muted" style={{ marginTop: 0 }}>{isNew ? 'Eiendommen er opprettet. Her er de faste kontrollene som gjelder alle næringseiendommer. Kontroller for tekniske anlegg legges til når du registrerer systemene.' : 'Forslag basert på eiendommen og registrerte systemer. Kontroller som allerede finnes, vises ikke.'}</p>
+      {rows.length ? <>
+        <div className="checks">{rows.map((r, i) => { const m = MALER[r.k]; return <label key={r.k + r.a}><input type="checkbox" checked={sel[i]} onChange={ev => setSel(s => s.map((x, j) => j === i ? ev.target.checked : x))} /><span><span className="ct">{m.n}{r.a && <> <span className="tag">{aNavn(r.a)}</span></>}</span><br /><span className="cs">{m.t} · {intTxt({ n: m.i[0], enhet: m.i[1] })} · {m.h}</span></span></label>; })}</div>
+        <div className="form" style={{ marginTop: 14 }}><div className="fld half"><label>Første frist</label><input type="date" value={d} onChange={ev => setD(ev.target.value)} /></div><div className="fld half"><label>&nbsp;</label><div className="hint">Har du dato for sist utførte kontroll, registrer den etterpå med «Utført», så beregnes neste frist automatisk.</div></div></div>
+      </> : <div className="empty"><b>Ingen nye forslag</b>Alle standardkontroller finnes allerede.</div>}
+    </div>
+    <div className="mf"><button className="btn" onClick={close}>{rows.length ? 'Hopp over' : 'Lukk'}</button>{rows.length > 0 && <button className="btn pri" disabled={busy} onClick={run}>Opprett valgte</button>}</div>
+  </>;
+}
+export function generatePlan(eid: string, isNew?: boolean) { openModal({ wide: true, render: close => <GenPlanBody eid={eid} isNew={isNew} close={close} /> }); }
+
+export function editOppgave(id?: string, preset: any = {}) {
+  const o: Rec = id ? byId('oppgaver', id)! : { aktiv: true, ansvar: 'Eier', type: 'Egenkontroll', kategori: 'Bygg', intervall: { n: 1, enhet: 'år' }, nesteFrist: addDays(today(), 30), eiendomId: S.eiendommer[0]?.id, ...preset } as any;
+  const v = { ...o, in: o.intervall?.n || 1, ie: o.intervall?.enhet || 'år' };
+  const fields: Field[] = [
+    { k: 'navn', label: 'Kontroll / oppgave', req: true },
+    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true },
+    { k: 'anleggId', label: 'System', type: 'select', options: () => S.anlegg.filter(a => !v.eiendomId || a.eiendomId === (v as any).eiendomId).map(a => [a.id, eNavn(a.eiendomId) + ' – ' + aNavn(a.id)] as [string, string]), empty: '(Hele eiendommen)', half: true },
+    { k: 'kategori', label: 'Fagområde', type: 'select', options: KATS, half: true }, { k: 'type', label: 'Type', type: 'select', options: TYPER, half: true },
+    { k: 'in', label: 'Intervall', type: 'number', half: true }, { k: 'ie', label: 'Enhet', type: 'select', options: ENH, half: true },
+    { k: 'nesteFrist', label: 'Neste frist', type: 'date', req: true, half: true }, { k: 'utfores', label: 'Utføres av / leverandør', half: true },
+    { k: 'ansvar', label: 'Ansvarlig part', type: 'select', options: ['Eier', 'Leietaker'], half: true },
+    { k: 'leietakerId', label: 'Leietaker', type: 'select', options: () => S.leietakere.map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true, show: x => x.ansvar === 'Leietaker' },
+    { k: 'hjemmel', label: 'Hjemmel / krav', hint: 'Lov, forskrift, standard eller avtale som utløser kontrollen' },
+    { k: 'aktiv', label: 'Aktiv (vises i kontrollplanen)', type: 'checkbox' },
+    { k: 'notat', label: 'Notater / sjekkpunkter', type: 'textarea' }];
+  formModal({
+    title: id ? 'Rediger kontroll' : 'Ny kontroll/oppgave', fields, values: v,
+    extraFoot: close => id ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette kontrollen med historikk?')) { await removeDoc('oppgaver', id); close(); } }}>Slett</button> : null,
+    onSave: async x => { x.intervall = { n: +x.in || 1, enhet: x.ie }; delete x.in; delete x.ie; if (x.anleggId) { const a = byId('anlegg', x.anleggId); if (a) x.eiendomId = a.eiendomId; } await save('oppgaver', { ...o, ...x }); toast('Kontroll lagret'); },
+  });
+}
+export function utfor(id: string) {
+  const o = byId('oppgaver', id); if (!o) return;
+  const fields: Field[] = [
+    { k: 'dato', label: 'Utført dato', type: 'date', def: today(), req: true, half: true }, { k: 'av', label: 'Utført av', def: o.utfores && state.me?.rolle !== 'tekniker' ? o.utfores : (state.me?.navn || o.utfores || ''), half: true },
+    { k: 'res', label: 'Resultat', type: 'select', options: ['OK – ingen avvik', 'Avvik funnet', 'Ikke utført / utsatt'], def: 'OK – ingen avvik', half: true },
+    { k: 'nyFrist', label: 'Ny frist (beregnes automatisk)', type: 'date', half: true, hint: 'La stå tom for automatisk beregning ut fra intervallet' },
+    { k: 'komm', label: 'Kommentar', type: 'textarea' },
+    { k: 'fil', label: 'Rapport / sjekkliste', type: 'file' },
+    { k: 'avs', type: 'custom', label: 'Avvik fra kontrollen', show: x => x.res === 'Avvik funnet', def: [{ t: '', a: 'Middels', k: '' }], hint: 'Hvert avvik registreres i avvikslisten med kobling til denne kontrollen.',
+      render: (v, set) => { const L: any[] = v.avs || []; const kc = S.komponenter.filter(k => o.anleggId && k.anleggId === o.anleggId); const upd = (i: number, p: any) => set({ avs: L.map((x, j) => j === i ? { ...x, ...p } : x) });
+        return <>{L.map((r, i) => <div className="arow" key={i}><input placeholder="Beskriv avviket" value={r.t} onChange={e => upd(i, { t: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px' }} />
+          {kc.length > 0 && <select value={r.k} onChange={e => upd(i, { k: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: 7, maxWidth: 150 }}><option value="">Komponent –</option>{kc.map(k => <option key={k.id} value={k.id}>{'-' + k.kode + pad(k.lop)} {k.navn}</option>)}</select>}
+          <select value={r.a} onChange={e => upd(i, { a: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: 7 }}>{AV_ALV.map(a => <option key={a}>{a}</option>)}</select></div>)}
+          <button type="button" className="btn sm" onClick={() => set({ avs: [...L, { t: '', a: 'Middels', k: '' }] })}>+ Legg til avvik</button></>; } },
+  ];
+  formModal({
+    title: 'Registrer utført: ' + o.navn, fields, saveTxt: 'Registrer',
+    onSave: async x => {
+      const avs = x.res === 'Avvik funnet' ? (x.avs || []).filter((a: any) => a.t.trim()) : [];
+      let dokId = '';
+      if (x.fil) { const f = await uploadFile(x.fil, o.eiendomId); if (f) dokId = await save('dokumenter', { eiendomId: o.eiendomId, leietakerId: '', type: o.type === 'Egenkontroll' ? 'Egenkontrollskjema' : 'Servicerapport', tittel: o.navn + ' – ' + fd(x.dato), dato: x.dato, fil: f, oppgaveId: o.id }); }
+      const ids: string[] = [];
+      for (const a of avs) ids.push(await save('avvik', { tittel: a.t.trim(), eiendomId: o.eiendomId, anleggId: o.anleggId || '', komponentId: a.k || '', alv: a.a, status: 'Ny', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, ansvar: o.ansvar || 'Eier', leietakerId: o.leietakerId || '', oppdaget: x.dato, frist: addDays(x.dato, AV_FRIST[a.a]), logg: [{ t: new Date().toISOString(), s: 'Ny', k: 'Registrert fra kontroll: ' + o.navn, av: state.me?.navn }] }));
+      const h = [{ dato: x.dato, av: x.av, res: x.res, komm: x.komm, dokId, avvik: ids, regAv: state.me?.id }, ...(o.historikk || [])].slice(0, 80);
+      const upd: Rec = { ...o, historikk: h };
+      if (x.res !== 'Ikke utført / utsatt') { upd.sistUtfort = x.dato; upd.nesteFrist = x.nyFrist || addInt(x.dato, o.intervall); } else if (x.nyFrist) upd.nesteFrist = x.nyFrist;
+      await save('oppgaver', upd); toast(avs.length ? `Registrert med ${avs.length} avvik` : 'Registrert – neste frist ' + fd(upd.nesteFrist));
+    },
+  });
+}
+export function visOppgave(id: string) {
+  const o = byId('oppgaver', id); if (!o) return;
+  showModal(o.navn, close => <>
+    <dl className="dl"><dt>Eiendom</dt><dd>{eNavn(o.eiendomId)}</dd>{o.anleggId && <><dt>System</dt><dd>{aNavn(o.anleggId)}</dd></>}<dt>Type</dt><dd>{o.type} · {o.kategori}</dd><dt>Intervall</dt><dd>{intTxt(o.intervall)}</dd><dt>Neste frist</dt><dd><DueChip s={o.nesteFrist} /></dd><dt>Utføres av</dt><dd>{o.utfores || '–'}</dd><dt>Ansvar</dt><dd>{o.ansvar || 'Eier'}{o.leietakerId ? ' – ' + lNavn(o.leietakerId) : ''}</dd><dt>Hjemmel</dt><dd>{o.hjemmel || '–'}</dd>{o.notat && <><dt>Notater</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{o.notat}</dd></>}</dl>
+    <h3 style={{ marginTop: 18 }}>Historikk</h3>
+    {(o.historikk || []).length ? <div className="log">{o.historikk.map((h: any, i: number) => { const d = h.dokId && byId('dokumenter', h.dokId); return <div key={i}><span className="lt">{fd(h.dato)}</span> · <b>{h.res}</b>{h.av ? ' · ' + h.av : ''}{h.komm && <><br />{h.komm}</>}{d?.fil && <><br /><FileLink fil={d.fil} /></>}{(h.avvik || []).length > 0 && <><br /><span className="muted small">{h.avvik.length} avvik registrert</span></>}</div>; })}</div> : <p className="muted">Ikke registrert utført ennå.</p>}
+  </>, { foot: close => <>{canEdit() && <button className="btn" onClick={() => { close(); editOppgave(id); }}>Rediger</button>}<span className="grow" /><button className="btn pri" onClick={() => { close(); utfor(id); }}>Registrer utført</button></> });
+}
+
+// ================= AVVIK =================
+export function editAvvik(id?: string, preset: any = {}) {
+  const a: Rec = id ? byId('avvik', id)! : { status: 'Ny', alv: 'Middels', kilde: 'Eier/drift', ansvar: 'Eier', oppdaget: today(), eiendomId: S.eiendommer[0]?.id, ...preset } as any;
+  const staff = isStaff();
+  const fields: Field[] = [
+    { k: 'tittel', label: 'Avvik (kort beskrivelse)', req: true },
+    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true },
+    { k: 'anleggId', label: 'System', type: 'select', options: () => S.anlegg.map(x => [x.id, eNavn(x.eiendomId) + ' – ' + aNavn(x.id)] as [string, string]), empty: '–', half: true },
+    { k: 'komponentId', label: 'Komponent (TFM)', type: 'select', options: () => sortBy(S.komponenter, c => kNavn(c.id)).map(c => [c.id, eNavn(c.eiendomId) + ' – ' + kNavn(c.id)] as [string, string]), empty: '–' },
+    { k: 'alv', label: 'Alvorlighet', type: 'select', options: AV_ALV, half: true }, { k: 'status', label: 'Status', type: 'select', options: AV_STATUS, half: true },
+    { k: 'kilde', label: 'Kilde', type: 'select', options: AV_KILDE, half: true }, { k: 'meldtAv', label: 'Meldt av / referanse', half: true, ph: 'Navn, rapportnr., tilsynsref.' },
+    { k: 'ansvar', label: 'Ansvarlig for utbedring', type: 'select', options: ['Eier', 'Leietaker', 'Leverandør/entreprenør'], half: true },
+    ...(canEdit() ? [{ k: 'leietakerId', label: 'Leietaker', type: 'select', options: () => S.leietakere.map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true } as Field] : []),
+    { k: 'oppdaget', label: 'Oppdaget dato', type: 'date', half: true }, { k: 'frist', label: 'Frist for utbedring', type: 'date', half: true, hint: id ? '' : 'Tom = foreslått frist ut fra alvorlighet' },
+    { k: 'planlagt', label: 'Planlagt utbedret', type: 'date', half: true, show: x => ['Planlagt', 'Under utbedring', 'Utsatt'].includes(x.status) },
+    ...(canEdit() ? [{ k: 'kost', label: 'Estimert kostnad (kr)', type: 'number', half: true } as Field] : []),
+    { k: 'beskrivelse', label: 'Beskrivelse og tiltak', type: 'textarea' },
+    { k: 'komm', label: id ? 'Kommentar til denne endringen (legges i loggen)' : 'Kommentar', type: 'textarea', ph: id ? 'F.eks. hvorfor avviket utsettes eller avvises' : '' },
+    { k: 'fil', label: 'Vedlegg (bilde/PDF)', type: 'file' }];
+  let touchedFrist = false;
+  formModal({
+    title: id ? `Avvik #${a.nr || ''}` : 'Nytt avvik', fields, values: { ...a, komm: '', fil: null }, wide: true, readOnly: !staff,
+    onChange: (k, v) => { if (k === 'frist') touchedFrist = true; if (k === 'komponentId' && v.komponentId) { const c = byId('komponenter', v.komponentId); if (c) return { anleggId: c.anleggId, eiendomId: c.eiendomId }; } if (!id && !touchedFrist && (k === 'alv' || k === 'oppdaget')) return { frist: addDays(v.oppdaget || today(), AV_FRIST[v.alv]) }; },
+    bottom: () => <>
+      {a.oppgaveId && byId('oppgaver', a.oppgaveId) && <p className="small muted" style={{ marginTop: 12 }}>Registrert fra kontroll: <a href="#" onClick={e => { e.preventDefault(); visOppgave(a.oppgaveId); }}>{byId('oppgaver', a.oppgaveId)!.navn}</a></p>}
+      {(a.vedlegg || []).length > 0 && <><h3 style={{ marginTop: 14 }}>Vedlegg</h3>{a.vedlegg.map((f: any, i: number) => <div key={i}><FileLink fil={f} /></div>)}</>}
+      {id && (a.logg || []).length > 0 && <><h3 style={{ marginTop: 18 }}>Logg</h3><div className="log">{a.logg.slice().reverse().map((l: any, i: number) => <div key={i}><span className="lt">{new Date(l.t).toLocaleString('nb-NO', { dateStyle: 'short', timeStyle: 'short' })}{l.av ? ' · ' + l.av : ''}</span> · <StChip s={l.s} />{l.k && <><br />{l.k}</>}</div>)}</div></>}
+    </>,
+    extraFoot: close => id && canEdit() ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette avviket permanent? Vanligvis bør avvik heller settes til «Avvist» eller «Lukket» slik at historikken bevares.')) { await removeDoc('avvik', id); close(); } }}>Slett</button> : null,
+    onSave: async x => {
+      const komm = x.komm; const fil = x.fil; delete x.komm; delete x.fil;
+      if (x.komponentId) { const kc = byId('komponenter', x.komponentId); if (kc) { x.anleggId = kc.anleggId; x.eiendomId = kc.eiendomId; } }
+      const o: Rec = { ...a, ...x }; if (!o.frist) o.frist = addDays(o.oppdaget || today(), AV_FRIST[o.alv]);
+      if (fil) { const f = await uploadFile(fil, o.eiendomId, o.leietakerId && canEdit() ? o.leietakerId : undefined); if (f) o.vedlegg = [...(a.vedlegg || []), f]; }
+      o.logg = (a.logg || []).slice(); const av = state.me?.navn || state.me?.epost;
+      if (!id) o.logg.push({ t: new Date().toISOString(), s: o.status, k: komm || 'Registrert', av });
+      else if (o.status !== a.status || komm) o.logg.push({ t: new Date().toISOString(), s: o.status, k: (o.status !== a.status ? `Status: ${a.status} → ${o.status}` : '') + (komm ? (o.status !== a.status ? '. ' : '') + komm : ''), av });
+      if (AV_LUKKET.includes(o.status) && !AV_LUKKET.includes(a.status)) o.lukket = today();
+      if (!AV_LUKKET.includes(o.status)) delete o.lukket;
+      await save('avvik', o); toast('Avvik lagret');
+    },
+  });
+}
+
+// ================= DOKUMENT =================
+export function editDok(id?: string, preset: any = {}) {
+  const d: Rec = id ? byId('dokumenter', id)! : { dato: today(), type: 'Annet', eiendomId: S.eiendommer[0]?.id, ...preset } as any;
+  const ro = !!id && !canEdit();
+  const fields: Field[] = [
+    { k: 'tittel', label: 'Tittel', req: true },
+    { k: 'type', label: 'Dokumenttype', type: 'select', options: canEdit() ? DOK_TYPER : DOK_TYPER.filter(t => !['Leieavtale', 'Forsikringspolise', 'Samordningsavtale', 'Leietakers IK-dokumentasjon'].includes(t)), half: true },
+    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true },
+    ...(canEdit() ? [{ k: 'leietakerId', label: 'Leietaker (valgfritt)', type: 'select', options: () => S.leietakere.map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true } as Field] : []),
+    { k: 'anleggId', label: 'System (valgfritt)', type: 'select', options: () => S.anlegg.map(x => [x.id, eNavn(x.eiendomId) + ' – ' + aNavn(x.id)] as [string, string]), empty: '–', half: true },
+    { k: 'dato', label: 'Dokumentdato', type: 'date', half: true }, { k: 'gyldigTil', label: 'Gyldig til / revideres', type: 'date', half: true },
+    { k: 'plassering', label: 'Plassering / lenke', ph: 'F.eks. Arkiv perm 3, SharePoint, FDV-portal', hint: 'Brukes om dokumentet ligger et annet sted' },
+    ...(!ro ? [{ k: 'fil', label: d.fil ? 'Erstatt fil' : 'Last opp fil (maks 50 MB)', type: 'file' } as Field] : []),
+    { k: 'notat', label: 'Notat', type: 'textarea' }];
+  formModal({
+    title: ro ? d.tittel : id ? 'Rediger dokument' : 'Nytt dokument', fields, values: { ...d, fil: null }, readOnly: ro,
+    top: d.fil ? <p style={{ marginTop: 0 }}>Fil: <FileLink fil={d.fil} /></p> : undefined,
+    extraFoot: close => id && canEdit() ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette dokumentet? Filen fjernes permanent.')) { await deleteFile(d.fil); await removeDoc('dokumenter', id); close(); } }}>Slett</button> : null,
+    onSave: async x => {
+      const fil = x.fil; delete x.fil; const o: Rec = { ...d, ...x };
+      if (fil) { const f = await uploadFile(fil, o.eiendomId, o.leietakerId || undefined); if (!f) return false; if (d.fil) await deleteFile(d.fil); o.fil = f; }
+      if (!o.tittel) o.tittel = o.type; await save('dokumenter', o); toast('Dokument lagret');
+    },
+  });
+}
+export async function toggleDokNA(eid: string, type: string) { const e = byId('eiendommer', eid)!; const na = (e.dokNA || []).slice(); const i = na.indexOf(type); if (i >= 0) na.splice(i, 1); else na.push(type); await save('eiendommer', { ...e, dokNA: na }); }
+
+// ================= LEIETAKER =================
+export function editLeietaker(id?: string, preset: any = {}) {
+  const l: Rec = id ? byId('leietakere', id)! : { varsel: 12, eiendomId: S.eiendommer[0]?.id, ...preset } as any;
+  const fields: Field[] = [
+    { k: 'navn', label: 'Leietaker (firma)', req: true, half: true }, { k: 'orgnr', label: 'Org.nr.', half: true },
+    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true }, { k: 'lokale', label: 'Leieobjekt / etasje', half: true },
+    { k: 'areal', label: 'Areal (m²)', type: 'number', half: true },
+    { k: 'virksomhet', label: 'Type virksomhet', type: 'select', options: ['Kontor', 'Butikk/handel', 'Servering', 'Lager/logistikk', 'Industri/verksted', 'Helse/omsorg', 'Undervisning', 'Annet'], empty: '–', half: true },
+    { k: 'sec', label: 'Leieavtale', type: 'sec' },
+    { k: 'start', label: 'Avtalestart', type: 'date', half: true }, { k: 'slutt', label: 'Avtaleutløp', type: 'date', half: true },
+    { k: 'avtaletype', label: 'Avtalemal', type: 'select', options: ['Standard næringsleiekontrakt (Norsk Eiendom)', 'Standard leieavtale (Huseierne)', 'Egen mal', 'Annet'], empty: '–', half: true },
+    { k: 'varsel', label: 'Varslingsfrist fornyelse (mnd før utløp)', type: 'number', half: true },
+    { k: 'sec2', label: 'Kontakt', type: 'sec' },
+    { k: 'kontakt', label: 'Kontaktperson', half: true }, { k: 'brannvernleder', label: 'Leietakers brannvernleder', half: true },
+    { k: 'epost', label: 'E-post', type: 'email', half: true }, { k: 'tlf', label: 'Telefon', half: true },
+    { k: 'notat', label: 'Notater (vises ikke for leietaker)', type: 'textarea' }];
+  formModal({
+    title: id ? 'Rediger leietaker' : 'Ny leietaker', fields, values: l,
+    extraFoot: close => id ? <button className="btn danger" onClick={async () => { if (await confirmBox(`Slette leietaker «${l.navn}»? Brukere koblet til leietakeren mister tilgangen.`)) { await removeDoc('leietakere', id); close(); go('leietakere'); } }}>Slett</button> : null,
+    onSave: async x => {
+      const o: Rec = { ...l, ...x };
+      if (!id) {
+        const keys = STD_PLIKTER.slice(); if (x.virksomhet === 'Servering') keys.push('fett', 'fgass_egen'); if (x.virksomhet === 'Butikk/handel') keys.push('fgass_egen');
+        o.plikter = keys.map(k => ({ key: k, navn: PLIKTER[k].n, hjemmel: PLIKTER[k].h, frekvens: { n: 1, enhet: 'år' }, sist: '' }));
+        o.matrise = Object.fromEntries(VEDL_KAT.map(([k, v]) => [k, v]));
+      }
+      const nid = await save('leietakere', o); toast('Leietaker lagret'); if (!id) go('leietaker/' + nid);
+    },
+  });
+}
+export function bekreftPlikt(lid: string, idx: number) {
+  const l = byId('leietakere', lid)!; const p = (l.plikter || [])[idx]; if (!p) return;
+  const fields: Field[] = [
+    { k: 'sist', label: 'Bekreftet / dokumentert dato', type: 'date', def: today(), half: true },
+    { k: 'form', label: 'Form', type: 'select', options: ['Skriftlig bekreftelse', 'Dokumentasjon mottatt', 'Kontrollert på befaring', 'Muntlig'], def: 'Skriftlig bekreftelse', half: true },
+    { k: 'komm', label: 'Kommentar', type: 'textarea', def: p.komm || '' }, { k: 'fil', label: 'Dokumentasjon fra leietaker', type: 'file' },
+    { k: 'in', label: 'Frekvens', type: 'number', def: p.frekvens?.n || 1, half: true }, { k: 'ie', label: 'Enhet', type: 'select', options: ENH, def: p.frekvens?.enhet || 'år', half: true },
+    { k: 'ikkeRelevant', label: 'Ikke relevant for denne leietakeren', type: 'checkbox', def: !!p.ikkeRelevant }];
+  formModal({
+    title: p.navn, fields, top: <p className="muted small" style={{ marginTop: 0 }}>{p.hjemmel}{p.bekreftetAvLeietaker ? ` · Sist bekreftet av leietaker ${fd(p.sist)}` : ''}</p>,
+    extraFoot: close => <button className="btn danger" onClick={async () => { if (await confirmBox('Fjerne denne plikten fra leietakeren?', 'Fjern')) { const pl = l.plikter.slice(); pl.splice(idx, 1); await save('leietakere', { ...l, plikter: pl }); close(); } }}>Fjern plikt</button>,
+    onSave: async x => {
+      const pl = l.plikter.slice(); const np: Rec = { ...p, sist: x.sist, form: x.form, komm: x.komm, frekvens: { n: +x.in || 1, enhet: x.ie }, ikkeRelevant: x.ikkeRelevant, bekreftetAvLeietaker: false };
+      if (x.fil) { const f = await uploadFile(x.fil, l.eiendomId, l.id); if (f) np.dokId = await save('dokumenter', { eiendomId: l.eiendomId, leietakerId: l.id, type: 'Leietakers IK-dokumentasjon', tittel: p.navn + ' – ' + l.navn, dato: x.sist, fil: f }); }
+      pl[idx] = np; await save('leietakere', { ...l, plikter: pl }); toast('Bekreftelse registrert');
+    },
+  });
+}
+export function nyPlikt(lid: string) {
+  const l = byId('leietakere', lid)!; const have = (l.plikter || []).map((p: any) => p.key);
+  formModal({
+    title: 'Legg til plikt for ' + l.navn,
+    fields: [{ k: 'key', label: 'Velg fra standardlisten', type: 'select', options: Object.entries(PLIKTER).filter(([k]) => !have.includes(k)).map(([k, v]) => [k, v.n] as [string, string]), empty: '(Egendefinert plikt)' },
+      { k: 'navn', label: 'Egendefinert plikt', show: x => !x.key }, { k: 'hjemmel', label: 'Hjemmel / avtalepunkt', show: x => !x.key }],
+    onSave: async x => {
+      const p: Rec = x.key ? { key: x.key, navn: PLIKTER[x.key].n, hjemmel: PLIKTER[x.key].h } as any : { key: crypto.randomUUID(), navn: x.navn, hjemmel: x.hjemmel } as any;
+      if (!p.navn) { toast('Skriv inn plikten'); return false; }
+      p.frekvens = { n: 1, enhet: 'år' }; p.sist = ''; await save('leietakere', { ...l, plikter: [...(l.plikter || []), p] });
+    },
+  });
+}
+export async function setMatrise(lid: string, k: string, val: string) { const l = byId('leietakere', lid)!; await save('leietakere', { ...l, matrise: { ...(l.matrise || {}), [k]: val } }); toast('Vedlikeholdsansvar oppdatert'); }
+export function brev(lid: string) {
+  const l = byId('leietakere', lid)!; const e = byId('eiendommer', l.eiendomId) || ({} as Rec);
+  const pl = (l.plikter || []).map((p: any) => ({ p, s: pliktStatus(p) })).filter((x: any) => x.s.o > 0);
+  const av = openAvvik().filter(a => a.leietakerId === l.id && a.ansvar === 'Leietaker');
+  const oppg = activeTasks().filter(o => o.ansvar === 'Leietaker' && o.leietakerId === l.id && (dUntil(o.nesteFrist) as number) <= 60);
+  const lt = Object.entries(l.matrise || {}).filter(([, v]) => v === 'Leietaker').map(([k]) => k);
+  const frist = fd(addDays(today(), 30));
+  let t = `Emne: Oppfølging av internkontroll og vedlikehold – ${l.lokale ? l.lokale + ', ' : ''}${e.navn || ''}\n\nHei${l.kontakt ? ' ' + l.kontakt : ''},\n\nSom eier av ${e.navn || 'eiendommen'}${e.adresse ? ' (' + e.adresse + ')' : ''} følger vi opp brannsikkerhet, internkontroll og vedlikehold i samarbeid med leietakerne, jf. internkontrollforskriften § 6, forskrift om brannforebygging og leieavtalen.\n\n`;
+  if (pl.length) { t += `Vi ber om bekreftelse og eventuell dokumentasjon på følgende innen ${frist}:\n`; pl.forEach(({ p }: any) => { t += `• ${p.navn}${p.sist ? ` (sist bekreftet ${fd(p.sist)})` : ''}\n`; }); t += `\nDere kan bekrefte og laste opp dokumentasjon direkte i Eiendomskontroll når dere er logget inn.\n\n`; }
+  if (oppg.length) { t += 'Kontroller dere har ansvar for som forfaller snart:\n'; oppg.forEach(o => t += `• ${o.navn} – frist ${fd(o.nesteFrist)}\n`); t += '\n'; }
+  if (av.length) { t += 'Åpne avvik der dere er ansvarlige for utbedring:\n'; av.forEach(a => t += `• #${a.nr} ${a.tittel} – frist ${fd(a.frist)}\n`); t += 'Gi oss beskjed når avvikene er utbedret, gjerne med bilde eller dokumentasjon.\n\n'; }
+  if (lt.length) { t += 'Til påminnelse har dere etter leieavtalen ansvar for:\n'; lt.forEach(k => t += `• ${k}\n`); t += '\n'; }
+  t += `Feil, skader eller avvik i bygget eller tekniske anlegg skal meldes til oss så snart de oppdages.\n\nMed vennlig hilsen\n${state.me?.navn || ''}\n`;
+  showModal('Oppfølgingsbrev til ' + l.navn, () => <><p className="muted small" style={{ marginTop: 0 }}>Generert fra status i appen. Kopier inn i e-post{l.epost ? ` til ${l.epost}` : ''} og juster ved behov.</p><pre className="letter">{t}</pre></>,
+    { wide: true, foot: close => <><button className="btn" onClick={close}>Lukk</button><button className="btn pri" onClick={() => copyText(t)}>Kopier tekst</button></> });
+}
