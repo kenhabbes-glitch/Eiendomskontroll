@@ -7,8 +7,8 @@ const json = (status: number, body: any) => new Response(JSON.stringify(body), {
 
 export default async (req: Request) => {
   if (req.method !== 'POST') return json(405, { error: 'Bare POST' });
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim().replace(/\/(rest|auth|storage)\/v1.*$/i, '').replace(/\/+$/, '');
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
   if (!url || !key) return json(500, { error: 'Serveren mangler SUPABASE_URL eller SUPABASE_SERVICE_ROLE_KEY' });
   const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 

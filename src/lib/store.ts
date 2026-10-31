@@ -1,8 +1,10 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { useSyncExternalStore } from 'react';
 
-const URL_ = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+// Tåler at adressen er limt inn med /rest/v1, /auth/v1 eller skråstrek til slutt
+const rensUrl = (u?: string) => (u || '').trim().replace(/\/(rest|auth|storage)\/v1.*$/i, '').replace(/\/+$/, '');
+const URL_ = rensUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined) || undefined;
+const KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
 export const configured = !!(URL_ && KEY);
 // Må leses før Supabase-klienten fjerner token fra adressen
 const FRA_LENKE = /type=(recovery|invite)/.test(location.hash + location.search);
