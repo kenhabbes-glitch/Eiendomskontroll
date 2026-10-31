@@ -94,3 +94,17 @@ Filer lagres i den private bøtten `filer` med sti `{eiendom_id}/felles/...` ell
 - Arealrapport (PDF) lages i nettleseren med pdf-lib: valgfrie etasjer og leietakere, plantegninger med arealer og dekning av fellesareal. Kontraktfestet fellesareal settes på leietakeren (`fellesAvtale`: m2 | pst_felles | paslag, `fellesAvtaleVerdi`).
 - Serviceavtaler: `SERVICEAVTALE` i catalog.ts angir per systemtype om det er lovkrav om fagkyndig vedlikehold/kontroll (lov) eller anbefalt (anb). Status hentes fra dokumenter av typen «Serviceavtale» koblet via `anleggId`/`anleggIds`.
 - `SUPABASE_SERVICE_ROLE_KEY` gir full tilgang til databasen. Den skal bare ligge i Netlify sine miljøvariabler, aldri i koden eller med `VITE_`-prefiks.
+
+## Arbeidsordre (avvik på tegning, tildeling og eksterne utførende)
+
+1. Kjør `supabase/migrations/003_arbeidsordre.sql` i Supabase (SQL Editor → New query → lim inn → Run). Den legger til:
+   - rollen **Utførende (ekstern)** som bare ser arbeidsordre tildelt dem,
+   - kolonnen `tildelt_id` på avvik, med regler for hva utførende kan endre (status «Under utbedring»/«Utført – til kontroll», logg, vedlegg),
+   - tabellen `ao_invitasjon` for lenker sendt på e-post,
+   - **hendelseslogg**: alle endringer i alle tabeller logges automatisk av databasen (hvem, når, hva som ble endret).
+2. E-post (valgfritt, men anbefalt): opprett konto hos [Resend](https://resend.com), verifiser domenet deres, og legg inn i Netlify → Environment variables:
+   - `RESEND_API_KEY` – API-nøkkelen fra Resend
+   - `EPOST_FRA` – avsender, f.eks. `Eiendomskontroll <varsel@dittdomene.no>`
+   Uten dette åpnes arbeidsordren i brukerens eget e-postprogram i stedet (PDF må da legges ved manuelt).
+
+Flyt: avvik → «Plasser på tegning» → «Tildel» (intern bruker) eller «Send på e-post» (hvem som helst). Mottakeren åpner lenken, oppretter bruker eller logger inn, ser plasseringen, starter jobben, laster opp bilder/filer og kvitterer ut. Avviket går til «Utført – til kontroll», og forvalter godkjenner og lukker eller sender tilbake.

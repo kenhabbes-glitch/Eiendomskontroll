@@ -7,6 +7,7 @@ import { aNavn, byId, compRest, compYear, dUntil, docCoverage, eNavn, fd, intTxt
 import { editAnlegg, editAvvik, editDok, editKomponent, toggleDokNA, utfor, visOppgave } from '../lib/actions';
 import { enhetStatus } from '../lib/oppslag';
 import { openPlan } from '../views/Arealer';
+import { tildeltNavn } from '../lib/arbeidsordre';
 export const Pin = ({ o }: { o: any }) => o.pos?.tegningId ? <a href="#" title="Vis på tegning" style={{ marginLeft: 6, textDecoration: 'none' }} onClick={e => { e.preventDefault(); e.stopPropagation(); openPlan(o.pos.tegningId, { mode: 'tfm', focus: o.id }); }}>⌖</a> : null;
 import { AlvChip, Chip, DueChip, Empty, FileLink, RestChip, StChip, TgChip } from './ui';
 
@@ -43,7 +44,8 @@ export function AvvikTable({ list, showE = true }: { list: Rec[]; showE?: boolea
     {L.map(a => { const closed = AV_LUKKET.includes(a.status); const kc = a.komponentId && byId('komponenter', a.komponentId);
       return <tr key={a.id} className="click" onClick={() => editAvvik(a.id)}>
         <td className="num muted">{a.nr}</td>
-        <td><b style={{ fontWeight: 500 }}>{a.tittel}</b>{kc ? <div className="small muted mono">{tfmKomp(kc)}</div> : a.anleggId ? <div className="small muted">{aNavn(a.anleggId)}</div> : null}</td>
+        <td><b style={{ fontWeight: 500 }}>{a.tittel}</b>{kc ? <div className="small muted mono">{tfmKomp(kc)}</div> : a.anleggId ? <div className="small muted">{aNavn(a.anleggId)}</div> : null}
+          {(a.pos || a.tildeltId) && <div className="small muted">{a.pos && <span style={{ color: '#b42318' }} title="Plassert på tegning">▲ </span>}{a.tildeltId && <>→ {tildeltNavn(a.tildeltId) || 'ekstern'}</>}</div>}</td>
         {showE && <td>{eNavn(a.eiendomId)}</td>}
         <td><AlvChip a={a.alv} /></td>
         <td><StChip s={a.status} />{a.status === 'Utsatt' && a.planlagt && <div className="small muted">til {fd(a.planlagt)}</div>}</td>

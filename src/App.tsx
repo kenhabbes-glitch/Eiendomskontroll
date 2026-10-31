@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { canEdit, configured, initAuth, isAdmin, isStaff, isTenant, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
+import { canEdit, configured, initAuth, isAdmin, isStaff, isTenant, isUtforer, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
 import { activeTasks, dUntil, openAvvik } from './lib/utils';
 import { ModalHost, Tip, Toast } from './components/ui';
 import { Oversikt } from './views/Oversikt';
@@ -16,6 +16,7 @@ import { Brukere, DataAdmin } from './views/Brukere';
 import { Portal } from './views/Portal';
 import { Profil } from './views/Profil';
 import { Innstillinger } from './views/Innstillinger';
+import { AoLenke, ArbeidsordreListe, Hendelseslogg, mineAo } from './views/Arbeidsordre';
 
 export function go(path: string) { if (location.hash === '#/' + path) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = '#/' + path; }
 function useRoute() {
@@ -39,17 +40,21 @@ const I: Record<string, string> = {
   brukere: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z',
   portal: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z',
   innstillinger: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
+  arbeidsordre: 'M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.8-3.8a6 6 0 01-7.9 7.9l-6.9 6.9a2.1 2.1 0 01-3-3l6.9-6.9a6 6 0 017.9-7.9z',
+  logg: 'M12 8v4l3 3M3.05 11a9 9 0 11.5 4M3 4v5h5',
   data: 'M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
 };
 
 function navFor(): [string, string][] {
   if (isTenant()) return [['portal', 'Mitt leieforhold'], ['regelverk', 'Plikter og regelverk']];
-  const n: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['kontroller', 'Kontrollplan'], ['avvik', 'Avvik']];
+  if (isUtforer()) return [['arbeidsordre', 'Mine arbeidsordre']];
+  const n: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['kontroller', 'Kontrollplan'], ['avvik', 'Avvik'], ['arbeidsordre', 'Mine arbeidsordre']];
   if (canEdit()) n.push(['leietakere', 'Leietakere']);
   n.push(['tfm', 'TFM-register'], ['arealer', 'Tegninger og arealer'], ['dokumenter', 'Dokumenter']);
   if (canEdit()) n.push(['vedlikehold', 'Vedlikeholdsplan']);
   n.push(['regelverk', 'Regelverk og plikter']);
   if (canEdit()) n.push(['innstillinger', 'Innstillinger']);
+  if (canEdit()) n.push(['logg', 'Hendelseslogg']);
   if (isAdmin()) n.push(['brukere', 'Brukere og roller'], ['data', 'Import og eksport']);
   return n;
 }
@@ -61,11 +66,12 @@ export default function App() {
   if (!configured) return <Setup />;
   if (!state.ready) return <div className="login"><div className="card"><p>Laster …</p></div></div>;
   if (state.recovery && state.me) return <SetPassword />;
+  if (r.v === 'ao' && r.id) return <><AoLenke token={r.id} /><Toast /></>;
   if (!state.me) return <Login />;
   if (state.me.rolle === 'ingen') return <NoAccess />;
 
   const nav = navFor();
-  const def = isTenant() ? 'portal' : 'oversikt';
+  const def = isTenant() ? 'portal' : isUtforer() ? 'arbeidsordre' : 'oversikt';
   let v = r.v || def;
   if (!nav.some(n => n[0] === v) && !['eiendom', 'leietaker', 'profil'].includes(v)) v = def;
   if (v === 'leietaker' && !canEdit()) v = def;
@@ -95,13 +101,15 @@ export default function App() {
     case 'portal': body = <Portal />; break;
     case 'profil': body = <Profil />; break;
     case 'innstillinger': body = <Innstillinger />; break;
+    case 'arbeidsordre': body = <ArbeidsordreListe id={r.id} />; break;
+    case 'logg': body = <Hendelseslogg />; break;
   }
   return <div id="app">
     <aside id="side">
       <div className="brand"><b>Eiendomskontroll</b><span>Drift · kontroll · dokumentasjon</span></div>
       <nav id="nav">{nav.map(([k, l]) => <a key={k} href={'#/' + k} className={cur === k ? 'on' : ''}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={I[k]} /></svg>{l}
-        {k === 'kontroller' && forf > 0 && <span className="n">{forf}</span>}{k === 'avvik' && avv > 0 && <span className="n">{avv}</span>}
+        {k === 'kontroller' && forf > 0 && <span className="n">{forf}</span>}{k === 'avvik' && avv > 0 && <span className="n">{avv}</span>}{k === 'arbeidsordre' && mineAo().length > 0 && <span className="n">{mineAo().length}</span>}
       </a>)}</nav>
       <div className="sidefoot">
         <a className="userbox" href="#/profil" style={{ textDecoration: 'none' }}><span className="av">{ini}</span><span><div style={{ color: '#fff' }}>{me.navn || me.epost}</div><div className="r">{rolleNavn(me.rolle)}</div></span></a>

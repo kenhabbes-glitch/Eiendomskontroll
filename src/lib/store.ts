@@ -12,12 +12,13 @@ export const sb: SupabaseClient = createClient(URL_ || 'http://localhost', KEY |
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 });
 
-export type Rolle = 'admin' | 'forvalter' | 'tekniker' | 'leietaker' | 'ingen';
+export type Rolle = 'admin' | 'forvalter' | 'tekniker' | 'leietaker' | 'utforer' | 'ingen';
 export const ROLLER: [Rolle, string, string][] = [
   ['admin', 'Administrator', 'Ser og endrer alt. Administrerer brukere, roller og eiendommer.'],
   ['forvalter', 'Forvalter / driftsleder', 'Full drift av tildelte eiendommer: kontroller, avvik, dokumenter, leietakere, arealer og vedlikeholdsplan.'],
   ['tekniker', 'Driftstekniker / serviceleverandør', 'Ser kontrollplan, systemer og avvik på tildelte eiendommer. Registrerer utførte kontroller og avvik. Ser ikke leietakere, leieavtaler eller økonomi.'],
   ['leietaker', 'Leietaker', 'Ser eget leieforhold. Melder avvik, bekrefter internkontrollplikter og laster opp dokumentasjon.'],
+  ['utforer', 'Utførende (ekstern)', 'Ser bare arbeidsordre (avvik) som er tildelt dem, med plassering på tegning. Kan starte jobben, kvittere ut og laste opp bilder og dokumentasjon.'],
   ['ingen', 'Ingen tilgang', 'Venter på at en administrator tildeler rolle.'],
 ];
 export const rolleNavn = (r?: string) => ROLLER.find(x => x[0] === r)?.[1] || r || '';
@@ -30,7 +31,7 @@ export const TABLES = {
   anlegg: { table: 'systemer', cols: { eiendomId: 'eiendom_id' } as ColMap },
   komponenter: { table: 'komponenter', cols: { eiendomId: 'eiendom_id', anleggId: 'system_id' } as ColMap },
   oppgaver: { table: 'oppgaver', cols: { eiendomId: 'eiendom_id' } as ColMap },
-  avvik: { table: 'avvik', cols: { eiendomId: 'eiendom_id', leietakerId: 'leietaker_id' } as ColMap },
+  avvik: { table: 'avvik', cols: { eiendomId: 'eiendom_id', leietakerId: 'leietaker_id', tildeltId: 'tildelt_id' } as ColMap },
   dokumenter: { table: 'dokumenter', cols: { eiendomId: 'eiendom_id', leietakerId: 'leietaker_id' } as ColMap },
   tegninger: { table: 'tegninger', cols: { eiendomId: 'eiendom_id' } as ColMap },
 };
@@ -70,6 +71,28 @@ function apply(col: Col | 'profiles' | 'tilganger', type: 'upsert' | 'delete', o
   if (type === 'delete') { if (i >= 0) arr.splice(i, 1); }
   else if (i >= 0) arr[i] = o; else arr.push(o);
   bump();
+}
+
+// ---- varsler i appen (vises som banner og i nettleservarsel hvis tillatt)
+export const varsler: { t: string; lenke?: string; tid: number }[] = [];
+export function varsle(t: string, lenke?: string) {
+  varsler.unshift({ t, lenke, tid: Date.now() }); toast(t);
+  try { if ('Notification' in window && Notification.permission === 'granted' && document.hidden) new Notification('Eiendomskontroll', { body: t }); } catch { }
+  bump();
+}
+
+// ---- arbeidsordre (Netlify-funksjon)
+export async function aoApi(body: any, medInnlogging = true) {
+  const headers: any = { 'Content-Type': 'application/json' };
+  if (medInnlogging) { const { data: { session } } = await sb.auth.getSession(); if (session) headers.Authorization = 'Bearer ' + session.access_token; }
+  const r = await fetch('/.netlify/functions/arbeidsordre', { method: 'POST', headers, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'Feil ' + r.status);
+  return j;
+}
+/** Fører en egen hendelse i hendelsesloggen (i tillegg til de automatiske) */
+export async function loggHendelse(tekst: string, radId?: string, eiendomId?: string) {
+  try { await sb.from('hendelseslogg').insert({ bruker_id: state.me?.id, bruker: state.me?.navn || state.me?.epost, tabell: 'hendelse', rad_id: radId || null, eiendom_id: eiendomId || null, handling: 'hendelse', tekst }); } catch { }
 }
 
 // ---- toast
@@ -122,7 +145,7 @@ export async function loadData() {
   state.loading = true; state.error = ''; bump();
   try {
     await Promise.all(COLS.map(async c => { S[c] = (await loadAll(TABLES[c].table)).map(r => fromRow(c, r)); }));
-    if (state.me && state.me.rolle !== 'leietaker') {
+    if (state.me && ['admin', 'forvalter', 'tekniker'].includes(state.me.rolle)) {
       await loadInnst();
       S.profiles = await loadAll('profiles');
       S.tilganger = await loadAll('eiendom_tilgang');
@@ -132,7 +155,10 @@ export async function loadData() {
   if (channel) sb.removeChannel(channel);
   channel = sb.channel('endringer');
   COLS.forEach(c => channel.on('postgres_changes', { event: '*', schema: 'public', table: TABLES[c].table }, (p: any) => {
-    if (p.eventType === 'DELETE') apply(c, 'delete', { id: p.old.id }); else apply(c, 'upsert', fromRow(c, p.new));
+    if (p.eventType === 'DELETE') { apply(c, 'delete', { id: p.old.id }); return; }
+    const ny = fromRow(c, p.new);
+    if (c === 'avvik' && state.me && ny.tildeltId === state.me.id) { const gml = S.avvik.find(x => x.id === ny.id); if (!gml || gml.tildeltId !== state.me.id) varsle(`Du er tildelt arbeidsordre: avvik #${ny.nr} ${ny.tittel || ''}`, 'arbeidsordre/' + ny.id); }
+    apply(c, 'upsert', ny);
   }));
   channel.on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (p: any) => {
     if (p.eventType === 'DELETE') apply('profiles', 'delete', { id: p.old.id }); else { apply('profiles', 'upsert', p.new); if (p.new.id === state.me?.id) setMe(p.new); }
@@ -174,15 +200,16 @@ export const isAdmin = () => role() === 'admin';
 export const canEdit = () => role() === 'admin' || role() === 'forvalter';
 export const isStaff = () => ['admin', 'forvalter', 'tekniker'].includes(role());
 export const isTenant = () => role() === 'leietaker';
+export const isUtforer = () => role() === 'utforer';
 
 // ---- filer (privat bøtte «filer»)
 const MIME: Record<string, string> = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', txt: 'text/plain', csv: 'text/csv', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', doc: 'application/msword', xls: 'application/vnd.ms-excel', dwg: 'application/acad', msg: 'application/vnd.ms-outlook', eml: 'message/rfc822' };
 export type Fil = { path: string; navn: string; type?: string; str?: number };
-export async function uploadFile(file: Blob & { name?: string }, eiendomId: string, leietakerId?: string, navn?: string): Promise<Fil | null> {
+export async function uploadFile(file: Blob & { name?: string }, eiendomId: string, leietakerId?: string, navn?: string, mappe?: string): Promise<Fil | null> {
   const name = navn || file.name || 'fil';
   const ext = (name.split('.').pop() || '').toLowerCase();
   const safe = name.replace(/[^\w.\-æøåÆØÅ]+/g, '_').slice(-80);
-  const path = `${eiendomId}/${leietakerId ? 'leietaker/' + leietakerId : 'felles'}/${crypto.randomUUID()}-${safe}`;
+  const path = `${eiendomId}/${mappe ? mappe : leietakerId ? 'leietaker/' + leietakerId : 'felles'}/${crypto.randomUUID()}-${safe}`;
   const { error } = await sb.storage.from('filer').upload(path, file, { contentType: file.type || MIME[ext] || 'application/octet-stream', upsert: false });
   if (error) { toast('Opplasting feilet: ' + feiltekst(error)); return null; }
   return { path, navn: name, type: file.type || MIME[ext], str: file.size };

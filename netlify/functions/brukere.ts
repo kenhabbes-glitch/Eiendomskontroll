@@ -25,7 +25,7 @@ export default async (req: Request) => {
     const epost = String(body.epost || '').trim().toLowerCase();
     const rolle = String(body.rolle || '');
     if (!/^\S+@\S+\.\S+$/.test(epost)) return json(400, { error: 'Ugyldig e-postadresse' });
-    if (!['admin', 'forvalter', 'tekniker', 'leietaker'].includes(rolle)) return json(400, { error: 'Ugyldig rolle' });
+    if (!['admin', 'forvalter', 'tekniker', 'leietaker', 'utforer'].includes(rolle)) return json(400, { error: 'Ugyldig rolle' });
     if (rolle === 'leietaker' && !body.leietaker_id) return json(400, { error: 'Leietaker mangler' });
     const redirectTo = typeof body.redirectTo === 'string' && /^https?:\/\//.test(body.redirectTo) ? body.redirectTo : undefined;
     const { data, error } = await admin.auth.admin.inviteUserByEmail(epost, { data: { navn: body.navn || '' }, redirectTo });
@@ -45,7 +45,7 @@ export default async (req: Request) => {
   if (body.action === 'testbruker') {
     const epost = String(body.epost || '').trim().toLowerCase(); const rolle = String(body.rolle || ''); const passord = String(body.passord || '');
     if (!/^\S+@\S+\.\S+$/.test(epost)) return json(400, { error: 'Ugyldig e-postadresse' });
-    if (!['admin', 'forvalter', 'tekniker', 'leietaker'].includes(rolle)) return json(400, { error: 'Ugyldig rolle' });
+    if (!['admin', 'forvalter', 'tekniker', 'leietaker', 'utforer'].includes(rolle)) return json(400, { error: 'Ugyldig rolle' });
     if (passord.length < 8) return json(400, { error: 'Passordet må ha minst 8 tegn' });
     let id = '';
     const { data, error } = await admin.auth.admin.createUser({ email: epost, password: passord, email_confirm: true, user_metadata: { navn: body.navn || '', test: true } });

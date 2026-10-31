@@ -23,7 +23,7 @@ function RapportValg({ eid, close }: { eid: string; close: () => void }) {
     setBusy('Lager rapport …');
     try {
       const bytes = await byggPdf(eid, { tids, lids, medTegn, medDek, kost: +kost.replace(',', '.') || 0 }, setBusy);
-      const blob = new Blob([bytes], { type: 'application/pdf' }); const url = URL.createObjectURL(blob);
+      const blob = new Blob([bytes as any], { type: 'application/pdf' }); const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = `Arealrapport ${e.navn} ${new Date().toISOString().slice(0, 10)}.pdf`; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 20000); toast('Arealrapport lastet ned'); close();
     } catch (err: any) { console.error(err); toast('Kunne ikke lage rapporten: ' + (err?.message || err)); }
@@ -52,17 +52,17 @@ const navn = (k: string) => k === '_ledig' ? 'Ledig areal' : k === '_ukjent' ? '
 
 // ---------- PDF
 type Opt = { tids: string[]; lids: string[]; medTegn: boolean; medDek: boolean; kost: number };
-const A4 = [595.28, 841.89]; const M = 44;
-const INK = rgb(0.11, 0.14, 0.13), MUTED = rgb(0.42, 0.45, 0.43), LINE = rgb(0.85, 0.86, 0.84), ACC = rgb(0.12, 0.44, 0.36), RED = rgb(0.71, 0.14, 0.09), GREEN = rgb(0.12, 0.44, 0.36), SOFT = rgb(0.96, 0.96, 0.95);
-const hex = (h: string) => { const n = parseInt(h.replace('#', ''), 16); return rgb((n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255); };
+export const A4 = [595.28, 841.89]; export const M = 44;
+export const INK = rgb(0.11, 0.14, 0.13), MUTED = rgb(0.42, 0.45, 0.43), LINE = rgb(0.85, 0.86, 0.84), ACC = rgb(0.12, 0.44, 0.36), RED = rgb(0.71, 0.14, 0.09), GREEN = rgb(0.12, 0.44, 0.36), SOFT = rgb(0.96, 0.96, 0.95);
+export const hex = (h: string) => { const n = parseInt(h.replace('#', ''), 16); return rgb((n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255); };
 /** Bare tegn som standardfontene (WinAnsi) kan vise */
-const safe = (s: any) => String(s ?? '').replace(/−/g, '-').replace(/[   ]/g, ' ').replace(/[^\x20-\x7E -ÿ–—‘’“”•…€]/g, '');
+export const safe = (s: any) => String(s ?? '').replace(/−/g, '-').replace(/[   ]/g, ' ').replace(/[^\x20-\x7E -ÿ–—‘’“”•…€]/g, '');
 const nm2 = (v: number) => (Math.round(v * 10) / 10).toLocaleString('nb-NO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' m²';
 const sgn = (v: number) => (v >= 0.05 ? '+' : v <= -0.05 ? '-' : '') + nm2(Math.abs(v));
 const kr = (v: number) => Math.round(v).toLocaleString('nb-NO') + ' kr';
 const pst = (v: number) => (v * 100).toLocaleString('nb-NO', { maximumFractionDigits: 1 }) + ' %';
 
-class Doc {
+export class Doc {
   pdf!: PDFDocument; f!: PDFFont; b!: PDFFont; page!: PDFPage; y = 0; side = 0; tittel = '';
   static async ny(tittel: string) { const d = new Doc(); d.pdf = await PDFDocument.create(); d.f = await d.pdf.embedFont(StandardFonts.Helvetica); d.b = await d.pdf.embedFont(StandardFonts.HelveticaBold); d.tittel = tittel; d.pdf.setTitle(tittel); d.pdf.setCreator('Eiendomskontroll'); return d; }
   nyside(liggende = false) { this.page = this.pdf.addPage(liggende ? [A4[1], A4[0]] : [A4[0], A4[1]]); this.side++; this.y = this.page.getHeight() - M; this.fot(); return this.page; }
@@ -120,7 +120,7 @@ async function byggPdf(eid: string, o: Opt, status: (s: string) => void) {
   if (L.length) {
     D.h2('Arealoppgave per leietaker' + (delvis ? ' (utvalg)' : ''));
     const har = L.some(k => C.per[k].avtale);
-    const rows = L.map(k => { const p = C.per[k]; const l = byId('leietakere', k);
+    const rows: any[] = L.map(k => { const p = C.per[k]; const l = byId('leietakere', k);
       return { sw: k === '_ledig' ? KAT_FARGE.ledig : ltColor(eid, k), c: [navn(k) + (l?.lokale ? ' – ' + l.lokale : ''), p.etg.join(', '), nm2(p.eks), nm2(p.fe), nm2(p.fb), ...(har ? [p.avtale ? nm2(p.felles) : '–'] : []), nm2(p.tot), C.totLeie ? pst(p.tot / C.totLeie) : '–'] }; });
     const s = (f: (p: any) => number) => L.reduce((a, k) => a + f(C.per[k]), 0);
     rows.push({ bold: true, fill: true, sw: undefined as any, c: ['Sum' + (delvis ? ' utvalg' : ''), '', nm2(s(p => p.eks)), nm2(s(p => p.fe)), nm2(s(p => p.fb)), ...(har ? [''] : []), nm2(s(p => p.tot)), C.totLeie ? pst(s(p => p.tot) / C.totLeie) : ''] });
@@ -157,7 +157,7 @@ async function byggPdf(eid: string, o: Opt, status: (s: string) => void) {
     if (d.ledig > 0.05) lin.push(['Andel som faller på ledig areal (eier)', -d.ledig]);
     if (d.ukjent > 0.05) lin.push(['Andel på leieareal uten leietaker (eier)', -d.ukjent]);
     if (d.ikkeFordelt > 0.05) lin.push(['Ikke fordelt (ingen leieareal i etasjen)', -d.ikkeFordelt]);
-    const rows2 = lin.map(([l, v], i) => ({ c: [l, i < 2 ? nm2(v) : sgn(v), ...(o.kost ? [i < 2 ? kr(v * o.kost) : (v < 0 ? '-' : '+') + kr(Math.abs(v) * o.kost)] : [])], farge: [, i >= 2 && v < -0.05 ? RED : undefined, i >= 2 && v < -0.05 ? RED : undefined] }));
+    const rows2: any[] = lin.map(([l, v], i) => ({ c: [l, i < 2 ? nm2(v) : sgn(v), ...(o.kost ? [i < 2 ? kr(v * o.kost) : (v < 0 ? '-' : '+') + kr(Math.abs(v) * o.kost)] : [])], farge: [, i >= 2 && v < -0.05 ? RED : undefined, i >= 2 && v < -0.05 ? RED : undefined] }));
     const neg = d.netto < -0.05;
     rows2.push({ bold: true, fill: true, c: ['Netto ' + (neg ? 'underdekning – eier bærer' : 'overdekning'), sgn(d.netto), ...(o.kost ? [(d.netto < 0 ? '-' : '+') + kr(Math.abs(d.netto) * o.kost)] : [])], farge: [, neg ? RED : GREEN, neg ? RED : GREEN] });
     D.tabell([['Hele bygget', 4], ['Areal', 1.4, true], ...(o.kost ? [['Kr per år', 1.4, true] as [string, number, boolean]] : [])], rows2 as any);

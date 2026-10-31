@@ -8,6 +8,7 @@ import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, c
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
 import { openPlan } from '../views/Arealer';
+import { AoPanel, HendelseListe, aoSnapshot } from './arbeidsordre';
 import { adresseFelter, brregData, enhetStatus, seEiendomUrl, virksomhetFraNaering, rensOrgnr } from './oppslag';
 import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip, DueChip, type Field } from '../components/ui';
 
@@ -330,7 +331,7 @@ export function editAvvik(id?: string, preset: any = {}) {
   const fields: Field[] = [
     { k: 'tittel', label: 'Avvik (kort beskrivelse)', req: true },
     { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true },
-    { k: 'anleggId', label: 'System', type: 'select', options: () => S.anlegg.map(x => [x.id, eNavn(x.eiendomId) + ' – ' + aNavn(x.id)] as [string, string]), empty: '–', half: true },
+    { k: 'anleggId', label: 'System', type: 'select', options: () => S.anlegg.map(x => [x.id, eNavn(x.eiendomId) + ' – ' + aNavn(x.id)] as [string, string]), empty: '–', half: true, hint: 'Hovedsystemet avviket gjelder – følger med i arbeidsordren' },
     { k: 'komponentId', label: 'Komponent (TFM)', type: 'select', options: () => sortBy(S.komponenter, c => kNavn(c.id)).map(c => [c.id, eNavn(c.eiendomId) + ' – ' + kNavn(c.id)] as [string, string]), empty: '–' },
     { k: 'alv', label: 'Alvorlighet', type: 'select', options: AV_ALV, half: true }, { k: 'status', label: 'Status', type: 'select', options: AV_STATUS, half: true },
     { k: 'kilde', label: 'Kilde', type: 'select', options: AV_KILDE, half: true }, { k: 'meldtAv', label: 'Meldt av / referanse', half: true, ph: 'Navn, rapportnr., tilsynsref.' },
@@ -343,25 +344,30 @@ export function editAvvik(id?: string, preset: any = {}) {
     { k: 'beskrivelse', label: 'Beskrivelse og tiltak', type: 'textarea' },
     { k: 'komm', label: id ? 'Kommentar til denne endringen (legges i loggen)' : 'Kommentar', type: 'textarea', ph: id ? 'F.eks. hvorfor avviket utsettes eller avvises' : '' },
     { k: 'fil', label: 'Vedlegg (bilde/PDF)', type: 'file' }];
-  let touchedFrist = false;
-  formModal({
+  let touchedFrist = false; const lukkRef: { c?: () => void } = {};
+  lukkRef.c = formModal({
     title: id ? `Avvik #${a.nr || ''}` : 'Nytt avvik', fields, values: { ...a, komm: '', fil: null }, wide: true, readOnly: !staff,
     onChange: (k, v) => { if (k === 'frist') touchedFrist = true; if (k === 'komponentId' && v.komponentId) { const c = byId('komponenter', v.komponentId); if (c) return { anleggId: c.anleggId, eiendomId: c.eiendomId }; } if (!id && !touchedFrist && (k === 'alv' || k === 'oppdaget')) return { frist: addDays(v.oppdaget || today(), AV_FRIST[v.alv]) }; },
     bottom: () => <>
+      {id && staff && <AoPanel id={id} lukk={() => lukkRef.c?.()} />}
+      {!id && <p className="small muted" style={{ marginTop: 12 }}>Etter lagring kan avviket plasseres på tegning, tildeles en bruker eller sendes som arbeidsordre på e-post.</p>}
       {a.oppgaveId && byId('oppgaver', a.oppgaveId) && <p className="small muted" style={{ marginTop: 12 }}>Registrert fra kontroll: <a href="#" onClick={e => { e.preventDefault(); visOppgave(a.oppgaveId); }}>{byId('oppgaver', a.oppgaveId)!.navn}</a></p>}
       {(a.vedlegg || []).length > 0 && <><h3 style={{ marginTop: 14 }}>Vedlegg</h3>{a.vedlegg.map((f: any, i: number) => <div key={i}><FileLink fil={f} /></div>)}</>}
-      {id && (a.logg || []).length > 0 && <><h3 style={{ marginTop: 18 }}>Logg</h3><div className="log">{a.logg.slice().reverse().map((l: any, i: number) => <div key={i}><span className="lt">{new Date(l.t).toLocaleString('nb-NO', { dateStyle: 'short', timeStyle: 'short' })}{l.av ? ' · ' + l.av : ''}</span> · <StChip s={l.s} />{l.k && <><br />{l.k}</>}</div>)}</div></>}
+      {id && ((byId('avvik', id) || a).logg || []).length > 0 && <><h3 style={{ marginTop: 18 }}>Logg</h3><div className="log">{(byId('avvik', id) || a).logg.slice().reverse().map((l: any, i: number) => <div key={i}><span className="lt">{new Date(l.t).toLocaleString('nb-NO', { dateStyle: 'short', timeStyle: 'short' })}{l.av ? ' · ' + l.av : ''}</span> · <StChip s={l.s} />{l.k && <><br />{l.k}</>}</div>)}</div></>}
+      {id && staff && <details style={{ marginTop: 10 }}><summary className="small">Full endringslogg fra databasen</summary><div style={{ marginTop: 8 }}><HendelseListe radId={id} /></div></details>}
     </>,
     extraFoot: close => id && canEdit() ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette avviket permanent? Vanligvis bør avvik heller settes til «Avvist» eller «Lukket» slik at historikken bevares.')) { await removeDoc('avvik', id); close(); } }}>Slett</button> : null,
     onSave: async x => {
       const komm = x.komm; const fil = x.fil; delete x.komm; delete x.fil;
       if (x.komponentId) { const kc = byId('komponenter', x.komponentId); if (kc) { x.anleggId = kc.anleggId; x.eiendomId = kc.eiendomId; } }
-      const o: Rec = { ...a, ...x }; if (!o.frist) o.frist = addDays(o.oppdaget || today(), AV_FRIST[o.alv]);
-      if (fil) { const f = await uploadFile(fil, o.eiendomId, o.leietakerId && canEdit() ? o.leietakerId : undefined); if (f) o.vedlegg = [...(a.vedlegg || []), f]; }
-      o.logg = (a.logg || []).slice(); const av = state.me?.navn || state.me?.epost;
+      const base: Rec = id ? { ...(byId('avvik', id) || a) } : a; // ferske felt (plassering, tildeling, vedlegg, logg) kan være endret mens skjemaet var åpent
+      const o: Rec = { ...base, ...x }; if (!o.frist) o.frist = addDays(o.oppdaget || today(), AV_FRIST[o.alv]);
+      if (fil) { const f = await uploadFile(fil, o.eiendomId, o.leietakerId && canEdit() ? o.leietakerId : undefined); if (f) o.vedlegg = [...(base.vedlegg || []), f]; }
+      o.logg = (base.logg || []).slice(); const av = state.me?.navn || state.me?.epost;
       if (!id) o.logg.push({ t: new Date().toISOString(), s: o.status, k: komm || 'Registrert', av });
-      else if (o.status !== a.status || komm) o.logg.push({ t: new Date().toISOString(), s: o.status, k: (o.status !== a.status ? `Status: ${a.status} → ${o.status}` : '') + (komm ? (o.status !== a.status ? '. ' : '') + komm : ''), av });
-      if (AV_LUKKET.includes(o.status) && !AV_LUKKET.includes(a.status)) o.lukket = today();
+      else if (o.status !== base.status || komm) o.logg.push({ t: new Date().toISOString(), s: o.status, k: (o.status !== base.status ? `Status: ${base.status} → ${o.status}` : '') + (komm ? (o.status !== base.status ? '. ' : '') + komm : ''), av });
+      if (AV_LUKKET.includes(o.status) && !AV_LUKKET.includes(base.status)) o.lukket = today();
+      if (o.anleggId || o.komponentId || o.ao) o.ao = aoSnapshot(o);
       if (!AV_LUKKET.includes(o.status)) delete o.lukket;
       await save('avvik', o); toast('Avvik lagret');
     },
