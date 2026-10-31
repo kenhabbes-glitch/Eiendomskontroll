@@ -1,7 +1,7 @@
 import React from 'react';
 import { AV_LUKKET, VEDL_KAT } from '../lib/catalog';
 import { S, bump, feiltekst, save, sb, state, toast, uploadFile, useStore } from '../lib/store';
-import { addDays, byId, fd, intTxt, pliktStatus, sortBy, today } from '../lib/utils';
+import { addDays, byId, fd, intTxt, pliktStatus, sortBy, today, leieAreal, m2 } from '../lib/utils';
 import { AlvChip, Chip, Empty, FileLink, StChip, formModal, showModal } from '../components/ui';
 
 async function refreshMine() {
@@ -71,7 +71,7 @@ export function Portal() {
       <div className="kpis" style={{ marginTop: 14, marginBottom: 0 }}>
         <div className={'kpi ' + (mangler.length ? 'warn' : 'ok')} style={{ cursor: 'default' }}><div className="l">Plikter som må bekreftes</div><div className="v">{mangler.length}</div><div className="s">av {pl.length} plikter</div></div>
         <div className="kpi" style={{ cursor: 'default' }}><div className="l">Åpne meldinger</div><div className="v">{apne.length}</div><div className="s">{A.length - apne.length} avsluttet</div></div>
-        <div className="kpi" style={{ cursor: 'default' }}><div className="l">Leieavtale</div><div className="v" style={{ fontSize: 17, letterSpacing: 0 }}>{l.slutt ? 'til ' + fd(l.slutt) : '–'}</div><div className="s">{l.areal ? l.areal + ' m² leieareal' : ''}</div></div>
+        <div className="kpi" style={{ cursor: 'default' }}><div className="l">Leieavtale</div><div className="v" style={{ fontSize: 17, letterSpacing: 0 }}>{l.slutt ? 'til ' + fd(l.slutt) : '–'}</div><div className="s">{leieAreal(l).verdi !== null ? m2(leieAreal(l).verdi) + ' leieareal' : ''}</div></div>
       </div>
       {e.kontaktLeietaker && <p className="small" style={{ marginBottom: 0 }}>Kontakt utleier: {e.kontaktLeietaker}</p>}
     </div>

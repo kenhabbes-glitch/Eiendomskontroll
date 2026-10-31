@@ -102,6 +102,20 @@ export function arealCalc(eid: string) {
   const totLeie = Object.values(per).reduce((s: number, p: any) => s + p.tot, 0);
   return { per, etg, unscaled, fellesBygg, totEks, totLeie, ikkeFordelt };
 }
+export type LeieArealInfo = { verdi: number | null; kilde: 'overstyrt' | 'maalt' | 'manuell' | null; p: { eks: number; fe: number; fb: number; tot: number; etg?: string[] } | null; adv: string[] };
+/** Gjeldende leieareal for en leietaker: overstyrt > oppmålt fra tegninger (inkl. andel fellesareal) > eldre manuell verdi */
+export function leieAreal(l: Rec): LeieArealInfo {
+  const C = arealCalc(l.eiendomId); let p: any = C.per[l.id] || null;
+  if (!p && l.arealBeregnet?.tot && !S.tegninger.some(t => t.eiendomId === l.eiendomId)) p = l.arealBeregnet; // leietakere ser ikke tegningene
+  const ovRaw = l.arealOverstyrt; const ov = ovRaw !== '' && ovRaw != null && !isNaN(+ovRaw) ? +ovRaw : null;
+  const adv: string[] = [];
+  if (p && (p.fe || 0) + (p.fb || 0) < 0.05) adv.push('Andel fellesareal er ikke med – det er ikke tegnet fellesarealer for eiendommen');
+  if (p && C.unscaled) adv.push(`${C.unscaled} tegning(er) på eiendommen mangler målestokk og er ikke regnet med`);
+  if (ov !== null) return { verdi: ov, kilde: 'overstyrt', p, adv: [] };
+  if (p) return { verdi: p.tot, kilde: 'maalt', p, adv };
+  if (+l.areal) return { verdi: +l.areal, kilde: 'manuell', p: null, adv: [] };
+  return { verdi: null, kilde: null, p: null, adv: [] };
+}
 export function docCoverage(e: Rec, PAAKREVD: string[]) {
   const docs = S.dokumenter.filter(d => d.eiendomId === e.id); const na = e.dokNA || [];
   return PAAKREVD.map(t => {

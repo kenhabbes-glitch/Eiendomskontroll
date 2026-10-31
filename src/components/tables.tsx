@@ -1,7 +1,7 @@
 import React, { type ReactNode } from 'react';
 import { KOMP, DOK_PAAKREVD, AV_LUKKET } from '../lib/catalog';
 import { S, canEdit } from '../lib/store';
-import { kostNaa, kostTip, kostJustert, nok, YEAR } from '../lib/utils';
+import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2 } from '../lib/utils';
 const justTip = (a: any) => { const y = Math.max(compYear(a) || YEAR, YEAR); return `${kostTip(a)}. Prisjustert med KPI til utskiftingsåret ${y}.`; };
 import { aNavn, byId, compRest, compYear, dUntil, docCoverage, eNavn, fd, intTxt, knok, lNavn, openAvvik, pad, pliktStatus, sortBy, tfmKomp, tfmSys, type Rec } from '../lib/utils';
 import { editAnlegg, editAvvik, editDok, editKomponent, toggleDokNA, utfor, visOppgave } from '../lib/actions';
@@ -126,7 +126,7 @@ export function LeieTable({ list, showE = true }: { list: Rec[]; showE?: boolean
       const users = S.profiles.filter(p => p.leietaker_id === l.id && p.rolle === 'leietaker').length;
       return <tr key={l.id} className="click" onClick={() => go('leietaker/' + l.id)}>
         <td><b style={{ fontWeight: 500 }}>{l.navn}</b>{l.brreg && enhetStatus(l.brreg).c !== 'green' && <> <Chip c={enhetStatus(l.brreg).c}>{enhetStatus(l.brreg).t}</Chip></>}<div className="small muted">{l.virksomhet}{l.orgnr ? ' · ' + l.orgnr : ''}</div></td>{showE && <td>{eNavn(l.eiendomId)}</td>}
-        <td className="small">{l.lokale || '–'}</td><td className="num">{l.areal ? l.areal + ' m²' : '–'}</td>
+        <td className="small">{l.lokale || '–'}</td><td className="num">{(() => { const la = leieAreal(l); return la.verdi === null ? '–' : <>{m2(la.verdi)}{la.adv.length > 0 && <span data-tip={la.adv.join('\n')} style={{ color: 'var(--amber)', marginLeft: 4 }}>⚠</span>}{la.kilde === 'overstyrt' && <div className="small muted">overstyrt</div>}</>; })()}</td>
         <td>{d === null ? <span className="muted">–</span> : d < 0 ? <Chip c="red">Utløpt {fd(l.slutt)}</Chip> : d <= varsel ? <Chip c="amber">{fd(l.slutt)}</Chip> : <span className="small">{fd(l.slutt)}</span>}</td>
         <td>{ps.length ? (bad ? <Chip c="red">{bad} av {ps.length} mangler</Chip> : <Chip c="green">{ps.length} av {ps.length} OK</Chip>) : <span className="muted">–</span>}</td>
         <td className="num">{openAvvik().filter(a => a.leietakerId === l.id).length}</td>

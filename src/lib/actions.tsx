@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state } from './store';
+import { leieAreal, m2 } from './utils';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok } from './utils';
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
@@ -351,8 +352,12 @@ export function editLeietaker(id?: string, preset: any = {}) {
     { k: 'brregInfo', type: 'custom', show: v => !!v.brreg, render: v => { const st = enhetStatus(v.brreg); return <div className="note small"><b>{v.brreg.navn}</b> {st.t && <span style={{ color: st.c === 'green' ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>· {st.t}</span>}<br />{[v.brreg.orgform, v.brreg.naering, v.brreg.ansatte != null ? v.brreg.ansatte + ' ansatte' : '', v.brreg.adresse].filter(Boolean).join(' · ')}{v.brreg.dagligLeder && <><br />Daglig leder: {v.brreg.dagligLeder}{v.brreg.styreleder ? ' · Styreleder: ' + v.brreg.styreleder : ''}</>}</div>; } },
     { k: 'navn', label: 'Leietaker (firma)', req: true, half: true }, { k: 'orgnr', label: 'Org.nr.', half: true, mono: true },
     { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true }, { k: 'lokale', label: 'Leieobjekt / etasje', half: true },
-    { k: 'areal', label: 'Areal (m²)', type: 'number', half: true },
+    { k: 'arealOverstyrt', label: 'Overstyr leieareal (m²)', type: 'number', half: true, hint: 'La stå tom for å bruke arealet fra tegningene' },
     { k: 'virksomhet', label: 'Type virksomhet', type: 'select', options: ['Kontor', 'Butikk/handel', 'Servering', 'Lager/logistikk', 'Industri/verksted', 'Helse/omsorg', 'Undervisning', 'Annet'], empty: '–', half: true },
+    { k: 'arealInfo', type: 'custom', render: v => { const i = leieAreal({ ...l, eiendomId: v.eiendomId, arealOverstyrt: v.arealOverstyrt }); const p = i.p;
+      return <div className="note small" style={{ color: 'var(--ink)' }}>{p ? <>Oppmålt fra tegninger: <b className="mono">{m2(p.tot)}</b> <span className="muted">= eksklusivt {m2(p.eks)} + andel felles etasje {m2(p.fe)} + andel felles bygg {m2(p.fb)}{p.etg?.length ? ` · ${p.etg.join(', ')}` : ''}</span></> : <span className="muted">Ingen arealer er tegnet for denne leietakeren ennå (Tegninger og arealer).</span>}
+        {i.kilde === 'overstyrt' && p && Math.abs(i.verdi! - p.tot) >= 0.1 && <><br /><b>Overstyrt til {m2(i.verdi)}</b> <span className="muted">({i.verdi! - p.tot > 0 ? '+' : ''}{(i.verdi! - p.tot).toLocaleString('nb-NO', { maximumFractionDigits: 1 })} m² mot oppmålt)</span></>}
+        {leieAreal({ ...l, eiendomId: v.eiendomId, arealOverstyrt: '' }).adv.map((a, j) => <div key={j} style={{ color: 'var(--amber)', marginTop: 4 }}>⚠ {a}</div>)}</div>; } },
     { k: 'sec', label: 'Leieavtale', type: 'sec' },
     { k: 'start', label: 'Avtalestart', type: 'date', half: true }, { k: 'slutt', label: 'Avtaleutløp', type: 'date', half: true },
     { k: 'avtaletype', label: 'Avtalemal', type: 'select', options: ['Standard næringsleiekontrakt (Norsk Eiendom)', 'Standard leieavtale (Huseierne)', 'Egen mal', 'Annet'], empty: '–', half: true },
@@ -362,10 +367,10 @@ export function editLeietaker(id?: string, preset: any = {}) {
     { k: 'epost', label: 'E-post', type: 'email', half: true }, { k: 'tlf', label: 'Telefon', half: true },
     { k: 'notat', label: 'Notater (vises ikke for leietaker)', type: 'textarea' }];
   formModal({
-    title: id ? 'Rediger leietaker' : 'Ny leietaker', fields, values: l,
+    title: id ? 'Rediger leietaker' : 'Ny leietaker', fields, values: { ...l, arealOverstyrt: l.arealOverstyrt ?? (!leieAreal({ ...l, arealOverstyrt: '' }).p && +l.areal ? +l.areal : '') },
     extraFoot: close => id ? <button className="btn danger" onClick={async () => { if (await confirmBox(`Slette leietaker «${l.navn}»? Brukere koblet til leietakeren mister tilgangen.`)) { await removeDoc('leietakere', id); close(); go('leietakere'); } }}>Slett</button> : null,
     onSave: async x => {
-      delete x.sokLt; delete x.brregInfo;
+      delete x.sokLt; delete x.brregInfo; delete x.arealInfo; x.areal = null;
       if (x.orgnr && rensOrgnr(x.orgnr).length === 9 && x.brreg?.orgnr !== rensOrgnr(x.orgnr)) { const b = await brregData(x.orgnr).catch(() => null); if (b) { x.brreg = b; if (!x.virksomhet) x.virksomhet = virksomhetFraNaering(b.naeringKode); } }
       const o: Rec = { ...l, ...x };
       if (!id) {

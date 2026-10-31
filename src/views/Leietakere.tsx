@@ -1,7 +1,7 @@
 import React from 'react';
 import { DOK_LEIE, VEDL_KAT } from '../lib/catalog';
 import { S, isAdmin, useStore } from '../lib/store';
-import { arealCalc, byId, eNavn, fd, intTxt, m2, pliktStatus } from '../lib/utils';
+import { leieAreal, byId, eNavn, fd, intTxt, m2, pliktStatus } from '../lib/utils';
 import { bekreftPlikt, brev, editAvvik, editDok, editLeietaker, nyPlikt, setMatrise } from '../lib/actions';
 import { AvvikTable, DokTable, LeieTable, TaskTable } from '../components/tables';
 import { Chip, Empty, FileLink } from '../components/ui';
@@ -42,11 +42,11 @@ export function LeietakerView({ id }: { id: string }) {
   if (!l) return <Empty t="Fant ikke leietakeren"><a href="#/leietakere">Tilbake</a></Empty>;
   const mx = l.matrise || {}; const cats = [...VEDL_KAT.map(x => x[0]), ...Object.keys(mx).filter(k => !VEDL_KAT.some(x => x[0] === k))];
   const A = S.avvik.filter(a => a.leietakerId === id); const D = S.dokumenter.filter(d => d.leietakerId === id); const T = S.oppgaver.filter(o => o.leietakerId === id && o.aktiv !== false);
-  const maalt = arealCalc(l.eiendomId).per[l.id];
+  const la = leieAreal(l);
   const users = S.profiles.filter(p => p.leietaker_id === id);
   const dl: [string, React.ReactNode][] = ([
     ['Eiendom', <a href={'#/eiendom/' + l.eiendomId}>{eNavn(l.eiendomId)}</a>], ['Leieobjekt', l.lokale],
-    ['Areal', (l.areal || maalt) ? <>{l.areal ? l.areal + ' m²' : ''}{maalt && <span className="muted small"> · oppmålt {m2(maalt.tot)}{l.arealMaalt ? '' : ' (ikke overført)'}</span>}</> : ''],
+    ['Leieareal', la.verdi !== null ? <><b>{m2(la.verdi)}</b> <span className="muted small">{la.kilde === 'maalt' ? `fra tegninger (eksklusivt ${m2(la.p!.eks)} + andel fellesareal ${m2(la.p!.fe + la.p!.fb)})` : la.kilde === 'overstyrt' ? (la.p ? `overstyrt · oppmålt ${m2(la.p.tot)}` : 'overstyrt manuelt') : 'registrert manuelt'}</span>{la.adv.map((a, i) => <div key={i} className="small" style={{ color: 'var(--amber)' }}>⚠ {a}</div>)}</> : <span className="muted">Ikke registrert</span>],
     ['Org.nr.', l.orgnr], ['Virksomhet', l.virksomhet], ['Avtaleperiode', l.start || l.slutt ? fd(l.start) + ' – ' + fd(l.slutt) : ''], ['Avtalemal', l.avtaletype],
     ['Kontakt', [l.kontakt, l.epost, l.tlf].filter(Boolean).join(' · ')], ['Brannvernleder', l.brannvernleder]] as [string, React.ReactNode][]).filter(x => x[1]);
   const docMiss = DOK_LEIE.filter(t => !D.some(d => d.type === t));

@@ -1,5 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { S, canEdit, deleteFile, save, removeDoc, toast, uploadFile, useStore } from '../lib/store';
+
+/** Lagrer beregnet leieareal (inkl. andel fellesareal) på leietakerne til eiendommen */
+export async function syncArealer(eid: string) {
+  const C = arealCalc(eid); const dato = new Date().toISOString().slice(0, 10);
+  for (const l of S.leietakere.filter(x => x.eiendomId === eid)) {
+    const p = C.per[l.id]; const r = (v: number) => Math.round(v * 10) / 10;
+    const ny = p ? { tot: r(p.tot), eks: r(p.eks), fe: r(p.fe), fb: r(p.fb), etg: p.etg, dato } : null;
+    const gml = l.arealBeregnet || null;
+    const lik = (!ny && !gml) || (ny && gml && ny.tot === gml.tot && ny.eks === gml.eks && ny.fe === gml.fe && ny.fb === gml.fb);
+    if (!lik) { try { await save('leietakere', { ...l, arealBeregnet: ny }); } catch { } }
+  }
+}
 import { AREAL_KAT, KAT_FARGE, arealCalc, byId, centroid, clone, eNavn, lNavn, ltColor, m2, mpp, sortBy, toCsv, today, zoneArea, zoneColor, type Rec } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, openModal, textModal, useFileUrl } from '../components/ui';
 import { Sel, eiendomOpts, useFilter } from './common';
@@ -30,9 +42,9 @@ export function editTegning(id?: string, eid?: string) {
   if (!id) fields.push({ k: 'fil', label: 'Plantegning (PDF, PNG eller JPG)', type: 'file', req: true, accept: '.pdf,.png,.jpg,.jpeg,.webp' }, { k: 'side', label: 'Sidenummer i PDF', type: 'number', half: true, hint: 'Bare for PDF med flere sider' });
   formModal({
     title: id ? 'Rediger tegning' : 'Last opp plantegning', fields, values: t, saveTxt: id ? 'Lagre' : 'Last opp',
-    extraFoot: close => id ? <button className="btn danger" onClick={async () => { if (await confirmBox(`Slette tegningen «${t.navn}» med ${(t.soner || []).length} oppmålte arealer?`)) { await deleteFile(t.fil); await removeDoc('tegninger', id); close(); } }}>Slett</button> : null,
+    extraFoot: close => id ? <button className="btn danger" onClick={async () => { if (await confirmBox(`Slette tegningen «${t.navn}» med ${(t.soner || []).length} oppmålte arealer?`)) { await deleteFile(t.fil); await removeDoc('tegninger', id); await syncArealer(t.eiendomId); close(); } }}>Slett</button> : null,
     onSave: async x => {
-      if (id) { await save('tegninger', { ...t, eiendomId: x.eiendomId, navn: x.navn, etasje: x.etasje }); return; }
+      if (id) { await save('tegninger', { ...t, eiendomId: x.eiendomId, navn: x.navn, etasje: x.etasje }); await syncArealer(x.eiendomId); if (x.eiendomId !== t.eiendomId) await syncArealer(t.eiendomId); return; }
       const f: File = x.fil; const ext = (f.name.split('.').pop() || '').toLowerCase(); let blob: Blob = f, w = 0, h = 0, navn = f.name;
       try {
         if (ext === 'pdf') { toast('Leser PDF …'); const r = await pdfToImage(f, x.side); blob = r.blob; w = r.w; h = r.h; navn = f.name.replace(/\.pdf$/i, '') + (blob.type === 'image/png' ? '.png' : '.jpg'); }
@@ -76,7 +88,7 @@ function PlanEditor({ tid, close }: { tid: string; close: () => void }) {
     if (ref && st.shift) { const dx = Math.abs(p[0] - ref[0]), dy = Math.abs(p[1] - ref[1]); return dx > dy ? [p[0], ref[1]] : [ref[0], p[1]]; }
     return p;
   };
-  const flush = async () => { clearTimeout(st.saveT); if (!st.dirty) return; st.dirty = false; st.status = 'Lagrer …'; rr(); try { await save('tegninger', clone(T)); st.status = 'Lagret'; } catch { st.dirty = true; st.status = 'Lagring feilet'; } rr(); };
+  const flush = async () => { clearTimeout(st.saveT); if (!st.dirty) return; st.dirty = false; st.status = 'Lagrer …'; rr(); try { await save('tegninger', clone(T)); await syncArealer(T.eiendomId); st.status = 'Lagret'; } catch { st.dirty = true; st.status = 'Lagring feilet'; } rr(); };
   const change = () => { if (ro) return; st.dirty = true; st.status = 'Ikke lagret …'; clearTimeout(st.saveT); st.saveT = setTimeout(flush, 900); rr(); };
   const setTool = (t: string) => { st.tool = t; st.draft = []; if (t !== 'skala') st.scale = []; if (t !== 'maal') st.meas = []; if (t !== 'velg') st.sel = null; rr(); };
   const closePoly = () => { if (st.draft.length < 3) return; const z = { id: crypto.randomUUID(), navn: 'Areal ' + (T.soner.length + 1), kat: 'leie', leietakerId: '', pts: st.draft.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]) }; T.soner.push(z); st.draft = []; st.sel = z.id; st.tool = 'velg'; change(); setTimeout(() => { const n = document.getElementById('zN') as HTMLInputElement; n?.focus(); n?.select(); }, 30); };
@@ -99,7 +111,7 @@ function PlanEditor({ tid, close }: { tid: string; close: () => void }) {
     document.addEventListener('keydown', keys); document.addEventListener('keyup', keys);
     return () => { document.removeEventListener('keydown', keys); document.removeEventListener('keyup', keys); };
   });
-  useEffect(() => () => { if (st.dirty) save('tegninger', clone(T)).catch(() => {}); }, []);
+  useEffect(() => () => { if (st.dirty) save('tegninger', clone(T)).then(() => syncArealer(T.eiendomId)).catch(() => {}); }, []);
 
   const onDown = (e: React.PointerEvent) => {
     st.shift = e.shiftKey; const p = pt(e); const tg = e.target as Element; const hdl = tg.getAttribute('data-h'); const zid = tg.getAttribute('data-z');
@@ -185,7 +197,6 @@ export function ArealSection({ eid }: { eid: string }) {
   const keys = Object.keys(C.per).sort((a, b) => (+a.startsWith('_') - +b.startsWith('_')) || lNavn(a).localeCompare(lNavn(b)));
   const nm = (k: string) => k === '_ledig' ? 'Ledig areal' : k === '_ukjent' ? 'Leieareal uten leietaker' : lNavn(k) || 'Ukjent leietaker';
   const tot = C.totLeie; const ikke = C.etg.reduce((s: number, x: any) => s + (x.sum.ikke || 0), 0);
-  const sync = async () => { const L = Object.entries(C.per).filter(([k]) => byId('leietakere', k)); if (!L.length) return; if (!await confirmBox(`Oppdatere arealet på ${L.length} leietakere med oppmålt leieareal (inkl. fellesarealandel)?`, 'Oppdater')) return; for (const [k, p] of L as any) { const l = byId('leietakere', k)!; await save('leietakere', { ...l, areal: Math.round(p.tot * 10) / 10, arealMaalt: today() }); } toast('Leietakernes areal oppdatert'); };
   const csv = () => { const f = (v: number) => v.toLocaleString('nb-NO', { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }); const rows: any[][] = [['Leietaker', 'Etasje', 'Eksklusivt areal m2', 'Andel felles etasje m2', 'Andel felles bygg m2', 'Leieareal m2', 'Andel %']]; keys.forEach(k => { const p = C.per[k]; rows.push([nm(k), p.etg.join(', '), f(p.eks), f(p.fe), f(p.fb), f(p.tot), tot ? f(p.tot / tot * 100) : '']); }); rows.push(['Sum', '', f(C.totEks), '', '', f(tot), '100']); textModal('Arealoppgave – ' + e.navn, toCsv(rows)); };
   return <>
     <div className="plancards">
@@ -195,17 +206,18 @@ export function ArealSection({ eid }: { eid: string }) {
       {ed && <button className="upcard" onClick={() => editTegning(undefined, eid)}><b style={{ fontSize: 22 }}>+</b><span>Last opp plantegning</span><span className="small">PDF, PNG eller JPG</span></button>}
       {!ed && !T.length && <div className="card"><Empty t="Ingen tegninger" /></div>}
     </div>
-    <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Arealoppgave – {e.navn}</h2>{keys.length > 0 && <><button className="btn sm" onClick={csv}>Kopier arealoppgave (CSV)</button>{ed && <button className="btn sm" onClick={sync}>Oppdater areal på leietakerne</button>}</>}</div>
+    <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Arealoppgave – {e.navn}</h2>{keys.length > 0 && <><button className="btn sm" onClick={csv}>Kopier arealoppgave (CSV)</button></>}</div>
       {C.unscaled > 0 && <div className="banner">{C.unscaled} tegning(er) har arealer, men mangler målestokk og er ikke med i oppgaven.</div>}
-      {keys.length ? <div className="tbl-wrap"><table><thead><tr><th>Leietaker</th><th>Etasje</th><th className="num">Eksklusivt areal</th><th className="num">Andel felles etasje</th><th className="num">Andel felles bygg</th><th className="num">Leieareal</th><th className="num">Andel</th>{ed && <th className="num">I leieavtalen</th>}</tr></thead><tbody>
-        {keys.map(k => { const p = C.per[k]; const l = byId('leietakere', k); const diff = l && l.areal ? p.tot - +l.areal : null;
+      {keys.length ? <div className="tbl-wrap"><table><thead><tr><th>Leietaker</th><th>Etasje</th><th className="num">Eksklusivt areal</th><th className="num">Andel felles etasje</th><th className="num">Andel felles bygg</th><th className="num">Leieareal</th><th className="num">Andel</th>{ed && <th className="num">Overstyrt på leietaker</th>}</tr></thead><tbody>
+        {keys.map(k => { const p = C.per[k]; const l = byId('leietakere', k); const ov = l && l.arealOverstyrt !== '' && l.arealOverstyrt != null && !isNaN(+l.arealOverstyrt) ? +l.arealOverstyrt : null;
           return <tr key={k} className={l && ed ? 'click' : ''} onClick={() => l && ed && go('leietaker/' + k)}><td><span className="sw" style={{ display: 'inline-block', verticalAlign: -1, marginRight: 6, background: k === '_ledig' ? KAT_FARGE.ledig : ltColor(eid, k) }} />{nm(k)}</td><td className="small">{p.etg.join(', ')}</td>
             <td className="num">{m2(p.eks)}</td><td className="num">{m2(p.fe)}</td><td className="num">{m2(p.fb)}</td><td className="num" style={{ fontWeight: 600 }}>{m2(p.tot)}</td><td className="num">{tot ? (p.tot / tot * 100).toLocaleString('nb-NO', { maximumFractionDigits: 1 }) + ' %' : '–'}</td>
-            {ed && <td className="num">{l && l.areal ? <>{m2(+l.areal)}{diff !== null && Math.abs(diff) >= 1 && <div className="small" style={{ color: 'var(--amber)' }}>{diff > 0 ? '+' : ''}{diff.toLocaleString('nb-NO', { maximumFractionDigits: 1 })}</div>}</> : '–'}</td>}</tr>; })}
+            {ed && <td className="num">{ov !== null ? <>{m2(ov)}{Math.abs(ov - p.tot) >= 1 && <div className="small" style={{ color: 'var(--amber)' }}>{ov - p.tot > 0 ? '+' : ''}{(ov - p.tot).toLocaleString('nb-NO', { maximumFractionDigits: 1 })} mot oppmålt</div>}</> : <span className="muted">–</span>}</td>}</tr>; })}
         <tr className="grp"><td colSpan={2}>Sum utleibart</td><td className="num">{m2(C.totEks)}</td><td className="num">{m2(keys.reduce((s, k) => s + C.per[k].fe, 0))}</td><td className="num">{m2(keys.reduce((s, k) => s + C.per[k].fb, 0))}</td><td className="num">{m2(tot)}</td><td className="num">100 %</td>{ed && <td />}</tr>
       </tbody></table></div> : <div className="tbl-wrap"><Empty t="Ingen oppmålte leiearealer ennå">{ed && 'Last opp plantegning, sett målestokk og tegn arealene.'}</Empty></div>}
       {C.ikkeFordelt > 0 && <p className="small" style={{ color: 'var(--amber)' }}>{m2(C.ikkeFordelt)} fellesareal er ikke fordelt fordi det ikke finnes leieareal å fordele på.</p>}
-      <p className="small muted">Fellesareal i etasjen fordeles forholdsmessig på leiearealene (inkl. ledig areal) i samme etasje. Fellesareal for hele bygget fordeles på alle leiearealer. Ikke utleibart areal: {m2(ikke)}. Arealene er målt fra tegning og er veiledende – en formell arealoppgave etter NS 3940 bør kontrollmåles.</p></div>
+      {C.fellesBygg + C.etg.reduce((s: number, x: any) => s + (x.sum.felles_etg || 0), 0) < 0.05 && keys.length > 0 && <div className="banner">Det er ikke tegnet fellesarealer for eiendommen, så leiearealene inneholder ingen andel fellesareal. Tegn korridorer, trapperom, inngangsparti o.l. som «Fellesareal» hvis de skal fordeles.</div>}
+      <p className="small muted">Leiearealet (inkl. andel fellesareal) lagres automatisk på leietakerne når tegningene endres, og kan overstyres på leietakeren. Fellesareal i etasjen fordeles forholdsmessig på leiearealene (inkl. ledig areal) i samme etasje. Fellesareal for hele bygget fordeles på alle leiearealer. Ikke utleibart areal: {m2(ikke)}. Arealene er målt fra tegning og er veiledende – en formell arealoppgave etter NS 3940 bør kontrollmåles.</p></div>
     {C.etg.length > 0 && <div className="sec"><h2>Oppmålt per etasje</h2><div className="tbl-wrap"><table><thead><tr><th>Tegning / etasje</th><th className="num">Leieareal</th><th className="num">Ledig</th><th className="num">Felles etasje</th><th className="num">Felles bygg</th><th className="num">Ikke utleibart</th><th className="num">Sum oppmålt</th></tr></thead><tbody>
       {C.etg.map((x: any) => <tr key={x.t.id} className="click" onClick={() => openPlan(x.t.id)}><td>{x.t.navn}{!x.ok && <> <Chip c="amber">Mangler målestokk</Chip></>}</td>{['leie', 'ledig', 'felles_etg', 'felles_bygg', 'ikke'].map(c => <td key={c} className="num">{x.ok ? m2(x.sum[c]) : '–'}</td>)}<td className="num" style={{ fontWeight: 600 }}>{x.ok ? m2(Object.values(x.sum as Record<string, number>).reduce((a, b) => a + b, 0)) : '–'}</td></tr>)}
     </tbody></table></div></div>}
