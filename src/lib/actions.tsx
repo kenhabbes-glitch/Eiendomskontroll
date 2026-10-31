@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state } from './store';
 import { leieAreal, m2 } from './utils';
-import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar } from './utils';
+import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst } from './utils';
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
 import { openPlan } from '../views/Arealer';
@@ -76,7 +76,7 @@ function UtskiftNote({ v, typeLevetid, sysId, kompAv }: { v: any; typeLevetid?: 
   const lev = +v.levetid || typeLevetid || 0; const ber = +v.aar && lev ? +v.aar + lev : null;
   const k = kpiInnst();
   if (kompAv && !egetAar(v)) { const s = byId('anlegg', kompAv); const sy = s ? compYear(s) : null; return <div className="note small" style={{ color: 'var(--ink)' }}>Uten egen levetid følger komponenten systemets utskiftingsår{sy ? <>: <b className="mono">{sy}</b></> : ' (systemet mangler år)'}.
-    {+v.kost > 0 && sy && <><br />Prisjustert kostnad i {Math.max(sy, YEAR)}: <b className="mono">{nok(kostJustert(v, sy))}</b> – inngår i systemets totale utskiftingskostnad.</>}</div>; }
+    {+v.kost > 0 && sy && <><br />Prisjustert kostnad i {Math.max(sy, YEAR)}: <b className="mono">{nok(kostJustert(v, sy))}</b> · nåverdi <b className="mono">{nok(naaverdi(kostJustert(v, sy), Math.max(sy, YEAR)))}</b> – inngår i systemets totale utskiftingskostnad.</>}</div>; }
   const aar = +v.planAar || ber;
   const ks = sysId ? S.komponenter.filter(c => c.anleggId === sysId && +c.kost > 0) : [];
   const kNaa = ks.reduce((s, c) => s + kostNaa(c), 0); const sNaa = +v.kost > 0 ? (+v.kostAar && +v.kostAar < YEAR ? kostNaa(v) : +v.kost) : 0;
@@ -86,8 +86,10 @@ function UtskiftNote({ v, typeLevetid, sysId, kompAv }: { v: any; typeLevetid?: 
       : +v.planAar ? <>Utskiftingsår: <b className="mono">{v.planAar}</b> (satt manuelt)</> : <span className="muted">Fyll inn installert år og levetid, så beregnes utskiftingsåret.</span>}
     {ks.length > 0 && <><br />Kostnad i dag for hele systemet: <b className="mono">{nok(sNaa + kNaa)}</b> <span className="muted">= sentralkost {nok(sNaa)} + {ks.length} komponenter {nok(kNaa)}</span>
       {aar && <><br />Prisjustert totalkostnad i {Math.max(aar, YEAR)}: <b className="mono">{nok(sJ + kJ)}</b></>}</>}
+    {aar && (sJ + kJ) > 0 && <><br />Nåverdi i dag: <b className="mono">{nok(naaverdi(sJ + kJ, Math.max(aar, YEAR)))}</b> <span className="muted">(diskontert {Math.max(aar - YEAR, 0)} år med {renteInnst().toLocaleString('nb-NO')} % kalkulasjonsrente)</span></>}
     {!ks.length && sysId !== undefined && <><br /><span className="muted">Komponentkostnader du legger inn på komponentene, summeres automatisk med sentralkosten.</span></>}
     {+v.kost > 0 && aar && !ks.length && <><br />Prisjustert kostnad i {Math.max(aar, YEAR)}: <b className="mono">{nok(kostJustert(v, aar))}</b> <span className="muted">(fra {nok(v.kost)} i {+v.kostAar || YEAR}-kroner, KPI {k.modus === 'fast' ? k.fast.toLocaleString('nb-NO') + ' %/år' : 'per år fra innstillinger'}{aar < YEAR ? ' · etterslep regnet til i år' : ''})</span></>}
+    {+v.kost > 0 && aar && !ks.length && <><br />Nåverdi i dag: <b className="mono">{nok(naaverdi(kostJustert(v, aar), Math.max(aar, YEAR)))}</b> <span className="muted">({renteInnst().toLocaleString('nb-NO')} % kalkulasjonsrente)</span></>}
   </div>;
 }
 

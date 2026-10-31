@@ -1,7 +1,7 @@
 import React, { type ReactNode } from 'react';
 import { KOMP, DOK_PAAKREVD, AV_LUKKET } from '../lib/catalog';
 import { S, canEdit } from '../lib/store';
-import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2, sysKostNaa, sysKostUtskift, sysKostTip, kompAar, egetAar } from '../lib/utils';
+import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2, sysKostNaa, sysKostUtskift, sysKostTip, kompAar, egetAar, sysNaaverdi, kompNaaverdi, nvTip } from '../lib/utils';
 const justTip = (a: any) => { const y = Math.max(compYear(a) || YEAR, YEAR); return `${kostTip(a)}. Prisjustert med KPI til utskiftingsåret ${y}.`; };
 import { aNavn, byId, compRest, compYear, dUntil, docCoverage, eNavn, fd, intTxt, knok, lNavn, openAvvik, pad, pliktStatus, sortBy, tfmKomp, tfmSys, type Rec } from '../lib/utils';
 import { editAnlegg, editAvvik, editDok, editKomponent, toggleDokNA, utfor, visOppgave } from '../lib/actions';
@@ -69,13 +69,14 @@ export function DokTable({ list, showE = true }: { list: Rec[]; showE?: boolean 
 function SysKost({ a }: { a: Rec }) {
   const c = sysKostNaa(a); const y = compYear(a); const v = c.tot ? sysKostUtskift(a) : 0;
   return <><td className="num" style={{ whiteSpace: 'nowrap' }} data-tip={c.tot ? sysKostTip(a) : undefined}>{c.tot ? nok(c.tot) : '–'}{c.n > 0 && <div className="small muted">inkl. {c.n} komp.</div>}</td>
-    <td className="num" data-tip={c.tot && y ? `${sysKostTip(a)}. Prisjustert med KPI til utskiftingsåret ${Math.max(y, YEAR)}.` : undefined}>{c.tot && y ? nok(v) : '–'}</td></>;
+    <td className="num" data-tip={c.tot && y ? `${sysKostTip(a)}. Prisjustert med KPI til utskiftingsåret ${Math.max(y, YEAR)}.` : undefined}>{c.tot && y ? nok(v) : '–'}</td>
+    <td className="num" data-tip={c.tot && y ? nvTip(y) : undefined}>{c.tot && y ? nok(sysNaaverdi(a)) : '–'}</td></>;
 }
 
 export function AnleggTable({ list, showE = false }: { list: Rec[]; showE?: boolean }) {
   if (!list.length) return <Wrap><Empty t="Ingen systemer eller bygningsdeler registrert" /></Wrap>;
   const L = sortBy(list, a => (KOMP[a.type]?.g || '') + '|' + aNavn(a.id)); const ok = canEdit();
-  return <Wrap><table><thead><tr><th>System / bygningsdel</th>{showE && <th>Eiendom</th>}<th className="num">Installert år</th><th className="num">Levetid</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}<th>Kontroller</th></tr></thead><tbody>
+  return <Wrap><table><thead><tr><th>System / bygningsdel</th>{showE && <th>Eiendom</th>}<th className="num">Installert år</th><th className="num">Levetid</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}{ok && <th className="num">Nåverdi</th>}<th>Kontroller</th></tr></thead><tbody>
     {L.map(a => { const k = KOMP[a.type] || ({} as any); const r = compRest(a); const n = S.oppgaver.filter(o => o.anleggId === a.id && o.aktiv !== false); const due = n.filter(o => (dUntil(o.nesteFrist) as number) < 0).length;
       return <tr key={a.id} className="click" onClick={() => editAnlegg(a.id)}>
         <td>{a.tfmSys && <span className="mono small">{tfmSys(a)} </span>}<b style={{ fontWeight: 500 }}>{a.navn || k.n}</b><div className="small muted">{a.navn ? k.n : k.g}{a.fabrikat ? ' · ' + a.fabrikat : ''}</div></td>
@@ -108,10 +109,10 @@ export function TfmTree({ list, q, onNewKomp }: { list: Rec[]; q: string; onNewK
       <td className="mono small" style={{ paddingLeft: 26, whiteSpace: 'nowrap' }}>{'-' + (c.kode || '') + pad(c.lop) + (c.typekode ? '%' + c.typekode : '')}<Pin o={c} /></td>
       <td>{c.navn}<div className="small muted">{[c.fabrikat, c.plassering, c.serienr ? 's/n ' + c.serienr : ''].filter(Boolean).join(' · ')}</div></td>
       <td className="num">{c.aar || '–'}</td><td className="num">{kompAar(c) || '–'}{!egetAar(c) && kompAar(c) ? <div className="small muted">følger systemet</div> : null}</td><td>{egetAar(c) ? <RestChip r={compRest(c)} /> : <span className="muted small">–</span>}</td><td><TgChip t={c.tg} /></td>
-      {ok && <td className="num" data-tip={c.kost ? kostTip(c) : undefined}>{c.kost ? nok(kostNaa(c)) : '–'}</td>}{ok && <td className="num" data-tip={c.kost ? `${kostTip(c)}. Prisjustert med KPI til ${Math.max(kompAar(c) || YEAR, YEAR)}.` : undefined}>{c.kost && kompAar(c) ? nok(kostJustert(c, kompAar(c))) : '–'}</td>}<td /><td /></tr>));
+      {ok && <td className="num" data-tip={c.kost ? kostTip(c) : undefined}>{c.kost ? nok(kostNaa(c)) : '–'}</td>}{ok && <td className="num" data-tip={c.kost ? `${kostTip(c)}. Prisjustert med KPI til ${Math.max(kompAar(c) || YEAR, YEAR)}.` : undefined}>{c.kost && kompAar(c) ? nok(kostJustert(c, kompAar(c))) : '–'}</td>}{ok && <td className="num" data-tip={c.kost && kompAar(c) ? nvTip(kompAar(c)) : undefined}>{c.kost && kompAar(c) ? nok(kompNaaverdi(c)) : '–'}</td>}<td /><td /></tr>));
   });
-  return <Wrap><table><thead><tr><th>TFM-kode</th><th>System / komponent</th><th className="num">Installert år</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}<th>Kontroller</th><th /></tr></thead>
-    <tbody>{rows.length ? rows : <tr><td colSpan={10} className="muted">Ingen treff.</td></tr>}</tbody></table></Wrap>;
+  return <Wrap><table><thead><tr><th>TFM-kode</th><th>System / komponent</th><th className="num">Installert år</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}{ok && <th className="num">Nåverdi</th>}<th>Kontroller</th><th /></tr></thead>
+    <tbody>{rows.length ? rows : <tr><td colSpan={11} className="muted">Ingen treff.</td></tr>}</tbody></table></Wrap>;
 }
 
 export function CoverageTable({ es }: { es: Rec[] }) {

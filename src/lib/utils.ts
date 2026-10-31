@@ -72,6 +72,13 @@ export function kompAar(k: Rec): number | null { if (egetAar(k)) return compYear
 export function sysKostNaa(a: Rec) { const ks = sysKomp(a).filter(k => +k.kost > 0); const sentral = kostNaa(a); const komp = ks.reduce((s, k) => s + kostNaa(k), 0); return { sentral, komp, n: ks.length, tot: sentral + komp }; }
 /** Prisjustert kostnad for hele systemet i utskiftingsåret (alle komponenter skiftes sammen med systemet) */
 export function sysKostUtskift(a: Rec, aar?: number | null) { const y = aar ?? compYear(a); if (!y) return 0; return kostJustert(a, y) + sysKomp(a).reduce((s, k) => s + kostJustert(k, y), 0); }
+// ---- Nåverdi: fremtidig (KPI-justert, nominell) kostnad diskontert til i dag med kalkulasjonsrenten
+export const RENTE_STANDARD = 6;
+export function renteInnst() { const r = S.innst?.rente || {}; return r.sats === '' || r.sats == null || isNaN(+r.sats) ? RENTE_STANDARD : +r.sats; }
+export function naaverdi(belop: number, aar: number | null) { if (!belop || !aar) return 0; return belop / Math.pow(1 + renteInnst() / 100, Math.max(aar - YEAR, 0)); }
+export function sysNaaverdi(a: Rec) { const y = compYear(a); return y ? naaverdi(sysKostUtskift(a, y), Math.max(y, YEAR)) : 0; }
+export function kompNaaverdi(k: Rec) { const y = kompAar(k); return y && +k.kost ? naaverdi(kostJustert(k, y), Math.max(y, YEAR)) : 0; }
+export const nvTip = (y: number | null) => `Nåverdi: kostnaden i ${Math.max(y || YEAR, YEAR)} diskontert til ${YEAR} med ${renteInnst().toLocaleString('nb-NO')} % kalkulasjonsrente`;
 export function sysKostTip(a: Rec) { const c = sysKostNaa(a); return c.n ? `Sentralkost ${nok(c.sentral)} + ${c.n} komponenter ${nok(c.komp)} (${YEAR}-kroner)` : kostTip(a); }
 export function beregnetAar(a: Rec) { const b = +a.aar || 0; const l = +a.levetid || KOMP[a.type]?.l || 0; return b && l ? b + l : null; }
 export function compRest(a: Rec) { const y = compYear(a); return y === null ? null : y - YEAR; }

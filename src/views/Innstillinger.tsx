@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { S, isAdmin, saveInnst, toast, useStore } from '../lib/store';
-import { KPI_STANDARD, YEAR, kpiFaktor, kpiInnst, nok } from '../lib/utils';
+import { KPI_STANDARD, RENTE_STANDARD, YEAR, kpiFaktor, kpiInnst, nok, renteInnst } from '../lib/utils';
 
 const SQL_URL = 'https://github.com/kenhabbes-glitch/Eiendomskontroll/blob/main/supabase/migrations/002_innstillinger.sql';
 
@@ -45,5 +45,22 @@ export function Innstillinger() {
       <div className="note small" style={{ marginTop: 14 }}>Eksempel: 1 000 000 kr anslått i {YEAR} blir {eks.map(([n, f]) => `${nok(1e6 * f)} i ${YEAR + n}`).join(' · ')}.</div>
       {!ro ? <div style={{ marginTop: 14 }}><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? 'Lagrer …' : 'Lagre KPI-innstillinger'}</button></div> : <p className="small muted">Bare administrator kan endre innstillingene.</p>}
     </div>
+    <RenteKort ro={ro} />
   </>;
+}
+
+function RenteKort({ ro }: { ro: boolean }) {
+  useStore();
+  const [v, setV] = useState(String(renteInnst())); const [busy, setBusy] = useState(false);
+  useEffect(() => { setV(String(renteInnst()).replace('.', ',')); }, [JSON.stringify(S.innst.rente || {})]);
+  const r = parseFloat(v.replace(',', '.'));
+  const lagre = async () => { if (isNaN(r) || r < 0 || r > 30) { toast('Skriv inn en rente mellom 0 og 30 %'); return; } setBusy(true); try { await saveInnst('rente', { sats: r }); toast('Kalkulasjonsrente lagret'); } catch { } setBusy(false); };
+  const kpi = kpiInnst().fast;
+  return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}>
+    <h2>Kalkulasjonsrente for nåverdi</h2>
+    <p className="small muted" style={{ marginTop: -4 }}>Nåverdien viser hva fremtidige utskiftinger er verdt i dag: kostnaden prisjusteres med KPI frem til utskiftingsåret og diskonteres tilbake til {YEAR} med denne renten. Siden kostnadene er KPI-justert (nominelle), bør renten også være nominell. Realrenten er omtrent kalkulasjonsrente minus KPI{!isNaN(r) ? ` – nå ca. ${(r - kpi).toLocaleString('nb-NO', { maximumFractionDigits: 2 })} %` : ''}.</p>
+    <div className="form" style={{ maxWidth: 420 }}><div className="fld half"><label>Kalkulasjonsrente (% per år)</label><input value={v} readOnly={ro} onChange={e => setV(e.target.value)} inputMode="decimal" placeholder={String(RENTE_STANDARD)} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px' }} /></div></div>
+    {!isNaN(r) && <div className="note small">Eksempel: 1 000 000 kr som må betales om 10 år har nåverdi {nok(1e6 / Math.pow(1 + r / 100, 10))}, om 20 år {nok(1e6 / Math.pow(1 + r / 100, 20))}.</div>}
+    {!ro && <div style={{ marginTop: 14 }}><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? 'Lagrer …' : 'Lagre kalkulasjonsrente'}</button></div>}
+  </div>;
 }
