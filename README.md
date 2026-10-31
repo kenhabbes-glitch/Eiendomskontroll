@@ -89,4 +89,5 @@ Filer lagres i den private bøtten `filer` med sti `{eiendom_id}/felles/...` ell
 - Hjemler, intervaller og NS 3451-koder i katalogen er veiledende og må kontrolleres mot gjeldende regelverk, egen merkeinstruks og forsikringsvilkår.
 - Arealer målt fra tegning er veiledende – en formell arealoppgave etter NS 3940 bør kontrollmåles.
 - Systemer og komponenter kan plasseres som markører på plantegninger («Systemkart»). Plasseringen lagres i feltet `pos` (tegningId, x, y) på systemet/komponenten.
+- Utskiftingskostnad for et system = sentralkost (på systemet) + summen av komponentenes kostnader. Komponenter uten egen levetid følger systemets utskiftingsår; komponenter med kortere egen levetid kommer i tillegg i vedlikeholdsplanen.
 - `SUPABASE_SERVICE_ROLE_KEY` gir full tilgang til databasen. Den skal bare ligge i Netlify sine miljøvariabler, aldri i koden eller med `VITE_`-prefiks.

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state } from './store';
 import { leieAreal, m2 } from './utils';
-import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok } from './utils';
+import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar } from './utils';
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
 import { openPlan } from '../views/Arealer';
@@ -72,13 +72,22 @@ function PlasseringFelt({ kind, id, eiendomId, close }: { kind: 'a' | 'k'; id?: 
 }
 
 // Viser beregnet utskiftingsår og prisjustert kostnad live i skjemaet
-function UtskiftNote({ v, typeLevetid }: { v: any; typeLevetid?: number }) {
+function UtskiftNote({ v, typeLevetid, sysId, kompAv }: { v: any; typeLevetid?: number; sysId?: string; kompAv?: string }) {
   const lev = +v.levetid || typeLevetid || 0; const ber = +v.aar && lev ? +v.aar + lev : null;
-  const aar = +v.planAar || ber; const k = kpiInnst();
+  const k = kpiInnst();
+  if (kompAv && !egetAar(v)) { const s = byId('anlegg', kompAv); const sy = s ? compYear(s) : null; return <div className="note small" style={{ color: 'var(--ink)' }}>Uten egen levetid følger komponenten systemets utskiftingsår{sy ? <>: <b className="mono">{sy}</b></> : ' (systemet mangler år)'}.
+    {+v.kost > 0 && sy && <><br />Prisjustert kostnad i {Math.max(sy, YEAR)}: <b className="mono">{nok(kostJustert(v, sy))}</b> – inngår i systemets totale utskiftingskostnad.</>}</div>; }
+  const aar = +v.planAar || ber;
+  const ks = sysId ? S.komponenter.filter(c => c.anleggId === sysId && +c.kost > 0) : [];
+  const kNaa = ks.reduce((s, c) => s + kostNaa(c), 0); const sNaa = +v.kost > 0 ? (+v.kostAar && +v.kostAar < YEAR ? kostNaa(v) : +v.kost) : 0;
+  const kJ = aar ? ks.reduce((s, c) => s + kostJustert(c, aar), 0) : 0; const sJ = +v.kost > 0 && aar ? kostJustert(v, aar) : 0;
   return <div className="note small" style={{ color: 'var(--ink)' }}>
     {ber ? <>Beregnet utskiftingsår: <b className="mono">{ber}</b> <span className="muted">({v.aar} + {lev} år{!v.levetid && typeLevetid ? ', veiledende levetid' : ''})</span>{+v.planAar && +v.planAar !== ber ? <> · <b>overstyrt til {v.planAar}</b></> : null}</>
       : +v.planAar ? <>Utskiftingsår: <b className="mono">{v.planAar}</b> (satt manuelt)</> : <span className="muted">Fyll inn installert år og levetid, så beregnes utskiftingsåret.</span>}
-    {+v.kost > 0 && aar && <><br />Prisjustert kostnad i {Math.max(aar, YEAR)}: <b className="mono">{nok(kostJustert(v, aar))}</b> <span className="muted">(fra {nok(v.kost)} i {+v.kostAar || YEAR}-kroner, KPI {k.modus === 'fast' ? k.fast.toLocaleString('nb-NO') + ' %/år' : 'per år fra innstillinger'}{aar < YEAR ? ' · etterslep regnet til i år' : ''})</span></>}
+    {ks.length > 0 && <><br />Kostnad i dag for hele systemet: <b className="mono">{nok(sNaa + kNaa)}</b> <span className="muted">= sentralkost {nok(sNaa)} + {ks.length} komponenter {nok(kNaa)}</span>
+      {aar && <><br />Prisjustert totalkostnad i {Math.max(aar, YEAR)}: <b className="mono">{nok(sJ + kJ)}</b></>}</>}
+    {!ks.length && sysId !== undefined && <><br /><span className="muted">Komponentkostnader du legger inn på komponentene, summeres automatisk med sentralkosten.</span></>}
+    {+v.kost > 0 && aar && !ks.length && <><br />Prisjustert kostnad i {Math.max(aar, YEAR)}: <b className="mono">{nok(kostJustert(v, aar))}</b> <span className="muted">(fra {nok(v.kost)} i {+v.kostAar || YEAR}-kroner, KPI {k.modus === 'fast' ? k.fast.toLocaleString('nb-NO') + ' %/år' : 'per år fra innstillinger'}{aar < YEAR ? ' · etterslep regnet til i år' : ''})</span></>}
   </div>;
 }
 
@@ -97,8 +106,8 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'navn', label: 'Betegnelse / plassering', half: true, ph: 'F.eks. Ventilasjon kontorfløy' }, { k: 'fabrikat', label: 'Fabrikat / modell', half: true },
     { k: 'aar', label: 'Installert/utskiftet år', type: 'number', half: true }, { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Tomt = veiledende levetid for typen' },
     { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true, hint: 'La stå tom for å bruke beregnet år' }, { k: 'tg', label: 'Tilstandsgrad (NS 3424)', type: 'select', options: TG_OPTS, half: true },
-    ...(isStaff() && canEdit() ? [{ k: 'kost', label: 'Estimert utskiftingskostnad (kr)', type: 'number', half: true } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR, hint: 'Året beløpet er anslått i' } as Field] : []),
-    { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} typeLevetid={KOMP[v.type]?.l} /> },
+    ...(isStaff() && canEdit() ? [{ k: 'kost', label: 'Sentralkost på systemnivå (kr)', type: 'number', half: true, hint: 'F.eks. sentral, styring, kabling. Komponentene summeres i tillegg.' } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR, hint: 'Året beløpet er anslått i' } as Field] : []),
+    { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} typeLevetid={KOMP[v.type]?.l} sysId={id || ''} /> },
     { k: 'ansvar', label: 'Ansvar for vedlikehold', type: 'select', options: ['Eier', 'Leietaker', 'Delt'], half: true },
     { k: 'leverandor', label: 'Serviceleverandør / avtale', half: true }, { k: 'tgdato', label: 'Tilstand vurdert dato', type: 'date', half: true },
     { k: 'plass', type: 'custom', label: 'Plassering på tegning', render: v => <PlasseringFelt kind="a" id={id} eiendomId={v.eiendomId} close={() => closeRef.c?.()} /> },
@@ -147,11 +156,11 @@ export function editKomponent(id?: string, anleggId?: string) {
     { k: 'prev', type: 'custom', render: v => { const a = byId('anlegg', v.anleggId); return <div className="note mono" style={{ fontSize: 14, color: 'var(--ink)' }}>{`${a ? tfmSys(a, true) : ''}-${String(v.kode || '').toUpperCase()}${pad(v.lop || 1)}${v.typekode ? '%' + v.typekode : ''}`}</div>; } },
     { k: 'plassering', label: 'Plassering (rom/etasje)', half: true }, { k: 'fabrikat', label: 'Fabrikat / modell', half: true },
     { k: 'serienr', label: 'Serienummer', half: true }, { k: 'aar', label: 'Installert år', type: 'number', half: true },
-    { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Fyll ut for å ta med komponenten i vedlikeholdsplanen' }, { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true },
+    { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Tomt = skiftes sammen med systemet' }, { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true },
     { k: 'plass', type: 'custom', label: 'Plassering på tegning', render: v => <PlasseringFelt kind="k" id={id} eiendomId={byId('anlegg', v.anleggId)?.eiendomId || k.eiendomId} close={() => closeRefK.c?.()} /> },
     { k: 'tg', label: 'Tilstandsgrad', type: 'select', options: TG_OPTS, half: true },
     ...(canEdit() ? [{ k: 'kost', label: 'Utskiftingskostnad (kr)', type: 'number', half: true } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR } as Field] : []),
-    { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} /> },
+    { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} kompAv={v.anleggId} /> },
     { k: 'notat', label: 'Notater', type: 'textarea' }];
   const closeRefK: { c?: () => void } = {};
   closeRefK.c = formModal({

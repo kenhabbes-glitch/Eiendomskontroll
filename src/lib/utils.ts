@@ -63,6 +63,16 @@ export function kostJustert(a: Rec, aar?: number | null) { const k = +a.kost || 
 /** Kostnad indeksregulert fra prisnivååret til inneværende år */
 export function kostNaa(a: Rec) { const k = +a.kost || 0; if (!k) return 0; const f = kostAarFor(a); return f < YEAR ? k * kpiFaktor(f, YEAR) : k; }
 export function kostTip(a: Rec) { const f = kostAarFor(a); return f < YEAR ? `Anslått ${nok(a.kost)} i ${f}-kroner, indeksregulert til ${YEAR}` : `Anslått i ${f}-kroner`; }
+// ---- System = sentralkost (på systemet) + sum av komponentenes kostnader
+export const sysKomp = (a: Rec) => S.komponenter.filter(k => k.anleggId === a.id);
+/** Komponenten har egen levetid/utskiftingsår (ellers følger den systemet) */
+export const egetAar = (k: Rec) => !!(+k.planAar || (+k.aar && +k.levetid));
+export function kompAar(k: Rec): number | null { if (egetAar(k)) return compYear(k); const a = byId('anlegg', k.anleggId); return a ? compYear(a) : null; }
+/** Kostnad i dag for hele systemet: sentralkost + alle komponenter */
+export function sysKostNaa(a: Rec) { const ks = sysKomp(a).filter(k => +k.kost > 0); const sentral = kostNaa(a); const komp = ks.reduce((s, k) => s + kostNaa(k), 0); return { sentral, komp, n: ks.length, tot: sentral + komp }; }
+/** Prisjustert kostnad for hele systemet i utskiftingsåret (alle komponenter skiftes sammen med systemet) */
+export function sysKostUtskift(a: Rec, aar?: number | null) { const y = aar ?? compYear(a); if (!y) return 0; return kostJustert(a, y) + sysKomp(a).reduce((s, k) => s + kostJustert(k, y), 0); }
+export function sysKostTip(a: Rec) { const c = sysKostNaa(a); return c.n ? `Sentralkost ${nok(c.sentral)} + ${c.n} komponenter ${nok(c.komp)} (${YEAR}-kroner)` : kostTip(a); }
 export function beregnetAar(a: Rec) { const b = +a.aar || 0; const l = +a.levetid || KOMP[a.type]?.l || 0; return b && l ? b + l : null; }
 export function compRest(a: Rec) { const y = compYear(a); return y === null ? null : y - YEAR; }
 export function pliktStatus(p: Rec): { c: string; t: string; o: number; nx?: string } {
