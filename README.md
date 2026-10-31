@@ -105,6 +105,7 @@ Filer lagres i den private bøtten `filer` med sti `{eiendom_id}/felles/...` ell
 2. E-post (valgfritt, men anbefalt): opprett konto hos [Resend](https://resend.com), verifiser domenet deres, og legg inn i Netlify → Environment variables:
    - `RESEND_API_KEY` – API-nøkkelen fra Resend
    - `EPOST_FRA` – avsender, f.eks. `Eiendomskontroll <varsel@dittdomene.no>`
+   Alternativt SMTP (f.eks. Gmail): `SMTP_USER` (Gmail-adressen), `SMTP_PASS` (app-passord fra Google), valgfritt `SMTP_HOST`/`SMTP_PORT` (standard smtp.gmail.com:465), `EPOST_FRA` og `EPOST_SVAR`. SMTP brukes foran Resend hvis begge er satt.
    Uten dette åpnes arbeidsordren i brukerens eget e-postprogram i stedet (PDF må da legges ved manuelt).
 
 Flyt: avvik → «Plasser på tegning» → «Tildel» (intern bruker) eller «Send på e-post» (hvem som helst). Mottakeren åpner lenken, oppretter bruker eller logger inn, ser plasseringen, starter jobben, laster opp bilder/filer og kvitterer ut. Avviket går til «Utført – til kontroll», og forvalter godkjenner og lukker eller sender tilbake.

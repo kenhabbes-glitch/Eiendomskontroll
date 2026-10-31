@@ -1,10 +1,11 @@
 // Netlify-funksjon for arbeidsordre: sende på e-post, invitere eksterne utførende
 // og la dem opprette bruker. Kjører med Supabase service-nøkkel på serveren.
 //
-// E-post sendes via Resend (https://resend.com) hvis RESEND_API_KEY er satt.
-// Avsender settes i EPOST_FRA, f.eks. «Eiendomskontroll <varsel@dittdomene.no>».
+// E-post sendes via SMTP (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS – f.eks. Gmail med app-passord)
+// eller Resend (RESEND_API_KEY). Avsender settes i EPOST_FRA. Svar går til den som sendte (eller EPOST_SVAR).
 // Uten nøkkel returneres teksten, og appen åpner brukerens eget e-postprogram.
 import { createClient } from '@supabase/supabase-js';
+import nodemailer from 'nodemailer';
 
 const json = (status: number, body: any) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const esc = (s: any) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
@@ -31,11 +32,23 @@ export default async (req: Request) => {
   const leggTilAvvikLogg = async (a: any, k: string, av: string) => { const d = a.data || {}; const l = [...(d.logg || []), { t: new Date().toISOString(), s: d.status, k, av }]; await admin.from('avvik').update({ data: { ...d, logg: l } }).eq('id', a.id); };
   const hentAvvik = async (id: string) => { const { data } = await admin.from('avvik').select('*').eq('id', id).single(); return data; };
 
-  const sendEpost = async (til: string, emne: string, html: string, tekst: string, vedlegg?: { navn: string; base64: string }) => {
-    const rk = (process.env.RESEND_API_KEY || '').trim(); const fra = (process.env.EPOST_FRA || 'Eiendomskontroll <onboarding@resend.dev>').trim();
-    if (!rk) return { sendt: false, grunn: 'E-posttjeneste er ikke satt opp (RESEND_API_KEY mangler)' };
+  // E-post: SMTP (f.eks. Gmail eller kundens e-postserver) brukes hvis SMTP_* er satt, ellers Resend, ellers ingen.
+  const sendEpost = async (til: string, emne: string, html: string, tekst: string, vedlegg?: { navn: string; base64: string }, svarTil?: string) => {
+    const env = (k: string) => (process.env[k] || '').trim();
+    const replyTo = env('EPOST_SVAR') || svarTil || undefined;
+    if (env('SMTP_USER') && env('SMTP_PASS')) {
+      const port = +(env('SMTP_PORT') || 465);
+      const fra = env('EPOST_FRA') || `Eiendomskontroll <${env('SMTP_USER')}>`;
+      try {
+        const t = nodemailer.createTransport({ host: env('SMTP_HOST') || 'smtp.gmail.com', port, secure: port === 465, auth: { user: env('SMTP_USER'), pass: env('SMTP_PASS').replace(/\s+/g, '') } });
+        await t.sendMail({ from: fra, to: til, replyTo, subject: emne, text: tekst, html, attachments: vedlegg ? [{ filename: vedlegg.navn, content: vedlegg.base64, encoding: 'base64', contentType: 'application/pdf' }] : undefined });
+        return { sendt: true };
+      } catch (e: any) { return { sendt: false, grunn: 'E-post feilet (SMTP): ' + (e?.response || e?.message || e) }; }
+    }
+    const rk = env('RESEND_API_KEY'); const fra = env('EPOST_FRA') || 'Eiendomskontroll <onboarding@resend.dev>';
+    if (!rk) return { sendt: false, grunn: 'E-posttjeneste er ikke satt opp (SMTP_USER/SMTP_PASS eller RESEND_API_KEY mangler)' };
     const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + rk, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: fra, to: [til], subject: emne, html, text: tekst, ...(vedlegg ? { attachments: [{ filename: vedlegg.navn, content: vedlegg.base64 }] } : {}) }) });
+      body: JSON.stringify({ from: fra, to: [til], subject: emne, html, text: tekst, ...(replyTo ? { reply_to: replyTo } : {}), ...(vedlegg ? { attachments: [{ filename: vedlegg.navn, content: vedlegg.base64 }] } : {}) }) });
     if (!r.ok) { const j = await r.json().catch(() => ({})); return { sendt: false, grunn: 'E-post feilet: ' + (j.message || r.status) }; }
     return { sendt: true };
   };
@@ -82,7 +95,7 @@ export default async (req: Request) => {
     }
     const m = aoTekst(a, lenke, String(body.melding || ''), p.navn || p.epost);
     const vedlegg = typeof body.pdf === 'string' && body.pdf.length < 8_000_000 ? { navn: `Arbeidsordre avvik ${a.nr}.pdf`, base64: body.pdf } : undefined;
-    const r = await sendEpost(til, m.emne, m.html, m.tekst, vedlegg);
+    const r = await sendEpost(til, m.emne, m.html, m.tekst, vedlegg, p.epost || undefined);
     const hva = body.action === 'inviter' ? `Arbeidsordre ${r.sendt ? 'sendt' : 'klargjort'} på e-post til ${til}` : `Varsel om tildeling ${r.sendt ? 'sendt' : 'klargjort'} på e-post til ${til}`;
     await logg(p, a, hva); if (r.sendt) await leggTilAvvikLogg(a, hva, p.navn || p.epost);
     return json(200, { ...r, til, lenke, emne: m.emne, tekst: m.tekst });
