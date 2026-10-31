@@ -54,14 +54,14 @@ export function useStore() { return useSyncExternalStore(cb => { subs.add(cb); r
 
 function fromRow(col: Col, r: any) {
   const o: any = { ...(r.data || {}), id: r.id, opprettet: r.created_at, endret: r.updated_at, opprettetAv: r.created_by };
-  const cols = TABLES[col].cols; for (const k in cols) o[k] = r[cols[k]] ?? '';
+  const cols = TABLES[col].cols; for (const k in cols) { if (k === 'tildeltId' && !(cols[k] in r)) continue; o[k] = r[cols[k]] ?? ''; } // tildelt_id finnes først etter 003-migreringen
   if (col === 'avvik') o.nr = r.nr;
   return o;
 }
 function toRow(col: Col, o: any) {
   const { id, opprettet, endret, opprettetAv, nr, ...rest } = o;
   const row: any = { id }; const cols = TABLES[col].cols;
-  for (const k in cols) { row[cols[k]] = rest[k] || null; delete rest[k]; }
+  for (const k in cols) { if (k === 'tildeltId' && !(k in rest)) continue; row[cols[k]] = rest[k] || null; delete rest[k]; }
   row.data = JSON.parse(JSON.stringify(rest));
   return row;
 }
