@@ -60,6 +60,9 @@ export function kpiFaktor(fra: number, til: number) { let f = 1; for (let y = fr
 export const kostAarFor = (a: Rec) => +a.kostAar || YEAR;
 /** Prisjustert kostnad i utskiftingsåret (etterslep regnes til inneværende år) */
 export function kostJustert(a: Rec, aar?: number | null) { const k = +a.kost || 0; if (!k) return 0; const y = Math.max(aar ?? compYear(a) ?? YEAR, YEAR); return k * kpiFaktor(kostAarFor(a), y); }
+/** Kostnad indeksregulert fra prisnivååret til inneværende år */
+export function kostNaa(a: Rec) { const k = +a.kost || 0; if (!k) return 0; const f = kostAarFor(a); return f < YEAR ? k * kpiFaktor(f, YEAR) : k; }
+export function kostTip(a: Rec) { const f = kostAarFor(a); return f < YEAR ? `Anslått ${nok(a.kost)} i ${f}-kroner, indeksregulert til ${YEAR}` : `Anslått i ${f}-kroner`; }
 export function beregnetAar(a: Rec) { const b = +a.aar || 0; const l = +a.levetid || KOMP[a.type]?.l || 0; return b && l ? b + l : null; }
 export function compRest(a: Rec) { const y = compYear(a); return y === null ? null : y - YEAR; }
 export function pliktStatus(p: Rec): { c: string; t: string; o: number; nx?: string } {

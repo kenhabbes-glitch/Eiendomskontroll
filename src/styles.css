@@ -211,3 +211,4 @@ pre.letter{white-space:pre-wrap;font-family:inherit;background:var(--surface2);b
 .yes{color:var(--green);font-weight:600}.no{color:var(--muted)}
 .portalhero{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
 details>summary{cursor:pointer;font-weight:500}
+th.num{font-family:inherit;font-size:11.5px}
