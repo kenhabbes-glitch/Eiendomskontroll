@@ -92,4 +92,5 @@ Filer lagres i den private bøtten `filer` med sti `{eiendom_id}/felles/...` ell
 - Utskiftingskostnad for et system = sentralkost (på systemet) + summen av komponentenes kostnader. Komponenter uten egen levetid følger systemets utskiftingsår; komponenter med kortere egen levetid kommer i tillegg i vedlikeholdsplanen.
 - Nåverdi = KPI-justert kostnad i utskiftingsåret diskontert til i dag med kalkulasjonsrenten (Innstillinger, standard 6 %). Lagres i `innstillinger` med nøkkel `rente`.
 - Arealrapport (PDF) lages i nettleseren med pdf-lib: valgfrie etasjer og leietakere, plantegninger med arealer og dekning av fellesareal. Kontraktfestet fellesareal settes på leietakeren (`fellesAvtale`: m2 | pst_felles | paslag, `fellesAvtaleVerdi`).
+- Serviceavtaler: `SERVICEAVTALE` i catalog.ts angir per systemtype om det er lovkrav om fagkyndig vedlikehold/kontroll (lov) eller anbefalt (anb). Status hentes fra dokumenter av typen «Serviceavtale» koblet via `anleggId`/`anleggIds`.
 - `SUPABASE_SERVICE_ROLE_KEY` gir full tilgang til databasen. Den skal bare ligge i Netlify sine miljøvariabler, aldri i koden eller med `VITE_`-prefiks.

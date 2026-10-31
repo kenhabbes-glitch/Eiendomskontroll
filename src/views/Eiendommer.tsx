@@ -3,7 +3,7 @@ import { AV_LUKKET, DOK_PAAKREVD } from '../lib/catalog';
 import { S, canEdit, isAdmin, useStore } from '../lib/store';
 import { activeTasks, byId, dUntil, openAvvik, sortBy } from '../lib/utils';
 import { autoTfm, editAnlegg, editAvvik, editDok, editEiendom, editKomponent, editLeietaker, editOppgave, generatePlan, importTfm, visOppgave } from '../lib/actions';
-import { AvvikTable, CoverageTable, DokTable, LeieTable, TaskTable, TfmTree } from '../components/tables';
+import { AvvikTable, CoverageTable, DokTable, LeieTable, ServiceavtaleTable, TaskTable, TfmTree } from '../components/tables';
 import { Chip, DueChip, Empty } from '../components/ui';
 import { ArealSection } from './Arealer';
 import { kartUrl, seEiendomUrl, enhetStatus } from '../lib/oppslag';
@@ -59,7 +59,7 @@ export function Eiendom({ id }: { id: string }) {
   if (cur === 'kontroll') c = <>{ed && <div className="toolbar"><button className="btn pri" onClick={() => generatePlan(id)}>Generer / utvid kontrollplan</button><button className="btn" onClick={() => editOppgave(undefined, { eiendomId: id })}>+ Egen kontroll/oppgave</button></div>}
     <TaskTable list={T.filter(o => o.aktiv !== false)} showE={false} />{T.some(o => o.aktiv === false) && <p className="small muted">{T.filter(o => o.aktiv === false).length} inaktive kontroller skjult.</p>}</>;
   if (cur === 'avvik') c = <><div className="toolbar"><button className="btn pri" onClick={() => editAvvik(undefined, { eiendomId: id })}>+ Nytt avvik</button></div><AvvikTable list={A} showE={false} /></>;
-  if (cur === 'dok') c = <><div className="toolbar"><button className="btn pri" onClick={() => editDok(undefined, { eiendomId: id })}>+ Dokument</button></div>{ed && <CoverageTable es={[e]} />}<div className="sec"><DokTable list={D} showE={false} /></div></>;
+  if (cur === 'dok') c = <><div className="toolbar"><button className="btn pri" onClick={() => editDok(undefined, { eiendomId: id })}>+ Dokument</button></div>{ed && <CoverageTable es={[e]} />}<div className="sec"><h2>Serviceavtaler for systemer</h2><ServiceavtaleTable es={[e]} showE={false} visAnb /></div><div className="sec"><h2>Alle dokumenter</h2><DokTable list={D} showE={false} /></div></>;
   if (cur === 'leie') c = <><div className="toolbar"><button className="btn pri" onClick={() => editLeietaker(undefined, { eiendomId: id })}>+ Leietaker</button></div><LeieTable list={L} showE={false} /></>;
   if (cur === 'areal') c = <ArealSection eid={id} />;
   return <>

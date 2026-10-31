@@ -1,10 +1,11 @@
 // Skjemaer og handlinger (opprett/rediger/slett) som brukes fra flere visninger.
 import React, { useState } from 'react';
+import { SERVICEAVTALE } from './catalog';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state } from './store';
 import { leieAreal, m2, FELLES_AVTALE } from './utils';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst } from './utils';
-import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, type Rec } from './utils';
+import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
 import { openPlan } from '../views/Arealer';
 import { adresseFelter, brregData, enhetStatus, seEiendomUrl, virksomhetFraNaering, rensOrgnr } from './oppslag';
@@ -112,6 +113,11 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} typeLevetid={KOMP[v.type]?.l} sysId={id || ''} /> },
     { k: 'ansvar', label: 'Ansvar for vedlikehold', type: 'select', options: ['Eier', 'Leietaker', 'Delt'], half: true },
     { k: 'leverandor', label: 'Serviceleverandør / avtale', half: true }, { k: 'tgdato', label: 'Tilstand vurdert dato', type: 'date', half: true },
+    { k: 'saInfo', type: 'custom', render: v => { const kr = SERVICEAVTALE[v.type]; if (!kr) return null; const st = id ? saStatus({ ...a, id }, kr) : { s: kr.n === 'lov' ? 'no' : 'anb', d: null };
+      return <div className="note small" style={{ color: 'var(--ink)' }}><b>Serviceavtale: {kr.n === 'lov' ? 'lovkrav' : 'anbefalt'}</b> – <span className="muted">{kr.h}.</span><br />
+        {st.s === 'na' ? 'Markert som ikke relevant.' : st.d ? <>Registrert: <b>{st.d.tittel}</b>{st.d.gyldigTil ? ` · gyldig til ${fd(st.d.gyldigTil)}` : ''}{st.s === 'exp' && <b style={{ color: 'var(--red)' }}> · UTLØPT</b>}</> : <span style={{ color: kr.n === 'lov' ? 'var(--red)' : undefined }}>Ingen serviceavtale registrert.</span>}
+        {!st.d && id && canEdit() && <> <button type="button" className="btn sm" onClick={() => { closeRef.c?.(); editDok(undefined, { eiendomId: v.eiendomId, type: 'Serviceavtale', anleggId: id, tittel: 'Serviceavtale – ' + (v.navn || KOMP[v.type]?.n) + (v.leverandor ? ' (' + v.leverandor + ')' : '') }); }}>Registrer avtale</button></>}
+        {!id && <span className="muted"> Lagre systemet først, deretter kan avtalen registreres her eller under Dokumenter.</span>}</div>; } },
     { k: 'plass', type: 'custom', label: 'Plassering på tegning', render: v => <PlasseringFelt kind="a" id={id} eiendomId={v.eiendomId} close={() => closeRef.c?.()} /> },
     { k: 'notat', label: 'Notater', type: 'textarea' },
   ];
@@ -138,7 +144,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
       v.tfmSys = String(v.tfmSys || '').replace(/\D/g, ''); v.tfmLop = v.tfmSys ? pad(String(v.tfmLop || '1').replace(/\D/g, '') || 1) : '';
       const dup = v.tfmSys && S.anlegg.find(x => x.id !== id && x.eiendomId === v.eiendomId && x.tfmSys === v.tfmSys && pad(x.tfmLop) === v.tfmLop);
       if (dup) { toast(`TFM-koden =${v.tfmSys}.${v.tfmLop} er allerede brukt på «${dup.navn || KOMP[dup.type]?.n}»`); return false; }
-      delete v.plass; const fersk = id ? byId('anlegg', id) : null;
+      delete v.plass; delete v.saInfo; const fersk = id ? byId('anlegg', id) : null;
       const nid = await save('anlegg', { ...a, ...v, pos: fersk ? fersk.pos ?? null : a.pos ?? null, mk: undefined, forste: undefined });
       for (const k of mk) await save('oppgaver', taskFromMal(k, MALER, v.eiendomId, nid, forste));
       toast(mk.length ? `Lagret og opprettet ${mk.length} kontroller` : 'Lagret');
@@ -372,6 +378,8 @@ export function editDok(id?: string, preset: any = {}) {
     { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true },
     ...(canEdit() ? [{ k: 'leietakerId', label: 'Leietaker (valgfritt)', type: 'select', options: () => S.leietakere.map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true } as Field] : []),
     { k: 'anleggId', label: 'System (valgfritt)', type: 'select', options: () => S.anlegg.map(x => [x.id, eNavn(x.eiendomId) + ' – ' + aNavn(x.id)] as [string, string]), empty: '–', half: true },
+    { k: 'anleggIds', type: 'custom', label: 'Avtalen gjelder også disse systemene', render: (v, set) => { if (v.type !== 'Serviceavtale') return null; const L = sortBy(S.anlegg.filter(x => x.eiendomId === v.eiendomId && x.id !== v.anleggId), x => aNavn(x.id)); const sel: string[] = v.anleggIds || [];
+      return L.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 14px' }}>{L.map(x => <label key={x.id} className="small" style={{ display: 'flex', gap: 5, alignItems: 'center' }}><input type="checkbox" checked={sel.includes(x.id)} onChange={ev => set({ anleggIds: ev.target.checked ? [...sel, x.id] : sel.filter(i => i !== x.id) })} />{aNavn(x.id)}{SERVICEAVTALE[x.type]?.n === 'lov' && <span style={{ color: 'var(--blue)' }}>●</span>}</label>)}</div> : <span className="small muted">Ingen andre systemer på eiendommen.</span>; } },
     { k: 'dato', label: 'Dokumentdato', type: 'date', half: true }, { k: 'gyldigTil', label: 'Gyldig til / revideres', type: 'date', half: true },
     { k: 'plassering', label: 'Plassering / lenke', ph: 'F.eks. Arkiv perm 3, SharePoint, FDV-portal', hint: 'Brukes om dokumentet ligger et annet sted' },
     ...(!ro ? [{ k: 'fil', label: d.fil ? 'Erstatt fil' : 'Last opp fil (maks 50 MB)', type: 'file' } as Field] : []),

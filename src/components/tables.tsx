@@ -1,7 +1,7 @@
 import React, { type ReactNode } from 'react';
-import { KOMP, DOK_PAAKREVD, AV_LUKKET } from '../lib/catalog';
-import { S, canEdit } from '../lib/store';
-import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2, sysKostNaa, sysKostUtskift, sysKostTip, kompAar, egetAar, sysNaaverdi, kompNaaverdi, nvTip } from '../lib/utils';
+import { KOMP, DOK_PAAKREVD, AV_LUKKET, SERVICEAVTALE } from '../lib/catalog';
+import { S, canEdit, save } from '../lib/store';
+import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2, sysKostNaa, sysKostUtskift, sysKostTip, kompAar, egetAar, sysNaaverdi, kompNaaverdi, nvTip, saStatus } from '../lib/utils';
 const justTip = (a: any) => { const y = Math.max(compYear(a) || YEAR, YEAR); return `${kostTip(a)}. Prisjustert med KPI til utskiftingsåret ${y}.`; };
 import { aNavn, byId, compRest, compYear, dUntil, docCoverage, eNavn, fd, intTxt, knok, lNavn, openAvvik, pad, pliktStatus, sortBy, tfmKomp, tfmSys, type Rec } from '../lib/utils';
 import { editAnlegg, editAvvik, editDok, editKomponent, toggleDokNA, utfor, visOppgave } from '../lib/actions';
@@ -126,6 +126,28 @@ export function CoverageTable({ es }: { es: Rec[] }) {
             {x.s === 'no' && ok && <><br /><a href="#" className="small muted" style={{ fontSize: 10.5 }} onClick={ev => { ev.preventDefault(); toggleDokNA(e.id, x.t); }}>ikke rel.</a></>}</td>; })}
         <td className="mono">{rel.length ? Math.round(okk / rel.length * 100) : 100}%</td></tr>; })}
   </tbody></table></Wrap>;
+}
+
+export const saNy = (a: Rec) => ({ eiendomId: a.eiendomId, type: 'Serviceavtale', anleggId: a.id, tittel: 'Serviceavtale – ' + (a.navn || KOMP[a.type]?.n || 'system') + (a.leverandor ? ' (' + a.leverandor + ')' : '') });
+export function ServiceavtaleTable({ es, visAnb = false, showE = true }: { es: Rec[]; visAnb?: boolean; showE?: boolean }) {
+  const ok = canEdit(); const ids = es.map(e => e.id);
+  const A = sortBy(S.anlegg.filter(a => ids.includes(a.eiendomId) && SERVICEAVTALE[a.type]), a => eNavn(a.eiendomId) + (SERVICEAVTALE[a.type].n === 'lov' ? '0' : '1') + aNavn(a.id))
+    .map(a => ({ a, k: SERVICEAVTALE[a.type], st: saStatus(a, SERVICEAVTALE[a.type]) })).filter(r => r.k.n === 'lov' || visAnb || r.st.d);
+  if (!A.length) return <Wrap><Empty t="Ingen systemer som krever serviceavtale">Når du registrerer heis, brannalarm, sprinkler, fettutskiller, kjøleanlegg o.l., dukker de opp her.</Empty></Wrap>;
+  const lov = A.filter(r => r.k.n === 'lov' && r.st.s !== 'na'); const har = lov.filter(r => r.st.s === 'ok' || r.st.s === 'soon').length;
+  const naToggle = async (a: Rec) => { await save('anlegg', { ...a, saIkkeRelevant: !a.saIkkeRelevant }); };
+  return <>
+    {lov.length > 0 && <p className="small" style={{ margin: '0 0 8px' }}>{har === lov.length ? <Chip c="green">Alle {lov.length} systemer med lovkrav har gyldig serviceavtale</Chip> : <Chip c="red">{lov.length - har} av {lov.length} systemer med lovkrav mangler gyldig serviceavtale</Chip>}</p>}
+    <Wrap><table><thead><tr><th>System</th>{showE && <th>Eiendom</th>}<th>Krav</th><th>Leverandør</th><th>Serviceavtale</th><th>Gyldig til</th><th /></tr></thead><tbody>
+    {A.map(({ a, k, st }) => <tr key={a.id}>
+      <td><a href="#" onClick={e => { e.preventDefault(); editAnlegg(a.id); }}>{aNavn(a.id)}</a></td>{showE && <td>{eNavn(a.eiendomId)}</td>}
+      <td><span data-tip={k.h}>{k.n === 'lov' ? <Chip c="blue">Lovkrav</Chip> : <Chip>Anbefalt</Chip>}</span></td>
+      <td className="small">{a.leverandor || <span className="muted">–</span>}</td>
+      <td>{st.s === 'na' ? <Chip>Ikke relevant</Chip> : st.d ? <a href="#" onClick={e => { e.preventDefault(); editDok(st.d!.id); }}>{st.d.tittel}</a> : st.s === 'no' ? <Chip c="red">Mangler</Chip> : <span className="muted small">Ingen registrert</span>}</td>
+      <td>{st.d?.gyldigTil ? (st.s === 'exp' ? <Chip c="red">Utløpt {fd(st.d.gyldigTil)}</Chip> : st.s === 'soon' ? <Chip c="amber">{fd(st.d.gyldigTil)}</Chip> : <span className="small">{fd(st.d.gyldigTil)}</span>) : st.d ? <span className="small muted">Løpende</span> : <span className="muted">–</span>}</td>
+      <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{ok && <>{(!st.d || st.s === 'exp') && st.s !== 'na' && <button className="btn sm" onClick={() => editDok(undefined, saNy(a))}>{st.s === 'exp' ? 'Ny avtale' : 'Registrer avtale'}</button>}
+        {!st.d && <a href="#" className="small muted" style={{ marginLeft: 8 }} onClick={e => { e.preventDefault(); naToggle(a); }}>{a.saIkkeRelevant ? 'angre' : 'ikke rel.'}</a>}</>}</td></tr>)}
+  </tbody></table></Wrap></>;
 }
 
 export function LeieTable({ list, showE = true }: { list: Rec[]; showE?: boolean }) {

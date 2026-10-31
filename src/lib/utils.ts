@@ -148,6 +148,15 @@ export function leieAreal(l: Rec): LeieArealInfo {
   if (+l.areal) return { verdi: +l.areal, kilde: 'manuell', p: null, adv: [] };
   return { verdi: null, kilde: null, p: null, adv: [] };
 }
+/** Serviceavtale-status for et system: dokument av typen «Serviceavtale» koblet til systemet */
+export function saStatus(a: Rec, krav?: { n: string } | null) {
+  if (a.saIkkeRelevant) return { s: 'na' as const, d: null as Rec | null };
+  const ds = S.dokumenter.filter(d => d.type === 'Serviceavtale' && (d.anleggId === a.id || (d.anleggIds || []).includes(a.id)));
+  if (!ds.length) return { s: (krav?.n === 'lov' ? 'no' : 'anb') as 'no' | 'anb', d: null };
+  const best = ds.slice().sort((x, y) => (y.gyldigTil || '9999').localeCompare(x.gyldigTil || '9999'))[0];
+  const g = best.gyldigTil ? dUntil(best.gyldigTil)! : null;
+  return { s: (g === null ? 'ok' : g < 0 ? 'exp' : g <= 90 ? 'soon' : 'ok') as 'ok' | 'exp' | 'soon', d: best };
+}
 export function docCoverage(e: Rec, PAAKREVD: string[]) {
   const docs = S.dokumenter.filter(d => d.eiendomId === e.id); const na = e.dokNA || [];
   return PAAKREVD.map(t => {

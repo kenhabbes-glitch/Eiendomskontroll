@@ -166,3 +166,28 @@ export const TYPER=["Lovpålagt","Egenkontroll","Service","Forsikringskrav","Anb
 export const KATS=["Brann","Elektro","Heis","VVS","Energi","Bygg","Internkontroll","Miljø","Annet"];
 export const ENH: [string, string][] = [["uke","uke(r)"],["mnd","måned(er)"],["år","år"]];
 
+
+/* Serviceavtale per systemtype.
+   lov = lovkrav om fagkyndig vedlikehold/kontroll – serviceavtale er den normale måten å oppfylle kravet på
+   anb = ikke lovkrav, men anbefalt (driftssikkerhet, garanti, forsikring) */
+export const SERVICEAVTALE: Record<string, { n: 'lov' | 'anb'; h: string }> = {
+  heis: { n: 'lov', h: 'Pbl. § 29-9 og TEK17 § 16-1: eier skal sørge for vedlikehold og ettersyn utført av fagkyndig, i tillegg til sikkerhetskontroll minst hvert annet år' },
+  rulletrapp: { n: 'lov', h: 'Pbl. § 29-9 og TEK17 § 16-1: vedlikehold og ettersyn utført av fagkyndig' },
+  loft: { n: 'lov', h: 'Pbl. § 29-9 og TEK17 § 16-1: vedlikehold og ettersyn av løfteinnretning' },
+  brannalarm: { n: 'lov', h: 'Forskrift om brannforebygging § 5: sikkerhetsinnretninger skal kontrolleres og vedlikeholdes (NS 3960). Forsikring krever normalt FG-godkjent firma' },
+  talevarsling: { n: 'lov', h: 'Forskrift om brannforebygging § 5: sikkerhetsinnretninger skal kontrolleres og vedlikeholdes (NS 3961)' },
+  sprinkler: { n: 'lov', h: 'Forskrift om brannforebygging § 5 (NS-EN 12845). Forsikring krever normalt årlig kontroll av FG-godkjent firma' },
+  roykluker: { n: 'lov', h: 'Forskrift om brannforebygging § 5: brannventilasjon er sikkerhetsinnretning som skal kontrolleres og vedlikeholdes' },
+  fettutskiller: { n: 'lov', h: 'Forurensningsforskriften kap. 15A og kommunal forskrift: regelmessig tømming av godkjent firma – mange kommuner krever tømmeavtale' },
+  oljeutskiller: { n: 'lov', h: 'Forurensningsforskriften kap. 15 og kommunal forskrift: tømming og kontroll av godkjent firma' },
+  varmepumpe: { n: 'lov', h: 'Produktforskriften kap. 6a (F-gass): lekkasjekontroll av sertifisert personell/foretak' },
+  kjole: { n: 'lov', h: 'Produktforskriften kap. 6a (F-gass): lekkasjekontroll av sertifisert personell/foretak' },
+  trykk: { n: 'lov', h: 'Forskrift om håndtering av trykkpåkjent utstyr: periodisk kontroll av kontrollorgan' },
+  nodlys: { n: 'anb', h: 'Årlig kontroll (NS-EN 50172) – kan gjøres av egen elektroinstallatør. Forsikring kan kreve det' },
+  nodstrom: { n: 'anb', h: 'Anbefalt service etter produsentens krav' },
+  ventilasjon: { n: 'anb', h: 'Anbefalt for drift, inneklima og energi' },
+  sd: { n: 'anb', h: 'Anbefalt for drift og programvareoppdatering' },
+  adgang: { n: 'anb', h: 'Anbefalt; forsikring kan kreve service på innbruddsalarm' },
+  kjel: { n: 'anb', h: 'Anbefalt service på brenner og kjel' },
+  brannspjeld: { n: 'anb', h: 'Funksjonstest etter FOB § 5 – kan inngå i avtale med ventilasjonsfirma' },
+};
