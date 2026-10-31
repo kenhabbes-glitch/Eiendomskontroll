@@ -38,7 +38,7 @@ export function editEiendom(id?: string) {
     { k: 'eierInfo', type: 'custom', render: v => <div className="small muted">{v.eierBrreg ? <>{[v.eierBrreg.orgform, v.eierBrreg.adresse, v.eierBrreg.dagligLeder ? 'Daglig leder: ' + v.eierBrreg.dagligLeder : '', v.eierBrreg.styreleder ? 'Styreleder: ' + v.eierBrreg.styreleder : ''].filter(Boolean).join(' · ')}. </> : null}
       Tinglyst hjemmelshaver finnes ikke i noe åpent API{seEiendomUrl(v) ? <> – kontroller den i <a href={seEiendomUrl(v)} target="_blank" rel="noopener noreferrer">Se eiendom</a> (innlogging med ID-porten).</> : ' – søk opp adressen over for å få lenke til Se eiendom.'}</div> },
     { k: 's1', label: 'Ansvar og kontakter', type: 'sec' },
-    { k: 'driftsansvarlig', label: 'Driftsansvarlig / vaktmester', half: true }, { k: 'brannansvarlig', label: 'Eiers ansvarlige for brannsikkerhet', half: true },
+    { k: 'driftsansvarlig', label: 'Driftsansvarlig / driftstekniker', half: true }, { k: 'brannansvarlig', label: 'Eiers ansvarlige for brannsikkerhet', half: true },
     { k: 'forsikring', label: 'Forsikringsselskap / polise', half: true }, { k: 'kontaktLeietaker', label: 'Kontakt for leietakere (navn, tlf, e-post)', half: true },
     { k: 'notat', label: 'Notater', type: 'textarea' }];
   formModal({
