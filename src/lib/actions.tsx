@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state } from './store';
-import { leieAreal, m2 } from './utils';
+import { leieAreal, m2, FELLES_AVTALE } from './utils';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst } from './utils';
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
@@ -401,8 +401,11 @@ export function editLeietaker(id?: string, preset: any = {}) {
     { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true }, { k: 'lokale', label: 'Leieobjekt / etasje', half: true },
     { k: 'arealOverstyrt', label: 'Overstyr leieareal (m²)', type: 'number', half: true, hint: 'La stå tom for å bruke arealet fra tegningene' },
     { k: 'virksomhet', label: 'Type virksomhet', type: 'select', options: ['Kontor', 'Butikk/handel', 'Servering', 'Lager/logistikk', 'Industri/verksted', 'Helse/omsorg', 'Undervisning', 'Annet'], empty: '–', half: true },
-    { k: 'arealInfo', type: 'custom', render: v => { const i = leieAreal({ ...l, eiendomId: v.eiendomId, arealOverstyrt: v.arealOverstyrt }); const p = i.p;
-      return <div className="note small" style={{ color: 'var(--ink)' }}>{p ? <>Oppmålt fra tegninger: <b className="mono">{m2(p.tot)}</b> <span className="muted">= eksklusivt {m2(p.eks)} + andel felles etasje {m2(p.fe)} + andel felles bygg {m2(p.fb)}{p.etg?.length ? ` · ${p.etg.join(', ')}` : ''}</span></> : <span className="muted">Ingen arealer er tegnet for denne leietakeren ennå (Tegninger og arealer).</span>}
+    { k: 'fellesAvtale', label: 'Kontraktfestet fellesareal', type: 'select', options: FELLES_AVTALE, half: true },
+    { k: 'fellesAvtaleVerdi', label: 'Avtalt verdi (m² eller %)', type: 'number', half: true, hint: 'Brukes i stedet for målt andel fellesareal' },
+    { k: 'arealInfo', type: 'custom', render: v => { const i = leieAreal({ ...l, id: l.id || '_ny', eiendomId: v.eiendomId, arealOverstyrt: v.arealOverstyrt, fellesAvtale: v.fellesAvtale, fellesAvtaleVerdi: v.fellesAvtaleVerdi }); const p: any = i.p;
+      return <div className="note small" style={{ color: 'var(--ink)' }}>{p ? <>Leieareal fra tegninger: <b className="mono">{m2(p.tot)}</b> <span className="muted">= eksklusivt {m2(p.eks)} + {p.avtale ? <>avtalt fellesareal {m2(p.felles)}</> : <>andel felles etasje {m2(p.fe)} + andel felles bygg {m2(p.fb)}</>}{p.etg?.length ? ` · ${p.etg.join(', ')}` : ''}</span>
+        {p.avtale && <><br />Målt andel fellesareal er {m2(p.fellesBer)}. Avtalen gir <b style={{ color: p.diff < 0 ? 'var(--red)' : 'var(--green)' }}>{p.diff >= 0 ? 'overdekning' : 'underdekning'} på {m2(Math.abs(p.diff))}</b>{p.diff < 0 ? ' som eier ikke får fakturert.' : ' i eiers favør.'}</>}</> : <span className="muted">Ingen arealer er tegnet for denne leietakeren ennå (Tegninger og arealer).</span>}
         {i.kilde === 'overstyrt' && p && Math.abs(i.verdi! - p.tot) >= 0.1 && <><br /><b>Overstyrt til {m2(i.verdi)}</b> <span className="muted">({i.verdi! - p.tot > 0 ? '+' : ''}{(i.verdi! - p.tot).toLocaleString('nb-NO', { maximumFractionDigits: 1 })} m² mot oppmålt)</span></>}
         {leieAreal({ ...l, eiendomId: v.eiendomId, arealOverstyrt: '' }).adv.map((a, j) => <div key={j} style={{ color: 'var(--amber)', marginTop: 4 }}>⚠ {a}</div>)}</div>; } },
     { k: 'sec', label: 'Leieavtale', type: 'sec' },

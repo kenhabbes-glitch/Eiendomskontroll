@@ -6,9 +6,9 @@ export async function syncArealer(eid: string) {
   const C = arealCalc(eid); const dato = new Date().toISOString().slice(0, 10);
   for (const l of S.leietakere.filter(x => x.eiendomId === eid)) {
     const p = C.per[l.id]; const r = (v: number) => Math.round(v * 10) / 10;
-    const ny = p ? { tot: r(p.tot), eks: r(p.eks), fe: r(p.fe), fb: r(p.fb), etg: p.etg, dato } : null;
+    const ny = p ? { tot: r(p.tot), eks: r(p.eks), fe: r(p.fe), fb: r(p.fb), felles: r(p.felles), fellesBer: r(p.fellesBer), avtale: p.avtale || '', etg: p.etg, dato } : null;
     const gml = l.arealBeregnet || null;
-    const lik = (!ny && !gml) || (ny && gml && ny.tot === gml.tot && ny.eks === gml.eks && ny.fe === gml.fe && ny.fb === gml.fb);
+    const lik = (!ny && !gml) || (ny && gml && ny.tot === gml.tot && ny.eks === gml.eks && ny.fe === gml.fe && ny.fb === gml.fb && ny.felles === gml.felles);
     if (!lik) { try { await save('leietakere', { ...l, arealBeregnet: ny }); } catch { } }
   }
 }
@@ -18,6 +18,7 @@ import { Sel, eiendomOpts, useFilter } from './common';
 import { KOMP, TFM_KODER } from '../lib/catalog';
 import { pad, tfmSys, tfmKomp, openAvvik } from '../lib/utils';
 import { editAnlegg, editKomponent } from '../lib/actions';
+import { arealRapport } from '../lib/arealRapport';
 
 // ---------- systemer/komponenter som markører på tegning
 export const FAG: [string, string, string][] = [['2', 'Bygning', '#8a5a2b'], ['3', 'VVS', '#2457a6'], ['4', 'Elkraft', '#b07a00'], ['5', 'Tele og automasjon', '#b42318'], ['6', 'Andre installasjoner', '#7b3fa0'], ['7', 'Utendørs', '#5b6b00']];
@@ -240,6 +241,23 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
 
 function Thumb({ t }: { t: Rec }) { const u = useFileUrl(t.fil?.path); return u ? <img src={u} alt="" /> : <span className="muted small">Laster …</span>; }
 
+export function Dekning({ C }: { C: any }) {
+  const d = C.dekning; const neg = d.netto < -0.05;
+  return <div className="card" style={{ marginTop: 12 }}><h3 style={{ marginTop: 0 }}>Dekning av fellesareal</h3>
+    <div className="kpis" style={{ marginBottom: 8 }}>
+      <div className="kpi" style={{ cursor: 'default' }}><div className="l">Fellesareal totalt</div><div className="v">{m2(d.F)}</div></div>
+      <div className="kpi" style={{ cursor: 'default' }}><div className="l">Fakturert leietakere</div><div className="v">{m2(d.fakturert)}</div><div className="s">{(d.grad * 100).toLocaleString('nb-NO', { maximumFractionDigits: 1 })} % dekning</div></div>
+      <div className={'kpi ' + (neg ? 'bad' : 'ok')} style={{ cursor: 'default' }}><div className="l">{neg ? 'Underdekning (eier bærer)' : 'Overdekning'}</div><div className="v">{m2(Math.abs(d.netto))}</div></div></div>
+    <table className="small" style={{ width: 'auto' }}><tbody>
+      <tr><td>Avvik fra kontraktfestet fellesareal</td><td className="num" style={{ paddingLeft: 24, color: d.avvik < 0 ? 'var(--red)' : undefined }}>{d.avvik >= 0 ? '+' : '−'}{m2(Math.abs(d.avvik))}</td></tr>
+      {d.ledig > 0.05 && <tr><td>Andel som faller på ledig areal</td><td className="num" style={{ paddingLeft: 24, color: 'var(--red)' }}>−{m2(d.ledig)}</td></tr>}
+      {d.ukjent > 0.05 && <tr><td>Andel på leieareal uten leietaker</td><td className="num" style={{ paddingLeft: 24, color: 'var(--red)' }}>−{m2(d.ukjent)}</td></tr>}
+      {d.ikkeFordelt > 0.05 && <tr><td>Ikke fordelt (ingen leieareal i etasjen)</td><td className="num" style={{ paddingLeft: 24, color: 'var(--red)' }}>−{m2(d.ikkeFordelt)}</td></tr>}
+      <tr style={{ fontWeight: 600 }}><td>Netto {neg ? 'underdekning' : 'overdekning'}</td><td className="num" style={{ paddingLeft: 24 }}>{d.netto >= 0 ? '+' : '−'}{m2(Math.abs(d.netto))}</td></tr>
+    </tbody></table>
+    <p className="small muted" style={{ marginBottom: 0 }}>Underdekning betyr fellesareal eier ikke får fakturert leietakerne (og dermed ikke får dekket felleskostnad for). Kontraktfestet fellesareal settes på leietakeren.</p></div>;
+}
+
 export function ArealSection({ eid }: { eid: string }) {
   useStore();
   const e = byId('eiendommer', eid); if (!e) return null; const ed = canEdit();
@@ -257,15 +275,16 @@ export function ArealSection({ eid }: { eid: string }) {
       {ed && <button className="upcard" onClick={() => editTegning(undefined, eid)}><b style={{ fontSize: 22 }}>+</b><span>Last opp plantegning</span><span className="small">PDF, PNG eller JPG</span></button>}
       {!ed && !T.length && <div className="card"><Empty t="Ingen tegninger" /></div>}
     </div>
-    <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Arealoppgave – {e.navn}</h2>{keys.length > 0 && <><button className="btn sm" onClick={csv}>Kopier arealoppgave (CSV)</button></>}</div>
+    <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Arealoppgave – {e.navn}</h2>{keys.length > 0 && <><button className="btn sm" onClick={csv}>Kopier arealoppgave (CSV)</button><button className="btn sm pri" onClick={() => arealRapport(eid)}>Arealrapport (PDF)</button></>}</div>
       {C.unscaled > 0 && <div className="banner">{C.unscaled} tegning(er) har arealer, men mangler målestokk og er ikke med i oppgaven.</div>}
-      {keys.length ? <div className="tbl-wrap"><table><thead><tr><th>Leietaker</th><th>Etasje</th><th className="num">Eksklusivt areal</th><th className="num">Andel felles etasje</th><th className="num">Andel felles bygg</th><th className="num">Leieareal</th><th className="num">Andel</th>{ed && <th className="num">Overstyrt på leietaker</th>}</tr></thead><tbody>
+      {keys.length ? <div className="tbl-wrap"><table><thead><tr><th>Leietaker</th><th>Etasje</th><th className="num">Eksklusivt areal</th><th className="num">Andel felles etasje</th><th className="num">Andel felles bygg</th>{C.dekning.harAvtale && <th className="num">Avtalt felles</th>}<th className="num">Leieareal</th><th className="num">Andel</th>{ed && <th className="num">Overstyrt på leietaker</th>}</tr></thead><tbody>
         {keys.map(k => { const p = C.per[k]; const l = byId('leietakere', k); const ov = l && l.arealOverstyrt !== '' && l.arealOverstyrt != null && !isNaN(+l.arealOverstyrt) ? +l.arealOverstyrt : null;
           return <tr key={k} className={l && ed ? 'click' : ''} onClick={() => l && ed && go('leietaker/' + k)}><td><span className="sw" style={{ display: 'inline-block', verticalAlign: -1, marginRight: 6, background: k === '_ledig' ? KAT_FARGE.ledig : ltColor(eid, k) }} />{nm(k)}</td><td className="small">{p.etg.join(', ')}</td>
-            <td className="num">{m2(p.eks)}</td><td className="num">{m2(p.fe)}</td><td className="num">{m2(p.fb)}</td><td className="num" style={{ fontWeight: 600 }}>{m2(p.tot)}</td><td className="num">{tot ? (p.tot / tot * 100).toLocaleString('nb-NO', { maximumFractionDigits: 1 }) + ' %' : '–'}</td>
+            <td className="num">{m2(p.eks)}</td><td className="num">{m2(p.fe)}</td><td className="num">{m2(p.fb)}</td>{C.dekning.harAvtale && <td className="num">{p.avtale ? <>{m2(p.felles)}<div className="small" style={{ color: p.diff < 0 ? 'var(--red)' : 'var(--green)' }}>{p.diff >= 0 ? '+' : '−'}{m2(Math.abs(p.diff))}</div></> : <span className="muted">–</span>}</td>}<td className="num" style={{ fontWeight: 600 }}>{m2(p.tot)}</td><td className="num">{tot ? (p.tot / tot * 100).toLocaleString('nb-NO', { maximumFractionDigits: 1 }) + ' %' : '–'}</td>
             {ed && <td className="num">{ov !== null ? <>{m2(ov)}{Math.abs(ov - p.tot) >= 1 && <div className="small" style={{ color: 'var(--amber)' }}>{ov - p.tot > 0 ? '+' : ''}{(ov - p.tot).toLocaleString('nb-NO', { maximumFractionDigits: 1 })} mot oppmålt</div>}</> : <span className="muted">–</span>}</td>}</tr>; })}
-        <tr className="grp"><td colSpan={2}>Sum utleibart</td><td className="num">{m2(C.totEks)}</td><td className="num">{m2(keys.reduce((s, k) => s + C.per[k].fe, 0))}</td><td className="num">{m2(keys.reduce((s, k) => s + C.per[k].fb, 0))}</td><td className="num">{m2(tot)}</td><td className="num">100 %</td>{ed && <td />}</tr>
+        <tr className="grp"><td colSpan={2}>Sum utleibart</td><td className="num">{m2(C.totEks)}</td><td className="num">{m2(keys.reduce((s, k) => s + C.per[k].fe, 0))}</td><td className="num">{m2(keys.reduce((s, k) => s + C.per[k].fb, 0))}</td>{C.dekning.harAvtale && <td />}<td className="num">{m2(tot)}</td><td className="num">100 %</td>{ed && <td />}</tr>
       </tbody></table></div> : <div className="tbl-wrap"><Empty t="Ingen oppmålte leiearealer ennå">{ed && 'Last opp plantegning, sett målestokk og tegn arealene.'}</Empty></div>}
+      {C.dekning.F > 0 && keys.length > 0 && <Dekning C={C} />}
       {C.ikkeFordelt > 0 && <p className="small" style={{ color: 'var(--amber)' }}>{m2(C.ikkeFordelt)} fellesareal er ikke fordelt fordi det ikke finnes leieareal å fordele på.</p>}
       {C.fellesBygg + C.etg.reduce((s: number, x: any) => s + (x.sum.felles_etg || 0), 0) < 0.05 && keys.length > 0 && <div className="banner">Det er ikke tegnet fellesarealer for eiendommen, så leiearealene inneholder ingen andel fellesareal. Tegn korridorer, trapperom, inngangsparti o.l. som «Fellesareal» hvis de skal fordeles.</div>}
       <p className="small muted">Leiearealet (inkl. andel fellesareal) lagres automatisk på leietakerne når tegningene endres, og kan overstyres på leietakeren. Fellesareal i etasjen fordeles forholdsmessig på leiearealene (inkl. ledig areal) i samme etasje. Fellesareal for hele bygget fordeles på alle leiearealer. Ikke utleibart areal: {m2(ikke)}. Arealene er målt fra tegning og er veiledende – en formell arealoppgave etter NS 3940 bør kontrollmåles.</p></div>

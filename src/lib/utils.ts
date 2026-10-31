@@ -103,7 +103,14 @@ export function zoneArea(t: Rec, z: Rec) { const r = mpp(t); return r && z.pts &
 export function centroid(p: number[][]) { let a = 0, cx = 0, cy = 0; for (let i = 0; i < p.length; i++) { const [x0, y0] = p[i], [x1, y1] = p[(i + 1) % p.length]; const f = x0 * y1 - x1 * y0; a += f; cx += (x0 + x1) * f; cy += (y0 + y1) * f; } if (Math.abs(a) < 1e-9) return p[0]; a /= 2; return [cx / (6 * a), cy / (6 * a)]; }
 export function ltColor(eid: string, lid: string) { const L = sortBy(S.leietakere.filter(l => l.eiendomId === eid), l => l.navn).map(l => l.id); const i = L.indexOf(lid); return i < 0 ? '#1f6f5c' : LT_FARGE[i % LT_FARGE.length]; }
 export function zoneColor(t: Rec, z: Rec) { return z.kat === 'leie' ? ltColor(t.eiendomId, z.leietakerId) : KAT_FARGE[z.kat] || '#6b736d'; }
-export function arealCalc(eid: string) {
+export const FELLES_AVTALE: [string, string][] = [['', 'Ingen avtale – målt andel fra tegning'], ['m2', 'Fast antall m² fellesareal'], ['pst_felles', '% av byggets totale fellesareal'], ['paslag', '% påslag på eksklusivt areal']];
+/** Kontraktfestet fellesareal (m²) for en leietaker, eller null hvis ingen avtale */
+export function kontraktFelles(l: Rec | null | undefined, eks: number, F: number): number | null {
+  if (!l || !l.fellesAvtale) return null; const v = +String(l.fellesAvtaleVerdi ?? '').replace(',', '.'); if (isNaN(v) || String(l.fellesAvtaleVerdi ?? '') === '') return null;
+  return l.fellesAvtale === 'm2' ? v : l.fellesAvtale === 'pst_felles' ? F * v / 100 : l.fellesAvtale === 'paslag' ? eks * v / 100 : null;
+}
+export const avtaleTekst = (l: Rec) => !l?.fellesAvtale ? '' : l.fellesAvtale === 'm2' ? `${String(l.fellesAvtaleVerdi).replace('.', ',')} m² avtalt` : l.fellesAvtale === 'pst_felles' ? `${String(l.fellesAvtaleVerdi).replace('.', ',')} % av fellesarealet` : `${String(l.fellesAvtaleVerdi).replace('.', ',')} % påslag`;
+export function arealCalc(eid: string, over?: Rec) {
   const T = S.tegninger.filter(t => t.eiendomId === eid); const per: Record<string, any> = {}; const etg: any[] = [];
   let unscaled = 0, fellesBygg = 0, ikkeFordelt = 0;
   sortBy(T, t => +t.etasje || 0).forEach(t => {
@@ -115,14 +122,22 @@ export function arealCalc(eid: string) {
     etg.push({ t, sum, ok: true });
   });
   const totEks = Object.values(per).reduce((s: number, p: any) => s + p.eks, 0); if (!totEks) ikkeFordelt += fellesBygg;
-  Object.values(per).forEach((p: any) => { p.fb = totEks ? fellesBygg * p.eks / totEks : 0; p.tot = p.eks + p.fe + p.fb; });
+  const F = etg.reduce((s: number, x: any) => s + (x.ok ? (x.sum.felles_etg || 0) + (x.sum.felles_bygg || 0) : 0), 0);
+  Object.entries(per).forEach(([k, p]: [string, any]) => { p.fb = totEks ? fellesBygg * p.eks / totEks : 0; p.fellesBer = p.fe + p.fb;
+    const l = k.startsWith('_') ? null : (over && over.id === k ? over : byId('leietakere', k)); const kf = kontraktFelles(l, p.eks, F);
+    p.avtale = kf !== null ? l!.fellesAvtale : ''; p.felles = kf !== null ? kf : p.fellesBer; p.diff = p.felles - p.fellesBer; p.tot = p.eks + p.felles; });
   const totLeie = Object.values(per).reduce((s: number, p: any) => s + p.tot, 0);
-  return { per, etg, unscaled, fellesBygg, totEks, totLeie, ikkeFordelt };
+  // Dekning av fellesareal: hvor mye av fellesarealet som faktisk faktureres leietakerne
+  const leiet = Object.entries(per).filter(([k]) => !k.startsWith('_')).map(([, p]) => p as any);
+  const fakturert = leiet.reduce((s, p) => s + p.felles, 0); const avvik = leiet.reduce((s, p) => s + p.diff, 0);
+  const ledigF = per._ledig ? per._ledig.fellesBer : 0; const ukjentF = per._ukjent ? per._ukjent.fellesBer : 0;
+  const dekning = { F, fakturert, avvik, ledig: ledigF, ukjent: ukjentF, ikkeFordelt, netto: fakturert - F, grad: F ? fakturert / F : 0, harAvtale: leiet.some(p => p.avtale) };
+  return { per, etg, unscaled, fellesBygg, totEks, totLeie, ikkeFordelt, dekning };
 }
 export type LeieArealInfo = { verdi: number | null; kilde: 'overstyrt' | 'maalt' | 'manuell' | null; p: { eks: number; fe: number; fb: number; tot: number; etg?: string[] } | null; adv: string[] };
 /** Gjeldende leieareal for en leietaker: overstyrt > oppmålt fra tegninger (inkl. andel fellesareal) > eldre manuell verdi */
 export function leieAreal(l: Rec): LeieArealInfo {
-  const C = arealCalc(l.eiendomId); let p: any = C.per[l.id] || null;
+  const C = arealCalc(l.eiendomId, l.id ? l : undefined); let p: any = C.per[l.id] || null;
   if (!p && l.arealBeregnet?.tot && !S.tegninger.some(t => t.eiendomId === l.eiendomId)) p = l.arealBeregnet; // leietakere ser ikke tegningene
   const ovRaw = l.arealOverstyrt; const ov = ovRaw !== '' && ovRaw != null && !isNaN(+ovRaw) ? +ovRaw : null;
   const adv: string[] = [];
