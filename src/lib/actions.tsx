@@ -6,6 +6,7 @@ import { leieAreal, m2 } from './utils';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok } from './utils';
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
+import { openPlan } from '../views/Arealer';
 import { adresseFelter, brregData, enhetStatus, seEiendomUrl, virksomhetFraNaering, rensOrgnr } from './oppslag';
 import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip, DueChip, type Field } from '../components/ui';
 
@@ -55,6 +56,21 @@ export function editEiendom(id?: string) {
 }
 
 // ================= SYSTEM / BYGNINGSDEL =================
+// Plassering av system/komponent på tegning
+function PlasseringFelt({ kind, id, eiendomId, close }: { kind: 'a' | 'k'; id?: string; eiendomId: string; close: () => void }) {
+  const o = id ? byId(kind === 'a' ? 'anlegg' : 'komponenter', id) : null; const T = sortBy(S.tegninger.filter(t => t.eiendomId === eiendomId), t => +t.etasje || 0);
+  const [tid, setTid] = React.useState(o?.pos?.tegningId || T[0]?.id || '');
+  if (!id) return <div className="small muted">Lagre først – deretter kan du plassere den på en tegning.</div>;
+  if (!T.length) return <div className="small muted">Ingen tegninger for eiendommen. Last opp under «Tegninger og arealer».</div>;
+  const t = o?.pos ? byId('tegninger', o.pos.tegningId) : null;
+  return <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+    {t ? <span className="small">Plassert på <b>{t.navn}</b></span> : <span className="small muted">Ikke plassert</span>}
+    {t && <button type="button" className="btn sm" onClick={() => { close(); openPlan(t.id, { mode: 'tfm', focus: id }); }}>Vis på tegning</button>}
+    {canEdit() && <>{T.length > 1 && <select value={tid} onChange={e => setTid(e.target.value)} style={{ border: '1px solid var(--line2)', borderRadius: 7, padding: '5px 6px', width: 'auto' }}>{T.map(x => <option key={x.id} value={x.id}>{x.navn}</option>)}</select>}
+      <button type="button" className="btn sm" onClick={() => { close(); openPlan(tid, { mode: 'tfm', placeId: id }); }}>{t ? 'Flytt' : 'Plasser på tegning'}</button></>}
+  </div>;
+}
+
 // Viser beregnet utskiftingsår og prisjustert kostnad live i skjemaet
 function UtskiftNote({ v, typeLevetid }: { v: any; typeLevetid?: number }) {
   const lev = +v.levetid || typeLevetid || 0; const ber = +v.aar && lev ? +v.aar + lev : null;
@@ -85,12 +101,14 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} typeLevetid={KOMP[v.type]?.l} /> },
     { k: 'ansvar', label: 'Ansvar for vedlikehold', type: 'select', options: ['Eier', 'Leietaker', 'Delt'], half: true },
     { k: 'leverandor', label: 'Serviceleverandør / avtale', half: true }, { k: 'tgdato', label: 'Tilstand vurdert dato', type: 'date', half: true },
+    { k: 'plass', type: 'custom', label: 'Plassering på tegning', render: v => <PlasseringFelt kind="a" id={id} eiendomId={v.eiendomId} close={() => closeRef.c?.()} /> },
     { k: 'notat', label: 'Notater', type: 'textarea' },
   ];
   if (!id) fields.push(
     { k: 'mk', type: 'custom', label: 'Kontroller som opprettes for dette systemet', hint: 'Du kan justere hver kontroll senere.', render: (v, set) => { const ms = KOMP[v.type]?.m || []; return ms.length ? <div className="checks">{ms.map(k => <label key={k}><input type="checkbox" checked={(v.mk || []).includes(k)} onChange={e => set({ mk: e.target.checked ? [...(v.mk || []), k] : (v.mk || []).filter((x: string) => x !== k) })} /><span><span className="ct">{MALER[k].n}</span><br /><span className="cs">{MALER[k].t} · {intTxt({ n: MALER[k].i[0], enhet: MALER[k].i[1] })} · {MALER[k].h}</span></span></label>)}</div> : <div className="muted small">Ingen standardkontroller for denne typen.</div>; } },
     { k: 'forste', label: 'Første frist for nye kontroller', type: 'date', half: true });
-  formModal({
+  const closeRef: { c?: () => void } = {};
+  closeRef.c = formModal({
     title: ro ? aNavn(id) : id ? 'Rediger system / bygningsdel' : 'Nytt system / bygningsdel', fields, values: a, readOnly: ro,
     onChange: (k, v, prev) => {
       if (k === 'tfmSys') touched.sys = true; if (k === 'tfmLop') touched.lop = true;
@@ -109,7 +127,8 @@ export function editAnlegg(id?: string, eiendomId?: string) {
       v.tfmSys = String(v.tfmSys || '').replace(/\D/g, ''); v.tfmLop = v.tfmSys ? pad(String(v.tfmLop || '1').replace(/\D/g, '') || 1) : '';
       const dup = v.tfmSys && S.anlegg.find(x => x.id !== id && x.eiendomId === v.eiendomId && x.tfmSys === v.tfmSys && pad(x.tfmLop) === v.tfmLop);
       if (dup) { toast(`TFM-koden =${v.tfmSys}.${v.tfmLop} er allerede brukt på «${dup.navn || KOMP[dup.type]?.n}»`); return false; }
-      const nid = await save('anlegg', { ...a, ...v, mk: undefined, forste: undefined });
+      delete v.plass; const fersk = id ? byId('anlegg', id) : null;
+      const nid = await save('anlegg', { ...a, ...v, pos: fersk ? fersk.pos ?? null : a.pos ?? null, mk: undefined, forste: undefined });
       for (const k of mk) await save('oppgaver', taskFromMal(k, MALER, v.eiendomId, nid, forste));
       toast(mk.length ? `Lagret og opprettet ${mk.length} kontroller` : 'Lagret');
     },
@@ -129,11 +148,13 @@ export function editKomponent(id?: string, anleggId?: string) {
     { k: 'plassering', label: 'Plassering (rom/etasje)', half: true }, { k: 'fabrikat', label: 'Fabrikat / modell', half: true },
     { k: 'serienr', label: 'Serienummer', half: true }, { k: 'aar', label: 'Installert år', type: 'number', half: true },
     { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Fyll ut for å ta med komponenten i vedlikeholdsplanen' }, { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true },
+    { k: 'plass', type: 'custom', label: 'Plassering på tegning', render: v => <PlasseringFelt kind="k" id={id} eiendomId={byId('anlegg', v.anleggId)?.eiendomId || k.eiendomId} close={() => closeRefK.c?.()} /> },
     { k: 'tg', label: 'Tilstandsgrad', type: 'select', options: TG_OPTS, half: true },
     ...(canEdit() ? [{ k: 'kost', label: 'Utskiftingskostnad (kr)', type: 'number', half: true } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR } as Field] : []),
     { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} /> },
     { k: 'notat', label: 'Notater', type: 'textarea' }];
-  formModal({
+  const closeRefK: { c?: () => void } = {};
+  closeRefK.c = formModal({
     title: ro ? kNavn(id) : id ? 'Rediger komponent' : 'Ny komponent', fields, values: k, readOnly: ro,
     onChange: (key, v) => { if (key === 'lop') touched.lop = true; if ((key === 'kode' || key === 'anleggId') && !touched.lop && !id) return { lop: nextKompLop(v.anleggId, v.kode) }; },
     extraFoot: close => id && !ro ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette komponenten?')) { await removeDoc('komponenter', id); close(); } }}>Slett</button> : null,
@@ -142,7 +163,8 @@ export function editKomponent(id?: string, anleggId?: string) {
       if (!x.navn) x.navn = TFM_KODER.find(c => c[0] === x.kode)?.[1] || '';
       const dup = S.komponenter.find(z => z.id !== id && z.anleggId === x.anleggId && String(z.kode || '').toUpperCase() === x.kode && pad(z.lop) === x.lop);
       if (dup) { toast('Komponentkoden er allerede brukt i dette systemet'); return false; }
-      const a = byId('anlegg', x.anleggId); await save('komponenter', { ...k, ...x, eiendomId: a ? a.eiendomId : k.eiendomId }); toast('Komponent lagret');
+      delete x.plass; const fersk = id ? byId('komponenter', id) : null;
+      const a = byId('anlegg', x.anleggId); await save('komponenter', { ...k, ...x, pos: fersk ? fersk.pos ?? null : k.pos ?? null, eiendomId: a ? a.eiendomId : k.eiendomId }); toast('Komponent lagret');
     },
   });
 }

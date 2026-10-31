@@ -15,6 +15,18 @@ export async function syncArealer(eid: string) {
 import { AREAL_KAT, KAT_FARGE, arealCalc, byId, centroid, clone, eNavn, lNavn, ltColor, m2, mpp, sortBy, toCsv, today, zoneArea, zoneColor, type Rec } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, openModal, textModal, useFileUrl } from '../components/ui';
 import { Sel, eiendomOpts, useFilter } from './common';
+import { KOMP, TFM_KODER } from '../lib/catalog';
+import { pad, tfmSys, tfmKomp, openAvvik } from '../lib/utils';
+import { editAnlegg, editKomponent } from '../lib/actions';
+
+// ---------- systemer/komponenter som markører på tegning
+export const FAG: [string, string, string][] = [['2', 'Bygning', '#8a5a2b'], ['3', 'VVS', '#2457a6'], ['4', 'Elkraft', '#b07a00'], ['5', 'Tele og automasjon', '#b42318'], ['6', 'Andre installasjoner', '#7b3fa0'], ['7', 'Utendørs', '#5b6b00']];
+export type MItem = { kind: 'a' | 'k'; o: Rec };
+export function itemFag(i: MItem) { const sys = i.kind === 'a' ? i.o : byId('anlegg', i.o.anleggId); const c = String(sys?.tfmSys || '')[0] || String(KOMP[sys?.type]?.g || '')[0] || ''; return c; }
+export const fagFarge = (c: string) => FAG.find(f => f[0] === c)?.[2] || '#3d4a44';
+export function itemKode(i: MItem) { return i.kind === 'a' ? (tfmSys(i.o) || '(uten kode)') : '-' + (i.o.kode || '') + pad(i.o.lop); }
+export function itemNavn(i: MItem) { return i.kind === 'a' ? (i.o.navn || KOMP[i.o.type]?.n || 'System') : (i.o.navn || TFM_KODER.find(c => c[0] === (i.o.kode || '').toUpperCase())?.[1] || 'Komponent'); }
+async function lagrePos(i: MItem, pos: any) { await save(i.kind === 'a' ? 'anlegg' : 'komponenter', { ...i.o, pos }); }
 
 const go = (p: string) => { location.hash = '#/' + p; };
 
@@ -60,23 +72,30 @@ export function editTegning(id?: string, eid?: string) {
 
 // ---------- tegneverktøy
 const HELP: Record<string, string> = {
+  plasser: 'Velg system eller komponent i listen til høyre, og klikk der det skal stå på tegningen. Markører kan dras til ny plassering.',
   velg: 'Klikk på et areal for å velge det. Dra i hjørnepunktene for å justere. Dra i bakgrunnen for å flytte tegningen, scroll for å zoome.',
   skala: 'Klikk på to punkter med kjent avstand, f.eks. endene av en målsatt vegg. Skriv inn lengden i meter til høyre. Zoom inn for presisjon.',
   tegn: 'Klikk hjørnene i arealet. Avslutt ved å klikke på første punkt, dobbeltklikke eller trykke Enter. Hold Shift for rette vinkler. Punkter fester seg til eksisterende hjørner. Backspace angrer, Esc avbryter.',
   maal: 'Klikk to punkter for å måle avstanden. Hold Shift for vannrett/loddrett.',
 };
-export function openPlan(tid: string) { openModal({ noFrame: true, render: close => <PlanEditor tid={tid} close={close} /> }); }
+export type PlanOpts = { mode?: 'tfm'; placeId?: string; focus?: string };
+export function openPlan(tid: string, opts: PlanOpts = {}) { openModal({ noFrame: true, render: close => <PlanEditor tid={tid} close={close} opts={opts} /> }); }
 
-function PlanEditor({ tid, close }: { tid: string; close: () => void }) {
+function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void; opts?: PlanOpts }) {
   const t0 = byId('tegninger', tid)!; const ro = !canEdit();
   const T = useRef<Rec>({ ...clone(t0), soner: clone(t0?.soner || []) }).current;
   const [, setTick] = useState(0); const rr = () => setTick(x => x + 1);
-  const st = useRef({ tool: mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '' }).current;
+  const tfmMode = opts.mode === 'tfm';
+  const st = useRef({ lagA: !tfmMode, lagM: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, tool: opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '' }).current;
   const [vb, setVb] = useState({ x: 0, y: 0, w: T.w || 1000, h: T.h || 800 });
   const svgRef = useRef<SVGSVGElement>(null);
   const src = useFileUrl(T.fil?.path);
   const [scM, setScM] = useState('');
   const L = sortBy(S.leietakere.filter(l => l.eiendomId === T.eiendomId), l => l.navn);
+  const items: MItem[] = [...sortBy(S.anlegg.filter(a => a.eiendomId === T.eiendomId), a => (a.tfmSys || '999') + pad(a.tfmLop)).flatMap(a => [{ kind: 'a', o: a } as MItem, ...sortBy(S.komponenter.filter(k => k.anleggId === a.id), k => (k.kode || '') + pad(k.lop)).map(k => ({ kind: 'k', o: k } as MItem))])];
+  const markers = items.filter(i => i.o.pos?.tegningId === T.id && (!st.fag || itemFag(i) === st.fag));
+  const findItem = (id: string | null) => items.find(i => i.o.id === id);
+  useEffect(() => { if (opts.focus) { const i = findItem(opts.focus); if (i?.o.pos) { const w = (T.w || 1000) / 3, h = (T.h || 800) / 3; setVb({ x: i.o.pos.x - w / 2, y: i.o.pos.y - h / 2, w, h }); } } }, []);
 
   const k = () => { const r = svgRef.current?.getBoundingClientRect(); return r ? Math.max(vb.w / (r.width || 1), vb.h / (r.height || 1)) : 1; };
   const pt = (e: { clientX: number; clientY: number }) => { const s = svgRef.current!; const p = s.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const q = p.matrixTransform(s.getScreenCTM()!.inverse()); return [q.x, q.y]; };
@@ -90,7 +109,7 @@ function PlanEditor({ tid, close }: { tid: string; close: () => void }) {
   };
   const flush = async () => { clearTimeout(st.saveT); if (!st.dirty) return; st.dirty = false; st.status = 'Lagrer …'; rr(); try { await save('tegninger', clone(T)); await syncArealer(T.eiendomId); st.status = 'Lagret'; } catch { st.dirty = true; st.status = 'Lagring feilet'; } rr(); };
   const change = () => { if (ro) return; st.dirty = true; st.status = 'Ikke lagret …'; clearTimeout(st.saveT); st.saveT = setTimeout(flush, 900); rr(); };
-  const setTool = (t: string) => { st.tool = t; st.draft = []; if (t !== 'skala') st.scale = []; if (t !== 'maal') st.meas = []; if (t !== 'velg') st.sel = null; rr(); };
+  const setTool = (t: string) => { st.tool = t; if (t !== 'plasser') st.placeId = ''; if (t === 'tegn' || t === 'skala') st.lagA = true; if (t !== 'velg') st.selM = null; st.draft = []; if (t !== 'skala') st.scale = []; if (t !== 'maal') st.meas = []; if (t !== 'velg') st.sel = null; rr(); };
   const closePoly = () => { if (st.draft.length < 3) return; const z = { id: crypto.randomUUID(), navn: 'Areal ' + (T.soner.length + 1), kat: 'leie', leietakerId: '', pts: st.draft.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]) }; T.soner.push(z); st.draft = []; st.sel = z.id; st.tool = 'velg'; change(); setTimeout(() => { const n = document.getElementById('zN') as HTMLInputElement; n?.focus(); n?.select(); }, 30); };
   const done = async () => { await flush(); close(); };
 
@@ -101,12 +120,12 @@ function PlanEditor({ tid, close }: { tid: string; close: () => void }) {
       st.shift = e.shiftKey;
       if (e.key === ' ' && !inField) { st.space = e.type === 'keydown'; e.preventDefault(); return; }
       if (e.type !== 'keydown') return;
-      if (e.key === 'Escape') { if (st.draft.length || st.scale.length || st.meas.length) { st.draft = []; st.scale = []; st.meas = []; rr(); } else if (st.sel) { st.sel = null; rr(); } else done(); return; }
+      if (e.key === 'Escape') { if (st.draft.length || st.scale.length || st.meas.length) { st.draft = []; st.scale = []; st.meas = []; rr(); } else if (st.sel || st.selM || st.placeId) { st.sel = null; st.selM = null; st.placeId = ''; rr(); } else done(); return; }
       if (inField || ro) return;
       if (e.key === 'Enter' && st.tool === 'tegn') closePoly();
       if (e.key === 'Backspace' && st.tool === 'tegn' && st.draft.length) { st.draft.pop(); rr(); e.preventDefault(); }
       if ((e.key === 'Delete' || e.key === 'Backspace') && st.tool === 'velg' && st.sel) { T.soner = T.soner.filter((q: Rec) => q.id !== st.sel); st.sel = null; change(); e.preventDefault(); }
-      const map: Record<string, string> = { v: 'velg', t: 'tegn', m: 'maal', s: 'skala' }; if (map[e.key]) setTool(map[e.key]);
+      const map: Record<string, string> = { v: 'velg', t: 'tegn', m: 'maal', s: 'skala', p: 'plasser' }; if (map[e.key]) setTool(map[e.key]);
     };
     document.addEventListener('keydown', keys); document.addEventListener('keyup', keys);
     return () => { document.removeEventListener('keydown', keys); document.removeEventListener('keyup', keys); };
@@ -115,8 +134,11 @@ function PlanEditor({ tid, close }: { tid: string; close: () => void }) {
 
   const onDown = (e: React.PointerEvent) => {
     st.shift = e.shiftKey; const p = pt(e); const tg = e.target as Element; const hdl = tg.getAttribute('data-h'); const zid = tg.getAttribute('data-z');
+    const mid = (tg.closest && tg.closest('[data-m]')?.getAttribute('data-m')) || null;
+    if (mid && e.button === 0 && (st.tool === 'velg' || st.tool === 'plasser')) { st.selM = mid; st.sel = null; if (!ro) { st.drag = { t: 'm', id: mid, cx: e.clientX, cy: e.clientY, moved: false }; svgRef.current!.setPointerCapture(e.pointerId); } rr(); return; }
+    if (st.tool === 'plasser' && e.button === 0 && !ro) { const it = findItem(st.placeId); if (!it) { toast('Velg først hva som skal plasseres i listen til høyre'); return; } lagrePos(it, { tegningId: T.id, x: Math.round(p[0] * 10) / 10, y: Math.round(p[1] * 10) / 10 }).then(() => { toast(itemKode(it) + ' plassert'); }); st.selM = it.o.id; const nx = items.find(i => !i.o.pos && i.o.id !== it.o.id); st.placeId = nx ? nx.o.id : ''; rr(); return; }
     if (e.button === 1 || st.space || (st.tool === 'velg' && hdl == null && !zid)) { st.drag = { t: 'pan', cx: e.clientX, cy: e.clientY, vb0: { ...vb }, moved: false }; svgRef.current!.setPointerCapture(e.pointerId); return; }
-    if (st.tool === 'velg') { if (hdl != null && !ro) { st.drag = { t: 'v', i: +hdl }; svgRef.current!.setPointerCapture(e.pointerId); return; } if (zid) { st.sel = zid; rr(); return; } }
+    if (st.tool === 'velg') { if (st.selM) { st.selM = null; rr(); } if (hdl != null && !ro) { st.drag = { t: 'v', i: +hdl }; svgRef.current!.setPointerCapture(e.pointerId); return; } if (zid) { st.sel = zid; rr(); return; } }
     if (e.button !== 0 || ro) return;
     if (st.tool === 'tegn') { const q = snap(p, st.draft[st.draft.length - 1]); if (st.draft.length >= 3 && Math.hypot(q[0] - st.draft[0][0], q[1] - st.draft[0][1]) < 12 * k()) { closePoly(); return; } st.draft.push(q); rr(); return; }
     if (st.tool === 'skala') { const q = snap(p, st.scale[0]); if (st.scale.length >= 2) st.scale = []; st.scale.push(q); if (st.scale.length === 2) setTimeout(() => (document.getElementById('scM') as HTMLInputElement)?.focus(), 30); rr(); return; }
@@ -125,11 +147,13 @@ function PlanEditor({ tid, close }: { tid: string; close: () => void }) {
   const onMove = (e: React.PointerEvent) => {
     st.shift = e.shiftKey; const p = pt(e);
     if (st.drag?.t === 'pan') { const r = svgRef.current!.getBoundingClientRect(); const v0 = st.drag.vb0; const kk = Math.max(v0.w / r.width, v0.h / r.height); setVb({ ...v0, x: v0.x - (e.clientX - st.drag.cx) * kk, y: v0.y - (e.clientY - st.drag.cy) * kk }); if (Math.abs(e.clientX - st.drag.cx) + Math.abs(e.clientY - st.drag.cy) > 4) st.drag.moved = true; return; }
+    if (st.drag?.t === 'm') { if (Math.abs(e.clientX - st.drag.cx) + Math.abs(e.clientY - st.drag.cy) > 4) st.drag.moved = true; if (st.drag.moved) { st.mpos = p; rr(); } return; }
     if (st.drag?.t === 'v') { const z = T.soner.find((z: Rec) => z.id === st.sel); if (z) { const n = z.pts.length; z.pts[st.drag.i] = snap(p, z.pts[(st.drag.i + n - 1) % n], { z: z.id, i: st.drag.i }); rr(); } return; }
     const ref = st.tool === 'tegn' ? st.draft[st.draft.length - 1] : st.tool === 'skala' ? (st.scale.length === 1 ? st.scale[0] : null) : st.tool === 'maal' ? (st.meas.length === 1 ? st.meas[0] : null) : null;
     if (st.tool !== 'velg') { st.hover = snap(p, ref); rr(); }
   };
   const onUp = () => {
+    if (st.drag?.t === 'm') { const it = findItem(st.drag.id); if (it && st.drag.moved && st.mpos) { const pos = { tegningId: T.id, x: Math.round(st.mpos[0] * 10) / 10, y: Math.round(st.mpos[1] * 10) / 10 }; it.o.pos = pos; lagrePos(it, pos); } st.mpos = null; st.drag = null; rr(); return; }
     if (st.drag?.t === 'v') { const z = T.soner.find((z: Rec) => z.id === st.sel); if (z) z.pts[st.drag.i] = z.pts[st.drag.i].map((v: number) => Math.round(v * 10) / 10); change(); }
     if (st.drag?.t === 'pan' && !st.drag.moved && st.tool === 'velg' && st.sel) { st.sel = null; rr(); }
     st.drag = null;
@@ -145,16 +169,28 @@ function PlanEditor({ tid, close }: { tid: string; close: () => void }) {
     <div className="mh"><h2>{eNavn(T.eiendomId)} · {T.navn}</h2><span className="small muted">{ro ? 'Lesetilgang' : st.status}</span><button className="btn sm" onClick={done}>Ferdig</button></div>
     <div className="pbody">
       <div className="ptools">
-        {(['velg', 'skala', 'tegn', 'maal'] as const).filter(t => !ro || t === 'velg' || t === 'maal').map(t => <button key={t} className={st.tool === t ? 'on' : ''} onClick={() => setTool(t)}>{({ velg: 'Velg / panorer', skala: 'Sett målestokk', tegn: 'Tegn areal', maal: 'Mål avstand' } as any)[t]}</button>)}
+        {(['velg', 'skala', 'tegn', 'maal', 'plasser'] as const).filter(t => !ro || t === 'velg' || t === 'maal').map(t => <button key={t} className={st.tool === t ? 'on' : ''} onClick={() => setTool(t)}>{({ velg: 'Velg / panorer', skala: 'Sett målestokk', tegn: 'Tegn areal', maal: 'Mål avstand', plasser: 'Plasser system/komponent' } as any)[t]}</button>)}
+        <hr /><div className="small" style={{ fontWeight: 600 }}>Vis på tegningen</div>
+        <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={st.lagA} onChange={e => { st.lagA = e.target.checked; rr(); }} />Arealer</label>
+        <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={st.lagM} onChange={e => { st.lagM = e.target.checked; rr(); }} />Systemer og komponenter</label>
+        <select value={st.fag} onChange={e => { st.fag = e.target.value; rr(); }} style={{ border: '1px solid var(--line2)', borderRadius: 7, padding: '5px 6px', fontSize: 12.5 }}><option value="">Alle fag</option>{FAG.map(f => <option key={f[0]} value={f[0]}>{f[0]} {f[1]}</option>)}</select>
         <hr /><button onClick={() => setVb({ x: 0, y: 0, w: T.w, h: T.h })}>Tilpass til vindu</button><div className="phelp">{HELP[st.tool]}</div>
       </div>
       <div className="pcanvas"><svg ref={svgRef} className={st.tool === 'velg' ? 'pan' : ''} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
         onDoubleClick={() => { if (st.tool === 'tegn') { if (st.draft.length > 3) st.draft.pop(); closePoly(); } }} onPointerLeave={() => { st.hover = null; if (st.tool !== 'velg') rr(); }} fontFamily="IBM Plex Sans,sans-serif">
         {src && <image href={src} x={0} y={0} width={T.w} height={T.h} />}
-        {T.soner.map((z: Rec) => { const c = zoneColor(T, z); const on = z.id === st.sel; return <polygon key={z.id} points={z.pts.map((p: number[]) => p.join(',')).join(' ')} fill={c} fillOpacity={on ? .38 : .24} stroke={c} strokeWidth={on ? 3 : 1.6} vectorEffect="non-scaling-stroke" data-z={z.id} style={{ cursor: 'pointer' }} />; })}
-        {T.soner.map((z: Rec) => { const c = centroid(z.pts); const a = zoneArea(T, z); let lt = z.kat === 'leie' && z.leietakerId ? lNavn(z.leietakerId) : ''; if (lt === z.navn) lt = '';
+        {st.lagA && T.soner.map((z: Rec) => { const c = zoneColor(T, z); const on = z.id === st.sel; return <polygon key={z.id} points={z.pts.map((p: number[]) => p.join(',')).join(' ')} fill={c} fillOpacity={on ? .38 : .24} stroke={c} strokeWidth={on ? 3 : 1.6} vectorEffect="non-scaling-stroke" data-z={z.id} style={{ cursor: 'pointer' }} />; })}
+        {st.lagA && T.soner.map((z: Rec) => { const c = centroid(z.pts); const a = zoneArea(T, z); let lt = z.kat === 'leie' && z.leietakerId ? lNavn(z.leietakerId) : ''; if (lt === z.navn) lt = '';
           return <g key={'l' + z.id} pointerEvents="none"><text x={c[0]} y={c[1]} textAnchor="middle" fontSize={fs} fontWeight={600} fill="#1d2320" stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{z.navn}</text>
             <text x={c[0]} y={c[1] + fs * 1.25} textAnchor="middle" fontSize={fs * .9} fill="#1d2320" stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{(lt ? lt + ' · ' : '') + (a != null ? m2(a) : 'mangler målestokk')}</text></g>; })}
+        {st.lagM && markers.map(i => { const isDrag = st.drag?.t === 'm' && st.drag.id === i.o.id && st.mpos; const x = isDrag ? st.mpos![0] : i.o.pos.x, y = isDrag ? st.mpos![1] : i.o.pos.y; const col = fagFarge(itemFag(i)); const on = st.selM === i.o.id;
+          const av = openAvvik().filter(a => i.kind === 'a' ? a.anleggId === i.o.id && !a.komponentId : a.komponentId === i.o.id).length; const R0 = (i.kind === 'a' ? 8 : 6) * kk;
+          return <g key={'m' + i.o.id} data-m={i.o.id} style={{ cursor: ro ? 'pointer' : 'move' }}>
+            {on && <circle cx={x} cy={y} r={R0 * 2.1} fill={col} fillOpacity={.18} />}
+            {av > 0 && <circle cx={x} cy={y} r={R0 * 1.55} fill="none" stroke="#b42318" strokeWidth={2.5} vectorEffect="non-scaling-stroke" />}
+            {i.kind === 'a' ? <rect x={x - R0} y={y - R0} width={R0 * 2} height={R0 * 2} rx={R0 * .3} fill={col} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" /> : <circle cx={x} cy={y} r={R0} fill={col} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
+            <text x={x} y={y - R0 - 4 * kk} textAnchor="middle" fontSize={fs * .85} fontFamily="IBM Plex Mono,monospace" fontWeight={600} fill={col} stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{itemKode(i)}</text></g>; })}
+        {st.tool === 'plasser' && st.hover && st.placeId && <g pointerEvents="none"><line x1={st.hover[0] - 12 * kk} y1={st.hover[1]} x2={st.hover[0] + 12 * kk} y2={st.hover[1]} stroke="#1d2320" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /><line x1={st.hover[0]} y1={st.hover[1] - 12 * kk} x2={st.hover[0]} y2={st.hover[1] + 12 * kk} stroke="#1d2320" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /><text x={st.hover[0] + 10 * kk} y={st.hover[1] - 8 * kk} fontSize={fs * .85} fontFamily="IBM Plex Mono,monospace" fill="#1d2320" stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{findItem(st.placeId) ? itemKode(findItem(st.placeId)!) : ''}</text></g>}
         {selZ && st.tool === 'velg' && !ro && selZ.pts.map((p: number[], i: number) => <circle key={'h' + i} cx={p[0]} cy={p[1]} r={r * 1.2} fill="#fff" stroke={zoneColor(T, selZ)} strokeWidth={2} vectorEffect="non-scaling-stroke" data-h={i} style={{ cursor: 'move' }} />)}
         {T.skala && (st.tool === 'skala' || !st.sel) && !st.scale.length && line(T.skala.a, T.skala.b, '#b42318', true, 'Målestokk ' + fmtM(T.skala.m), 'sk')}
         {st.scale.length > 0 && (st.scale[1] || st.hover) && line(st.scale[0], st.scale[1] || st.hover!, '#b42318', true, '', 'sc')}
@@ -165,6 +201,20 @@ function PlanEditor({ tid, close }: { tid: string; close: () => void }) {
         {!st.draft.length && st.hover && st.tool !== 'velg' && <circle cx={st.hover[0]} cy={st.hover[1]} r={r} fill="none" stroke="#1f6f5c" strokeWidth={2} vectorEffect="non-scaling-stroke" pointerEvents="none" />}
       </svg></div>
       <div className="pside">
+        {st.tool === 'plasser' && <><h3>Plasser på tegningen</h3>
+          {items.length ? <><select value={st.placeId} onChange={e => { st.placeId = e.target.value; rr(); }}><option value="">– velg system eller komponent –</option>
+            {items.map(i => <option key={i.o.id} value={i.o.id}>{(i.kind === 'k' ? '   ' : '') + itemKode(i) + ' ' + itemNavn(i) + (i.o.pos ? (i.o.pos.tegningId === T.id ? ' ✓' : ' (annen tegning)') : '')}</option>)}</select>
+            <p className="small muted" style={{ margin: '0 0 8px' }}>{st.placeId ? 'Klikk på tegningen der den skal stå. Neste uplasserte velges automatisk.' : 'Velg hva som skal plasseres.'} {items.filter(i => !i.o.pos).length} av {items.length} er ikke plassert.</p></>
+            : <p className="small muted">Ingen systemer er registrert på eiendommen. Registrer dem under «Systemer og komponenter (TFM)».</p>}</>}
+        {(() => { const i = findItem(st.selM); if (!i) return null; const av = openAvvik().filter(a => i.kind === 'a' ? a.anleggId === i.o.id && !a.komponentId : a.komponentId === i.o.id); const sys = i.kind === 'k' ? byId('anlegg', i.o.anleggId) : null; const info = [i.o.fabrikat, i.o.plassering, i.o.aar ? 'installert ' + i.o.aar : '', i.o.tg].filter(Boolean);
+          return <><h3>{i.kind === 'a' ? 'System' : 'Komponent'}</h3>
+            <div className="note small" style={{ color: 'var(--ink)' }}><b className="mono" style={{ color: fagFarge(itemFag(i)) }}>{i.kind === 'a' ? tfmSys(i.o, true) : tfmKomp(i.o, true)}</b><br /><b>{itemNavn(i)}</b>{sys && <div className="muted">i {tfmSys(sys)} {sys.navn || KOMP[sys.type]?.n}</div>}
+              {info.length > 0 && <div className="muted">{info.join(' · ')}</div>}
+              {av.length > 0 && <div style={{ color: 'var(--red)', marginTop: 4 }}>{av.length} åpne avvik: {av.slice(0, 3).map(a => '#' + a.nr + ' ' + a.tittel).join(', ')}</div>}</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}><button className="btn sm" onClick={() => i.kind === 'a' ? editAnlegg(i.o.id) : editKomponent(i.o.id)}>Åpne</button>
+              {!ro && <button className="btn sm" onClick={() => { st.tool = 'plasser'; st.placeId = i.o.id; rr(); }}>Flytt</button>}
+              {!ro && <button className="btn sm danger" onClick={async () => { await lagrePos(i, null); st.selM = null; rr(); }}>Fjern fra tegning</button>}</div></>; })()}
+        {st.lagM && markers.length > 0 && <><h3>Tegnforklaring</h3><div className="small">{FAG.filter(f => markers.some(m => itemFag(m) === f[0])).map(f => <div key={f[0]} style={{ display: 'flex', gap: 6, alignItems: 'center' }}><span className="sw" style={{ background: f[2] }} />{f[0]} {f[1]}</div>)}<div className="muted" style={{ marginTop: 4 }}>■ system · ● komponent · rød ring = åpne avvik</div></div></>}
         <h3>Målestokk</h3>
         {st.scale.length === 2 ? <><label className="small">Lengde mellom punktene (meter)</label><input id="scM" type="number" step="any" placeholder="F.eks. 12.4" value={scM} onChange={e => setScM(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveScale(); }} />
           <div style={{ display: 'flex', gap: 6 }}><button className="btn sm pri" onClick={saveScale}>Lagre målestokk</button><button className="btn sm" onClick={() => { st.scale = []; rr(); }}>Avbryt</button></div></>
@@ -202,7 +252,8 @@ export function ArealSection({ eid }: { eid: string }) {
     <div className="plancards">
       {T.map(t => <div key={t.id} className="card plancard"><div className="thumb" onClick={() => openPlan(t.id)}><Thumb t={t} /></div><div className="t">{t.navn}</div>
         <div className="small muted">{mpp(t) ? 'Målestokk satt' : <span style={{ color: 'var(--amber)' }}>Mangler målestokk</span>} · {(t.soner || []).length} arealer</div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}><button className="btn sm pri" onClick={() => openPlan(t.id)}>{ed ? 'Åpne og tegn' : 'Åpne'}</button>{ed && <button className="btn sm" onClick={() => editTegning(t.id)}>Rediger</button>}</div></div>)}
+        <div className="small muted">{[...S.anlegg, ...S.komponenter].filter(x => x.pos?.tegningId === t.id).length} systemer/komponenter plassert</div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}><button className="btn sm pri" onClick={() => openPlan(t.id)}>{ed ? 'Arealer' : 'Åpne'}</button><button className="btn sm" onClick={() => openPlan(t.id, { mode: 'tfm' })}>Systemkart</button>{ed && <button className="btn sm" onClick={() => editTegning(t.id)}>Rediger</button>}</div></div>)}
       {ed && <button className="upcard" onClick={() => editTegning(undefined, eid)}><b style={{ fontSize: 22 }}>+</b><span>Last opp plantegning</span><span className="small">PDF, PNG eller JPG</span></button>}
       {!ed && !T.length && <div className="card"><Empty t="Ingen tegninger" /></div>}
     </div>
