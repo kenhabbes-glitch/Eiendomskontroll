@@ -238,19 +238,20 @@ export function utfor(id: string) {
     { k: 'dato', label: 'Utført dato', type: 'date', def: today(), req: true, half: true }, { k: 'av', label: 'Utført av', def: o.utfores && state.me?.rolle !== 'tekniker' ? o.utfores : (state.me?.navn || o.utfores || ''), half: true },
     { k: 'res', label: 'Resultat', type: 'select', options: ['OK – ingen avvik', 'Avvik funnet', 'Ikke utført / utsatt'], def: 'OK – ingen avvik', half: true },
     { k: 'nyFrist', label: 'Ny frist (beregnes automatisk)', type: 'date', half: true, hint: 'La stå tom for automatisk beregning ut fra intervallet' },
-    { k: 'komm', label: 'Kommentar', type: 'textarea' },
-    { k: 'fil', label: 'Rapport / sjekkliste', type: 'file' },
-    { k: 'avs', type: 'custom', label: 'Avvik fra kontrollen', show: x => x.res === 'Avvik funnet', def: [{ t: '', a: 'Middels', k: '' }], hint: 'Hvert avvik registreres i avvikslisten med kobling til denne kontrollen.',
+    { k: 'avs', type: 'custom', label: 'Avvik fra kontrollen – ett avvik per linje', show: x => x.res === 'Avvik funnet', def: [{ t: '', a: 'Middels', k: '' }], hint: 'Hver linje blir et eget avvik i avvikslisten, med kobling til denne kontrollen. Bruk kommentarfeltet bare til utfyllende informasjon.',
       render: (v, set) => { const L: any[] = v.avs || []; const kc = S.komponenter.filter(k => o.anleggId && k.anleggId === o.anleggId); const upd = (i: number, p: any) => set({ avs: L.map((x, j) => j === i ? { ...x, ...p } : x) });
-        return <>{L.map((r, i) => <div className="arow" key={i}><input placeholder="Beskriv avviket" value={r.t} onChange={e => upd(i, { t: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px' }} />
+        return <>{L.map((r, i) => <div className="arow" key={i}><input placeholder={`Avvik ${i + 1}: beskriv hva som er feil`} value={r.t} autoFocus={i === L.length - 1 && i > 0} onChange={e => upd(i, { t: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px' }} />
           {kc.length > 0 && <select value={r.k} onChange={e => upd(i, { k: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: 7, maxWidth: 150 }}><option value="">Komponent –</option>{kc.map(k => <option key={k.id} value={k.id}>{'-' + k.kode + pad(k.lop)} {k.navn}</option>)}</select>}
           <select value={r.a} onChange={e => upd(i, { a: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: 7 }}>{AV_ALV.map(a => <option key={a}>{a}</option>)}</select></div>)}
           <button type="button" className="btn sm" onClick={() => set({ avs: [...L, { t: '', a: 'Middels', k: '' }] })}>+ Legg til avvik</button></>; } },
+    { k: 'komm', label: 'Kommentar', type: 'textarea' },
+    { k: 'fil', label: 'Rapport / sjekkliste', type: 'file' },
   ];
   formModal({
     title: 'Registrer utført: ' + o.navn, fields, saveTxt: 'Registrer',
     onSave: async x => {
       const avs = x.res === 'Avvik funnet' ? (x.avs || []).filter((a: any) => a.t.trim()) : [];
+      if (x.res === 'Avvik funnet' && !avs.length) { toast('Skriv inn avvikene i feltene under «Avvik fra kontrollen» – én linje per avvik'); return false; }
       let dokId = '';
       if (x.fil) { const f = await uploadFile(x.fil, o.eiendomId); if (f) dokId = await save('dokumenter', { eiendomId: o.eiendomId, leietakerId: '', type: o.type === 'Egenkontroll' ? 'Egenkontrollskjema' : 'Servicerapport', tittel: o.navn + ' – ' + fd(x.dato), dato: x.dato, fil: f, oppgaveId: o.id }); }
       const ids: string[] = [];
@@ -267,7 +268,7 @@ export function visOppgave(id: string) {
   showModal(o.navn, close => <>
     <dl className="dl"><dt>Eiendom</dt><dd>{eNavn(o.eiendomId)}</dd>{o.anleggId && <><dt>System</dt><dd>{aNavn(o.anleggId)}</dd></>}<dt>Type</dt><dd>{o.type} · {o.kategori}</dd><dt>Intervall</dt><dd>{intTxt(o.intervall)}</dd><dt>Neste frist</dt><dd><DueChip s={o.nesteFrist} /></dd><dt>Utføres av</dt><dd>{o.utfores || '–'}</dd><dt>Ansvar</dt><dd>{o.ansvar || 'Eier'}{o.leietakerId ? ' – ' + lNavn(o.leietakerId) : ''}</dd><dt>Hjemmel</dt><dd>{o.hjemmel || '–'}</dd>{o.notat && <><dt>Notater</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{o.notat}</dd></>}</dl>
     <h3 style={{ marginTop: 18 }}>Historikk</h3>
-    {(o.historikk || []).length ? <div className="log">{o.historikk.map((h: any, i: number) => { const d = h.dokId && byId('dokumenter', h.dokId); return <div key={i}><span className="lt">{fd(h.dato)}</span> · <b>{h.res}</b>{h.av ? ' · ' + h.av : ''}{h.komm && <><br />{h.komm}</>}{d?.fil && <><br /><FileLink fil={d.fil} /></>}{(h.avvik || []).length > 0 && <><br /><span className="muted small">{h.avvik.length} avvik registrert</span></>}</div>; })}</div> : <p className="muted">Ikke registrert utført ennå.</p>}
+    {(o.historikk || []).length ? <div className="log">{o.historikk.map((h: any, i: number) => { const d = h.dokId && byId('dokumenter', h.dokId); return <div key={i}><span className="lt">{fd(h.dato)}</span> · <b>{h.res}</b>{h.av ? ' · ' + h.av : ''}{h.komm && <><br />{h.komm}</>}{d?.fil && <><br /><FileLink fil={d.fil} /></>}{(() => { const n = Math.max((h.avvik || []).length, S.avvik.filter(a => a.oppgaveId === o.id && a.oppdaget === h.dato).length); return n > 0 ? <><br /><span className="muted small">{n} avvik registrert</span></> : null; })()}{!(h.avvik || []).length && !S.avvik.some(a => a.oppgaveId === o.id && a.oppdaget === h.dato) && h.res === 'Avvik funnet' && <><br /><a href="#" className="small" onClick={e => { e.preventDefault(); close(); editAvvik(undefined, { eiendomId: o.eiendomId, anleggId: o.anleggId || '', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, oppdaget: h.dato, beskrivelse: h.komm || '', ansvar: o.ansvar || 'Eier', leietakerId: o.leietakerId || '' }); }}>Ingen avvik ble opprettet – registrer avvik fra denne kontrollen</a></>}</div>; })}</div> : <p className="muted">Ikke registrert utført ennå.</p>}
   </>, { foot: close => <>{canEdit() && <button className="btn" onClick={() => { close(); editOppgave(id); }}>Rediger</button>}<span className="grow" /><button className="btn pri" onClick={() => { close(); utfor(id); }}>Registrer utført</button></> });
 }
 
