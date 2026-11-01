@@ -13,6 +13,15 @@ import { AlvChip, Chip, DueChip, Empty, FileLink, ForslagMerke, RestChip, StChip
 
 const go = (p: string) => { location.hash = '#/' + p; };
 const stop = (e: React.MouseEvent) => e.stopPropagation();
+
+// NS 3451 hovedgrupper + felles åpen/lukket-tilstand (deles mellom TFM-registeret og eiendommens systemliste)
+export const HOVEDGRUPPER: Record<string, string> = { '1': 'Felleskostnader', '2': 'Bygning', '3': 'VVS-installasjoner', '4': 'Elkraftinstallasjoner', '5': 'Tele og automatisering', '6': 'Andre installasjoner', '7': 'Utendørs' };
+const APEN_KEY = 'tfmApen';
+export function useApen() {
+  const [apen, setA] = React.useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem(APEN_KEY) || '{}'); } catch { return {}; } });
+  const lagre = (n: Record<string, boolean>) => { setA(n); try { localStorage.setItem(APEN_KEY, JSON.stringify(n)); } catch { } };
+  return { apen, toggle: (k: string) => lagre({ ...apen, [k]: !apen[k] }), settApen: (ks: string[], v: boolean) => { const n = { ...apen }; ks.forEach(k => { if (v) n[k] = true; else delete n[k]; }); lagre(n); } };
+}
 export const Wrap = ({ children }: { children: ReactNode }) => <div className="tbl-wrap">{children}</div>;
 
 export function TaskTable({ list, showE = true, group = true }: { list: Rec[]; showE?: boolean; group?: boolean }) {
@@ -89,32 +98,45 @@ export function AnleggTable({ list, showE = false }: { list: Rec[]; showE?: bool
 }
 
 export function TfmTree({ list, q, onNewKomp }: { list: Rec[]; q: string; onNewKomp?: (id: string) => void }) {
+  const { apen, toggle, settApen } = useApen();
   if (!list.length) return <Wrap><Empty t="Ingen systemer registrert">Registrer tekniske systemer og bygningsdeler med TFM-kode, eller importer en eksisterende TFM-liste.</Empty></Wrap>;
   const qq = q.toLowerCase(); const ok = canEdit();
   const sorted = list.slice().sort((a, b) => ((a.tfmSys || '999') + '.' + pad(a.tfmLop)).localeCompare((b.tfmSys || '999') + '.' + pad(b.tfmLop)) || aNavn(a.id).localeCompare(aNavn(b.id)));
-  const rows: ReactNode[] = [];
+  const tving = !!qq;
+  const grupper: Record<string, { sys: string[]; rader: ReactNode[]; nS: number; nK: number }> = {};
   sorted.forEach(a => {
+    const gk = String(a.tfmSys || '')[0] || ''; const G = grupper[gk] ||= { sys: [], rader: [], nS: 0, nK: 0 }; const rows = G.rader;
     const k = KOMP[a.type] || ({} as any); const ks = sortBy(S.komponenter.filter(c => c.anleggId === a.id), c => (c.kode || '') + pad(c.lop));
     const n = S.oppgaver.filter(o => o.anleggId === a.id && o.aktiv !== false); const due = n.filter(o => (dUntil(o.nesteFrist) as number) < 0).length;
     const sysTxt = (tfmSys(a) + ' ' + (a.navn || '') + ' ' + k.n + ' ' + (a.fabrikat || '')).toLowerCase();
     const km = ks.filter(c => !qq || (tfmKomp(c) + ' ' + (c.navn || '') + ' ' + (c.fabrikat || '') + ' ' + (c.plassering || '')).toLowerCase().includes(qq));
     if (qq && !sysTxt.includes(qq) && !km.length) return;
-    const kl = qq && !sysTxt.includes(qq) ? km : ks;
+    const kl = qq && !sysTxt.includes(qq) ? km : ks; G.sys.push('s' + a.id); G.nS++; G.nK += kl.length;
+    const sOpen = tving || !!apen['s' + a.id]; if (!tving && !apen['g' + gk]) return;
     rows.push(<tr key={a.id} className="click sysrow" onClick={() => editAnlegg(a.id)}>
-      <td className="mono" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{tfmSys(a) || '–'}<Pin o={a} /></td>
+      <td className="mono" style={{ fontWeight: 600, whiteSpace: 'nowrap', paddingLeft: 22 }}><span onClick={e => { stop(e); if (kl.length && !tving) toggle('s' + a.id); }} title={kl.length ? (sOpen ? 'Skjul komponenter' : 'Vis komponenter') : ''} style={{ display: 'inline-block', width: 20, cursor: kl.length ? 'pointer' : 'default', color: 'var(--muted)', fontFamily: 'sans-serif' }}>{kl.length ? (sOpen ? '▾' : '▸') : ''}</span>{tfmSys(a) || '–'}<Pin o={a} />{kl.length > 0 && !sOpen && <span className="small muted" style={{ fontWeight: 400, marginLeft: 6, fontFamily: 'sans-serif' }}>({kl.length})</span>}</td>
       <td><b style={{ fontWeight: 600 }}>{a.navn || k.n}</b> <TaggChips t={taggerFor(a, 'a')} small /><div className="small muted">{[a.navn ? k.n : k.g, a.fabrikat].filter(Boolean).join(' · ')}</div></td>
       <td className="num">{a.aar || '–'}</td><td className="num">{compYear(a) || '–'}{a.planAar ? <div className="small muted">overstyrt</div> : null}</td><td><RestChip r={compRest(a)} /></td><td><TgChip t={a.tg} /></td>
       {ok && <SysKost a={a} />}
       <td className="small">{n.length ? <>{n.length} kontr.{due > 0 && <> · <span style={{ color: 'var(--red)' }}>{due} forfalt</span></>}</> : <span className="muted">–</span>}</td>
       <td style={{ whiteSpace: 'nowrap' }}>{ok && onNewKomp && <button className="btn sm" onClick={e => { stop(e); onNewKomp(a.id); }}>+ Komponent</button>}</td></tr>);
-    kl.forEach(c => rows.push(<tr key={c.id} className="click" onClick={() => editKomponent(c.id)}>
-      <td className="mono small" style={{ paddingLeft: 26, whiteSpace: 'nowrap' }}>{'-' + (c.kode || '') + pad(c.lop) + (c.typekode ? '%' + c.typekode : '')}<Pin o={c} /></td>
+    if (sOpen) kl.forEach(c => rows.push(<tr key={c.id} className="click" onClick={() => editKomponent(c.id)}>
+      <td className="mono small" style={{ paddingLeft: 58, whiteSpace: 'nowrap' }}>{'-' + (c.kode || '') + pad(c.lop) + (c.typekode ? '%' + c.typekode : '')}<Pin o={c} /></td>
       <td>{c.navn} {Array.isArray(c.tagger) && <TaggChips t={c.tagger} small />}<div className="small muted">{[c.fabrikat, c.plassering, c.serienr ? 's/n ' + c.serienr : ''].filter(Boolean).join(' · ')}</div></td>
       <td className="num">{c.aar || '–'}</td><td className="num">{kompAar(c) || '–'}{!egetAar(c) && kompAar(c) ? <div className="small muted">følger systemet</div> : null}</td><td>{egetAar(c) ? <RestChip r={compRest(c)} /> : <span className="muted small">–</span>}</td><td><TgChip t={c.tg} /></td>
       {ok && <td className="num" data-tip={c.kost ? kostTip(c) : undefined}>{c.kost ? nok(kostNaa(c)) : '–'}{erForslag(c) && <ForslagMerke />}</td>}{ok && <td className="num" data-tip={c.kost ? `${kostTip(c)}. Prisjustert med KPI til ${Math.max(kompAar(c) || YEAR, YEAR)}.` : undefined}>{c.kost && kompAar(c) ? nok(kostJustert(c, kompAar(c))) : '–'}</td>}{ok && <td className="num" data-tip={c.kost && kompAar(c) ? nvTip(kompAar(c)) : undefined}>{c.kost && kompAar(c) ? nok(kompNaaverdi(c)) : '–'}</td>}<td /><td /></tr>));
   });
-  return <Wrap><table><thead><tr><th>TFM-kode</th><th>System / komponent</th><th className="num">Installert år</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}{ok && <th className="num">Nåverdi</th>}<th>Kontroller</th><th /></tr></thead>
-    <tbody>{rows.length ? rows : <tr><td colSpan={11} className="muted">Ingen treff.</td></tr>}</tbody></table></Wrap>;
+  const nokler = Object.keys(grupper).sort((x, y) => (x || '9z').localeCompare(y || '9z'));
+  const alle = [...nokler.map(k => 'g' + k), ...nokler.flatMap(k => grupper[k].sys)];
+  const ncol = ok ? 11 : 8;
+  const rows: ReactNode[] = [];
+  nokler.forEach(k => { const G = grupper[k]; const gOpen = tving || !!apen['g' + k];
+    rows.push(<tr key={'g' + k} className="click grp" onClick={() => !tving && toggle('g' + k)} style={{ background: 'var(--bg2, #eef0ec)' }}>
+      <td colSpan={ncol} style={{ fontWeight: 700 }}><span style={{ display: 'inline-block', width: 18, color: 'var(--muted)' }}>{gOpen ? '▾' : '▸'}</span><span className="mono" style={{ marginRight: 8 }}>{k || '–'}</span>{k ? HOVEDGRUPPER[k] || 'Hovedgruppe ' + k : 'Uten TFM-kode'}<span className="small muted" style={{ fontWeight: 400, marginLeft: 10 }}>{G.nS} system{G.nS === 1 ? '' : 'er'}{G.nK ? ` · ${G.nK} komponent${G.nK === 1 ? '' : 'er'}` : ''}</span></td></tr>);
+    if (gOpen) rows.push(...G.rader); });
+  return <><div className="toolbar" style={{ marginTop: -4 }}><button className="btn sm" onClick={() => settApen(alle, true)}>▾ Vis alle</button><button className="btn sm" onClick={() => settApen(alle, false)}>▸ Skjul alle</button>{tving && <span className="small muted">Søk er aktivt – alt vises utvidet</span>}</div>
+  <Wrap><table><thead><tr><th>TFM-kode</th><th>System / komponent</th><th className="num">Installert år</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}{ok && <th className="num">Nåverdi</th>}<th>Kontroller</th><th /></tr></thead>
+    <tbody>{rows.length ? rows : <tr><td colSpan={11} className="muted">Ingen treff.</td></tr>}</tbody></table></Wrap></>;
 }
 
 export function CoverageTable({ es }: { es: Rec[] }) {

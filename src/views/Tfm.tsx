@@ -5,18 +5,10 @@ import { eNavn, openAvvik, pad, sortBy, tfmKomp, tfmSys, toCsv } from '../lib/ut
 import { editAnlegg, editKomponent } from '../lib/actions';
 import { Empty, TaggChips, TgChip, textModal } from '../components/ui';
 import { Search, Sel, eiendomOpts, useFilter } from './common';
-import { Pin } from '../components/tables';
+import { Pin, HOVEDGRUPPER, useApen } from '../components/tables';
 import { openPlan, plasserteFor, visPaaTegning } from './Arealer';
 import { TAGGER } from '../lib/catalog';
 import { taggerFor } from '../lib/utils';
-
-const HOVEDGRUPPER: Record<string, string> = { '1': 'Felleskostnader', '2': 'Bygning', '3': 'VVS-installasjoner', '4': 'Elkraftinstallasjoner', '5': 'Tele og automatisering', '6': 'Andre installasjoner', '7': 'Utendørs' };
-const APEN_KEY = 'tfmApen';
-function useApen() {
-  const [apen, setA] = React.useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem(APEN_KEY) || '{}'); } catch { return {}; } });
-  const lagre = (n: Record<string, boolean>) => { setA(n); try { localStorage.setItem(APEN_KEY, JSON.stringify(n)); } catch { } };
-  return { apen, toggle: (k: string) => lagre({ ...apen, [k]: !apen[k] }), settApen: (ks: string[], v: boolean) => { const n = { ...apen }; ks.forEach(k => { if (v) n[k] = true; else delete n[k]; }); lagre(n); } };
-}
 
 export function TfmRegister() {
   useStore(); const { apen, toggle, settApen } = useApen();
