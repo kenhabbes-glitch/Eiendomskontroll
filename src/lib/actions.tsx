@@ -102,11 +102,11 @@ function LeverandorSok({ v, set, kind, sysKode }: { v: any; set: (x: any) => voi
   const brukKost = (o: any, type: string) => set({ kost: Math.round(+o.belop_nok), kostAar: YEAR, kostKilde: { type: 'forslag', hva: type, kilde: o.kilde_url || '', omfang: o.omfang || '', dato: today(), belop: Math.round(+o.belop_nok) } });
   return <div className="note small" style={{ color: 'var(--ink)' }}>
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><b>Leverandørdata fra nett</b>
-      <button type="button" className="btn sm" disabled={busy || !String(v.fabrikat || '').trim()} onClick={sok}>{busy ? 'Søker … (inntil 1 min)' : res ? 'Søk på nytt' : 'Søk etter levetid og kostnad'}</button>
+      <button type="button" className="btn sm" disabled={busy || !String(v.fabrikat || '').trim()} onClick={sok}>{busy ? 'Søker med Google …' : res ? 'Søk på nytt' : 'Søk etter levetid og kostnad'}</button>
       {!String(v.fabrikat || '').trim() && <span className="muted">Fyll inn fabrikat/modell først.</span>}</div>
     {err && <div style={{ color: 'var(--red)', marginTop: 4 }}>{err}</div>}
     {res?.resultat && <div style={{ marginTop: 6 }}>
-      {res.resultat.produkt && <div className="muted">Tolket som: {res.resultat.produkt}{res.dato ? ` · søkt ${fd(res.dato)}` : ''}</div>}
+      {res.resultat.produkt && <div className="muted">Tolket som: {res.resultat.produkt}{res.dato ? ` · søkt ${fd(res.dato)}` : ''}{res.motor ? ` · ${res.motor}` : ''}</div>}
       <div style={{ marginTop: 4 }}>Levetid: {L?.aar || L?.min ? <><b>{L.aar || `${L.min}–${L.max}`} år</b>{L.type ? ` (${L.type})` : ''}{L.kilde_url && <> · <a href={L.kilde_url} target="_blank" rel="noopener noreferrer">kilde</a></>}{L.kommentar && <span className="muted"> – {L.kommentar}</span>}
         {' '}<button type="button" className="btn sm" onClick={() => set({ levetid: L.aar || Math.round((L.min + L.max) / 2), levetidKilde: `leverandør (${res.resultat.produkt || v.fabrikat})` })}>Bruk</button></> : <span className="muted">ikke funnet</span>}</div>
       {[['Utskifting', U], ['Retrofit/oppgradering', RF]].filter(x => x[1]?.belop_nok).map(([lab, o]: any) => <div key={lab} style={{ marginTop: 4 }}>
