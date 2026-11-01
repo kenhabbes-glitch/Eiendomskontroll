@@ -1,8 +1,210 @@
 diff --git a/bindings/javascript/src/svg/svgConverter.ts b/bindings/javascript/src/svg/svgConverter.ts
-index 48bdcc4..632a295 100644
+index 48bdcc4..4cfab09 100644
 --- a/bindings/javascript/src/svg/svgConverter.ts
 +++ b/bindings/javascript/src/svg/svgConverter.ts
-@@ -569,10 +569,11 @@ export class SvgConverter {
+@@ -26,13 +26,108 @@ import {
+ import { Box2D } from './box2d.js'
+ import { evaluateBSpline } from './bspline.js'
+ import { Color } from './color.js'
+-import { interpolatePolyline } from './polyline.js'
++import { createPolylineArcPoints, interpolatePolyline } from './polyline.js'
+ import { BBoxAndElement } from './transformBoundingBoxAndElement.js'
+ 
+ type SvgAnchorType = 'start' | 'middle' | 'end'
+ 
++const xmlEsc = (t: string) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
++/** AutoCAD-kontrollkoder i TEXT: %%u/%%o/%%k (understrek o.l.) fjernes, %%c=Ø, %%d=°, %%p=±, %%nnn=tegnkode */
++const acadKoder = (t: string) => String(t ?? '')
++  .replace(/%%(\d{3})/g, (_, n) => String.fromCharCode(+n))
++  .replace(/%%[uUoOkK]/g, '')
++  .replace(/%%[cC]/g, 'Ø').replace(/%%[dD]/g, '°').replace(/%%[pP]/g, '±').replace(/%%%/g, '%')
++
+ export class SvgConverter {
+   private blockMap = new Map<string, BBoxAndElement>()
++  private blockRecords = new Map<string, DwgBlockRecordTableEntry>()
++  private building = new Set<string>()
++  private hiddenLayers = new Set<string>()
++  private dwgRef: DwgDatabase | null = null
++  private extraElements: string[] = []
++
++  private pts(points: { x: number; y: number }[], closed: boolean, fill?: string): BBoxAndElement {
++    const bbox = new Box2D()
++    let d = ''
++    points.forEach((p, i) => { if (!isFinite(p.x) || !isFinite(p.y)) return; bbox.expandByPoint(p); d += (d ? 'L' : 'M') + p.x + ',' + p.y })
++    if (closed && d) d += 'Z'
++    return { bbox, element: d ? `<path d="${d}"${fill ? ` fill="${fill}"` : ''} />` : '' }
++  }
++
++  /** Gammeldags POLYLINE (2D/3D) med buer (bulge) */
++  private polyline(entity: any): BBoxAndElement | null {
++    const vs = (entity.vertices || []).filter((v: any) => !(v.flag & 16) && isFinite(v.x) && isFinite(v.y))
++    if (entity.flag & 64 || entity.flag & 16) { // polyface/mesh: tegn bare kantene som punkter i rekkefølge
++      if (!vs.length) return null
++    }
++    if (vs.length < 2) return null
++    const closed = !!(entity.flag & 1)
++    const out: { x: number; y: number }[] = []
++    for (let i = 0; i < vs.length; i++) {
++      const a = vs[i], b = vs[(i + 1) % vs.length]
++      out.push({ x: a.x, y: a.y })
++      if (i === vs.length - 1 && !closed) break
++      if (a.bulge) { try { createPolylineArcPoints(a, b, a.bulge).slice(1, -1).forEach(p => out.push(p)) } catch { /* ignorer */ } }
++    }
++    return this.pts(out, closed)
++  }
++
++  private edgePoints(path: any): { x: number; y: number }[] {
++    const out: { x: number; y: number }[] = []
++    if (path.vertices) {
++      const vs = path.vertices; const closed = path.isClosed !== false
++      for (let i = 0; i < vs.length; i++) {
++        const a = vs[i], b = vs[(i + 1) % vs.length]; out.push({ x: a.x, y: a.y })
++        if (i === vs.length - 1 && !closed) break
++        if (a.bulge) { try { createPolylineArcPoints(a, b, a.bulge).slice(1, -1).forEach(p => out.push(p)) } catch { /* ignorer */ } }
++      }
++      return out
++    }
++    (path.edges || []).forEach((e: any) => {
++      if (e.type === 1) { out.push(e.start); out.push(e.end) }
++      else if (e.type === 2) { let a0 = e.startAngle, a1 = e.endAngle; if (e.isCCW === false) { const t = a0; a0 = -a1; a1 = -t } if (a1 < a0) a1 += Math.PI * 2; const n = Math.max(6, Math.ceil((a1 - a0) / (Math.PI / 18))); for (let k = 0; k <= n; k++) { const t = a0 + (a1 - a0) * k / n; out.push({ x: e.center.x + e.radius * Math.cos(t), y: e.center.y + e.radius * (e.isCCW === false ? -Math.sin(t) : Math.sin(t)) }) } }
++      else if (e.type === 3) { const ax = e.end.x, ay = e.end.y, R1 = Math.hypot(ax, ay), R2 = R1 * e.lengthOfMinorAxis, rot = Math.atan2(ay, ax); let a0 = e.startAngle, a1 = e.endAngle; if (a1 < a0) a1 += Math.PI * 2; const n = 24; for (let k = 0; k <= n; k++) { const t = a0 + (a1 - a0) * k / n; const x = R1 * Math.cos(t), y = R2 * (e.isCCW === false ? -Math.sin(t) : Math.sin(t)); out.push({ x: e.center.x + x * Math.cos(rot) - y * Math.sin(rot), y: e.center.y + x * Math.sin(rot) + y * Math.cos(rot) }) } }
++      else if (e.type === 4) { (e.fitDatum && e.fitDatum.length ? e.fitDatum : e.controlPoints || []).forEach((p: any) => out.push(p)) }
++    })
++    return out
++  }
++
++  /** Skravur: heltrukken fylles mørkt (typisk vegger), mønster fylles lyst */
++  private hatch(entity: any): BBoxAndElement | null {
++    const bbox = new Box2D(); let d = ''
++    ;(entity.boundaryPaths || []).forEach((path: any) => {
++      const ps = this.edgePoints(path).filter(p => p && isFinite(p.x) && isFinite(p.y)); if (ps.length < 3) return
++      ps.forEach((p, i) => { bbox.expandByPoint(p); d += (i ? 'L' : 'M') + p.x + ',' + p.y }); d += 'Z'
++    })
++    if (!d) return null
++    const solid = entity.solidFill === 1 || /^SOLID$/i.test(entity.patternName || '')
++    return { bbox, element: `<path d="${d}" fill-rule="evenodd" data-h="${solid ? 's' : 'p'}" fill="${solid ? '#4a4a4a' : '#9a9a9a'}" fill-opacity="${solid ? 1 : 0.35}" stroke="none" />` }
++  }
++
++  private quad(e: any, fill: boolean): BBoxAndElement {
++    const c = [e.corner1, e.corner2, e.corner4 || e.corner3, e.corner3].filter(Boolean)
++    // SOLID/TRACE har hjørnerekkefølge 1-2-4-3
++    return this.pts(fill ? c : [e.corner1, e.corner2, e.corner3, e.corner4 || e.corner3].filter(Boolean), true, fill ? '#4a4a4a' : undefined)
++  }
++
++  private mline(e: any): BBoxAndElement | null {
++    const vs = e.vertices || []; if (vs.length < 2) return null
++    const n = e.numberOfLines || (vs[0].lines || []).length; const closed = !!(e.flags & 2)
++    const bbox = new Box2D(); const parts: string[] = []
++    for (let j = 0; j < n; j++) {
++      const ps = vs.map((v: any) => { const off = (v.lines?.[j]?.segmentParams?.[0]) || 0; return { x: v.vertex.x + v.miterDirection.x * off, y: v.vertex.y + v.miterDirection.y * off } })
++      const r = this.pts(ps, closed); if (r.element) { parts.push(r.element); if (r.bbox.valid) { bbox.expandByPoint(r.bbox.min); bbox.expandByPoint(r.bbox.max) } }
++    }
++    return parts.length ? { bbox, element: parts.join('') } : null
++  }
++
++  private attribs(entity: any): string {
++    return (entity.attribs || []).filter((a: any) => !(a.flags & 1) && a.text?.text).map((a: any) => {
++      const t = a.text; const p = (t.halign || t.valign) && t.endPoint && (t.endPoint.x || t.endPoint.y) ? t.endPoint : t.startPoint
++      const anchor: SvgAnchorType = t.halign == 1 || t.halign == 4 ? 'middle' : t.halign == 2 ? 'end' : 'start'
++      return this.lines([t.text], t.textHeight, p, 0, anchor, t.rotation || 0).element
++    }).join('')
++  }
+ 
+   private rotate(point: DwgPoint2D, angle: number) {
+     const cos = Math.cos(angle)
+@@ -177,8 +272,7 @@ export class SvgConverter {
+         .replace(/\\[KkCcHhWwTtAa][^;\\]*;?/g, '')
+         // Remove general \word; style control codes like \x; \pxqc;
+         .replace(/\\[a-zA-Z]+;?/g, '')
+-        // Remove AutoCAD %% control sequences like %%d, %%p, etc.
+-        .replace(/%%(d|p|c|%)/gi, '')
++        // AutoCAD %% control sequences are handled in lines()
+         // Replace escaped backslash
+         .replace(/\\\\/g, '\\')
+         // Replace non-breaking space
+@@ -197,7 +291,8 @@ export class SvgConverter {
+     fontsize: number,
+     insertionPoint: DwgPoint2D,
+     extentsWidth: number,
+-    anchor: SvgAnchorType = 'start'
++    anchor: SvgAnchorType = 'start',
++    rotation: number = 0
+   ): BBoxAndElement {
+     const bbox = new Box2D()
+       .expandByPoint({
+@@ -208,12 +303,12 @@ export class SvgConverter {
+         x: insertionPoint.x + extentsWidth,
+         y: insertionPoint.y - lines.length * fontsize * 1.5
+       })
++    const deg = (rotation || 0) * 180 / Math.PI
+     const texts = lines.map((line, index) => {
+       const x = insertionPoint.x
+-      const y = insertionPoint.y - index * fontsize * 1.5
+-      const transform = `translate(${x},${y}) scale(1,-1) translate(${-x},${-y})`
+-
+-      return `<text x="${x}" y="${y}" font-size="${fontsize}" text-anchor="${anchor}" transform="${transform}">${line}</text>`
++      const y = insertionPoint.y
++      const transform = `translate(${x},${y}) rotate(${deg}) scale(1,-1)`
++      return `<text x="0" y="${index * fontsize * 1.5}" font-size="${fontsize}" font-family="Arial, Helvetica, sans-serif" text-anchor="${anchor}" transform="${transform}">${xmlEsc(acadKoder(line))}</text>`
+     })
+     return { bbox, element: texts.join('\n') }
+   }
+@@ -242,7 +337,8 @@ export class SvgConverter {
+       fontsize,
+       insertionPoint,
+       entity.extentsWidth,
+-      anchor
++      anchor,
++      ((entity as any).rotation || (entity.direction ? Math.atan2(entity.direction.y, entity.direction.x) : 0))
+     )
+   }
+ 
+@@ -335,7 +431,7 @@ export class SvgConverter {
+ 
+   private text(entity: DwgTextEntity): BBoxAndElement {
+     const fontsize = entity.textHeight
+-    const insertionPoint = entity.startPoint
++    const insertionPoint = (entity.halign || entity.valign) && entity.endPoint && (entity.endPoint.x || entity.endPoint.y) ? entity.endPoint : entity.startPoint
+     const lines = [entity.text]
+     let extentsWidth = entity.endPoint.x - entity.endPoint.x
+     if (entity.halign == 0) {
+@@ -347,7 +443,7 @@ export class SvgConverter {
+     } else if (entity.halign == DwgTextHorizontalAlign.RIGHT) {
+       anchor = 'end'
+     }
+-    return this.lines(lines, fontsize, insertionPoint, extentsWidth, anchor)
++    return this.lines(lines, fontsize, insertionPoint, extentsWidth, anchor, entity.rotation || 0)
+   }
+ 
+   private vertices(
+@@ -540,7 +636,16 @@ export class SvgConverter {
+   }
+ 
+   private insert(entity: DwgInsertEntity): BBoxAndElement | null {
+-    const block = this.blockMap.get(entity.name)
++    let block = this.blockMap.get(entity.name)
++    if (!block && this.dwgRef && this.blockRecords.has(entity.name) && !this.building.has(entity.name)) {
++      this.building.add(entity.name)
++      const rec = this.blockRecords.get(entity.name)!
++      const item = this.block(rec, this.dwgRef)
++      this.building.delete(entity.name)
++      if (item) { const bp = (rec as any).basePoint; const el = bp && (bp.x || bp.y) ? `<g id="${xmlEsc(entity.name)}" transform="translate(${-bp.x},${-bp.y})">${item.element}</g>` : `<g id="${xmlEsc(entity.name)}">${item.element}</g>`; block = { bbox: bp && (bp.x || bp.y) ? item.bbox.clone().transform({ x: 1, y: 1 }, { x: -bp.x, y: -bp.y }) : item.bbox, element: el }; this.blockMap.set(entity.name, block); this.extraElements.push(el) }
++    }
++    const att = this.attribs(entity)
++    if (!block) return att ? { bbox: new Box2D(), element: att } : null
+     if (block) {
+       // In SVG, the unit of rotate is degrees — not radians.
+       const insertionPoint = entity.insertionPoint
+@@ -556,7 +661,7 @@ export class SvgConverter {
+         .rotate(entity.rotation, insertionPoint)
+       return {
+         bbox: newBBox,
+-        element: `<use href="#${entity.name}" transform="${transform}" />`
++        element: `<use href="#${xmlEsc(entity.name)}" transform="${transform}" />` + att
+       }
+     }
+     return null
+@@ -569,10 +674,11 @@ export class SvgConverter {
      const entities = block.entities
      const { bbox, elements } = entities.reduce(
        (acc: { bbox: Box2D; elements: string[] }, entity: DwgEntity) => {
@@ -16,7 +218,7 @@ index 48bdcc4..632a295 100644
              acc.bbox.expandByPoint(bbox.min)
              acc.bbox.expandByPoint(bbox.max)
            }
-@@ -582,10 +583,10 @@ export class SvgConverter {
+@@ -582,10 +688,10 @@ export class SvgConverter {
                ? color.cssColor
                : 'none'
            if (color.isByBlock) {
@@ -29,3 +231,76 @@ index 48bdcc4..632a295 100644
              )
            }
          }
+@@ -606,7 +712,8 @@ export class SvgConverter {
+   }
+ 
+   private entityToBoundsAndElement(entity: DwgEntity) {
+-    let result = null
++    let result: any = null
++    if (this.hiddenLayers.has((entity as any).layer)) return null
+     switch (entity.type) {
+       case 'ARC':
+         result = this.arc(entity as DwgArcEntity)
+@@ -649,13 +756,24 @@ export class SvgConverter {
+         )
+         break
+       }
+-      case 'POLYLINE': {
+-        // const polyline = entity as DwgPolylineEntity
+-        // const closed = !!(polyline.flag & 0x1)
+-        // const vertices = interpolatePolyline(polyline, closed)
+-        // result = this.vertices(vertices, closed)
++      case 'POLYLINE':
++      case 'POLYLINE2D':
++      case 'POLYLINE3D':
++        result = this.polyline(entity)
++        break
++      case 'HATCH':
++        result = this.hatch(entity)
++        break
++      case 'SOLID':
++      case 'TRACE':
++        result = this.quad(entity, true)
++        break
++      case '3DFACE':
++        result = this.quad(entity, false)
++        break
++      case 'MLINE':
++        result = this.mline(entity)
+         break
+-      }
+       case 'RAY':
+         result = this.ray(entity as DwgRayEntity)
+         break
+@@ -715,18 +833,11 @@ export class SvgConverter {
+ 
+   public convert(dwg: DwgDatabase) {
+     let modelSpace = null
+-    this.blockMap.clear()
+-    let blockElements = ''
++    this.blockMap.clear(); this.blockRecords.clear(); this.extraElements = []; this.dwgRef = dwg
++    this.hiddenLayers = new Set((dwg.tables.LAYER?.entries || []).filter((l: any) => l.off || l.frozen).map((l: any) => l.name))
+     dwg.tables.BLOCK_RECORD.entries.forEach(block => {
+-      if (isModelSpace(block.name)) {
+-        modelSpace = block
+-      } else {
+-        const item = this.block(block, dwg)
+-        if (item) {
+-          blockElements += item.element
+-          this.blockMap.set(block.name, item)
+-        }
+-      }
++      if (isModelSpace(block.name)) modelSpace = block
++      else this.blockRecords.set(block.name, block)
+     })
+ 
+     const ms = this.block(modelSpace!, dwg)
+@@ -752,7 +863,7 @@ export class SvgConverter {
+   viewBox="${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}"
+   width="100%" height="100%"
+ >
+-  <defs>${blockElements}</defs>
++  <defs>${this.extraElements.join('')}</defs>
+   <g stroke="#000000" stroke-width="0.1%" fill="none" transform="matrix(1,0,0,-1,0,0)">
+     ${ms ? ms.element : ''}
+   </g>

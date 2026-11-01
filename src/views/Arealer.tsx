@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { S, canEdit, deleteFile, save, removeDoc, toast, uploadFile, useStore } from '../lib/store';
+import { S, canEdit, deleteFile, fileUrl, save, removeDoc, toast, uploadFile, useStore } from '../lib/store';
 
 /** Lagrer beregnet leieareal (inkl. andel fellesareal) på leietakerne til eiendommen */
 export async function syncArealer(eid: string) {
@@ -57,7 +57,8 @@ export function editTegning(id?: string, eid?: string) {
   const t: Rec = id ? byId('tegninger', id)! : { eiendomId: eid || S.eiendommer[0]?.id, etasje: 1, navn: '1. etasje', side: 1 } as any;
   const fields: any[] = [{ k: 'eiendomId', label: 'Eiendom', type: 'select', options: eiendomOpts, req: true },
     { k: 'navn', label: 'Navn på tegning / etasje', req: true, half: true, ph: '1. etasje' }, { k: 'etasje', label: 'Etasjenummer (sortering)', type: 'number', half: true, hint: 'Kjeller = -1, U1 = 0 osv.' }];
-  if (id && t.kilde) fields.push({ k: 'kildeInfo', type: 'custom', render: () => <div className="note small" style={{ color: 'var(--ink)' }}>Original DWG: <FileLink fil={t.kilde} />{t.cad?.enhet ? ` · enhet ${t.cad.enhet}` : ''}{t.cad?.bredde ? ` · ca. ${Math.round(t.cad.bredde * 10) / 10} × ${Math.round(t.cad.hoyde * 10) / 10} m` : ''}</div> });
+  if (id && t.kilde) fields.push({ k: 'kildeInfo', type: 'custom', render: () => <div className="note small" style={{ color: 'var(--ink)' }}>Original DWG: <FileLink fil={t.kilde} />{t.cad?.enhet ? ` · enhet ${t.cad.enhet}` : ''}{t.cad?.bredde ? ` · ca. ${Math.round(t.cad.bredde * 10) / 10} × ${Math.round(t.cad.hoyde * 10) / 10} m` : ''}{t.cad?.advarsler?.length ? <div style={{ color: 'var(--amber)', marginTop: 4 }}>Ikke vist: {t.cad.advarsler.join('; ')}</div> : null}
+    <div style={{ marginTop: 6 }}><button type="button" className="btn sm" onClick={() => lesDwgPaaNytt(t.id)}>Les inn DWG på nytt</button> <span className="muted">Bruker siste versjon av DWG-leseren.</span></div></div> });
   const erCad = (x: any) => /\.dwg$/i.test(x?.fil?.name || '');
   if (!id) fields.push({ k: 'fil', label: 'Plantegning (DWG, PDF, PNG eller JPG)', type: 'file', req: true, accept: '.dwg,.pdf,.png,.jpg,.jpeg,.webp' },
     { k: 'side', label: 'Sidenummer i PDF', type: 'number', half: true, hint: 'Bare for PDF med flere sider', show: (x: any) => /\.pdf$/i.test(x?.fil?.name || '') },
@@ -76,7 +77,8 @@ export function editTegning(id?: string, eid?: string) {
           const kilde = await uploadFile(f, x.eiendomId, undefined, f.name);
           const fil = await uploadFile(blob as any, x.eiendomId, undefined, navn); if (!fil) return false;
           const skala = { a: [w * 0.02, h * 0.995], b: [w * 0.98, h * 0.995], m: Math.round(w * 0.96 * r.mpp * 1000) / 1000 };
-          const nid = await save('tegninger', { eiendomId: x.eiendomId, navn: x.navn, etasje: x.etasje, fil, kilde, w, h, soner: [], skala, cad: { enhet: r.enhet, bredde: r.bredde, hoyde: r.hoyde } });
+          const nid = await save('tegninger', { eiendomId: x.eiendomId, navn: x.navn, etasje: x.etasje, fil, kilde, w, h, soner: [], skala, cad: { enhet: r.enhet, bredde: r.bredde, hoyde: r.hoyde, advarsler: r.advarsler } });
+          if (r.advarsler.length) setTimeout(() => textModal('DWG – innhold som ikke vises', 'Tegningen er lest, men dette kunne ikke vises:\n\n• ' + r.advarsler.join('\n• ') + '\n\nRåd:\n• Xref: åpne tegningen i AutoCAD og bruk «Bind» (eller eTransmit) så eksterne tegninger blir en del av filen.\n• Proxy-objekter (AutoCAD Architecture, MagiCAD m.fl.): bruk «Export to AutoCAD» / «-EXPORTTOAUTOCAD», eller «Explode», og lagre på nytt.\n• Alternativt: plott tegningen til PDF og last opp PDF-en.', 'Lagre som ny DWG fra CAD-programmet og last opp på nytt, eller bruk PDF.'), 600);
           toast(`DWG lest. Målestokk satt automatisk (enhet ${r.enhet}, ca. ${r.bredde.toLocaleString('nb-NO', { maximumFractionDigits: 1 })} × ${r.hoyde.toLocaleString('nb-NO', { maximumFractionDigits: 1 })} m). Kontroller med «Mål avstand».`);
           setTimeout(() => openPlan(nid), 150); return;
         }
@@ -89,6 +91,19 @@ export function editTegning(id?: string, eid?: string) {
       setTimeout(() => openPlan(nid), 150);
     },
   });
+}
+
+async function lesDwgPaaNytt(id: string) {
+  const t = byId('tegninger', id); if (!t?.kilde) return;
+  if ((t.soner || []).length && !(await confirmBox(`Tegningen har ${(t.soner || []).length} oppmålte arealer. Når DWG-en leses inn på nytt kan utsnittet endre seg, slik at arealer og markører må kontrolleres/flyttes. Fortsette?`))) return;
+  try {
+    toast('Leser DWG på nytt …'); const u = await fileUrl(t.kilde.path); const b = await (await fetch(u)).blob();
+    const r = await dwgTilBilde(new File([b], t.kilde.navn || 'tegning.dwg'), 'auto');
+    const fil = await uploadFile(r.blob as any, t.eiendomId, undefined, (t.kilde.navn || 'tegning').replace(/\.dwg$/i, '') + '.png'); if (!fil) return;
+    const gml = t.fil; const skala = { a: [r.w * 0.02, r.h * 0.995], b: [r.w * 0.98, r.h * 0.995], m: Math.round(r.w * 0.96 * r.mpp * 1000) / 1000 };
+    await save('tegninger', { ...t, fil, w: r.w, h: r.h, skala, cad: { enhet: r.enhet, bredde: r.bredde, hoyde: r.hoyde, advarsler: r.advarsler } }); await deleteFile(gml); await syncArealer(t.eiendomId);
+    toast('DWG lest inn på nytt'); setTimeout(() => openPlan(id), 150);
+  } catch (e: any) { toast('Kunne ikke lese DWG: ' + (e?.message || e)); }
 }
 
 // ---------- tegneverktøy
