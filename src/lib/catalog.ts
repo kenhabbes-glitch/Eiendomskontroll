@@ -63,6 +63,17 @@ export const MALER: Record<string, Mal> = {
 };
 export const PROP_MALER=["brann_dok","vernerunde_brann","samordning","brannovelse_bygg","eier_ik","leietaker_ik","energiattest","tilstand","uteomrade","snoeis","radon"];
 export const KOMP: Record<string, KompType> = {
+  // NS 3451 hovedgruppe 1 – Dokumentasjon (ingen teknisk levetid)
+  dok_bygg:{n:"Bygningsdokumentasjon",g:"1 Dokumentasjon",l:0},
+  dok_forv:{n:"Dokumenter for forvaltning",g:"1 Dokumentasjon",l:0},
+  dok_jur:{n:"Juridiske og offentlige dokumenter",g:"1 Dokumentasjon",l:0},
+  dok_tomt:{n:"Tomt",g:"1 Dokumentasjon",l:0},
+  dok_dim:{n:"Dimensjonering",g:"1 Dokumentasjon",l:0},
+  dok_miljo:{n:"Miljø",g:"1 Dokumentasjon",l:0},
+  dok_tegn:{n:"Tegninger, planer og kart",g:"1 Dokumentasjon",l:0},
+  dok_brann:{n:"Branndokumentasjon",g:"1 Dokumentasjon",l:0},
+  dok_sikk:{n:"Sikkerhet",g:"1 Dokumentasjon",l:0},
+  dok_fdv:{n:"Drift og vedlikehold (FDV)",g:"1 Dokumentasjon",l:0},
   tak_asfalt:{n:"Tak – asfaltbelegg/takpapp",g:"2 Bygning",l:25,m:["tak_inspeksjon"],enh:"m2"},
   tak_folie:{n:"Tak – PVC/folie/membran",g:"2 Bygning",l:25,m:["tak_inspeksjon"],enh:"m2"},
   tak_stein:{n:"Tak – takstein/plater",g:"2 Bygning",l:45,m:["tak_inspeksjon"],enh:"m2"},
@@ -116,7 +127,7 @@ export const KOMP: Record<string, KompType> = {
   annet:{n:"Annet",g:"Annet",l:20},
 };
 /* TFM: standard systemkode (NS 3451) og hovedkomponent per type. Der tredje siffer er usikkert er hovedgruppen (xx0) brukt. */
-export const TFM_DEF: Record<string, [string, string]> = {tak_asfalt:["262","EA"],tak_folie:["262","EA"],tak_stein:["262","EA"],taksikring:["260","CA"],fasade_tre:["235","EA"],fasade_mur:["230","AA"],fasade_plate:["235","EA"],vinduer:["234","DV"],ytterdorer:["234","DU"],porter:["234","DP"],branndorer:["244","DB"],gulv:["255","EA"],innv:["240","EA"],
+export const TFM_DEF: Record<string, [string, string]> = {dok_bygg:["10",""],dok_forv:["11",""],dok_jur:["12",""],dok_tomt:["13",""],dok_dim:["14",""],dok_miljo:["15",""],dok_tegn:["16",""],dok_brann:["17",""],dok_sikk:["18",""],dok_fdv:["19",""],tak_asfalt:["262","EA"],tak_folie:["262","EA"],tak_stein:["262","EA"],taksikring:["260","CA"],fasade_tre:["235","EA"],fasade_mur:["230","AA"],fasade_plate:["235","EA"],vinduer:["234","DV"],ytterdorer:["234","DU"],porter:["234","DP"],branndorer:["244","DB"],gulv:["255","EA"],innv:["240","EA"],
  sanitar:["313","KR"],avlop:["312","KN"],tilbakeslag:["313","SG"],bereder:["315","NW"],dusj:["315","UB"],kjel:["320","IO"],varmepumpe:["320","IK"],kjole:["370","IK"],radiator:["320","LD"],ventilasjon:["360","IV"],kanaler:["360","KK"],sprinkler:["332","SJ"],brannslanger:["330","UO"],fettutskiller:["312","MO"],oljeutskiller:["312","MO"],
  eltavle:["432","FS"],elanlegg:["433","FS"],nodlys:["443","UN"],nodstrom:["460","IG"],belysning:["440","UP"],lynvern:["410","QY"],lading:["430","UE"],solcelle:["400","IG"],
  brannalarm:["542","OS"],sd:["563","OS"],adgang:["543","RK"],talevarsling:["540","UH"],heis:["621","KH"],rulletrapp:["622","KH"],loft:["620","KH"],roykluker:["263","DL"],brannspjeld:["360","SZ"],slokkere:["330","NZ"],trykk:["340","NT"],asfalt:["760","EA"],lekeplass:["770","HM"],gjerder:["720","AA"],annet:["","" ]};
@@ -213,6 +224,7 @@ export const SERVICEAVTALE: Record<string, { n: 'lov' | 'anb'; h: string }> = {
 /* Tagger (fagområder) for systemer og komponenter. Komponenter arver systemets tagger hvis de ikke har egne. */
 export const TAGGER: [string, string][] = [['Brann', '#b42318'], ['HVAC', '#0e7490'], ['VVS', '#2457a6'], ['Elektro', '#b07a00'], ['Bygning', '#8a5a2b'], ['Heis', '#7b3fa0'], ['Tele/IKT', '#4b5563'], ['Sikkerhet', '#9f1239'], ['Energi', '#15803d'], ['Utomhus', '#5b6b00']];
 export const TYPE_TAGGER: Record<string, string[]> = {
+  dok_brann: ['Brann'], dok_sikk: ['Sikkerhet'], dok_miljo: ['Energi'],
   brannalarm: ['Brann', 'Elektro'], talevarsling: ['Brann', 'Elektro'], nodlys: ['Brann', 'Elektro'], sprinkler: ['Brann', 'VVS'], brannslanger: ['Brann', 'VVS'], slokkere: ['Brann'],
   roykluker: ['Brann', 'Bygning'], brannspjeld: ['Brann', 'HVAC'], ventilasjon: ['HVAC'], kanaler: ['HVAC'], kjole: ['HVAC', 'Energi'], varmepumpe: ['HVAC', 'Energi'],
   heis: ['Heis'], rulletrapp: ['Heis'], loft: ['Heis'], eltavle: ['Elektro'], elanlegg: ['Elektro'], nodstrom: ['Elektro'], belysning: ['Elektro'], lynvern: ['Elektro'], lading: ['Elektro', 'Energi'], solcelle: ['Elektro', 'Energi'],

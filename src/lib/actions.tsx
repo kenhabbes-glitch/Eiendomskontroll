@@ -222,7 +222,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'type', label: 'Type system / bygningsdel', type: 'select', groups: kompGroups },
     { k: 'tagger', type: 'custom', label: 'Tagger (fag)', render: (v, set) => <div><TaggVelger value={Array.isArray(v.tagger) ? v.tagger : standardTagger(v)} onChange={t => set({ tagger: t })} disabled={!canEdit()} />
       <div className="hint">{Array.isArray(v.tagger) ? <>Egne tagger. {canEdit() && <a href="#" onClick={e => { e.preventDefault(); set({ tagger: undefined }); }}>Bruk standard for typen</a>}</> : 'Standard ut fra typen. Komponentene arver taggene.'}</div></div> },
-    { k: 'tfmSys', label: 'TFM systemkode (NS 3451)', half: true, mono: true, dl: NS3451, ph: '360', hint: '3 siffer etter NS 3451' },
+    { k: 'tfmSys', label: 'TFM systemkode (NS 3451)', half: true, mono: true, dl: NS3451, ph: '360', hint: '3 siffer etter NS 3451 (2 siffer for dokumentasjon, 10–19)' },
     { k: 'tfmLop', label: 'Systemløpenummer', half: true, mono: true, ph: '001' },
     { k: 'prev', type: 'custom', render: v => { const e = byId('eiendommer', v.eiendomId); return <div className="note mono" style={{ fontSize: 14, color: 'var(--ink)' }}>{v.tfmSys ? `${e?.tfmBygg ? '+' + e.tfmBygg : ''}=${v.tfmSys}.${pad(v.tfmLop || 1)}` : '(ingen TFM-kode)'}</div>; } },
     { k: 'navn', label: 'Betegnelse / plassering', half: true, ph: 'F.eks. Ventilasjon kontorfløy' }, { k: 'fabrikat', label: 'Fabrikat / modell', half: true },
