@@ -191,3 +191,15 @@ export const SERVICEAVTALE: Record<string, { n: 'lov' | 'anb'; h: string }> = {
   kjel: { n: 'anb', h: 'Anbefalt service på brenner og kjel' },
   brannspjeld: { n: 'anb', h: 'Funksjonstest etter FOB § 5 – kan inngå i avtale med ventilasjonsfirma' },
 };
+
+/* Tagger (fagområder) for systemer og komponenter. Komponenter arver systemets tagger hvis de ikke har egne. */
+export const TAGGER: [string, string][] = [['Brann', '#b42318'], ['HVAC', '#0e7490'], ['VVS', '#2457a6'], ['Elektro', '#b07a00'], ['Bygning', '#8a5a2b'], ['Heis', '#7b3fa0'], ['Tele/IKT', '#4b5563'], ['Sikkerhet', '#9f1239'], ['Energi', '#15803d'], ['Utomhus', '#5b6b00']];
+export const TYPE_TAGGER: Record<string, string[]> = {
+  brannalarm: ['Brann', 'Elektro'], talevarsling: ['Brann', 'Elektro'], nodlys: ['Brann', 'Elektro'], sprinkler: ['Brann', 'VVS'], brannslanger: ['Brann', 'VVS'], slokkere: ['Brann'],
+  roykluker: ['Brann', 'Bygning'], brannspjeld: ['Brann', 'HVAC'], ventilasjon: ['HVAC'], kanaler: ['HVAC'], kjole: ['HVAC', 'Energi'], varmepumpe: ['HVAC', 'Energi'],
+  heis: ['Heis'], rulletrapp: ['Heis'], loft: ['Heis'], eltavle: ['Elektro'], elanlegg: ['Elektro'], nodstrom: ['Elektro'], belysning: ['Elektro'], lynvern: ['Elektro'], lading: ['Elektro', 'Energi'], solcelle: ['Elektro', 'Energi'],
+  sd: ['Tele/IKT', 'Energi'], adgang: ['Sikkerhet', 'Tele/IKT'], fettutskiller: ['VVS'], oljeutskiller: ['VVS', 'Utomhus'], trykk: ['VVS'], kjel: ['VVS', 'Energi'], radiator: ['VVS'],
+  asfalt: ['Utomhus'], lekeplass: ['Utomhus'], gjerder: ['Utomhus'],
+};
+/** Standardtagg ut fra hovedgruppe i NS 3451 når typen ikke har egne */
+export const NS_TAGG: Record<string, string> = { '2': 'Bygning', '3': 'VVS', '4': 'Elektro', '5': 'Tele/IKT', '6': 'Bygning', '7': 'Utomhus' };

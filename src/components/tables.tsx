@@ -1,15 +1,15 @@
 import React, { type ReactNode } from 'react';
 import { KOMP, DOK_PAAKREVD, AV_LUKKET, SERVICEAVTALE } from '../lib/catalog';
 import { S, canEdit, save } from '../lib/store';
-import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2, sysKostNaa, sysKostUtskift, sysKostTip, kompAar, egetAar, sysNaaverdi, kompNaaverdi, nvTip, saStatus } from '../lib/utils';
+import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2, sysKostNaa, sysKostUtskift, sysKostTip, kompAar, egetAar, sysNaaverdi, kompNaaverdi, nvTip, saStatus, taggerFor } from '../lib/utils';
 const justTip = (a: any) => { const y = Math.max(compYear(a) || YEAR, YEAR); return `${kostTip(a)}. Prisjustert med KPI til utskiftingsåret ${y}.`; };
 import { aNavn, byId, compRest, compYear, dUntil, docCoverage, eNavn, fd, intTxt, knok, lNavn, openAvvik, pad, pliktStatus, sortBy, tfmKomp, tfmSys, type Rec } from '../lib/utils';
 import { editAnlegg, editAvvik, editDok, editKomponent, toggleDokNA, utfor, visOppgave } from '../lib/actions';
 import { enhetStatus } from '../lib/oppslag';
-import { openPlan } from '../views/Arealer';
+import { openPlan, plasserteFor, visPaaTegning } from '../views/Arealer';
 import { tildeltNavn } from '../lib/arbeidsordre';
-export const Pin = ({ o }: { o: any }) => o.pos?.tegningId ? <a href="#" title="Vis på tegning" style={{ marginLeft: 6, textDecoration: 'none' }} onClick={e => { e.preventDefault(); e.stopPropagation(); openPlan(o.pos.tegningId, { mode: 'tfm', focus: o.id }); }}>⌖</a> : null;
-import { AlvChip, Chip, DueChip, Empty, FileLink, RestChip, StChip, TgChip } from './ui';
+export const Pin = ({ o }: { o: any }) => { const n = plasserteFor(o).length; return n ? <a href="#" title={o.pos ? 'Vis på tegning' : `Vis ${n} plasserte komponenter på tegning`} style={{ marginLeft: 6, textDecoration: 'none' }} onClick={e => { e.preventDefault(); e.stopPropagation(); visPaaTegning(o); }}>⌖</a> : null; };
+import { AlvChip, Chip, DueChip, Empty, FileLink, RestChip, StChip, TaggChips, TgChip } from './ui';
 
 const go = (p: string) => { location.hash = '#/' + p; };
 const stop = (e: React.MouseEvent) => e.stopPropagation();
@@ -102,14 +102,14 @@ export function TfmTree({ list, q, onNewKomp }: { list: Rec[]; q: string; onNewK
     const kl = qq && !sysTxt.includes(qq) ? km : ks;
     rows.push(<tr key={a.id} className="click sysrow" onClick={() => editAnlegg(a.id)}>
       <td className="mono" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{tfmSys(a) || '–'}<Pin o={a} /></td>
-      <td><b style={{ fontWeight: 600 }}>{a.navn || k.n}</b><div className="small muted">{[a.navn ? k.n : k.g, a.fabrikat].filter(Boolean).join(' · ')}</div></td>
+      <td><b style={{ fontWeight: 600 }}>{a.navn || k.n}</b> <TaggChips t={taggerFor(a, 'a')} small /><div className="small muted">{[a.navn ? k.n : k.g, a.fabrikat].filter(Boolean).join(' · ')}</div></td>
       <td className="num">{a.aar || '–'}</td><td className="num">{compYear(a) || '–'}{a.planAar ? <div className="small muted">overstyrt</div> : null}</td><td><RestChip r={compRest(a)} /></td><td><TgChip t={a.tg} /></td>
       {ok && <SysKost a={a} />}
       <td className="small">{n.length ? <>{n.length} kontr.{due > 0 && <> · <span style={{ color: 'var(--red)' }}>{due} forfalt</span></>}</> : <span className="muted">–</span>}</td>
       <td style={{ whiteSpace: 'nowrap' }}>{ok && onNewKomp && <button className="btn sm" onClick={e => { stop(e); onNewKomp(a.id); }}>+ Komponent</button>}</td></tr>);
     kl.forEach(c => rows.push(<tr key={c.id} className="click" onClick={() => editKomponent(c.id)}>
       <td className="mono small" style={{ paddingLeft: 26, whiteSpace: 'nowrap' }}>{'-' + (c.kode || '') + pad(c.lop) + (c.typekode ? '%' + c.typekode : '')}<Pin o={c} /></td>
-      <td>{c.navn}<div className="small muted">{[c.fabrikat, c.plassering, c.serienr ? 's/n ' + c.serienr : ''].filter(Boolean).join(' · ')}</div></td>
+      <td>{c.navn} {Array.isArray(c.tagger) && <TaggChips t={c.tagger} small />}<div className="small muted">{[c.fabrikat, c.plassering, c.serienr ? 's/n ' + c.serienr : ''].filter(Boolean).join(' · ')}</div></td>
       <td className="num">{c.aar || '–'}</td><td className="num">{kompAar(c) || '–'}{!egetAar(c) && kompAar(c) ? <div className="small muted">følger systemet</div> : null}</td><td>{egetAar(c) ? <RestChip r={compRest(c)} /> : <span className="muted small">–</span>}</td><td><TgChip t={c.tg} /></td>
       {ok && <td className="num" data-tip={c.kost ? kostTip(c) : undefined}>{c.kost ? nok(kostNaa(c)) : '–'}</td>}{ok && <td className="num" data-tip={c.kost ? `${kostTip(c)}. Prisjustert med KPI til ${Math.max(kompAar(c) || YEAR, YEAR)}.` : undefined}>{c.kost && kompAar(c) ? nok(kostJustert(c, kompAar(c))) : '–'}</td>}{ok && <td className="num" data-tip={c.kost && kompAar(c) ? nvTip(kompAar(c)) : undefined}>{c.kost && kompAar(c) ? nok(kompNaaverdi(c)) : '–'}</td>}<td /><td /></tr>));
   });

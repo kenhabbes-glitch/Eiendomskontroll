@@ -19,8 +19,10 @@ import { KOMP, TFM_KODER, AV_LUKKET } from '../lib/catalog';
 import { pad, tfmSys, tfmKomp, openAvvik } from '../lib/utils';
 import { editAnlegg, editAvvik, editKomponent } from '../lib/actions';
 import { state, isUtforer } from '../lib/store';
-import { AlvChip, FileLink, StChip } from '../components/ui';
+import { AlvChip, FileLink, StChip, TaggChips, taggFarge } from '../components/ui';
 import { arealRapport } from '../lib/arealRapport';
+import { TAGGER } from '../lib/catalog';
+import { taggerFor } from '../lib/utils';
 import { ENHETER, dwgTilBilde, lagStil, rasteriser } from '../lib/dwg';
 
 // ---------- systemer/komponenter som markører på tegning
@@ -155,7 +157,15 @@ const HELP: Record<string, string> = {
   tegn: 'Klikk hjørnene i arealet. Avslutt ved å klikke på første punkt, dobbeltklikke eller trykke Enter. Hold Shift for rette vinkler. Punkter fester seg til eksisterende hjørner. Backspace angrer, Esc avbryter.',
   maal: 'Klikk to punkter for å måle avstanden. Hold Shift for vannrett/loddrett.',
 };
-export type PlanOpts = { mode?: 'tfm'; placeId?: string; focus?: string };
+/** Viser system (med komponenter) eller komponent på tegningen der den er plassert */
+export function plasserteFor(o: Rec): Rec[] { const erSys = !!o.type || !o.anleggId; const L = erSys ? [o, ...S.komponenter.filter(k => k.anleggId === o.id)] : [o]; return L.filter(x => x.pos?.tegningId && byId('tegninger', x.pos.tegningId)); }
+export function visPaaTegning(o: Rec) {
+  const L = plasserteFor(o); if (!L.length) { toast('Ikke plassert på noen tegning ennå'); return; }
+  const tell: Record<string, number> = {}; L.forEach(x => { tell[x.pos.tegningId] = (tell[x.pos.tegningId] || 0) + 1; });
+  const tid = Object.entries(tell).sort((a, b) => b[1] - a[1])[0][0];
+  openPlan(tid, { mode: 'tfm', focus: o.pos?.tegningId === tid ? o.id : undefined, fokus: L.filter(x => x.pos.tegningId === tid).map(x => x.id) });
+}
+export type PlanOpts = { mode?: 'tfm'; placeId?: string; focus?: string; fokus?: string[]; tagg?: string };
 export function openPlan(tid: string, opts: PlanOpts = {}) { openModal({ noFrame: true, render: close => <PlanEditor tid={tid} close={close} opts={opts} /> }); }
 
 function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void; opts?: PlanOpts }) {
@@ -163,7 +173,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   const T = useRef<Rec>({ ...clone(t0), soner: clone(t0?.soner || []) }).current;
   const [, setTick] = useState(0); const rr = () => setTick(x => x + 1);
   const tfmMode = opts.mode === 'tfm';
-  const st = useRef({ visPlassert: false, flyttOk: (opts.placeId || '') as string, lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, tool: opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '' }).current;
+  const st = useRef({ tagg: (opts.tagg || '') as string, fokus: new Set<string>(opts.fokus || (opts.focus ? [opts.focus] : [])), visPlassert: false, flyttOk: (opts.placeId || '') as string, lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, tool: opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '' }).current;
   const [vb, setVb] = useState({ x: 0, y: 0, w: T.w || 1000, h: T.h || 800 });
   const svgRef = useRef<SVGSVGElement>(null);
   const src = useFileUrl(T.fil?.path);
@@ -171,10 +181,17 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   const L = sortBy(S.leietakere.filter(l => l.eiendomId === T.eiendomId), l => l.navn);
   const items: MItem[] = [...sortBy(S.anlegg.filter(a => a.eiendomId === T.eiendomId), a => (a.tfmSys || '999') + pad(a.tfmLop)).flatMap(a => [{ kind: 'a', o: a } as MItem, ...sortBy(S.komponenter.filter(k => k.anleggId === a.id), k => (k.kode || '') + pad(k.lop)).map(k => ({ kind: 'k', o: k } as MItem))])];
   const avItems: MItem[] = sortBy(S.avvik.filter(a => a.eiendomId === T.eiendomId && (!AV_LUKKET.includes(a.status) || a.id === opts.focus || a.id === opts.placeId)), a => -(a.nr || 0)).map(a => ({ kind: 'v', o: a } as MItem));
-  const markers = items.filter(i => i.o.pos?.tegningId === T.id && (!st.fag || itemFag(i) === st.fag));
-  const avMarkers = avItems.filter(i => i.o.pos?.tegningId === T.id && (!st.fag || itemFag(i) === st.fag));
+  const itemTagger = (i: MItem) => i.kind === 'v' ? (i.o.komponentId ? taggerFor(byId('komponenter', i.o.komponentId), 'k') : taggerFor(byId('anlegg', i.o.anleggId), 'a')) : taggerFor(i.o, i.kind as any);
+  const filt = (i: MItem) => i.o.pos?.tegningId === T.id && (!st.fag || itemFag(i) === st.fag) && (!st.tagg || itemTagger(i).includes(st.tagg));
+  const markers = items.filter(filt);
+  const avMarkers = avItems.filter(filt);
+  const brukteTagger = [...new Set(items.filter(i => i.o.pos?.tegningId === T.id).flatMap(itemTagger))];
   const findItem = (id: string | null) => items.find(i => i.o.id === id) || avItems.find(i => i.o.id === id);
-  useEffect(() => { if (opts.focus) { const i = findItem(opts.focus); if (i?.o.pos) { const w = (T.w || 1000) / 3, h = (T.h || 800) / 3; setVb({ x: i.o.pos.x - w / 2, y: i.o.pos.y - h / 2, w, h }); } } }, []);
+  useEffect(() => {
+    const ps = [...st.fokus].map(id => findItem(id)).filter(i => i?.o.pos?.tegningId === T.id).map(i => i!.o.pos);
+    if (!ps.length) return; const x0 = Math.min(...ps.map(p => p.x)), x1 = Math.max(...ps.map(p => p.x)), y0 = Math.min(...ps.map(p => p.y)), y1 = Math.max(...ps.map(p => p.y));
+    const w = Math.max((T.w || 1000) / 3, (x1 - x0) * 1.5), h = Math.max((T.h || 800) / 3, (y1 - y0) * 1.5); setVb({ x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w, h });
+  }, []);
 
   const k = () => { const r = svgRef.current?.getBoundingClientRect(); return r ? Math.max(vb.w / (r.width || 1), vb.h / (r.height || 1)) : 1; };
   const pt = (e: { clientX: number; clientY: number }) => { const s = svgRef.current!; const p = s.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const q = p.matrixTransform(s.getScreenCTM()!.inverse()); return [q.x, q.y]; };
@@ -259,6 +276,8 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
         <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={st.lagM} onChange={e => { st.lagM = e.target.checked; rr(); }} />Systemer og komponenter</label>
         <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={st.lagV} onChange={e => { st.lagV = e.target.checked; rr(); }} />Avvik</label>
         <select value={st.fag} onChange={e => { st.fag = e.target.value; rr(); }} style={{ border: '1px solid var(--line2)', borderRadius: 7, padding: '5px 6px', fontSize: 12.5 }}><option value="">Alle fag</option>{FAG.map(f => <option key={f[0]} value={f[0]}>{f[0]} {f[1]}</option>)}</select>
+        <select value={st.tagg} onChange={e => { st.tagg = e.target.value; rr(); }} style={{ border: '1px solid var(--line2)', borderRadius: 7, padding: '5px 6px', fontSize: 12.5, marginTop: 4, color: st.tagg ? taggFarge(st.tagg) : undefined, fontWeight: st.tagg ? 600 : 400 }}><option value="">Alle tagger</option>{[...new Set([...TAGGER.map(t => t[0]), ...brukteTagger])].map(t => <option key={t} value={t}>{t}{brukteTagger.includes(t) ? '' : ' (ingen her)'}</option>)}</select>
+        {st.fokus.size > 0 && <button className="btn sm" style={{ marginTop: 4 }} onClick={() => { st.fokus = new Set(); rr(); }}>Fjern utheving</button>}
         <hr /><button onClick={() => setVb({ x: 0, y: 0, w: T.w, h: T.h })}>Tilpass til vindu</button><div className="phelp">{HELP[st.tool]}</div>
       </div>
       <div className="pcanvas"><svg ref={svgRef} className={st.tool === 'velg' ? 'pan' : ''} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
@@ -268,14 +287,14 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
         {st.lagA && T.soner.map((z: Rec) => { const c = centroid(z.pts); const a = zoneArea(T, z); let lt = z.kat === 'leie' && z.leietakerId ? lNavn(z.leietakerId) : ''; if (lt === z.navn) lt = '';
           return <g key={'l' + z.id} pointerEvents="none"><text x={c[0]} y={c[1]} textAnchor="middle" fontSize={fs} fontWeight={600} fill="#1d2320" stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{z.navn}</text>
             <text x={c[0]} y={c[1] + fs * 1.25} textAnchor="middle" fontSize={fs * .9} fill="#1d2320" stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{(lt ? lt + ' · ' : '') + (a != null ? m2(a) : 'mangler målestokk')}</text></g>; })}
-        {st.lagM && markers.map(i => { const isDrag = st.drag?.t === 'm' && st.drag.id === i.o.id && st.mpos; const x = isDrag ? st.mpos![0] : i.o.pos.x, y = isDrag ? st.mpos![1] : i.o.pos.y; const col = fagFarge(itemFag(i)); const on = st.selM === i.o.id;
+        {st.lagM && markers.map(i => { const isDrag = st.drag?.t === 'm' && st.drag.id === i.o.id && st.mpos; const x = isDrag ? st.mpos![0] : i.o.pos.x, y = isDrag ? st.mpos![1] : i.o.pos.y; const col = fagFarge(itemFag(i)); const on = st.selM === i.o.id || st.fokus.has(i.o.id);
           const av = openAvvik().filter(a => i.kind === 'a' ? a.anleggId === i.o.id && !a.komponentId : a.komponentId === i.o.id).length; const R0 = (i.kind === 'a' ? 8 : 6) * kk;
           return <g key={'m' + i.o.id} data-m={i.o.id} style={{ cursor: ro ? 'pointer' : 'move' }}>
             {on && <circle cx={x} cy={y} r={R0 * 2.1} fill={col} fillOpacity={.18} />}
             {av > 0 && <circle cx={x} cy={y} r={R0 * 1.55} fill="none" stroke="#b42318" strokeWidth={2.5} vectorEffect="non-scaling-stroke" />}
             {i.kind === 'a' ? <rect x={x - R0} y={y - R0} width={R0 * 2} height={R0 * 2} rx={R0 * .3} fill={col} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" /> : <circle cx={x} cy={y} r={R0} fill={col} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
             <text x={x} y={y - R0 - 4 * kk} textAnchor="middle" fontSize={fs * .85} fontFamily="IBM Plex Mono,monospace" fontWeight={600} fill={col} stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{itemKode(i)}</text></g>; })}
-        {st.lagV && avMarkers.map(i => { const isDrag = st.drag?.t === 'm' && st.drag.id === i.o.id && st.mpos; const x = isDrag ? st.mpos![0] : i.o.pos.x, y = isDrag ? st.mpos![1] : i.o.pos.y; const on = st.selM === i.o.id; const R0 = 10 * kk; const lukket = AV_LUKKET.includes(i.o.status); const col = lukket ? '#1f6f5c' : i.o.status === 'Utført – til kontroll' ? '#b07a00' : '#b42318';
+        {st.lagV && avMarkers.map(i => { const isDrag = st.drag?.t === 'm' && st.drag.id === i.o.id && st.mpos; const x = isDrag ? st.mpos![0] : i.o.pos.x, y = isDrag ? st.mpos![1] : i.o.pos.y; const on = st.selM === i.o.id || st.fokus.has(i.o.id); const R0 = 10 * kk; const lukket = AV_LUKKET.includes(i.o.status); const col = lukket ? '#1f6f5c' : i.o.status === 'Utført – til kontroll' ? '#b07a00' : '#b42318';
           return <g key={'v' + i.o.id} data-m={i.o.id} style={{ cursor: ro ? 'pointer' : 'move' }}>
             {on && <circle cx={x} cy={y - R0 * .2} r={R0 * 2.2} fill={col} fillOpacity={.18} />}
             <path d={`M${x} ${y - R0 * 1.25} L${x + R0 * 1.15} ${y + R0 * .75} L${x - R0 * 1.15} ${y + R0 * .75} Z`} fill={col} stroke="#fff" strokeWidth={2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
@@ -314,7 +333,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
         {(() => { const i = findItem(st.selM); if (!i || i.kind === 'v') return null; const av = openAvvik().filter(a => i.kind === 'a' ? a.anleggId === i.o.id && !a.komponentId : a.komponentId === i.o.id); const sys = i.kind === 'k' ? byId('anlegg', i.o.anleggId) : null; const info = [i.o.fabrikat, i.o.plassering, i.o.aar ? 'installert ' + i.o.aar : '', i.o.tg].filter(Boolean);
           return <><h3>{i.kind === 'a' ? 'System' : 'Komponent'}</h3>
             <div className="note small" style={{ color: 'var(--ink)' }}><b className="mono" style={{ color: fagFarge(itemFag(i)) }}>{i.kind === 'a' ? tfmSys(i.o, true) : tfmKomp(i.o, true)}</b><br /><b>{itemNavn(i)}</b>{sys && <div className="muted">i {tfmSys(sys)} {sys.navn || KOMP[sys.type]?.n}</div>}
-              {info.length > 0 && <div className="muted">{info.join(' · ')}</div>}
+              {info.length > 0 && <div className="muted">{info.join(' · ')}</div>}{itemTagger(i).length > 0 && <div style={{ marginTop: 4 }}><TaggChips t={itemTagger(i)} small /></div>}
               {av.length > 0 && <div style={{ color: 'var(--red)', marginTop: 4 }}>{av.length} åpne avvik: {av.slice(0, 3).map(a => '#' + a.nr + ' ' + a.tittel).join(', ')}</div>}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}><button className="btn sm" onClick={() => i.kind === 'a' ? editAnlegg(i.o.id) : editKomponent(i.o.id)}>Åpne</button>
               {!ro && <button className="btn sm" onClick={() => { st.tool = 'plasser'; st.placeId = i.o.id; st.flyttOk = i.o.id; rr(); }}>Flytt</button>}

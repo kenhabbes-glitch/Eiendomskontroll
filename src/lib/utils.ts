@@ -1,4 +1,4 @@
-import { KOMP, TFM_KODER, AV_LUKKET } from './catalog';
+import { KOMP, TFM_KODER, AV_LUKKET, TYPE_TAGGER, NS_TAGG } from './catalog';
 import { S } from './store';
 
 export type Rec = { id: string; [k: string]: any };
@@ -156,6 +156,15 @@ export function saStatus(a: Rec, krav?: { n: string } | null) {
   const best = ds.slice().sort((x, y) => (y.gyldigTil || '9999').localeCompare(x.gyldigTil || '9999'))[0];
   const g = best.gyldigTil ? dUntil(best.gyldigTil)! : null;
   return { s: (g === null ? 'ok' : g < 0 ? 'exp' : g <= 90 ? 'soon' : 'ok') as 'ok' | 'exp' | 'soon', d: best };
+}
+/** Gjeldende tagger for system/komponent (komponent arver systemets hvis ikke egne er satt) */
+export function standardTagger(a: Rec): string[] { return TYPE_TAGGER[a?.type] || (NS_TAGG[String(a?.tfmSys || '')[0]] ? [NS_TAGG[String(a.tfmSys)[0]]] : []); }
+export function taggerFor(o: Rec | null | undefined, kind?: 'a' | 'k'): string[] {
+  if (!o) return [];
+  const erK = kind ? kind === 'k' : !!o.anleggId && !o.type;
+  if (Array.isArray(o.tagger)) return o.tagger;
+  if (erK) return taggerFor(byId('anlegg', o.anleggId), 'a');
+  return standardTagger(o);
 }
 export function docCoverage(e: Rec, PAAKREVD: string[]) {
   const docs = S.dokumenter.filter(d => d.eiendomId === e.id); const na = e.dokNA || [];

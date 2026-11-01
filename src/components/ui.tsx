@@ -157,3 +157,19 @@ export function Tip() {
   if (!t) return null;
   return <div id="tip" style={{ display: 'block', left: Math.min(t.x + 14, innerWidth - 270), top: t.y + 14 }}>{t.h.split('\n').map((l, i) => <div key={i}>{l}</div>)}</div>;
 }
+
+// ---------------- Tagger (Brann, HVAC, Elektro …)
+import { TAGGER } from '../lib/catalog';
+export const taggFarge = (t: string) => TAGGER.find(x => x[0] === t)?.[1] || '#4b5563';
+export function TaggChips({ t, small }: { t: string[]; small?: boolean }) {
+  if (!t?.length) return null;
+  return <span style={{ display: 'inline-flex', gap: 3, flexWrap: 'wrap', verticalAlign: 'middle' }}>{t.map(x => <span key={x} style={{ fontSize: small ? 10.5 : 11.5, lineHeight: 1.5, padding: '0 6px', borderRadius: 9, color: '#fff', background: taggFarge(x), whiteSpace: 'nowrap' }}>{x}</span>)}</span>;
+}
+export function TaggVelger({ value, onChange, disabled }: { value: string[]; onChange: (v: string[]) => void; disabled?: boolean }) {
+  const [ny, setNy] = useState('');
+  const alle = [...TAGGER.map(x => x[0]), ...value.filter(v => !TAGGER.some(x => x[0] === v))];
+  return <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+    {alle.map(x => { const on = value.includes(x); return <button type="button" key={x} disabled={disabled} onClick={() => onChange(on ? value.filter(v => v !== x) : [...value, x])} style={{ border: '1px solid ' + taggFarge(x), background: on ? taggFarge(x) : '#fff', color: on ? '#fff' : taggFarge(x), borderRadius: 12, padding: '2px 10px', fontSize: 12.5, cursor: disabled ? 'default' : 'pointer' }}>{on ? '✓ ' : ''}{x}</button>; })}
+    {!disabled && <input value={ny} onChange={e => setNy(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const v = ny.trim(); if (v && !value.includes(v)) onChange([...value, v]); setNy(''); } }} placeholder="+ egen tagg" style={{ width: 110, border: '1px dashed var(--line2)', borderRadius: 12, padding: '2px 8px', fontSize: 12.5 }} />}
+  </div>;
+}

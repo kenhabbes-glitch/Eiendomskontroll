@@ -4,13 +4,13 @@ import { SERVICEAVTALE } from './catalog';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state } from './store';
 import { leieAreal, m2, FELLES_AVTALE } from './utils';
-import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst } from './utils';
+import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst, standardTagger, taggerFor } from './utils';
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
 import { openPlan } from '../views/Arealer';
 import { AoPanel, HendelseListe, aoSnapshot } from './arbeidsordre';
 import { adresseFelter, brregData, enhetStatus, seEiendomUrl, virksomhetFraNaering, rensOrgnr } from './oppslag';
-import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip, DueChip, type Field } from '../components/ui';
+import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip, DueChip, TaggChips, TaggVelger, type Field } from '../components/ui';
 
 const go = (p: string) => { location.hash = '#/' + p; };
 const eOpts = () => sortBy(S.eiendommer, e => e.navn).map(e => [e.id, e.navn] as [string, string]);
@@ -104,6 +104,8 @@ export function editAnlegg(id?: string, eiendomId?: string) {
   const fields: Field[] = [
     { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true },
     { k: 'type', label: 'Type system / bygningsdel', type: 'select', groups: kompGroups },
+    { k: 'tagger', type: 'custom', label: 'Tagger (fag)', render: (v, set) => <div><TaggVelger value={Array.isArray(v.tagger) ? v.tagger : standardTagger(v)} onChange={t => set({ tagger: t })} disabled={!canEdit()} />
+      <div className="hint">{Array.isArray(v.tagger) ? <>Egne tagger. {canEdit() && <a href="#" onClick={e => { e.preventDefault(); set({ tagger: undefined }); }}>Bruk standard for typen</a>}</> : 'Standard ut fra typen. Komponentene arver taggene.'}</div></div> },
     { k: 'tfmSys', label: 'TFM systemkode (NS 3451)', half: true, mono: true, dl: NS3451, ph: '360', hint: '3 siffer etter NS 3451' },
     { k: 'tfmLop', label: 'Systemløpenummer', half: true, mono: true, ph: '001' },
     { k: 'prev', type: 'custom', render: v => { const e = byId('eiendommer', v.eiendomId); return <div className="note mono" style={{ fontSize: 14, color: 'var(--ink)' }}>{v.tfmSys ? `${e?.tfmBygg ? '+' + e.tfmBygg : ''}=${v.tfmSys}.${pad(v.tfmLop || 1)}` : '(ingen TFM-kode)'}</div>; } },
@@ -162,6 +164,9 @@ export function editKomponent(id?: string, anleggId?: string) {
     { k: 'kode', label: 'TFM komponentkode', half: true, mono: true, dl: TFM_KODER, ph: 'JV', req: true, hint: '2 bokstaver, f.eks. JV vifte, JP pumpe, RT temperaturgiver' },
     { k: 'lop', label: 'Komponentløpenummer', half: true, mono: true, ph: '001' },
     { k: 'typekode', label: 'Typekode (valgfritt, etter %)', half: true, mono: true }, { k: 'navn', label: 'Betegnelse', half: true, ph: 'F.eks. Tilluftsvifte' },
+    { k: 'tagger', type: 'custom', label: 'Tagger (fag)', render: (v, set) => { const arv = taggerFor(byId('anlegg', v.anleggId), 'a'); const egne = Array.isArray(v.tagger);
+      return <div>{egne ? <TaggVelger value={v.tagger} onChange={t => set({ tagger: t })} disabled={!canEdit()} /> : <span className="small">Arver fra systemet: {arv.length ? <TaggChips t={arv} /> : <span className="muted">ingen</span>}</span>}
+        {canEdit() && <div className="hint">{egne ? <a href="#" onClick={e => { e.preventDefault(); set({ tagger: undefined }); }}>Arv systemets tagger igjen</a> : <a href="#" onClick={e => { e.preventDefault(); set({ tagger: [...arv] }); }}>Endre tagger for denne komponenten</a>}</div>}</div>; } },
     { k: 'prev', type: 'custom', render: v => { const a = byId('anlegg', v.anleggId); return <div className="note mono" style={{ fontSize: 14, color: 'var(--ink)' }}>{`${a ? tfmSys(a, true) : ''}-${String(v.kode || '').toUpperCase()}${pad(v.lop || 1)}${v.typekode ? '%' + v.typekode : ''}`}</div>; } },
     { k: 'plassering', label: 'Plassering (rom/etasje)', half: true }, { k: 'fabrikat', label: 'Fabrikat / modell', half: true },
     { k: 'serienr', label: 'Serienummer', half: true }, { k: 'aar', label: 'Installert år', type: 'number', half: true },
