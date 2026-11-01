@@ -1,0 +1,31 @@
+diff --git a/bindings/javascript/src/svg/svgConverter.ts b/bindings/javascript/src/svg/svgConverter.ts
+index 48bdcc4..632a295 100644
+--- a/bindings/javascript/src/svg/svgConverter.ts
++++ b/bindings/javascript/src/svg/svgConverter.ts
+@@ -569,10 +569,11 @@ export class SvgConverter {
+     const entities = block.entities
+     const { bbox, elements } = entities.reduce(
+       (acc: { bbox: Box2D; elements: string[] }, entity: DwgEntity) => {
+-        const boundsAndElement = this.entityToBoundsAndElement(entity)
++        let boundsAndElement: any = null
++        try { boundsAndElement = this.entityToBoundsAndElement(entity) } catch { boundsAndElement = null }
+         if (boundsAndElement) {
+           const { bbox, element } = boundsAndElement
+-          if (bbox.valid) {
++          if (bbox.valid && entity.type !== 'RAY' && entity.type !== 'XLINE') {
+             acc.bbox.expandByPoint(bbox.min)
+             acc.bbox.expandByPoint(bbox.max)
+           }
+@@ -582,10 +583,10 @@ export class SvgConverter {
+               ? color.cssColor
+               : 'none'
+           if (color.isByBlock) {
+-            acc.elements.push(`<g id="${entity.handle}">${element}</g>`)
++            acc.elements.push(`<g id="${entity.handle}" data-l="${String((entity as any).layer || '').replace(/"/g, '')}">${element}</g>`)
+           } else {
+             acc.elements.push(
+-              `<g id="${entity.handle}" stroke="${color.cssColor}" fill="${fill}">${element}</g>`
++              `<g id="${entity.handle}" data-l="${String((entity as any).layer || '').replace(/"/g, '')}" stroke="${color.cssColor}" fill="${fill}">${element}</g>`
+             )
+           }
+         }

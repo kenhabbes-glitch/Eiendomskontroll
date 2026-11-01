@@ -19,8 +19,9 @@ import { KOMP, TFM_KODER, AV_LUKKET } from '../lib/catalog';
 import { pad, tfmSys, tfmKomp, openAvvik } from '../lib/utils';
 import { editAnlegg, editAvvik, editKomponent } from '../lib/actions';
 import { state, isUtforer } from '../lib/store';
-import { AlvChip, StChip } from '../components/ui';
+import { AlvChip, FileLink, StChip } from '../components/ui';
 import { arealRapport } from '../lib/arealRapport';
+import { ENHETER, dwgTilBilde } from '../lib/dwg';
 
 // ---------- systemer/komponenter som markører på tegning
 export const FAG: [string, string, string][] = [['2', 'Bygning', '#8a5a2b'], ['3', 'VVS', '#2457a6'], ['4', 'Elkraft', '#b07a00'], ['5', 'Tele og automasjon', '#b42318'], ['6', 'Andre installasjoner', '#7b3fa0'], ['7', 'Utendørs', '#5b6b00']];
@@ -56,18 +57,33 @@ export function editTegning(id?: string, eid?: string) {
   const t: Rec = id ? byId('tegninger', id)! : { eiendomId: eid || S.eiendommer[0]?.id, etasje: 1, navn: '1. etasje', side: 1 } as any;
   const fields: any[] = [{ k: 'eiendomId', label: 'Eiendom', type: 'select', options: eiendomOpts, req: true },
     { k: 'navn', label: 'Navn på tegning / etasje', req: true, half: true, ph: '1. etasje' }, { k: 'etasje', label: 'Etasjenummer (sortering)', type: 'number', half: true, hint: 'Kjeller = -1, U1 = 0 osv.' }];
-  if (!id) fields.push({ k: 'fil', label: 'Plantegning (PDF, PNG eller JPG)', type: 'file', req: true, accept: '.pdf,.png,.jpg,.jpeg,.webp' }, { k: 'side', label: 'Sidenummer i PDF', type: 'number', half: true, hint: 'Bare for PDF med flere sider' });
+  if (id && t.kilde) fields.push({ k: 'kildeInfo', type: 'custom', render: () => <div className="note small" style={{ color: 'var(--ink)' }}>Original DWG: <FileLink fil={t.kilde} />{t.cad?.enhet ? ` · enhet ${t.cad.enhet}` : ''}{t.cad?.bredde ? ` · ca. ${Math.round(t.cad.bredde * 10) / 10} × ${Math.round(t.cad.hoyde * 10) / 10} m` : ''}</div> });
+  const erCad = (x: any) => /\.dwg$/i.test(x?.fil?.name || '');
+  if (!id) fields.push({ k: 'fil', label: 'Plantegning (DWG, PDF, PNG eller JPG)', type: 'file', req: true, accept: '.dwg,.pdf,.png,.jpg,.jpeg,.webp' },
+    { k: 'side', label: 'Sidenummer i PDF', type: 'number', half: true, hint: 'Bare for PDF med flere sider', show: (x: any) => /\.pdf$/i.test(x?.fil?.name || '') },
+    { k: 'enhet', label: 'Tegningsenhet i DWG', type: 'select', options: ENHETER.map(e => [e[0], e[1]]), half: true, def: 'auto', show: erCad, hint: 'Målestokken settes automatisk ut fra enheten. Bygningstegninger er nesten alltid i mm.' });
   formModal({
     title: id ? 'Rediger tegning' : 'Last opp plantegning', fields, values: t, saveTxt: id ? 'Lagre' : 'Last opp',
-    extraFoot: close => id ? <button className="btn danger" onClick={async () => { if (await confirmBox(`Slette tegningen «${t.navn}» med ${(t.soner || []).length} oppmålte arealer?`)) { await deleteFile(t.fil); await removeDoc('tegninger', id); await syncArealer(t.eiendomId); close(); } }}>Slett</button> : null,
+    extraFoot: close => id ? <button className="btn danger" onClick={async () => { if (await confirmBox(`Slette tegningen «${t.navn}» med ${(t.soner || []).length} oppmålte arealer?`)) { await deleteFile(t.fil); if (t.kilde) await deleteFile(t.kilde); await removeDoc('tegninger', id); await syncArealer(t.eiendomId); close(); } }}>Slett</button> : null,
     onSave: async x => {
       if (id) { await save('tegninger', { ...t, eiendomId: x.eiendomId, navn: x.navn, etasje: x.etasje }); await syncArealer(x.eiendomId); if (x.eiendomId !== t.eiendomId) await syncArealer(t.eiendomId); return; }
       const f: File = x.fil; const ext = (f.name.split('.').pop() || '').toLowerCase(); let blob: Blob = f, w = 0, h = 0, navn = f.name;
       try {
+        if (ext === 'dxf') { toast('DXF støttes ikke ennå. Bruk DWG, eller lagre tegningen som PDF.'); return false; }
+        if (ext === 'dwg') {
+          toast('Leser DWG … (første gang lastes DWG-leseren, ca. 11 MB)');
+          const r = await dwgTilBilde(f, x.enhet || 'auto'); blob = r.blob; w = r.w; h = r.h; navn = f.name.replace(/\.dwg$/i, '') + '.png';
+          const kilde = await uploadFile(f, x.eiendomId, undefined, f.name);
+          const fil = await uploadFile(blob as any, x.eiendomId, undefined, navn); if (!fil) return false;
+          const skala = { a: [w * 0.02, h * 0.995], b: [w * 0.98, h * 0.995], m: Math.round(w * 0.96 * r.mpp * 1000) / 1000 };
+          const nid = await save('tegninger', { eiendomId: x.eiendomId, navn: x.navn, etasje: x.etasje, fil, kilde, w, h, soner: [], skala, cad: { enhet: r.enhet, bredde: r.bredde, hoyde: r.hoyde } });
+          toast(`DWG lest. Målestokk satt automatisk (enhet ${r.enhet}, ca. ${r.bredde.toLocaleString('nb-NO', { maximumFractionDigits: 1 })} × ${r.hoyde.toLocaleString('nb-NO', { maximumFractionDigits: 1 })} m). Kontroller med «Mål avstand».`);
+          setTimeout(() => openPlan(nid), 150); return;
+        }
         if (ext === 'pdf') { toast('Leser PDF …'); const r = await pdfToImage(f, x.side); blob = r.blob; w = r.w; h = r.h; navn = f.name.replace(/\.pdf$/i, '') + (blob.type === 'image/png' ? '.png' : '.jpg'); }
         else if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) { const z = await imgSize(f); w = z.w; h = z.h; }
-        else { toast('Bruk PDF, PNG eller JPG'); return false; }
-      } catch (e: any) { toast(ext === 'pdf' ? 'Kunne ikke lese PDF-en. Eksporter tegningen som PNG/JPG og prøv igjen.' : e?.message || 'Kunne ikke lese filen'); return false; }
+        else { toast('Bruk DWG, PDF, PNG eller JPG'); return false; }
+      } catch (e: any) { toast(ext === 'pdf' ? 'Kunne ikke lese PDF-en. Eksporter tegningen som PNG/JPG og prøv igjen.' : ext === 'dwg' || ext === 'dxf' ? 'Kunne ikke lese DWG-filen: ' + (e?.message || e) + '. Prøv å lagre den i en annen DWG-versjon eller som PDF fra CAD-programmet.' : e?.message || 'Kunne ikke lese filen'); return false; }
       const fil = await uploadFile(blob as any, x.eiendomId, undefined, navn); if (!fil) return false;
       const nid = await save('tegninger', { eiendomId: x.eiendomId, navn: x.navn, etasje: x.etasje, fil, w, h, soner: [] });
       setTimeout(() => openPlan(nid), 150);
@@ -296,7 +312,7 @@ export function ArealSection({ eid }: { eid: string }) {
         <div className="small muted">{mpp(t) ? 'Målestokk satt' : <span style={{ color: 'var(--amber)' }}>Mangler målestokk</span>} · {(t.soner || []).length} arealer</div>
         <div className="small muted">{[...S.anlegg, ...S.komponenter].filter(x => x.pos?.tegningId === t.id).length} systemer/komponenter plassert</div>
         <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}><button className="btn sm pri" onClick={() => openPlan(t.id)}>{ed ? 'Arealer' : 'Åpne'}</button><button className="btn sm" onClick={() => openPlan(t.id, { mode: 'tfm' })}>Systemkart</button>{ed && <button className="btn sm" onClick={() => editTegning(t.id)}>Rediger</button>}</div></div>)}
-      {ed && <button className="upcard" onClick={() => editTegning(undefined, eid)}><b style={{ fontSize: 22 }}>+</b><span>Last opp plantegning</span><span className="small">PDF, PNG eller JPG</span></button>}
+      {ed && <button className="upcard" onClick={() => editTegning(undefined, eid)}><b style={{ fontSize: 22 }}>+</b><span>Last opp plantegning</span><span className="small">DWG, PDF, PNG eller JPG</span></button>}
       {!ed && !T.length && <div className="card"><Empty t="Ingen tegninger" /></div>}
     </div>
     <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Arealoppgave – {e.navn}</h2>{keys.length > 0 && <><button className="btn sm" onClick={csv}>Kopier arealoppgave (CSV)</button><button className="btn sm pri" onClick={() => arealRapport(eid)}>Arealrapport (PDF)</button></>}</div>

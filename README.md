@@ -112,3 +112,6 @@ Flyt: avvik → «Plasser på tegning» → «Tildel» (intern bruker) eller «S
 
 ### E-postoppsett i appen
 Kjør `supabase/migrations/004_epost.sql`. Deretter setter administrator avsendernavn, avsenderadresse, svar-til og SMTP (Gmail, Microsoft 365, Domeneshop, annen) eller Resend under **Innstillinger → E-post for arbeidsordre**. Passord/nøkler lagres i tabellen `epost_oppsett`, som bare serverfunksjonen kan lese. Oppsettet i appen overstyrer miljøvariablene i Netlify.
+
+## DWG-tegninger
+Plantegninger kan lastes opp som DWG. Filen leses i nettleseren av LibreDWG (WebAssembly, GPLv3) i en egen Web Worker (`public/dwg/`), gjøres om til et bilde og får **målestokk automatisk** ut fra tegningsenheten (INSUNITS, kan overstyres ved opplasting). Original-DWG lagres sammen med tegningen. Se `public/dwg/README.txt` og `tools/dwg-worker/BUILD.md`. DXF støttes foreløpig ikke.
