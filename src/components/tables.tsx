@@ -1,7 +1,7 @@
 import React, { type ReactNode } from 'react';
 import { KOMP, DOK_PAAKREVD, AV_LUKKET, SERVICEAVTALE } from '../lib/catalog';
 import { S, canEdit, save } from '../lib/store';
-import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2, sysKostNaa, sysKostUtskift, sysKostTip, kompAar, egetAar, sysNaaverdi, kompNaaverdi, nvTip, saStatus, taggerFor } from '../lib/utils';
+import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2, sysKostNaa, sysKostUtskift, sysKostTip, kompAar, egetAar, sysNaaverdi, kompNaaverdi, nvTip, saStatus, taggerFor, erForslag, harForslag } from '../lib/utils';
 const justTip = (a: any) => { const y = Math.max(compYear(a) || YEAR, YEAR); return `${kostTip(a)}. Prisjustert med KPI til utskiftingsåret ${y}.`; };
 import { aNavn, byId, compRest, compYear, dUntil, docCoverage, eNavn, fd, intTxt, knok, lNavn, openAvvik, pad, pliktStatus, sortBy, tfmKomp, tfmSys, type Rec } from '../lib/utils';
 import { editAnlegg, editAvvik, editDok, editKomponent, toggleDokNA, utfor, visOppgave } from '../lib/actions';
@@ -9,7 +9,7 @@ import { enhetStatus } from '../lib/oppslag';
 import { openPlan, plasserteFor, visPaaTegning } from '../views/Arealer';
 import { tildeltNavn } from '../lib/arbeidsordre';
 export const Pin = ({ o }: { o: any }) => { const n = plasserteFor(o).length; return n ? <a href="#" title={o.pos ? 'Vis på tegning' : `Vis ${n} plasserte komponenter på tegning`} style={{ marginLeft: 6, textDecoration: 'none' }} onClick={e => { e.preventDefault(); e.stopPropagation(); visPaaTegning(o); }}>⌖</a> : null; };
-import { AlvChip, Chip, DueChip, Empty, FileLink, RestChip, StChip, TaggChips, TgChip } from './ui';
+import { AlvChip, Chip, DueChip, Empty, FileLink, ForslagMerke, RestChip, StChip, TaggChips, TgChip } from './ui';
 
 const go = (p: string) => { location.hash = '#/' + p; };
 const stop = (e: React.MouseEvent) => e.stopPropagation();
@@ -70,7 +70,7 @@ export function DokTable({ list, showE = true }: { list: Rec[]; showE?: boolean 
 
 function SysKost({ a }: { a: Rec }) {
   const c = sysKostNaa(a); const y = compYear(a); const v = c.tot ? sysKostUtskift(a) : 0;
-  return <><td className="num" style={{ whiteSpace: 'nowrap' }} data-tip={c.tot ? sysKostTip(a) : undefined}>{c.tot ? nok(c.tot) : '–'}{c.n > 0 && <div className="small muted">inkl. {c.n} komp.</div>}</td>
+  return <><td className="num" style={{ whiteSpace: 'nowrap' }} data-tip={c.tot ? sysKostTip(a) : undefined}>{c.tot ? nok(c.tot) : '–'}{c.tot > 0 && harForslag(a) && <ForslagMerke tip="Hele eller deler av kostnaden er et forslag fra nettsøk – kontroller mot tilbud" />}{c.n > 0 && <div className="small muted">inkl. {c.n} komp.</div>}</td>
     <td className="num" data-tip={c.tot && y ? `${sysKostTip(a)}. Prisjustert med KPI til utskiftingsåret ${Math.max(y, YEAR)}.` : undefined}>{c.tot && y ? nok(v) : '–'}</td>
     <td className="num" data-tip={c.tot && y ? nvTip(y) : undefined}>{c.tot && y ? nok(sysNaaverdi(a)) : '–'}</td></>;
 }
@@ -111,7 +111,7 @@ export function TfmTree({ list, q, onNewKomp }: { list: Rec[]; q: string; onNewK
       <td className="mono small" style={{ paddingLeft: 26, whiteSpace: 'nowrap' }}>{'-' + (c.kode || '') + pad(c.lop) + (c.typekode ? '%' + c.typekode : '')}<Pin o={c} /></td>
       <td>{c.navn} {Array.isArray(c.tagger) && <TaggChips t={c.tagger} small />}<div className="small muted">{[c.fabrikat, c.plassering, c.serienr ? 's/n ' + c.serienr : ''].filter(Boolean).join(' · ')}</div></td>
       <td className="num">{c.aar || '–'}</td><td className="num">{kompAar(c) || '–'}{!egetAar(c) && kompAar(c) ? <div className="small muted">følger systemet</div> : null}</td><td>{egetAar(c) ? <RestChip r={compRest(c)} /> : <span className="muted small">–</span>}</td><td><TgChip t={c.tg} /></td>
-      {ok && <td className="num" data-tip={c.kost ? kostTip(c) : undefined}>{c.kost ? nok(kostNaa(c)) : '–'}</td>}{ok && <td className="num" data-tip={c.kost ? `${kostTip(c)}. Prisjustert med KPI til ${Math.max(kompAar(c) || YEAR, YEAR)}.` : undefined}>{c.kost && kompAar(c) ? nok(kostJustert(c, kompAar(c))) : '–'}</td>}{ok && <td className="num" data-tip={c.kost && kompAar(c) ? nvTip(kompAar(c)) : undefined}>{c.kost && kompAar(c) ? nok(kompNaaverdi(c)) : '–'}</td>}<td /><td /></tr>));
+      {ok && <td className="num" data-tip={c.kost ? kostTip(c) : undefined}>{c.kost ? nok(kostNaa(c)) : '–'}{erForslag(c) && <ForslagMerke />}</td>}{ok && <td className="num" data-tip={c.kost ? `${kostTip(c)}. Prisjustert med KPI til ${Math.max(kompAar(c) || YEAR, YEAR)}.` : undefined}>{c.kost && kompAar(c) ? nok(kostJustert(c, kompAar(c))) : '–'}</td>}{ok && <td className="num" data-tip={c.kost && kompAar(c) ? nvTip(kompAar(c)) : undefined}>{c.kost && kompAar(c) ? nok(kompNaaverdi(c)) : '–'}</td>}<td /><td /></tr>));
   });
   return <Wrap><table><thead><tr><th>TFM-kode</th><th>System / komponent</th><th className="num">Installert år</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}{ok && <th className="num">Nåverdi</th>}<th>Kontroller</th><th /></tr></thead>
     <tbody>{rows.length ? rows : <tr><td colSpan={11} className="muted">Ingen treff.</td></tr>}</tbody></table></Wrap>;

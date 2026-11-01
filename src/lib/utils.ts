@@ -179,3 +179,7 @@ export function docCoverage(e: Rec, PAAKREVD: string[]) {
 }
 export function csvCell(v: any) { const s = String(v ?? ''); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
 export function toCsv(rows: any[][]) { return rows.map(r => r.map(csvCell).join(';')).join('\n'); }
+
+// Kostnad satt fra nettsøk (forslag) og ikke endret siden
+export const erForslag = (o?: any) => !!(o && o.kostKilde?.type === 'forslag' && +o.kost > 0 && +o.kost === +o.kostKilde.belop);
+export const harForslag = (a: any) => erForslag(a) || sysKomp(a).some(erForslag);

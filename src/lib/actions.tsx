@@ -1,8 +1,9 @@
 // Skjemaer og handlinger (opprett/rediger/slett) som brukes fra flere visninger.
 import React, { useState } from 'react';
 import { SERVICEAVTALE, TG_DEF, KG_DEF } from './catalog';
+import { levetidRef, midt, spenn } from './ns3451';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
-import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state } from './store';
+import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb } from './store';
 import { leieAreal, m2, FELLES_AVTALE } from './utils';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst, standardTagger, taggerFor } from './utils';
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
@@ -67,6 +68,62 @@ export function editEiendom(id?: string) {
 }
 
 // ================= SYSTEM / BYGNINGSDEL =================
+// ---------- Levetid: ledetråd fra NS 3451 og oppslag hos leverandør
+function LevetidHjelp({ v, set, sysKode, typeLev }: { v: any; set: (x: any) => void; sysKode?: string; typeLev?: number }) {
+  const r = levetidRef(sysKode); const ed = canEdit(); const t = midt(r?.tek || null), f = midt(r?.fun || null);
+  const kilde = v.levetidKilde as string | undefined;
+  return <div className="note small" style={{ color: 'var(--ink)', marginTop: -4 }}>
+    {r ? <><b>Ledetråd NS 3451</b> <span className="muted">({r.kode} {r.navn})</span>: teknisk levetid <b>{spenn(r.tek)}</b>, funksjonell <b>{spenn(r.fun)}</b>.
+      {ed && <span style={{ display: 'inline-flex', gap: 6, marginLeft: 6, flexWrap: 'wrap' }}>{t && <button type="button" className="btn sm" onClick={() => set({ levetid: t, levetidKilde: `NS 3451 ${r.kode} teknisk` })}>Bruk teknisk ({t} år)</button>}{f && <button type="button" className="btn sm" onClick={() => set({ levetid: f, levetidKilde: `NS 3451 ${r.kode} funksjonell` })}>Bruk funksjonell ({f} år)</button>}</span>}</>
+      : <span className="muted">Ingen NS 3451-referanse for {sysKode ? 'koden ' + sysKode : 'systemet (mangler TFM-kode)'}.</span>}
+    {typeLev ? <span className="muted"> · Veiledende for typen: {typeLev} år.</span> : null}
+    {v.levetid && kilde ? <div style={{ marginTop: 4 }}><span className="chip" style={{ background: '#eef4ff', color: '#2457a6', borderRadius: 9, padding: '0 7px' }}>Forslag: {kilde}</span> <span className="muted">– kan endres i feltet over.</span></div> : null}
+  </div>;
+}
+
+function LeverandorSok({ v, set, kind, sysKode }: { v: any; set: (x: any) => void; kind: 'a' | 'k'; sysKode?: string }) {
+  const [busy, setBusy] = useState(false); const [res, setRes] = useState<any>(v.leverandorData || null); const [err, setErr] = useState('');
+  if (!canEdit()) return null;
+  const r = levetidRef(sysKode); const sys = kind === 'k' ? byId('anlegg', v.anleggId) : v;
+  const sok = async () => {
+    setBusy(true); setErr('');
+    try {
+      const { data, error } = await (sb as any).functions.invoke('leverandor-oppslag', { body: {
+        fabrikat: v.fabrikat, betegnelse: v.navn || '', systemtype: KOMP[sys?.type]?.n || '', komponent: kind === 'k' ? (TFM_KODER.find(c => c[0] === String(v.kode || '').toUpperCase())?.[1] || v.kode || '') : '',
+        nsKode: r?.kode || sysKode || '', nsNavn: r?.navn || '', aar: v.aar || '', kostAar: YEAR } });
+      if (error) { let m = error.message; try { const j = await error.context?.json?.(); if (j?.error) m = j.error; } catch { } throw new Error(m); }
+      if (data?.error) throw new Error(data.error);
+      const d = { ...data, dato: today() }; setRes(d); set({ leverandorData: d });
+    } catch (e: any) { setErr(e.message || String(e)); }
+    setBusy(false);
+  };
+  const L = res?.resultat?.levetid, U = res?.resultat?.utskifting, RF = res?.resultat?.retrofit;
+  const kr = (n: any) => Math.round(+n).toLocaleString('nb-NO') + ' kr';
+  const brukKost = (o: any, type: string) => set({ kost: Math.round(+o.belop_nok), kostAar: YEAR, kostKilde: { type: 'forslag', hva: type, kilde: o.kilde_url || '', omfang: o.omfang || '', dato: today(), belop: Math.round(+o.belop_nok) } });
+  return <div className="note small" style={{ color: 'var(--ink)' }}>
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><b>Leverandørdata fra nett</b>
+      <button type="button" className="btn sm" disabled={busy || !String(v.fabrikat || '').trim()} onClick={sok}>{busy ? 'Søker … (inntil 1 min)' : res ? 'Søk på nytt' : 'Søk etter levetid og kostnad'}</button>
+      {!String(v.fabrikat || '').trim() && <span className="muted">Fyll inn fabrikat/modell først.</span>}</div>
+    {err && <div style={{ color: 'var(--red)', marginTop: 4 }}>{err}</div>}
+    {res?.resultat && <div style={{ marginTop: 6 }}>
+      {res.resultat.produkt && <div className="muted">Tolket som: {res.resultat.produkt}{res.dato ? ` · søkt ${fd(res.dato)}` : ''}</div>}
+      <div style={{ marginTop: 4 }}>Levetid: {L?.aar || L?.min ? <><b>{L.aar || `${L.min}–${L.max}`} år</b>{L.type ? ` (${L.type})` : ''}{L.kilde_url && <> · <a href={L.kilde_url} target="_blank" rel="noopener noreferrer">kilde</a></>}{L.kommentar && <span className="muted"> – {L.kommentar}</span>}
+        {' '}<button type="button" className="btn sm" onClick={() => set({ levetid: L.aar || Math.round((L.min + L.max) / 2), levetidKilde: `leverandør (${res.resultat.produkt || v.fabrikat})` })}>Bruk</button></> : <span className="muted">ikke funnet</span>}</div>
+      {[['Utskifting', U], ['Retrofit/oppgradering', RF]].filter(x => x[1]?.belop_nok).map(([lab, o]: any) => <div key={lab} style={{ marginTop: 4 }}>
+        <span style={{ background: '#fff4e5', color: '#9a5b00', borderRadius: 9, padding: '0 7px', fontWeight: 600 }}>FORSLAG</span> {lab}: <b>{kr(o.belop_nok)}</b>{o.omfang && <span className="muted"> – {o.omfang}</span>}{o.kilde_url && <> · <a href={o.kilde_url} target="_blank" rel="noopener noreferrer">kilde</a></>}
+        {' '}<button type="button" className="btn sm" onClick={() => brukKost(o, lab)}>Bruk som kostnadsforslag</button></div>)}
+      {!U?.belop_nok && !RF?.belop_nok && <div className="muted" style={{ marginTop: 4 }}>Fant ingen kostnad.</div>}
+      {res.resultat.usikkerhet && <div className="muted" style={{ marginTop: 4 }}>Usikkerhet: {res.resultat.usikkerhet}. {res.resultat.notat || ''}</div>}
+      {res.kilder?.length > 0 && <details style={{ marginTop: 4 }}><summary>Kilder ({res.kilder.length})</summary>{res.kilder.slice(0, 8).map((k: any, i: number) => <div key={i}><a href={k.url} target="_blank" rel="noopener noreferrer">{k.title || k.url}</a></div>)}</details>}
+    </div>}
+  </div>;
+}
+
+function KostFlagg({ v }: { v: any }) {
+  const k = v.kostKilde; if (!k || k.type !== 'forslag' || +v.kost !== +k.belop) return null;
+  return <div className="small" style={{ marginTop: -4, color: '#9a5b00' }}><span style={{ background: '#fff4e5', borderRadius: 9, padding: '0 7px', fontWeight: 600 }}>FORSLAG</span> Kostnaden er et anslag fra nettsøk ({k.hva?.toLowerCase()}{k.omfang ? ': ' + k.omfang : ''}, {fd(k.dato)}){k.kilde && <> · <a href={k.kilde} target="_blank" rel="noopener noreferrer">kilde</a></>}. Kontroller mot tilbud. Endrer du beløpet, fjernes merket.</div>;
+}
+
 // Plassering av system/komponent på tegning
 function PlasseringFelt({ kind, id, eiendomId, close }: { kind: 'a' | 'k'; id?: string; eiendomId: string; close: () => void }) {
   const o = id ? byId(kind === 'a' ? 'anlegg' : 'komponenter', id) : null; const T = sortBy(S.tegninger.filter(t => t.eiendomId === eiendomId), t => +t.etasje || 0);
@@ -120,8 +177,11 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'prev', type: 'custom', render: v => { const e = byId('eiendommer', v.eiendomId); return <div className="note mono" style={{ fontSize: 14, color: 'var(--ink)' }}>{v.tfmSys ? `${e?.tfmBygg ? '+' + e.tfmBygg : ''}=${v.tfmSys}.${pad(v.tfmLop || 1)}` : '(ingen TFM-kode)'}</div>; } },
     { k: 'navn', label: 'Betegnelse / plassering', half: true, ph: 'F.eks. Ventilasjon kontorfløy' }, { k: 'fabrikat', label: 'Fabrikat / modell', half: true },
     { k: 'aar', label: 'Installert/utskiftet år', type: 'number', half: true }, { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Tomt = veiledende levetid for typen' },
+    { k: 'levHjelp', type: 'custom', render: (v, set) => <LevetidHjelp v={v} set={set} sysKode={v.tfmSys} typeLev={KOMP[v.type]?.l} /> },
     { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true, hint: 'La stå tom for å bruke beregnet år' },
     ...(isStaff() && canEdit() ? [{ k: 'kost', label: 'Sentralkost på systemnivå (kr)', type: 'number', half: true, hint: 'F.eks. sentral, styring, kabling. Komponentene summeres i tillegg.' } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR, hint: 'Året beløpet er anslått i' } as Field] : []),
+    { k: 'kostFlagg', type: 'custom', render: v => <KostFlagg v={v} /> },
+    { k: 'levSok', type: 'custom', render: (v, set) => <LeverandorSok v={v} set={set} kind="a" sysKode={v.tfmSys} /> },
     { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} typeLevetid={KOMP[v.type]?.l} sysId={id || ''} /> },
     { k: 'secTg', label: 'Tilstand', type: 'sec' }, ...tgFelt(),
     { k: 'secDrift', label: 'Drift', type: 'sec' },
@@ -144,6 +204,9 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     onChange: (k, v, prev) => {
       if (k === 'tfmSys') touched.sys = true; if (k === 'tfmLop') touched.lop = true;
       const p: any = {};
+      if (k === 'levetid') p.levetidKilde = undefined;
+      if ((k === 'type' || k === 'tfmSys') && !id && !touched.lev) { const r = levetidRef(k === 'type' ? (TFM_DEF[v.type]?.[0] || v.tfmSys) : v.tfmSys); const t = midt(r?.tek || null); if (t) { p.levetid = t; p.levetidKilde = `NS 3451 ${r!.kode} teknisk`; } }
+      if (k === 'levetid') touched.lev = true;
       if (k === 'type' && !id) { if (!touched.sys) p.tfmSys = TFM_DEF[v.type]?.[0] || ''; p.mk = KOMP[v.type]?.m || []; }
       if ((k === 'type' || k === 'tfmSys' || k === 'eiendomId') && !touched.lop && !id) p.tfmLop = nextSysLop(v.eiendomId, p.tfmSys ?? v.tfmSys);
       return p;
@@ -158,7 +221,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
       v.tfmSys = String(v.tfmSys || '').replace(/\D/g, ''); v.tfmLop = v.tfmSys ? pad(String(v.tfmLop || '1').replace(/\D/g, '') || 1) : '';
       const dup = v.tfmSys && S.anlegg.find(x => x.id !== id && x.eiendomId === v.eiendomId && x.tfmSys === v.tfmSys && pad(x.tfmLop) === v.tfmLop);
       if (dup) { toast(`TFM-koden =${v.tfmSys}.${v.tfmLop} er allerede brukt på «${dup.navn || KOMP[dup.type]?.n}»`); return false; }
-      delete v.plass; delete v.saInfo; delete v.tgInfo; delete v.secTg; delete v.secDrift; const fersk = id ? byId('anlegg', id) : null;
+      delete v.plass; delete v.saInfo; delete v.tgInfo; delete v.secTg; delete v.secDrift; delete v.levHjelp; delete v.levSok; delete v.kostFlagg; if (v.kostKilde && +v.kost !== +v.kostKilde.belop) v.kostKilde = undefined; const fersk = id ? byId('anlegg', id) : null;
       const nid = await save('anlegg', { ...a, ...v, pos: fersk ? fersk.pos ?? null : a.pos ?? null, mk: undefined, forste: undefined });
       for (const k of mk) await save('oppgaver', taskFromMal(k, MALER, v.eiendomId, nid, forste));
       toast(mk.length ? `Lagret og opprettet ${mk.length} kontroller` : 'Lagret');
@@ -182,22 +245,25 @@ export function editKomponent(id?: string, anleggId?: string) {
     { k: 'plassering', label: 'Plassering (rom/etasje)', half: true }, { k: 'fabrikat', label: 'Fabrikat / modell', half: true },
     { k: 'serienr', label: 'Serienummer', half: true }, { k: 'aar', label: 'Installert år', type: 'number', half: true },
     { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Tomt = skiftes sammen med systemet' }, { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true },
+    { k: 'levHjelp', type: 'custom', render: (v, set) => <LevetidHjelp v={v} set={set} sysKode={byId('anlegg', v.anleggId)?.tfmSys} /> },
     { k: 'plass', type: 'custom', label: 'Plassering på tegning', render: v => <PlasseringFelt kind="k" id={id} eiendomId={byId('anlegg', v.anleggId)?.eiendomId || k.eiendomId} close={() => closeRefK.c?.()} /> },
     ...(canEdit() ? [{ k: 'kost', label: 'Utskiftingskostnad (kr)', type: 'number', half: true } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR } as Field] : []),
+    { k: 'kostFlagg', type: 'custom', render: v => <KostFlagg v={v} /> },
+    { k: 'levSok', type: 'custom', render: (v, set) => <LeverandorSok v={v} set={set} kind="k" sysKode={byId('anlegg', v.anleggId)?.tfmSys} /> },
     { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} kompAv={v.anleggId} /> },
     { k: 'secTg', label: 'Tilstand', type: 'sec' }, ...tgFelt(),
     { k: 'notat', label: 'Notater', type: 'textarea' }];
   const closeRefK: { c?: () => void } = {};
   closeRefK.c = formModal({
     title: ro ? kNavn(id) : id ? 'Rediger komponent' : 'Ny komponent', fields, values: k, readOnly: ro,
-    onChange: (key, v) => { if (key === 'lop') touched.lop = true; if ((key === 'kode' || key === 'anleggId') && !touched.lop && !id) return { lop: nextKompLop(v.anleggId, v.kode) }; },
+    onChange: (key, v) => { if (key === 'levetid') return { levetidKilde: undefined }; if (key === 'lop') touched.lop = true; if ((key === 'kode' || key === 'anleggId') && !touched.lop && !id) return { lop: nextKompLop(v.anleggId, v.kode) }; },
     extraFoot: close => id && !ro ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette komponenten?')) { await removeDoc('komponenter', id); close(); } }}>Slett</button> : null,
     onSave: async x => {
       delete x.prev; delete x.beregn; if (x.kost && !x.kostAar) x.kostAar = YEAR; x.kode = String(x.kode || '').toUpperCase().replace(/[^A-ZÆØÅ]/g, ''); x.lop = pad(String(x.lop || '1').replace(/\D/g, '') || 1);
       if (!x.navn) x.navn = TFM_KODER.find(c => c[0] === x.kode)?.[1] || '';
       const dup = S.komponenter.find(z => z.id !== id && z.anleggId === x.anleggId && String(z.kode || '').toUpperCase() === x.kode && pad(z.lop) === x.lop);
       if (dup) { toast('Komponentkoden er allerede brukt i dette systemet'); return false; }
-      delete x.plass; delete x.tgInfo; delete x.secTg; const fersk = id ? byId('komponenter', id) : null;
+      delete x.plass; delete x.tgInfo; delete x.secTg; delete x.levHjelp; delete x.levSok; delete x.kostFlagg; if (x.kostKilde && +x.kost !== +x.kostKilde.belop) x.kostKilde = undefined; const fersk = id ? byId('komponenter', id) : null;
       const a = byId('anlegg', x.anleggId); await save('komponenter', { ...k, ...x, pos: fersk ? fersk.pos ?? null : k.pos ?? null, eiendomId: a ? a.eiendomId : k.eiendomId }); toast('Komponent lagret');
     },
   });

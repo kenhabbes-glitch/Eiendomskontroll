@@ -173,3 +173,7 @@ export function TaggVelger({ value, onChange, disabled }: { value: string[]; onC
     {!disabled && <input value={ny} onChange={e => setNy(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const v = ny.trim(); if (v && !value.includes(v)) onChange([...value, v]); setNy(''); } }} placeholder="+ egen tagg" style={{ width: 110, border: '1px dashed var(--line2)', borderRadius: 12, padding: '2px 8px', fontSize: 12.5 }} />}
   </div>;
 }
+
+export function ForslagMerke({ tip }: { tip?: string }) {
+  return <span data-tip={tip || 'Kostnaden er et forslag fra nettsøk – kontroller mot tilbud'} style={{ background: '#fff4e5', color: '#9a5b00', borderRadius: 9, padding: '0 6px', fontSize: 10.5, fontWeight: 600, marginLeft: 4, whiteSpace: 'nowrap' }}>FORSLAG</span>;
+}
