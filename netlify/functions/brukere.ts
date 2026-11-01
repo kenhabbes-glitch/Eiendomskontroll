@@ -2,6 +2,7 @@
 // service-nøkkel (som aldri sendes til nettleseren). Kun aktive administratorer
 // kan kalle den.
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 
 const json = (status: number, body: any) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
@@ -10,7 +11,7 @@ export default async (req: Request) => {
   const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim().replace(/\/(rest|auth|storage)\/v1.*$/i, '').replace(/\/+$/, '');
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
   if (!url || !key) return json(500, { error: 'Serveren mangler SUPABASE_URL eller SUPABASE_SERVICE_ROLE_KEY' });
-  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, realtime: { transport: ws as any } });
 
   // Hvem kaller?
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');

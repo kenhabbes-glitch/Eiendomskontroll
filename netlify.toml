@@ -4,7 +4,7 @@
   functions = "netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
 
 [[redirects]]
   from = "/*"
@@ -21,4 +21,4 @@
 [functions]
   node_bundler = "esbuild"
   # nodemailer bruker dynamiske require() som ikke tåler bundling – lastes fra node_modules ved kjøring
-  external_node_modules = ["nodemailer"]
+  external_node_modules = ["nodemailer", "ws"]

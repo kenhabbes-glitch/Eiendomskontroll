@@ -5,6 +5,7 @@
 // eller Resend (RESEND_API_KEY). Avsender settes i EPOST_FRA. Svar går til den som sendte (eller EPOST_SVAR).
 // Uten nøkkel returneres teksten, og appen åpner brukerens eget e-postprogram.
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 
 const json = (status: number, body: any) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const esc = (s: any) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
@@ -19,7 +20,7 @@ const handler = async (req: Request) => {
   const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim().replace(/\/(rest|auth|storage)\/v1.*$/i, '').replace(/\/+$/, '');
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
   if (!url || !key) return json(500, { error: 'Serveren mangler SUPABASE_URL eller SUPABASE_SERVICE_ROLE_KEY' });
-  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false }, realtime: { transport: ws as any } });
   let body: any; try { body = await req.json(); } catch { return json(400, { error: 'Ugyldig forespørsel' }); }
 
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');

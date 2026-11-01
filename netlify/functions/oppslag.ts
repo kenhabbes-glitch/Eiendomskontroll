@@ -1,6 +1,7 @@
 // Mellomledd for oppslag i åpne registre (Kartverket, Brønnøysund) når nettleseren
 // ikke kan kalle dem direkte. Kun forhåndsdefinerte oppslag, kun for innloggede brukere.
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 
 const json = (status: number, body: any) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, max-age=300' } });
 const rens = (u?: string) => (u || '').trim().replace(/\/(rest|auth|storage)\/v1.*$/i, '').replace(/\/+$/, '');
@@ -10,7 +11,7 @@ export default async (req: Request) => {
   const anon = (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
   if (!url || !anon || !token) return json(401, { error: 'Ikke innlogget' });
-  const sb = createClient(url, anon, { auth: { persistSession: false } });
+  const sb = createClient(url, anon, { auth: { persistSession: false }, realtime: { transport: ws as any } });
   const { data: u } = await sb.auth.getUser(token);
   if (!u?.user) return json(401, { error: 'Ikke innlogget' });
 
