@@ -28,14 +28,14 @@ Skriv tekstfeltene på norsk og kort.`;
 // Finn nyeste tilgjengelige «gemini-X.Y-flash» (ikke lite/preview/live/image/tts) for denne nøkkelen
 async function nyesteFlash(key: string): Promise<string> {
   try {
-    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', { headers: { 'x-goog-api-key': key } });
-    const j = await r.json();
+    const { j } = await medTidsfrist('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', { headers: { 'x-goog-api-key': key } }, 10000);
     const kand = (j.models || [])
       .filter((m: any) => (m.supportedGenerationMethods || []).includes('generateContent'))
       .map((m: any) => String(m.name).replace('models/', ''))
       .map((n: string) => ({ n, v: n.match(/^gemini-(\d+(?:\.\d+)?)-flash(?:-latest)?$/) }))
       .filter((x: any) => x.v)
       .sort((a: any, b: any) => parseFloat(b.v[1]) - parseFloat(a.v[1]) || a.n.length - b.n.length);
+    console.log('flash-modeller:', kand.map((x: any) => x.n).join(', ') || '(ingen)', '| alle:', (j.models || []).length);
     if (kand.length) return kand[0].n;
   } catch { /* faller tilbake */ }
   return 'gemini-flash-latest';
@@ -53,9 +53,10 @@ function tenking(modell: string) {
   return {};
 }
 
-async function medTidsfrist(url: string, init: RequestInit, ms: number) {
+// Tidsfristen dekker hele svaret (også innholdet), ikke bare at svaret begynner
+async function medTidsfrist(url: string, init: RequestInit, ms: number): Promise<{ status: number; ok: boolean; j: any }> {
   const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms);
-  try { return await fetch(url, { ...init, signal: ac.signal }); }
+  try { const r = await fetch(url, { ...init, signal: ac.signal }); const j = await r.json().catch((e) => { if (ac.signal.aborted) throw e; return {}; }); return { status: r.status, ok: r.ok, j }; }
   finally { clearTimeout(t); }
 }
 
@@ -108,24 +109,26 @@ Deno.serve(async (req) => {
           generationConfig: { temperature: 0.2, maxOutputTokens: 4096, ...tenking(motor) },
         }),
       }, ms);
-      const t0 = Date.now();
-      let r: Response; let j: any;
+      const t0 = Date.now(); console.log('modell', motor, 'provSok', Date.now() - sokAvslatt > 3600e3);
+      let r: { status: number; ok: boolean; j?: any }; let j: any;
       const provSok = Date.now() - sokAvslatt > 3600e3;
       try {
         if (!provSok) throw new Error('hopper over søk');
-        r = await kall(true, 45000); j = await r.json();
+        r = await kall(true, 45000); j = r.j;
+        console.log('med søk:', r.status, Date.now() - t0, 'ms', r.ok ? '' : JSON.stringify(j).slice(0, 300));
       } catch (_e) {
+        console.log('med søk avbrutt/hoppet over etter', Date.now() - t0, 'ms', String(_e));
         // Tidsavbrudd eller søk avslått nylig → gå direkte til svar uten søk
-        r = new Response(null, { status: 408 }); j = { error: { message: 'search timeout' } };
+        r = { status: 408, ok: false }; j = { error: { message: 'search timeout' } };
       }
       if (!r.ok) {
         const m = String(j?.error?.message || r.status);
         // Gratisnivået gir ikke Google-søk på alle modeller (kvote 0 / ikke støttet), eller søket tok for lang tid → prøv uten søk
         if (r.status === 429 || r.status === 408 || /search|grounding|tool/i.test(m)) {
           if (r.status !== 408) sokAvslatt = Date.now();
-          let r2: Response, j2: any;
-          try { r2 = await kall(false, Math.max(20000, 140000 - (Date.now() - t0))); j2 = await r2.json(); }
-          catch { return svar({ error: 'Google svarte ikke i tide. Prøv igjen om litt.' }, 504); }
+          let r2: { status: number; ok: boolean; j: any }, j2: any;
+          try { r2 = await kall(false, Math.max(20000, 120000 - (Date.now() - t0))); j2 = r2.j; console.log('uten søk:', r2.status, Date.now() - t0, 'ms', r2.ok ? '' : JSON.stringify(j2).slice(0, 300)); }
+          catch (e2) { console.log('uten søk avbrutt', Date.now() - t0, 'ms', String(e2)); return svar({ error: 'Google svarte ikke i tide. Prøv igjen om litt.' }, 504); }
           if (r2.ok) { r = r2; j = j2; utenSok = true; }
           else if (r2.status === 429) return svar({ error: 'Gratiskvoten hos Google er brukt opp for nå. Prøv igjen senere (døgnkvoten nullstilles ca. kl. 09 norsk tid).' }, 429);
           else return svar({ error: `Google Gemini (${motor}): ` + (j2?.error?.message || r2.status) }, 502);
