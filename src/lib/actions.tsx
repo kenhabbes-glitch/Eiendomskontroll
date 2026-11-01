@@ -406,6 +406,8 @@ export function utfor(id: string) {
     },
   });
 }
+// Settes av views/Sjekkliste for å unngå sirkulær import
+export const vurderPliktRef: { f?: (lid: string, idx: number) => void } = {};
 // Underpunkt per leietaker for eierkontroller som er koblet til leietakernes plikter
 function IkUnderpunkter({ o, close }: { o: Rec; close: () => void }) {
   useStore();
@@ -420,7 +422,7 @@ function IkUnderpunkter({ o, close }: { o: Rec; close: () => void }) {
           <div className="small muted" style={{ paddingLeft: 18 }}>{r.pl.filter(x => x.ok).length} av {r.pl.length} dokumentert</div></td>
         <td>{r.pl.length ? r.pl.map(x => <div key={x.idx} className="small" style={{ display: 'flex', gap: 6, alignItems: 'baseline', marginBottom: 3 }}>
           <span style={{ color: x.ok ? 'var(--green)' : 'var(--muted)' }}>{x.ok ? '✓' : '○'}</span>
-          <a href="#" onClick={e => { e.preventDefault(); bekreftPlikt(r.l.id, x.idx); }} style={{ color: 'inherit' }}>{x.p.navn}</a>
+          <a href="#" onClick={e => { e.preventDefault(); x.p.status === 'til_godkjenning' && x.p.innsendt ? vurderPliktRef.f?.(r.l.id, x.idx) : bekreftPlikt(r.l.id, x.idx); }} style={{ color: 'inherit' }}>{x.p.navn}</a>{x.p.status === 'til_godkjenning' && x.p.innsendt && <Chip c="blue">til godkjenning</Chip>}
           <span className="muted" style={{ whiteSpace: 'nowrap' }}>{x.p.sist ? fd(x.p.sist) + (!x.ok && x.s.o === 0 ? ' · forrige periode' : x.s.o === 2 ? ' · forfalt' : '') : 'mangler'}</span></div>)
           : <span className="small muted">Ingen relevante plikter registrert – <a href={'#/leietaker/' + r.l.id} onClick={() => close()}>legg til</a></span>}</td>
         <td style={{ verticalAlign: 'top' }}>{canEdit() && r.pl.some(x => !x.ok) && <button className="btn sm" onClick={() => { const f = r.pl.find(x => !x.ok)!; bekreftPlikt(r.l.id, f.idx); }}>Registrer</button>}</td></tr>)}

@@ -118,6 +118,13 @@ Hvis leiekontrakten fastsetter fellesarealet (som m², prosent av fellesarealet 
 - Når alle leietakerne er grønne, kvitteres kontrollen ut automatisk, og neste frist settes.
 - Bekreftelser kan registreres av eier/forvalter, eller av leietaker selv i leietakerportalen.
 - Plikter merket «Ikke relevant» for en leietaker teller ikke med.` },
+  'ik.send': { gruppe: 'Begreper', tittel: 'Sende sjekklisten til leietaker', tekst: `På leietakersiden trykker du «Send sjekkliste til leietaker». Leietaker får en e-post med lenke.
+
+- Første gang oppretter leietaker en bruker via lenken. Brukeren gir bare tilgang til eget leieforhold.
+- I portalen fyller leietaker ut sjekklisten for hver plikt, legger ved dokumentasjon og sender inn.
+- Innsendte plikter får status «Til godkjenning» og vises under «Krever handling nå» på oversikten.
+- Trykk «Vurder» for å godkjenne, eller «Send tilbake» med en forklaring på hva som mangler. Leietaker ser tilbakemeldingen i portalen.
+- Når du godkjenner, regnes plikten som dokumentert. Er alle leietakere dokumentert, kvitteres eierkontrollen ut automatisk.` },
   'ik.sjekkliste': { gruppe: 'Begreper', tittel: 'Sjekkliste for dokumentasjon', tekst: `Hver plikt har en sjekkliste over dokumentasjonen som bør innhentes fra leietaker, for eksempel branninstruks, deltakerliste fra brannøvelse eller risikovurdering i HMS-internkontrollen. Kryss av etter hvert som dokumentasjonen kommer inn, og legg ved filene. Du blir varslet hvis du registrerer en plikt som dokumentert uten at alle punktene er krysset av.` },
   'brannovelse': { gruppe: 'Begreper', tittel: 'Brannøvelser – hva krever regelverket?', tekst: `Forskrift om brannforebygging § 12 pålegger virksomheten som bruker bygget å drive systematisk brannsikkerhetsarbeid, med rutiner for kunnskap om brann, en branninstruks for varsling, evakuering/redning og slokking, og brannøvelser og opplæring av alle ansatte. Etter § 13 skal dette dokumenteres.
 

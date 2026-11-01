@@ -3,7 +3,7 @@ import { PLIKTER } from '../lib/catalog';
 import { Hjelp } from '../components/Hjelp';
 import { AV_LUKKET, VEDL_KAT } from '../lib/catalog';
 import { S, bump, feiltekst, save, sb, state, toast, uploadFile, useStore } from '../lib/store';
-import { addDays, byId, fd, intTxt, pliktStatus, sortBy, today, leieAreal, m2 } from '../lib/utils';
+import { addDays, byId, fd, intTxt, pliktStatus, pliktVis, sortBy, today, leieAreal, m2 } from '../lib/utils';
 import { AlvChip, Chip, Empty, FileLink, StChip, formModal, showModal } from '../components/ui';
 
 async function refreshMine() {
@@ -30,18 +30,19 @@ function meldAvvik(l: any) {
   });
 }
 function bekreft(l: any, p: any) {
+  const dok = PLIKTER[p.key]?.dok || [];
   formModal({
-    title: p.navn, saveTxt: 'Bekreft',
-    top: <p className="small muted" style={{ marginTop: 0 }}>{p.hjemmel}. Ved å bekrefte erklærer du at plikten er ivaretatt for virksomheten. Legg gjerne ved dokumentasjon.</p>,
-    fields: [...((PLIKTER[p.key]?.dok || []).length ? [{ k: 'sjekk', type: 'custom', label: 'Dette skal dokumenteres', def: [], render: (v: any, set: any) => <div className="note small" style={{ color: 'var(--ink)' }}>{PLIKTER[p.key].dok!.map(t => { const on = (v.sjekk || []).includes(t); return <label key={t} style={{ display: 'flex', gap: 8, alignItems: 'start', margin: '3px 0', cursor: 'pointer', fontWeight: 400 }}><input type="checkbox" checked={on} onChange={() => set({ sjekk: on ? v.sjekk.filter((x: string) => x !== t) : [...(v.sjekk || []), t] })} style={{ marginTop: 3 }} />{t}</label>; })}<div className="muted" style={{ marginTop: 4 }}>Kryss av for det som er på plass, og legg ved dokumentasjonen under.</div></div> } as any] : []),
-      { k: 'dato', label: 'Dato', type: 'date', def: today(), half: true }, { k: 'komm', label: 'Kommentar', type: 'textarea', ph: 'F.eks. navn på brannvernleder, dato for øvelse …' }, { k: 'fil', label: 'Dokumentasjon (valgfritt)', type: 'file' }],
+    title: p.navn, saveTxt: 'Send til utleier',
+    top: <><p className="small muted" style={{ marginTop: 0 }}>{p.hjemmel}. Kryss av for det som er på plass, legg ved dokumentasjon og send inn. Utleier går gjennom og godkjenner.</p>
+      {p.status === 'avvist' && p.tilbakemelding && <div className="note small" style={{ color: 'var(--red)', borderColor: 'var(--red)' }}><b>Tilbakemelding fra utleier {fd(p.tilbakemelding.tid)}:</b><br />{p.tilbakemelding.tekst}</div>}</>,
+    fields: [...(dok.length ? [{ k: 'sjekk', type: 'custom', label: 'Dette skal dokumenteres', def: p.innsendt?.sjekk || p.sjekk || [], render: (v: any, set: any) => <div className="note small" style={{ color: 'var(--ink)' }}>{dok.map(t => { const on = (v.sjekk || []).includes(t); return <label key={t} style={{ display: 'flex', gap: 8, alignItems: 'start', margin: '3px 0', cursor: 'pointer', fontWeight: 400 }}><input type="checkbox" checked={on} onChange={() => set({ sjekk: on ? v.sjekk.filter((x: string) => x !== t) : [...(v.sjekk || []), t] })} style={{ marginTop: 3 }} />{t}</label>; })}<div className="muted" style={{ marginTop: 4 }}>{(v.sjekk || []).length} av {dok.length} punkter krysset av</div></div> } as any] : []),
+      { k: 'dato', label: 'Dato (gjennomført/dokumentert)', type: 'date', def: today(), half: true }, { k: 'komm', label: 'Kommentar', type: 'textarea', def: p.innsendt?.komm || '', ph: 'F.eks. navn på brannvernleder, dato for øvelse, antall deltakere …' }, { k: 'fil', label: 'Dokumentasjon (PDF, bilde e.l.)', type: 'file' }],
     onSave: async v => {
-      if ((v.sjekk || []).length) v.komm = [v.komm, 'På plass: ' + v.sjekk.join('; ')].filter(Boolean).join('\n');
-      let dokId: string | null = null;
+      let dokId: string | null = p.innsendt?.dokId || null;
       if (v.fil) { const f = await uploadFile(v.fil, l.eiendomId, l.id); if (f) dokId = await save('dokumenter', { eiendomId: l.eiendomId, leietakerId: l.id, type: 'Leietakers IK-dokumentasjon', tittel: p.navn + ' – ' + l.navn, dato: v.dato, fil: f }); }
-      const { error } = await sb.rpc('bekreft_plikt', { p_key: p.key, p_dato: v.dato, p_kommentar: v.komm || '', p_dok: dokId });
-      if (error) { toast('Kunne ikke lagre: ' + feiltekst(error)); return false; }
-      await refreshMine(); toast('Takk – bekreftelsen er registrert');
+      const { error } = await sb.rpc('send_inn_plikt', { p_key: p.key, p_dato: v.dato, p_kommentar: v.komm || '', p_dok: dokId, p_sjekk: v.sjekk || [] });
+      if (error) { toast('Kunne ikke sende: ' + feiltekst(error)); return false; }
+      await refreshMine(); toast('Takk – sendt til utleier for godkjenning');
     },
   });
 }
@@ -68,7 +69,7 @@ export function Portal() {
   const A = sortBy(S.avvik.filter(a => a.leietakerId === l.id), a => (AV_LUKKET.includes(a.status) ? '1' : '0') + (a.opprettet || '')).reverse();
   const apne = A.filter(a => !AV_LUKKET.includes(a.status));
   const D = S.dokumenter.filter(d => d.leietakerId === l.id);
-  const pl = (l.plikter || []).filter((p: any) => !p.ikkeRelevant); const mangler = pl.filter((p: any) => pliktStatus(p).o >= 1);
+  const pl = (l.plikter || []).filter((p: any) => !p.ikkeRelevant); const mangler = pl.filter((p: any) => pliktStatus(p).o >= 1 && p.status !== 'til_godkjenning');
   const mx = l.matrise || {};
   return <>
     <div className="portalhero"><div className="head" style={{ marginBottom: 0 }}><div className="grow"><h1>{l.navn}<Hjelp id="side.portal" /></h1><p className="sub">{e.navn}{e.adresse ? ' · ' + e.adresse : ''}{l.lokale ? ' · ' + l.lokale : ''}</p></div><button className="btn pri" onClick={() => meldAvvik(l)}>+ Meld avvik eller feil</button></div>
@@ -79,9 +80,9 @@ export function Portal() {
       </div>
       {e.kontaktLeietaker && <p className="small" style={{ marginBottom: 0 }}>Kontakt utleier: {e.kontaktLeietaker}</p>}
     </div>
-    <div className="sec"><h2>Internkontroll og plikter</h2><p className="small muted" style={{ marginTop: -6 }}>Som leietaker har virksomheten egne plikter etter forskrift om brannforebygging, internkontrollforskriften og leieavtalen. Bekreft at de er ivaretatt.</p>
+    <div className="sec"><h2>Internkontroll og plikter</h2><p className="small muted" style={{ marginTop: -6 }}>Som leietaker har virksomheten egne plikter etter forskrift om brannforebygging, internkontrollforskriften og leieavtalen. Fyll ut sjekklisten for hver plikt, legg ved dokumentasjon og send til utleier for godkjenning.</p>
       <div className="tbl-wrap"><table><thead><tr><th>Plikt</th><th>Hjemmel</th><th>Frekvens</th><th>Sist bekreftet</th><th>Status</th><th /></tr></thead><tbody>
-        {pl.length ? pl.map((p: any) => { const s = pliktStatus(p); return <tr key={p.key}><td>{p.navn}{p.komm && <div className="small muted">{p.komm}</div>}</td><td className="small muted">{p.hjemmel}</td><td className="small">{intTxt(p.frekvens)}</td><td className="small">{fd(p.sist)}</td><td><Chip c={s.c}>{s.t}</Chip></td><td><button className={'btn sm ' + (s.o >= 1 ? 'pri' : '')} onClick={() => bekreft(l, p)}>Bekreft</button></td></tr>; }) : <tr><td colSpan={6} className="muted">Ingen plikter registrert.</td></tr>}
+        {pl.length ? pl.map((p: any) => { const s = pliktStatus(p); const v = pliktVis(p); const venter = p.status === 'til_godkjenning'; const dk = PLIKTER[p.key]?.dok || []; return <tr key={p.key}><td>{p.navn}{dk.length > 0 && <div className="small muted">{dk.length} punkter i sjekklisten</div>}{p.status === 'avvist' && p.tilbakemelding && <div className="small" style={{ color: 'var(--red)' }}>Utleier: {p.tilbakemelding.tekst}</div>}{venter && <div className="small muted">Sendt {fd(p.innsendt.tid)} – venter på utleier</div>}</td><td className="small muted">{p.hjemmel}</td><td className="small">{intTxt(p.frekvens)}</td><td className="small">{fd(p.sist)}</td><td><Chip c={v.c}>{v.t}</Chip></td><td><button className={'btn sm ' + (!venter && (s.o >= 1 || p.status === 'avvist') ? 'pri' : '')} onClick={() => bekreft(l, p)}>{venter ? 'Endre' : p.status === 'avvist' ? 'Send på nytt' : s.o >= 1 ? 'Fyll ut' : 'Oppdater'}</button></td></tr>; }) : <tr><td colSpan={6} className="muted">Ingen plikter registrert.</td></tr>}
       </tbody></table></div></div>
     <div className="sec"><h2>Mine meldinger og avvik</h2>{A.length ? <div className="tbl-wrap"><table><thead><tr><th className="num">Nr</th><th>Melding</th><th>Alvorlighet</th><th>Status</th><th>Meldt</th><th>Ansvar</th></tr></thead><tbody>
       {A.map(a => <tr key={a.id} className="click" onClick={() => visAvvik(a)}><td className="num muted">{a.nr}</td><td><b style={{ fontWeight: 500 }}>{a.tittel}</b></td><td><AlvChip a={a.alv} /></td><td><StChip s={a.status} /></td><td className="small">{fd(a.oppdaget)}</td><td className="small">{a.ansvar === 'Leietaker' ? <Chip c="amber">Dere</Chip> : 'Utleier'}</td></tr>)}

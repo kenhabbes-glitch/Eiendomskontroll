@@ -201,3 +201,10 @@ export function ikDekning(o: Rec, MALER: Record<string, any>): { rader: IkRad[];
   });
   return { rader, n: rader.length, nOk: rader.filter(r => r.ok).length, fra };
 }
+
+// Visningsstatus for en plikt, inkl. innsending fra leietaker som venter på godkjenning / er sendt tilbake
+export function pliktVis(p: Rec): { c: string; t: string } {
+  if (p.status === 'til_godkjenning' && p.innsendt) return { c: 'blue', t: 'Til godkjenning' };
+  if (p.status === 'avvist') return { c: 'red', t: 'Sendt tilbake' };
+  const s = pliktStatus(p); return { c: s.c, t: s.t };
+}

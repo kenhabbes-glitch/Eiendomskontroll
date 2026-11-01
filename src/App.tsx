@@ -19,6 +19,7 @@ import { Portal } from './views/Portal';
 import { Profil } from './views/Profil';
 import { Innstillinger } from './views/Innstillinger';
 import { AoLenke, ArbeidsordreListe, Hendelseslogg, mineAo } from './views/Arbeidsordre';
+import { LtLenke } from './views/Sjekkliste';
 
 export function go(path: string) { if (location.hash === '#/' + path) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = '#/' + path; }
 function useRoute() {
@@ -73,6 +74,7 @@ export default function App() {
   if (!state.ready) return <div className="login"><div className="card"><p>Laster …</p></div></div>;
   if (state.recovery && state.me) return <SetPassword />;
   if (r.v === 'ao' && r.id) return <><AoLenke token={r.id} /><Toast /></>;
+  if (r.v === 'lt' && r.id) return <><LtLenke token={r.id} /><Toast /></>;
   if (!state.me) return <Login />;
   if (state.me.rolle === 'ingen') return <NoAccess />;
 

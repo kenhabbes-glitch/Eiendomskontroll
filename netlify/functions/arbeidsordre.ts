@@ -173,5 +173,77 @@ export default async (req: Request) => {
     return json(200, { ok: true, avvik_id: a.id });
   }
 
+  // ================= Sjekkliste til leietaker =================
+  const hentLt = async (id: string) => { const { data } = await admin.from('leietakere').select('*').eq('id', id).maybeSingle(); return data; };
+  const ltLogg = (p: any, l: any, tekst: string) => admin.from('hendelseslogg').insert({ bruker_id: p?.id || null, bruker: p ? (p.navn || p.epost) : 'System', tabell: 'hendelse', rad_id: l.id, eiendom_id: l.eiendom_id, handling: 'sjekkliste', tekst });
+
+  // Eier/forvalter sender sjekklisten til leietaker på e-post (lenke til portalen, evt. med registrering)
+  if (body.action === 'lt_send') {
+    const p = await hvem(); if (!p || !['admin', 'forvalter'].includes(p.rolle)) return json(403, { error: 'Bare administrator/forvalter kan sende sjekklisten' });
+    const l = await hentLt(body.leietaker_id); if (!l) return json(404, { error: 'Fant ikke leietakeren' });
+    if (!(await harEiendom(p, l.eiendom_id))) return json(403, { error: 'Du har ikke tilgang til eiendommen' });
+    const til = String(body.epost || '').trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(til)) return json(400, { error: 'Ugyldig e-postadresse' });
+    const base = typeof body.lenkeBase === 'string' && /^https?:\/\//.test(body.lenkeBase) ? body.lenkeBase.replace(/\/+$/, '') : '';
+    const { data: fins } = await admin.from('profiles').select('id, rolle, leietaker_id').eq('epost', til).maybeSingle();
+    let lenke = `${base}/#/portal`;
+    if (!(fins && fins.rolle === 'leietaker' && fins.leietaker_id === l.id)) {
+      const { data: inv, error } = await admin.from('lt_invitasjon').insert({ leietaker_id: l.id, epost: til, opprettet_av: p.id }).select().single();
+      if (error) return json(500, { error: 'Kunne ikke lage invitasjon (er 005_sjekkliste.sql kjørt?): ' + error.message });
+      lenke = `${base}/#/lt/${inv.token}`;
+    }
+    const d = l.data || {}; const { data: e } = await admin.from('eiendommer').select('data').eq('id', l.eiendom_id).maybeSingle(); const en = e?.data?.navn || '';
+    const pl = (d.plikter || []).filter((x: any) => !x.ikkeRelevant);
+    const frist = body.frist ? String(body.frist).split('-').reverse().join('.') : '';
+    const melding = String(body.melding || ''); const avs = p.navn || p.epost;
+    const emne = `Sjekkliste brann og internkontroll – ${d.navn || ''}${en ? ' (' + en + ')' : ''}`;
+    const tekst = [`Hei,`, '', melding || `Som utleier følger vi opp at leietakerne i ${en || 'bygget'} ivaretar sine plikter etter forskrift om brannforebygging og internkontrollforskriften. Vi ber dere fylle ut sjekklisten og laste opp dokumentasjon.`, frist ? `\nFrist: ${frist}` : '', '', 'Punkter:', ...pl.map((x: any) => '- ' + x.navn), '', `Fyll ut her:\n${lenke}`, '', `Hilsen ${avs}`].filter(x => x !== null).join('\n');
+    const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1d2320"><p style="font-size:12px;color:#6b736d;margin:0">SJEKKLISTE</p><h2 style="margin:4px 0 12px">Brann og internkontroll – ${esc(d.navn)}</h2>
+      <p>${esc(melding || `Som utleier følger vi opp at leietakerne i ${en || 'bygget'} ivaretar sine plikter etter forskrift om brannforebygging og internkontrollforskriften. Vi ber dere fylle ut sjekklisten og laste opp dokumentasjon.`).replace(/\n/g, '<br>')}</p>
+      ${frist ? `<p><b>Frist: ${esc(frist)}</b></p>` : ''}<ul>${pl.map((x: any) => `<li>${esc(x.navn)}</li>`).join('')}</ul>
+      <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Åpne sjekklisten</a></p>
+      <p style="font-size:12px;color:#6b736d">Via lenken oppretter du bruker (eller logger inn), krysser av for dokumentasjonen og laster opp filer. Utleier går gjennom og godkjenner.<br>Sendt av ${esc(avs)}.</p></div>`;
+    const r = await sendEpost(til, emne, html, tekst, undefined, p.epost || undefined);
+    await ltLogg(p, l, `Sjekkliste ${r.sendt ? 'sendt' : 'klargjort'} til ${til} (${d.navn || ''})`);
+    await admin.from('leietakere').update({ data: { ...d, sjekklisteSendt: { tid: new Date().toISOString(), til, av: avs, frist: body.frist || '' } } }).eq('id', l.id);
+    return json(200, { ...r, til, lenke, emne, tekst });
+  }
+
+  // Leietaker åpner lenken (ikke innlogget)
+  if (body.action === 'lt_info') {
+    const { data: inv } = await admin.from('lt_invitasjon').select('*').eq('token', body.token).maybeSingle();
+    if (!inv) return json(404, { error: 'Lenken er ugyldig eller utløpt' });
+    const l = await hentLt(inv.leietaker_id); const { data: fins } = await admin.from('profiles').select('id').eq('epost', inv.epost).maybeSingle();
+    return json(200, { epost: inv.epost, leietaker: l?.data?.navn || '', brukt: !!inv.brukt, finnes: !!fins });
+  }
+
+  // Leietaker oppretter bruker via lenken
+  if (body.action === 'lt_registrer') {
+    const { data: inv } = await admin.from('lt_invitasjon').select('*').eq('token', body.token).maybeSingle();
+    if (!inv) return json(404, { error: 'Lenken er ugyldig' });
+    const passord = String(body.passord || ''); if (passord.length < 8) return json(400, { error: 'Passordet må ha minst 8 tegn' });
+    const { data: fins } = await admin.from('profiles').select('id').eq('epost', inv.epost).maybeSingle();
+    if (fins) return json(409, { error: 'Det finnes allerede en bruker med denne e-posten. Logg inn i stedet.' });
+    const { data: u, error } = await admin.auth.admin.createUser({ email: inv.epost, password: passord, email_confirm: true, user_metadata: { navn: body.navn || '' } });
+    if (error || !u?.user) return json(400, { error: error?.message || 'Kunne ikke opprette bruker' });
+    const navn = String(body.navn || '').trim() || inv.epost;
+    await admin.from('profiles').upsert({ id: u.user.id, epost: inv.epost, navn, rolle: 'leietaker', leietaker_id: inv.leietaker_id, aktiv: true });
+    await admin.from('lt_invitasjon').update({ brukt: new Date().toISOString(), bruker_id: u.user.id }).eq('token', inv.token);
+    const l = await hentLt(inv.leietaker_id); if (l) await ltLogg({ id: u.user.id, navn }, l, `Leietakerbruker ${inv.epost} opprettet via sjekkliste-lenke`);
+    return json(200, { ok: true, epost: inv.epost });
+  }
+
+  // Innlogget bruker aksepterer lenken (kobles til leietakeren)
+  if (body.action === 'lt_aksepter') {
+    const p = await hvem(); if (!p) return json(401, { error: 'Ikke innlogget' });
+    const { data: inv } = await admin.from('lt_invitasjon').select('*').eq('token', body.token).maybeSingle();
+    if (!inv) return json(404, { error: 'Lenken er ugyldig' });
+    if (inv.epost.toLowerCase() !== p.epost) return json(403, { error: `Lenken ble sendt til ${inv.epost}. Logg inn med den adressen.` });
+    if (['admin', 'forvalter', 'tekniker'].includes(p.rolle)) return json(200, { ok: true, ansatt: true, leietaker_id: inv.leietaker_id });
+    if (p.rolle === 'leietaker' && p.leietaker_id && p.leietaker_id !== inv.leietaker_id) return json(409, { error: 'Brukeren din er allerede koblet til en annen leietaker. Kontakt utleier.' });
+    await admin.from('profiles').update({ rolle: 'leietaker', leietaker_id: inv.leietaker_id, aktiv: true }).eq('id', p.id);
+    if (!inv.brukt) await admin.from('lt_invitasjon').update({ brukt: new Date().toISOString(), bruker_id: p.id }).eq('token', inv.token);
+    return json(200, { ok: true });
+  }
+
   return json(400, { error: 'Ukjent handling' });
 };
