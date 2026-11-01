@@ -2,7 +2,7 @@
 // Hjemler og intervaller er veiledende – kontroller mot gjeldende regelverk.
 export type Intervall = { n: number; enhet: 'uke' | 'mnd' | 'år' };
 export type Mal = { n: string; k: string; t: string; h: string; i: [number, 'uke' | 'mnd' | 'år']; u: string; lvl: 'e' | 'a'; b?: string; pl?: string[] | 'alle' };
-export type KompType = { n: string; g: string; l: number; m?: string[] };
+export type KompType = { n: string; g: string; l: number; m?: string[]; enh?: 'm2' };
 
 export const MALER: Record<string, Mal> = {
   nodutgang:{n:"Nødutganger og ytterdører – funksjonskontroll (dørlukker, panikk-/nødbeslag, nødåpner)",k:"Brann",t:"Egenkontroll",h:"FOB § 11 (rømningsveiene skal fungere); NS-EN 1125 / NS-EN 179 – produsentene anbefaler jevnlig (ofte månedlig) funksjonskontroll av panikk- og nødbeslag",i:[1,"mnd"],u:"Driftsansvarlig",lvl:"a"},
@@ -63,19 +63,19 @@ export const MALER: Record<string, Mal> = {
 };
 export const PROP_MALER=["brann_dok","vernerunde_brann","samordning","brannovelse_bygg","eier_ik","leietaker_ik","energiattest","tilstand","uteomrade","snoeis","radon"];
 export const KOMP: Record<string, KompType> = {
-  tak_asfalt:{n:"Tak – asfaltbelegg/takpapp",g:"2 Bygning",l:25,m:["tak_inspeksjon"]},
-  tak_folie:{n:"Tak – PVC/folie/membran",g:"2 Bygning",l:25,m:["tak_inspeksjon"]},
-  tak_stein:{n:"Tak – takstein/plater",g:"2 Bygning",l:45,m:["tak_inspeksjon"]},
+  tak_asfalt:{n:"Tak – asfaltbelegg/takpapp",g:"2 Bygning",l:25,m:["tak_inspeksjon"],enh:"m2"},
+  tak_folie:{n:"Tak – PVC/folie/membran",g:"2 Bygning",l:25,m:["tak_inspeksjon"],enh:"m2"},
+  tak_stein:{n:"Tak – takstein/plater",g:"2 Bygning",l:45,m:["tak_inspeksjon"],enh:"m2"},
   taksikring:{n:"Takadkomst og fallsikring",g:"2 Bygning",l:30,m:["fallsikring"]},
-  fasade_tre:{n:"Fasade – trekledning",g:"2 Bygning",l:40},
-  fasade_mur:{n:"Fasade – mur/betong/puss",g:"2 Bygning",l:60},
-  fasade_plate:{n:"Fasade – plater/sandwich",g:"2 Bygning",l:40},
+  fasade_tre:{n:"Fasade – trekledning",g:"2 Bygning",l:40,enh:"m2"},
+  fasade_mur:{n:"Fasade – mur/betong/puss",g:"2 Bygning",l:60,enh:"m2"},
+  fasade_plate:{n:"Fasade – plater/sandwich",g:"2 Bygning",l:40,enh:"m2"},
   vinduer:{n:"Vinduer",g:"2 Bygning",l:40,m:["vindu"]},
   ytterdorer:{n:"Ytterdører/inngangsparti",g:"2 Bygning",l:30,m:["nodutgang"]},
   porter:{n:"Porter (motoriserte)",g:"2 Bygning",l:25,m:["port_kontroll"]},
   branndorer:{n:"Branndører/brannskiller",g:"2 Bygning",l:30,m:["branndor"]},
-  gulv:{n:"Gulvbelegg fellesareal",g:"2 Bygning",l:20},
-  innv:{n:"Innvendige overflater fellesareal",g:"2 Bygning",l:12},
+  gulv:{n:"Gulvbelegg fellesareal",g:"2 Bygning",l:20,enh:"m2"},
+  innv:{n:"Innvendige overflater fellesareal",g:"2 Bygning",l:12,enh:"m2"},
   sanitar:{n:"Sanitærrør (vann)",g:"3 VVS",l:45,m:["vann_ventiler"]},
   avlop:{n:"Avløpsrør",g:"3 VVS",l:50,m:["avlop_spyl"]},
   tilbakeslag:{n:"Tilbakeslagssikring",g:"3 VVS",l:20,m:["tilbakeslag"]},
@@ -110,7 +110,7 @@ export const KOMP: Record<string, KompType> = {
   brannspjeld:{n:"Brannspjeld",g:"6 Andre installasjoner",l:30,m:["brannspjeld"]},
   slokkere:{n:"Håndslokkere",g:"6 Andre installasjoner",l:20,m:["slokker"]},
   trykk:{n:"Trykkpåkjent utstyr",g:"6 Andre installasjoner",l:20,m:["trykk"]},
-  asfalt:{n:"Asfalt/parkering",g:"7 Utendørs",l:20},
+  asfalt:{n:"Asfalt/parkering",g:"7 Utendørs",l:20,enh:"m2"},
   lekeplass:{n:"Lekeplass/uteområde-utstyr",g:"7 Utendørs",l:15,m:["lekeplass"]},
   gjerder:{n:"Gjerder/murer/støttemurer",g:"7 Utendørs",l:30,m:["stottemur"]},
   annet:{n:"Annet",g:"Annet",l:20},

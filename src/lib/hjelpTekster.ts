@@ -145,6 +145,13 @@ Kontroller alltid mot gjeldende forskrift og DSBs veiledning.` },
 - For komponenter knyttes kontrollen til systemet, med komponentkoden i navnet.
 - Kontroller mot FDV-dokumentasjonen. Uten Google-søk er anbefalingene generelle og mindre sikre.` },
 
+  'kost.m2': { gruppe: 'Begreper', tittel: 'Kostnad per m² og areal målt på tegning', tekst: `For bygningsdeler der kostnaden naturlig regnes per m² (tak, fasade, gulv, innvendige overflater, asfalt), kan du velge «Areal × pris per m²».
+
+- Skriv inn arealet, eller trykk «Mål areal på tegning». Velg tegning, tegn én eller flere flater (klikk hjørnene, avslutt på første punkt) og trykk «Bruk». Flatene summeres og lagres, så du kan endre målingen senere.
+- Tegningen må ha målestokk. Mangler den, setter du den først (klikk to punkter med kjent avstand).
+- Utskiftingskostnaden blir areal × m²-pris × faktor. Bruk faktor for takvinkel (plantegning viser horisontal flate), svinn eller rigg.
+- Kostnaden prisjusteres og nåverdiberegnes som andre kostnader.` },
+
   // ---------------- Skjemafelt (kobles automatisk på feltnøkkel)
   'felt.tfmSys': { gruppe: 'Skjemafelt', tittel: 'TFM systemkode', tekst: `Systemkoden fra NS 3451, normalt tre sifre (f.eks. 360 luftbehandling, 443 nødlys). Koden bestemmer hovedgruppen systemet vises under, og hvilken levetid som foreslås.` },
   'felt.tfmLop': { gruppe: 'Skjemafelt', tittel: 'Systemløpenummer', tekst: `Skiller like systemer i samme bygg fra hverandre: 360.001, 360.002 osv. Foreslås automatisk.` },

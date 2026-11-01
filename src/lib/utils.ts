@@ -62,7 +62,7 @@ export const kostAarFor = (a: Rec) => +a.kostAar || YEAR;
 export function kostJustert(a: Rec, aar?: number | null) { const k = +a.kost || 0; if (!k) return 0; const y = Math.max(aar ?? compYear(a) ?? YEAR, YEAR); return k * kpiFaktor(kostAarFor(a), y); }
 /** Kostnad indeksregulert fra prisnivååret til inneværende år */
 export function kostNaa(a: Rec) { const k = +a.kost || 0; if (!k) return 0; const f = kostAarFor(a); return f < YEAR ? k * kpiFaktor(f, YEAR) : k; }
-export function kostTip(a: Rec) { const f = kostAarFor(a); return f < YEAR ? `Anslått ${nok(a.kost)} i ${f}-kroner, indeksregulert til ${YEAR}` : `Anslått i ${f}-kroner`; }
+export function kostTip(a: Rec) { const f = kostAarFor(a); const m = a.kostMetode === 'm2' && a.mengde && a.m2pris ? `${(+a.mengde).toLocaleString('nb-NO')} m² × ${nok(a.m2pris)}/m²${+a.faktor && +a.faktor !== 1 ? ' × ' + String(a.faktor).replace('.', ',') : ''} = ${nok(a.kost)}. ` : ''; return m + (f < YEAR ? `Anslått ${nok(a.kost)} i ${f}-kroner, indeksregulert til ${YEAR}` : `Anslått i ${f}-kroner`); }
 // ---- System = sentralkost (på systemet) + sum av komponentenes kostnader
 export const sysKomp = (a: Rec) => S.komponenter.filter(k => k.anleggId === a.id);
 /** Komponenten har egen levetid/utskiftingsår (ellers følger den systemet) */

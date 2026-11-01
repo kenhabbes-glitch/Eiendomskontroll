@@ -70,6 +70,34 @@ export function editEiendom(id?: string) {
 }
 
 // ================= SYSTEM / BYGNINGSDEL =================
+
+// ---------- Kostnad per m² med areal målt på tegning
+const m2Kost = (v: any) => { const a = +String(v.mengde ?? '').replace(',', '.'), p = +String(v.m2pris ?? '').replace(',', '.'), f = +String(v.faktor ?? '1').replace(',', '.') || 1; return a > 0 && p > 0 ? Math.round(a * p * f) : null; };
+function m2Patch(k: string, v: any) {
+  if (!['mengde', 'm2pris', 'faktor', 'kostMetode'].includes(k) || v.kostMetode !== 'm2') return {};
+  const kost = m2Kost(v); return kost != null ? { kost, kostKilde: undefined, kostAar: v.kostAar || YEAR } : {};
+}
+function m2Felter(eid: (v: any) => string | undefined, navn: (v: any) => string): Field[] {
+  const vis = (x: any) => x.kostMetode === 'm2';
+  return [
+    { k: 'kostMetode', label: 'Hvordan beregnes kostnaden?', type: 'select', options: [['fast', 'Fast beløp'], ['m2', 'Areal × pris per m² (areal kan måles på tegning)']], help: 'kost.m2' },
+    { k: 'mengde', label: 'Areal (m²)', type: 'number', half: true, show: vis },
+    { k: 'm2pris', label: 'Pris per m² (kr)', type: 'number', half: true, show: vis, hint: 'Utskifting inkl. riving, materialer og montasje' },
+    { k: 'faktor', label: 'Faktor / påslag', type: 'number', half: true, show: vis, ph: '1', hint: 'F.eks. 1,15 for takvinkel, svinn eller rigg. Tomt = 1' },
+    { k: 'maalKnapp', type: 'custom', show: vis, render: (v, set) => {
+      const e = eid(v); const T = sortBy(S.tegninger.filter(t => t.eiendomId === e), t => +t.etasje || 0); const am = v.arealMaaling; const valgt = v._maalT || am?.tegningId || T[0]?.id || '';
+      const kost = m2Kost(v);
+      return <div className="note small" style={{ color: 'var(--ink)' }}>
+        {T.length ? <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select value={valgt} onChange={x => set({ _maalT: x.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 6, padding: '4px 6px' }}>{T.map(t => <option key={t.id} value={t.id}>{t.navn}{t.skala ? '' : ' (mangler målestokk)'}</option>)}</select>
+          <button type="button" className="btn sm" onClick={() => openPlan(valgt, { maal: { tittel: 'Areal for ' + navn(v), flater: am?.tegningId === valgt ? am.flater : [], onFerdig: r => { const nv = { ...v, mengde: r.m2 }; set({ arealMaaling: r, mengde: r.m2, ...(m2Kost(nv) != null ? { kost: m2Kost(nv), kostKilde: undefined, kostAar: v.kostAar || YEAR } : {}) }); toast(`Målt ${m2(r.m2)} – husk å lagre`); } } })}>📐 {am ? 'Endre måling på tegning' : 'Mål areal på tegning'}</button>
+          {am && <span className="muted">Målt {m2(am.m2)} på {byId('tegninger', am.tegningId)?.navn || 'tegning'} ({am.flater.length} flate{am.flater.length === 1 ? '' : 'r'})</span>}
+        </div> : <span className="muted">Ingen tegninger på eiendommen – skriv inn arealet, eller last opp en tegning under «Tegninger og arealer» for å måle.</span>}
+        {kost != null && <div style={{ marginTop: 6 }}>Utskiftingskostnad: <b>{(+v.mengde).toLocaleString('nb-NO')} m² × {nok(+String(v.m2pris).replace(',', '.'))}/m²{+String(v.faktor || 1).replace(',', '.') !== 1 ? ' × ' + v.faktor : ''} = {nok(kost)}</b> <span className="muted">– settes i kostnadsfeltet</span></div>}
+      </div>; } },
+  ];
+}
+
 // ---------- Levetid: ledetråd fra NS 3451 og oppslag hos leverandør
 function LevetidHjelp({ v, set, sysKode, typeLev }: { v: any; set: (x: any) => void; sysKode?: string; typeLev?: number }) {
   const r = levetidRef(sysKode); const ed = canEdit(); const t = midt(r?.tek || null), f = midt(r?.fun || null);
@@ -201,6 +229,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'aar', label: 'Installert/utskiftet år', type: 'number', half: true }, { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Tomt = veiledende levetid for typen' },
     { k: 'levHjelp', type: 'custom', render: (v, set) => <LevetidHjelp v={v} set={set} sysKode={v.tfmSys} typeLev={KOMP[v.type]?.l} /> },
     { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true, hint: 'La stå tom for å bruke beregnet år' },
+    ...(isStaff() && canEdit() ? m2Felter(v => v.eiendomId, v => v.navn || KOMP[v.type]?.n || 'systemet') : []),
     ...(isStaff() && canEdit() ? [{ k: 'kost', label: 'Sentralkost på systemnivå (kr)', type: 'number', half: true, hint: 'F.eks. sentral, styring, kabling. Komponentene summeres i tillegg.' } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR, hint: 'Året beløpet er anslått i' } as Field] : []),
     { k: 'kostFlagg', type: 'custom', render: v => <KostFlagg v={v} /> },
     { k: 'levSok', type: 'custom', render: (v, set) => <LeverandorSok v={v} set={set} kind="a" sysKode={v.tfmSys} /> },
@@ -231,7 +260,8 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     title: ro ? aNavn(id) : id ? 'Rediger system / bygningsdel' : 'Nytt system / bygningsdel', fields, values: a, readOnly: ro,
     onChange: (k, v, prev) => {
       if (k === 'tfmSys') touched.sys = true; if (k === 'tfmLop') touched.lop = true;
-      const p: any = {};
+      const p: any = { ...m2Patch(k, v) };
+      if (k === 'type' && !id && !v.mengde) p.kostMetode = KOMP[v.type]?.enh === 'm2' ? 'm2' : 'fast';
       if (k === 'levetid') p.levetidKilde = undefined;
       if ((k === 'type' || k === 'tfmSys') && !id && !touched.lev) { const r = levetidRef(k === 'type' ? (TFM_DEF[v.type]?.[0] || v.tfmSys) : v.tfmSys); const t = midt(r?.tek || null); if (t) { p.levetid = t; p.levetidKilde = `NS 3451 ${r!.kode} teknisk`; } }
       if (k === 'levetid') touched.lev = true;
@@ -249,7 +279,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
       v.tfmSys = String(v.tfmSys || '').replace(/\D/g, ''); v.tfmLop = v.tfmSys ? pad(String(v.tfmLop || '1').replace(/\D/g, '') || 1) : '';
       const dup = v.tfmSys && S.anlegg.find(x => x.id !== id && x.eiendomId === v.eiendomId && x.tfmSys === v.tfmSys && pad(x.tfmLop) === v.tfmLop);
       if (dup) { toast(`TFM-koden =${v.tfmSys}.${v.tfmLop} er allerede brukt på «${dup.navn || KOMP[dup.type]?.n}»`); return false; }
-      delete v.plass; delete v.saInfo; delete v.tgInfo; delete v.secTg; delete v.secDrift; delete v.levHjelp; delete v.levSok; delete v.kostFlagg; if (v.kostKilde && +v.kost !== +v.kostKilde.belop) v.kostKilde = undefined; const fersk = id ? byId('anlegg', id) : null;
+      delete v.maalKnapp; delete v._maalT; delete v.plass; delete v.saInfo; delete v.tgInfo; delete v.secTg; delete v.secDrift; delete v.levHjelp; delete v.levSok; delete v.kostFlagg; if (v.kostKilde && +v.kost !== +v.kostKilde.belop) v.kostKilde = undefined; const fersk = id ? byId('anlegg', id) : null;
       const nid = await save('anlegg', { ...a, ...v, pos: fersk ? fersk.pos ?? null : a.pos ?? null, mk: undefined, forste: undefined });
       for (const k of mk) await save('oppgaver', taskFromMal(k, MALER, v.eiendomId, nid, forste));
       for (const o of levMk) await save('oppgaver', levTask(o, v.eiendomId, nid, forste));
@@ -276,6 +306,7 @@ export function editKomponent(id?: string, anleggId?: string) {
     { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Tomt = skiftes sammen med systemet' }, { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true },
     { k: 'levHjelp', type: 'custom', render: (v, set) => <LevetidHjelp v={v} set={set} sysKode={byId('anlegg', v.anleggId)?.tfmSys} /> },
     { k: 'plass', type: 'custom', label: 'Plassering på tegning', render: v => <PlasseringFelt kind="k" id={id} eiendomId={byId('anlegg', v.anleggId)?.eiendomId || k.eiendomId} close={() => closeRefK.c?.()} /> },
+    ...(canEdit() ? m2Felter(v => byId('anlegg', v.anleggId)?.eiendomId, v => v.navn || 'komponenten') : []),
     ...(canEdit() ? [{ k: 'kost', label: 'Utskiftingskostnad (kr)', type: 'number', half: true } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR } as Field] : []),
     { k: 'kostFlagg', type: 'custom', render: v => <KostFlagg v={v} /> },
     { k: 'levSok', type: 'custom', render: (v, set) => <LeverandorSok v={v} set={set} kind="k" sysKode={byId('anlegg', v.anleggId)?.tfmSys} /> },
@@ -285,14 +316,14 @@ export function editKomponent(id?: string, anleggId?: string) {
   const closeRefK: { c?: () => void } = {};
   closeRefK.c = formModal({
     title: ro ? kNavn(id) : id ? 'Rediger komponent' : 'Ny komponent', fields, values: k, readOnly: ro,
-    onChange: (key, v) => { if (key === 'levetid') return { levetidKilde: undefined }; if (key === 'lop') touched.lop = true; if ((key === 'kode' || key === 'anleggId') && !touched.lop && !id) return { lop: nextKompLop(v.anleggId, v.kode) }; },
+    onChange: (key, v) => { if (key === 'levetid') return { levetidKilde: undefined }; const mp = m2Patch(key, v); if (Object.keys(mp).length) return mp; if (key === 'lop') touched.lop = true; if ((key === 'kode' || key === 'anleggId') && !touched.lop && !id) return { lop: nextKompLop(v.anleggId, v.kode) }; },
     extraFoot: close => id && !ro ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette komponenten?')) { await removeDoc('komponenter', id); close(); } }}>Slett</button> : null,
     onSave: async x => {
       delete x.prev; delete x.beregn; if (x.kost && !x.kostAar) x.kostAar = YEAR; x.kode = String(x.kode || '').toUpperCase().replace(/[^A-ZÆØÅ]/g, ''); x.lop = pad(String(x.lop || '1').replace(/\D/g, '') || 1);
       if (!x.navn) x.navn = TFM_KODER.find(c => c[0] === x.kode)?.[1] || '';
       const dup = S.komponenter.find(z => z.id !== id && z.anleggId === x.anleggId && String(z.kode || '').toUpperCase() === x.kode && pad(z.lop) === x.lop);
       if (dup) { toast('Komponentkoden er allerede brukt i dette systemet'); return false; }
-      const levMk: any[] = x.levMk || []; delete x.levMk; delete x.plass; delete x.tgInfo; delete x.secTg; delete x.levHjelp; delete x.levSok; delete x.kostFlagg; if (x.kostKilde && +x.kost !== +x.kostKilde.belop) x.kostKilde = undefined; const fersk = id ? byId('komponenter', id) : null;
+      const levMk: any[] = x.levMk || []; delete x.levMk; delete x.maalKnapp; delete x._maalT; delete x.plass; delete x.tgInfo; delete x.secTg; delete x.levHjelp; delete x.levSok; delete x.kostFlagg; if (x.kostKilde && +x.kost !== +x.kostKilde.belop) x.kostKilde = undefined; const fersk = id ? byId('komponenter', id) : null;
       { const sy = byId('anlegg', x.anleggId); for (const o of levMk) if (sy) await save('oppgaver', levTask(o, sy.eiendomId, sy.id, addDays(today(), 30))); } if (levMk.length) toast(`Opprettet ${levMk.length} kontroller fra leverandørens anbefaling`);
       const a = byId('anlegg', x.anleggId); await save('komponenter', { ...k, ...x, pos: fersk ? fersk.pos ?? null : k.pos ?? null, eiendomId: a ? a.eiendomId : k.eiendomId }); toast('Komponent lagret');
     },
