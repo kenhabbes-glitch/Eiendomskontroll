@@ -156,6 +156,11 @@ Kontroller alltid mot gjeldende forskrift og DSBs veiledning.` },
 - Utskiftingskostnaden blir areal × m²-pris × faktor. Bruk faktor for takvinkel (plantegning viser horisontal flate), svinn eller rigg.
 - Kostnaden prisjusteres og nåverdiberegnes som andre kostnader.` },
 
+  'ns.dok': { gruppe: 'Begreper', tittel: 'NS 3451 hovedgruppe 1 – Dokumentasjon', tekst: `I NS 3451 er hovedgruppe 1 dokumentasjon, ikke fysiske systemer: 10 Bygningsdokumentasjon, 11 Dokumenter for forvaltning, 12 Juridiske og offentlige dokumenter, 13 Tomt, 14 Dimensjonering, 15 Miljø, 16 Tegninger, planer og kart, 17 Branndokumentasjon, 18 Sikkerhet og 19 Drift og vedlikehold.
+
+- Dokumenter registreres under «Dokumenter» og får NS 3451-kode automatisk ut fra dokumenttypen (f.eks. brannkonsept → 17, FDV → 19, ferdigattest → 12). Koden kan overstyres i dokumentet.
+- I «Systemer og komponenter (TFM)» vises gruppe 1 som en oversikt over eiendommens dokumenter, sortert på 10–19, slik at hele NS 3451-strukturen er samlet ett sted.` },
+
   // ---------------- Skjemafelt (kobles automatisk på feltnøkkel)
   'felt.tfmSys': { gruppe: 'Skjemafelt', tittel: 'TFM systemkode', tekst: `Systemkoden fra NS 3451, normalt tre sifre (f.eks. 360 luftbehandling, 443 nødlys). Koden bestemmer hovedgruppen systemet vises under, og hvilken levetid som foreslås.` },
   'felt.tfmLop': { gruppe: 'Skjemafelt', tittel: 'Systemløpenummer', tekst: `Skiller like systemer i samme bygg fra hverandre: 360.001, 360.002 osv. Foreslås automatisk.` },

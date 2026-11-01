@@ -1,6 +1,6 @@
 import React, { type ReactNode } from 'react';
 import { Hjelp } from './Hjelp';
-import { KOMP, DOK_PAAKREVD, AV_LUKKET, SERVICEAVTALE, MALER } from '../lib/catalog';
+import { KOMP, DOK_PAAKREVD, AV_LUKKET, SERVICEAVTALE, MALER, NS_DOK, dokNs } from '../lib/catalog';
 import { ikDekning } from '../lib/utils';
 import { S, canEdit, save } from '../lib/store';
 import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2, sysKostNaa, sysKostUtskift, sysKostTip, kompAar, egetAar, sysNaaverdi, kompNaaverdi, nvTip, saStatus, taggerFor, erForslag, harForslag } from '../lib/utils';
@@ -17,7 +17,7 @@ const go = (p: string) => { location.hash = '#/' + p; };
 const stop = (e: React.MouseEvent) => e.stopPropagation();
 
 // NS 3451 hovedgrupper + felles åpen/lukket-tilstand (deles mellom TFM-registeret og eiendommens systemliste)
-export const HOVEDGRUPPER: Record<string, string> = { '1': 'Felleskostnader', '2': 'Bygning', '3': 'VVS-installasjoner', '4': 'Elkraftinstallasjoner', '5': 'Tele og automatisering', '6': 'Andre installasjoner', '7': 'Utendørs' };
+export const HOVEDGRUPPER: Record<string, string> = { '1': 'Dokumentasjon', '2': 'Bygning', '3': 'VVS-installasjoner', '4': 'Elkraftinstallasjoner', '5': 'Tele og automatisering', '6': 'Andre installasjoner', '7': 'Utendørs' };
 const APEN_KEY = 'tfmApen';
 export function useApen() {
   const [apen, setA] = React.useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem(APEN_KEY) || '{}'); } catch { return {}; } });
@@ -68,11 +68,11 @@ export function AvvikTable({ list, showE = true }: { list: Rec[]; showE?: boolea
 
 export function DokTable({ list, showE = true }: { list: Rec[]; showE?: boolean }) {
   if (!list.length) return <Wrap><Empty t="Ingen dokumenter">Last opp eller registrer plassering for dokumentasjon.</Empty></Wrap>;
-  const L = sortBy(list, d => d.type + '|' + (d.tittel || ''));
-  return <Wrap><table><thead><tr><th>Dokument</th><th>Type</th>{showE && <th>Eiendom</th>}<th>Dato</th><th>Gyldig til</th><th>Fil / plassering</th></tr></thead><tbody>
+  const L = sortBy(list, d => dokNs(d) + '|' + d.type + '|' + (d.tittel || ''));
+  return <Wrap><table><thead><tr><th>NS 3451</th><th>Dokument</th><th>Type</th>{showE && <th>Eiendom</th>}<th>Dato</th><th>Gyldig til</th><th>Fil / plassering</th></tr></thead><tbody>
     {L.map(d => { const gd = d.gyldigTil ? dUntil(d.gyldigTil)! : null;
       return <tr key={d.id} className="click" onClick={() => editDok(d.id)}>
-        <td><b style={{ fontWeight: 500 }}>{d.tittel}</b>{d.leietakerId && lNavn(d.leietakerId) && <div className="small muted">{lNavn(d.leietakerId)}</div>}</td>
+        <td className="mono small" title={NS_DOK[dokNs(d)]}>={dokNs(d)}</td><td><b style={{ fontWeight: 500 }}>{d.tittel}</b>{d.leietakerId && lNavn(d.leietakerId) && <div className="small muted">{lNavn(d.leietakerId)}</div>}</td>
         <td className="small">{d.type}</td>{showE && <td>{eNavn(d.eiendomId)}</td>}<td className="small">{fd(d.dato)}</td>
         <td>{d.gyldigTil ? (gd! < 0 ? <Chip c="red">Utløpt {fd(d.gyldigTil)}</Chip> : gd! <= 90 ? <Chip c="amber">{fd(d.gyldigTil)}</Chip> : <span className="small">{fd(d.gyldigTil)}</span>) : <span className="muted">–</span>}</td>
         <td className="small" onClick={stop}>{d.fil ? <FileLink fil={d.fil} /> : d.plassering || '–'}</td></tr>; })}
@@ -99,7 +99,7 @@ export function AnleggTable({ list, showE = false }: { list: Rec[]; showE?: bool
   </tbody></table></Wrap>;
 }
 
-export function TfmTree({ list, q, onNewKomp }: { list: Rec[]; q: string; onNewKomp?: (id: string) => void }) {
+export function TfmTree({ list, q, onNewKomp, eid, onDok }: { list: Rec[]; q: string; onNewKomp?: (id: string) => void; eid?: string; onDok?: () => void }) {
   const { apen, toggle, settApen } = useApen();
   if (!list.length) return <Wrap><Empty t="Ingen systemer registrert">Registrer tekniske systemer og bygningsdeler med TFM-kode, eller importer en eksisterende TFM-liste.</Empty></Wrap>;
   const qq = q.toLowerCase(); const ok = canEdit();
@@ -128,13 +128,25 @@ export function TfmTree({ list, q, onNewKomp }: { list: Rec[]; q: string; onNewK
       <td className="num">{c.aar || '–'}</td><td className="num">{kompAar(c) || '–'}{!egetAar(c) && kompAar(c) ? <div className="small muted">følger systemet</div> : null}</td><td>{egetAar(c) ? <RestChip r={compRest(c)} /> : <span className="muted small">–</span>}</td><td><TgChip t={c.tg} /></td>
       {ok && <td className="num" data-tip={c.kost ? kostTip(c) : undefined}>{c.kost ? nok(kostNaa(c)) : '–'}{erForslag(c) && <ForslagMerke />}</td>}{ok && <td className="num" data-tip={c.kost ? `${kostTip(c)}. Prisjustert med KPI til ${Math.max(kompAar(c) || YEAR, YEAR)}.` : undefined}>{c.kost && kompAar(c) ? nok(kostJustert(c, kompAar(c))) : '–'}</td>}{ok && <td className="num" data-tip={c.kost && kompAar(c) ? nvTip(kompAar(c)) : undefined}>{c.kost && kompAar(c) ? nok(kompNaaverdi(c)) : '–'}</td>}<td /><td /></tr>));
   });
+  // Hovedgruppe 1 Dokumentasjon: eiendommens dokumenter etter NS 3451 10–19 (ligger under Dokumenter, vises her for oversikt)
+  const D = eid ? S.dokumenter.filter(d => d.eiendomId === eid && (!qq || (d.tittel + ' ' + d.type).toLowerCase().includes(qq))) : [];
+  if (D.length || (eid && !qq)) {
+    const G = grupper['1'] ||= { sys: [], rader: [], nS: 0, nK: 0 }; G.sys.push('d1');
+    Object.keys(NS_DOK).forEach(k => { const dk = D.filter(d => dokNs(d) === k); if (!dk.length) return; const on = tving || !!apen['s1' + k];
+      G.rader.push(<tr key={'d' + k} className="click sysrow" onClick={() => toggle('s1' + k)}><td className="mono" style={{ fontWeight: 600, whiteSpace: 'nowrap', paddingLeft: 22 }}><span style={{ display: 'inline-block', width: 20, color: 'var(--muted)', fontFamily: 'sans-serif' }}>{on ? '▾' : '▸'}</span>={k}</td>
+        <td colSpan={ok ? 9 : 6}><b style={{ fontWeight: 600 }}>{NS_DOK[k]}</b> <span className="small muted">{dk.length} dokument{dk.length === 1 ? '' : 'er'}</span></td><td>{onDok && <button className="btn sm" onClick={e => { stop(e); onDok(); }} title="Gå til Dokumenter">Åpne</button>}</td></tr>);
+      if (on) dk.forEach(d => G.rader.push(<tr key={d.id} className="click" onClick={() => editDok(d.id)}><td className="small muted" style={{ paddingLeft: 58 }}>{d.type}</td><td colSpan={ok ? 9 : 6}>{d.tittel}{d.gyldigTil && <span className="small muted"> · gyldig til {fd(d.gyldigTil)}</span>}</td><td className="small" onClick={stop}>{d.fil ? <FileLink fil={d.fil} /> : d.plassering || ''}</td></tr>));
+    });
+    if (!G.rader.length) G.rader.push(<tr key="d-tom"><td /><td colSpan={ok ? 10 : 7} className="small muted">Ingen dokumenter registrert. {onDok && <a href="#" onClick={e => { e.preventDefault(); onDok(); }}>Gå til Dokumenter</a>}</td></tr>);
+    (G as any).nD = D.length;
+  }
   const nokler = Object.keys(grupper).sort((x, y) => (x || '9z').localeCompare(y || '9z'));
   const alle = [...nokler.map(k => 'g' + k), ...nokler.flatMap(k => grupper[k].sys)];
   const ncol = ok ? 11 : 8;
   const rows: ReactNode[] = [];
   nokler.forEach(k => { const G = grupper[k]; const gOpen = tving || !!apen['g' + k];
     rows.push(<tr key={'g' + k} className="click grp" onClick={() => !tving && toggle('g' + k)} style={{ background: 'var(--bg2, #eef0ec)' }}>
-      <td colSpan={ncol} style={{ fontWeight: 700 }}><span style={{ display: 'inline-block', width: 18, color: 'var(--muted)' }}>{gOpen ? '▾' : '▸'}</span><span className="mono" style={{ marginRight: 8 }}>{k || '–'}</span>{k ? HOVEDGRUPPER[k] || 'Hovedgruppe ' + k : 'Uten TFM-kode'}<span className="small muted" style={{ fontWeight: 400, marginLeft: 10 }}>{G.nS} system{G.nS === 1 ? '' : 'er'}{G.nK ? ` · ${G.nK} komponent${G.nK === 1 ? '' : 'er'}` : ''}</span></td></tr>);
+      <td colSpan={ncol} style={{ fontWeight: 700 }}><span style={{ display: 'inline-block', width: 18, color: 'var(--muted)' }}>{gOpen ? '▾' : '▸'}</span><span className="mono" style={{ marginRight: 8 }}>{k || '–'}</span>{k ? HOVEDGRUPPER[k] || 'Hovedgruppe ' + k : 'Uten TFM-kode'}<span className="small muted" style={{ fontWeight: 400, marginLeft: 10 }}>{k === '1' ? `${(G as any).nD || 0} dokumenter – administreres under Dokumenter` : <>{G.nS} system{G.nS === 1 ? '' : 'er'}{G.nK ? ` · ${G.nK} komponent${G.nK === 1 ? '' : 'er'}` : ''}</>}</span></td></tr>);
     if (gOpen) rows.push(...G.rader); });
   return <><div className="toolbar" style={{ marginTop: -4 }}><button className="btn sm" onClick={() => settApen(alle, true)}>▾ Vis alle</button><button className="btn sm" onClick={() => settApen(alle, false)}>▸ Skjul alle</button>{tving && <span className="small muted">Søk er aktivt – alt vises utvidet</span>}</div>
   <Wrap><table><thead><tr><th>TFM-kode</th><th>System / komponent</th><th className="num">Installert år</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}{ok && <th className="num">Nåverdi<Hjelp id="naaverdi" size={14} /></th>}<th>Kontroller</th><th /></tr></thead>

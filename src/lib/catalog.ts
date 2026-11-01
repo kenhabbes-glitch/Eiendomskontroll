@@ -169,6 +169,10 @@ export const VEDL_KAT: [string, string][] = [
 ];
 export const DOK_TYPER=["Ferdigattest/brukstillatelse","Brannkonsept/brannteknisk dokumentasjon","Branntegninger/rømningsplaner","FDV-dokumentasjon","Energiattest","Samsvarserklæring el-anlegg","Tilstandsrapport","Miljøkartlegging (asbest/PCB)","Forsikringspolise","Tegninger (plan/snitt/fasade)","Radonmåling","Tilsynsrapport","Servicerapport","Egenkontrollskjema","Serviceavtale","Leieavtale","Samordningsavtale","Leietakers IK-dokumentasjon","Annet"];
 export const DOK_PAAKREVD=DOK_TYPER.slice(0,9);
+// NS 3451 hovedgruppe 1 – Dokumentasjon (koder 10–19) og hvilken undergruppe hver dokumenttype hører til
+export const NS_DOK: Record<string, string> = { '10': 'Bygningsdokumentasjon', '11': 'Dokumenter for forvaltning', '12': 'Juridiske og offentlige dokumenter', '13': 'Tomt', '14': 'Dimensjonering', '15': 'Miljø', '16': 'Tegninger, planer og kart', '17': 'Branndokumentasjon', '18': 'Sikkerhet', '19': 'Drift og vedlikehold' };
+export const DOK_NS: Record<string, string> = { 'Ferdigattest/brukstillatelse': '12', 'Brannkonsept/brannteknisk dokumentasjon': '17', 'Branntegninger/rømningsplaner': '17', 'FDV-dokumentasjon': '19', 'Energiattest': '15', 'Samsvarserklæring el-anlegg': '12', 'Tilstandsrapport': '11', 'Miljøkartlegging (asbest/PCB)': '15', 'Forsikringspolise': '11', 'Tegninger (plan/snitt/fasade)': '16', 'Radonmåling': '15', 'Tilsynsrapport': '12', 'Servicerapport': '19', 'Egenkontrollskjema': '19', 'Serviceavtale': '19', 'Leieavtale': '11', 'Samordningsavtale': '18', 'Leietakers IK-dokumentasjon': '18', 'Annet': '10' };
+export const dokNs = (d: { type?: string; ns?: string }) => d.ns || DOK_NS[d.type || ''] || '10';
 export const DOK_LEIE=["Leieavtale","Samordningsavtale"];
 export const KATEGORIER=["Kontor","Handel","Lager/logistikk","Industri/verksted","Hotell/servering","Helse/omsorg","Undervisning","Kombinasjonsbygg","Parkering","Annet"];
 export const AV_STATUS=["Ny","Under vurdering","Planlagt","Under utbedring","Utført – til kontroll","Utsatt","Rettet","Avvist","Lukket"];

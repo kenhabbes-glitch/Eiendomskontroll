@@ -1,7 +1,7 @@
 // Skjemaer og handlinger (opprett/rediger/slett) som brukes fra flere visninger.
 import { Hjelp } from '../components/Hjelp';
 import React, { useState } from 'react';
-import { SERVICEAVTALE, TG_DEF, KG_DEF } from './catalog';
+import { SERVICEAVTALE, TG_DEF, KG_DEF, NS_DOK } from './catalog';
 import { levetidRef, midt, spenn } from './ns3451';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore } from './store';
@@ -566,6 +566,7 @@ export function editDok(id?: string, preset: any = {}) {
   const fields: Field[] = [
     { k: 'tittel', label: 'Tittel', req: true },
     { k: 'type', label: 'Dokumenttype', type: 'select', options: canEdit() ? DOK_TYPER : DOK_TYPER.filter(t => !['Leieavtale', 'Forsikringspolise', 'Samordningsavtale', 'Leietakers IK-dokumentasjon'].includes(t)), half: true },
+    { k: 'ns', label: 'NS 3451 dokumentgruppe', type: 'select', half: true, options: () => Object.entries(NS_DOK).map(([k, n]) => [k, k + ' ' + n] as [string, string]), empty: '(automatisk ut fra type)', help: 'ns.dok' },
     { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true },
     ...(canEdit() ? [{ k: 'leietakerId', label: 'Leietaker (valgfritt)', type: 'select', options: () => S.leietakere.map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true } as Field] : []),
     { k: 'anleggId', label: 'System (valgfritt)', type: 'select', options: () => S.anlegg.map(x => [x.id, eNavn(x.eiendomId) + ' – ' + aNavn(x.id)] as [string, string]), empty: '–', half: true },

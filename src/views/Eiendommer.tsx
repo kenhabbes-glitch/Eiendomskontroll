@@ -56,7 +56,7 @@ export function Eiendom({ id }: { id: string }) {
       {AN.some(a => !a.tfmSys) && <button className="btn" onClick={() => autoTfm(id)}>Tildel TFM-koder automatisk ({AN.filter(a => !a.tfmSys).length})</button>}</>}
       <input type="search" placeholder="Søk kode, navn, fabrikat …" value={q} onChange={ev => setQ(ev.target.value)} style={{ marginLeft: 'auto' }} /></div>
     <p className="small muted" style={{ margin: '-4px 0 10px' }}>{e.tfmBygg ? <>Byggnummer <span className="mono">+{e.tfmBygg}</span> · </> : ed ? 'Ingen TFM byggnummer satt (rediger eiendommen) · ' : ''}{AN.length} systemer · {S.komponenter.filter(k => k.eiendomId === id).length} komponenter · levetider er veiledende<Hjelp id="side.eiendom.tfm" /></p>
-    <TfmTree list={AN} q={q} onNewKomp={aid => editKomponent(undefined, aid)} /></>;
+    <TfmTree list={AN} q={q} eid={id} onDok={() => setTab('dok')} onNewKomp={aid => editKomponent(undefined, aid)} /></>;
   if (cur === 'kontroll') c = <>{ed && <div className="toolbar"><button className="btn pri" onClick={() => generatePlan(id)}>Generer / utvid kontrollplan</button><button className="btn" onClick={() => editOppgave(undefined, { eiendomId: id })}>+ Egen kontroll/oppgave</button></div>}
     <TaskTable list={T.filter(o => o.aktiv !== false)} showE={false} />{T.some(o => o.aktiv === false) && <p className="small muted">{T.filter(o => o.aktiv === false).length} inaktive kontroller skjult.</p>}</>;
   if (cur === 'avvik') c = <><div className="toolbar"><button className="btn pri" onClick={() => editAvvik(undefined, { eiendomId: id })}>+ Nytt avvik</button></div><AvvikTable list={A} showE={false} /></>;
