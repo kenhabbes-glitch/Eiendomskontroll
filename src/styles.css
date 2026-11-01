@@ -20,6 +20,10 @@ a{color:var(--acc)}
 .brand b{display:block;color:var(--sidehi);font-size:16px;letter-spacing:.2px}
 .brand span{font-size:12px;color:#8fa198}
 #nav{padding:10px 8px;display:flex;flex-direction:column;gap:2px;flex:1;overflow:auto}
+/* Skjul rullefeltet i menyen – den kan fortsatt rulles med musehjul/touch */
+#nav{scrollbar-width:none;-ms-overflow-style:none}
+#nav::-webkit-scrollbar{display:none;width:0;height:0}
+@media (max-height:820px){#nav a{padding:6px 10px}}
 #nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;color:var(--sideink);text-decoration:none;font-weight:500}
 #nav a:hover{background:var(--side2);color:#fff}
 #nav a.on{background:#2c4038;color:#fff}
