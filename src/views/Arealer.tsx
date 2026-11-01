@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Hjelp } from '../components/Hjelp';
 import { S, canEdit, deleteFile, fileUrl, save, removeDoc, toast, uploadFile, useStore } from '../lib/store';
 
@@ -173,6 +174,10 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   const t0 = byId('tegninger', tid)!; const ro = !canEdit();
   const T = useRef<Rec>({ ...clone(t0), soner: clone(t0?.soner || []) }).current;
   const [, setTick] = useState(0); const rr = () => setTick(x => x + 1);
+  const [tip, setTip] = useState<{ i: MItem; x: number; y: number } | null>(null);
+  const tipOn = (i: MItem) => (e: React.PointerEvent) => { if (!st.drag && e.pointerType !== 'touch') setTip({ i, x: e.clientX, y: e.clientY }); };
+  const tipMove = (e: React.PointerEvent) => { if (tip && !st.drag) setTip({ ...tip, x: e.clientX, y: e.clientY }); else if (tip) setTip(null); };
+  const tipOff = () => setTip(null);
   const tfmMode = opts.mode === 'tfm';
   const st = useRef({ tgF: '', tagg: (opts.tagg || '') as string, fokus: new Set<string>(opts.fokus || (opts.focus ? [opts.focus] : [])), visPlassert: false, flyttOk: (opts.placeId || '') as string, lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, tool: opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '' }).current;
   const [vb, setVb] = useState({ x: 0, y: 0, w: T.w || 1000, h: T.h || 800 });
@@ -292,13 +297,13 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
             <text x={c[0]} y={c[1] + fs * 1.25} textAnchor="middle" fontSize={fs * .9} fill="#1d2320" stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{(lt ? lt + ' · ' : '') + (a != null ? m2(a) : 'mangler målestokk')}</text></g>; })}
         {st.lagM && markers.map(i => { const isDrag = st.drag?.t === 'm' && st.drag.id === i.o.id && st.mpos; const x = isDrag ? st.mpos![0] : i.o.pos.x, y = isDrag ? st.mpos![1] : i.o.pos.y; const col = fagFarge(itemFag(i)); const on = st.selM === i.o.id || st.fokus.has(i.o.id);
           const av = openAvvik().filter(a => i.kind === 'a' ? a.anleggId === i.o.id && !a.komponentId : a.komponentId === i.o.id).length; const R0 = (i.kind === 'a' ? 8 : 6) * kk;
-          return <g key={'m' + i.o.id} data-m={i.o.id} style={{ cursor: ro ? 'pointer' : 'move' }}>
+          return <g key={'m' + i.o.id} data-m={i.o.id} style={{ cursor: ro ? 'pointer' : 'move' }} onPointerEnter={tipOn(i)} onPointerMove={tipMove} onPointerLeave={tipOff}>
             {on && <circle cx={x} cy={y} r={R0 * 2.1} fill={col} fillOpacity={.18} />}
             {av > 0 && <circle cx={x} cy={y} r={R0 * 1.55} fill="none" stroke="#b42318" strokeWidth={2.5} vectorEffect="non-scaling-stroke" />}
             {i.kind === 'a' ? <rect x={x - R0} y={y - R0} width={R0 * 2} height={R0 * 2} rx={R0 * .3} fill={col} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" /> : <circle cx={x} cy={y} r={R0} fill={col} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
             <text x={x} y={y - R0 - 4 * kk} textAnchor="middle" fontSize={fs * .85} fontFamily="IBM Plex Mono,monospace" fontWeight={600} fill={col} stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{itemKode(i)}{['TG2', 'TG3'].includes(i.o.tg) && <tspan fill={i.o.tg === 'TG3' ? '#b42318' : '#b07a00'}> {i.o.tg}</tspan>}</text></g>; })}
         {st.lagV && avMarkers.map(i => { const isDrag = st.drag?.t === 'm' && st.drag.id === i.o.id && st.mpos; const x = isDrag ? st.mpos![0] : i.o.pos.x, y = isDrag ? st.mpos![1] : i.o.pos.y; const on = st.selM === i.o.id || st.fokus.has(i.o.id); const R0 = 10 * kk; const lukket = AV_LUKKET.includes(i.o.status); const col = lukket ? '#1f6f5c' : i.o.status === 'Utført – til kontroll' ? '#b07a00' : '#b42318';
-          return <g key={'v' + i.o.id} data-m={i.o.id} style={{ cursor: ro ? 'pointer' : 'move' }}>
+          return <g key={'v' + i.o.id} data-m={i.o.id} style={{ cursor: ro ? 'pointer' : 'move' }} onPointerEnter={tipOn(i)} onPointerMove={tipMove} onPointerLeave={tipOff}>
             {on && <circle cx={x} cy={y - R0 * .2} r={R0 * 2.2} fill={col} fillOpacity={.18} />}
             <path d={`M${x} ${y - R0 * 1.25} L${x + R0 * 1.15} ${y + R0 * .75} L${x - R0 * 1.15} ${y + R0 * .75} Z`} fill={col} stroke="#fff" strokeWidth={2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
             <text x={x} y={y + R0 * .5} textAnchor="middle" fontSize={R0 * 1.25} fontWeight={700} fill="#fff" fontFamily="IBM Plex Sans,sans-serif">!</text>
@@ -312,7 +317,19 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
           {st.draft.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={i === 0 ? r * 1.5 : r} fill={i === 0 ? '#fff' : '#1f6f5c'} stroke="#1f6f5c" strokeWidth={2} vectorEffect="non-scaling-stroke" />)}
           {st.hover && r0 && <text x={st.hover[0] + 10 * kk} y={st.hover[1] - 10 * kk} fontSize={fs * .9} fill="#1f6f5c" stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{fmtM(Math.hypot(st.hover[0] - st.draft[st.draft.length - 1][0], st.hover[1] - st.draft[st.draft.length - 1][1]) * r0)}</text>}</g>}
         {!st.draft.length && st.hover && st.tool !== 'velg' && <circle cx={st.hover[0]} cy={st.hover[1]} r={r} fill="none" stroke="#1f6f5c" strokeWidth={2} vectorEffect="non-scaling-stroke" pointerEvents="none" />}
-      </svg></div>
+      </svg>
+      {tip && (() => { const i = tip.i; const sys = i.kind === 'k' ? byId('anlegg', i.o.anleggId) : i.kind === 'v' ? byId('anlegg', i.o.anleggId) : null; const kc = i.kind === 'v' && i.o.komponentId ? byId('komponenter', i.o.komponentId) : null;
+        const kode = i.kind === 'a' ? tfmSys(i.o, true) : i.kind === 'k' ? tfmKomp(i.o, true) : '#' + (i.o.nr || '');
+        const ekstra = i.kind === 'v' ? [i.o.status, i.o.alv].filter(Boolean).join(' · ') : [i.o.fabrikat, i.o.tg].filter(Boolean).join(' · ');
+        const left = Math.min(tip.x + 14, window.innerWidth - 320), top = tip.y + 16 > window.innerHeight - 90 ? tip.y - 80 : tip.y + 16;
+        return createPortal(<div className="plan-tip" style={{ left, top }}>
+          <div className="mono" style={{ fontWeight: 700, color: i.kind === 'v' ? '#b42318' : fagFarge(itemFag(i)) }}>{kode || '(uten TFM-kode)'}</div>
+          <div style={{ fontWeight: 600 }}>{itemNavn(i)}</div>
+          {i.kind === 'k' && sys && <div className="muted">i {tfmSys(sys)} {sys.navn || KOMP[sys.type]?.n}</div>}
+          {i.kind === 'v' && (kc || sys) && <div className="muted mono">{kc ? tfmKomp(kc) : tfmSys(sys!) + ' ' + (sys!.navn || KOMP[sys!.type]?.n || '')}</div>}
+          {ekstra && <div className="muted">{ekstra}</div>}
+        </div>, document.body); })()}
+      </div>
       <div className="pside">
         {st.tool === 'plasser' && <><h3>Plasser på tegningen</h3>
           {items.length + avItems.length ? <><select value={st.placeId} onChange={e => { st.placeId = e.target.value; st.flyttOk = ''; rr(); }}><option value="">– velg system, komponent eller avvik –</option>
