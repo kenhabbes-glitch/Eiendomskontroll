@@ -91,7 +91,12 @@ function LeverandorSok({ v, set, kind, sysKode }: { v: any; set: (x: any) => voi
       const { data, error } = await (sb as any).functions.invoke('leverandor-oppslag', { body: {
         fabrikat: v.fabrikat, betegnelse: v.navn || '', systemtype: KOMP[sys?.type]?.n || '', komponent: kind === 'k' ? (TFM_KODER.find(c => c[0] === String(v.kode || '').toUpperCase())?.[1] || v.kode || '') : '',
         nsKode: r?.kode || sysKode || '', nsNavn: r?.navn || '', aar: v.aar || '', kostAar: YEAR } });
-      if (error) { let m = error.message; try { const j = await error.context?.json?.(); if (j?.error) m = j.error; } catch { } throw new Error(m); }
+      if (error) {
+        const st = error.context?.status; let m = '';
+        try { const t = await error.context?.text?.(); try { m = JSON.parse(t)?.error || ''; } catch { m = ''; } } catch { }
+        if (!m) m = st === 546 || st === 504 ? 'Søket tok for lang tid og ble avbrutt. Prøv igjen.' : st === 401 ? 'Du er ikke innlogget lenger. Last siden på nytt.' : `Søket feilet (${st || error.message}).`;
+        throw new Error(m);
+      }
       if (data?.error) throw new Error(data.error);
       const d = { ...data, dato: today() }; setRes(d); set({ leverandorData: d });
     } catch (e: any) { setErr(e.message || String(e)); }
