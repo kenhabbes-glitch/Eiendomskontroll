@@ -3,7 +3,8 @@ import { Hjelp } from '../components/Hjelp';
 import { DOK_LEIE, VEDL_KAT } from '../lib/catalog';
 import { S, isAdmin, useStore } from '../lib/store';
 import { leieAreal, byId, eNavn, fd, intTxt, m2, pliktStatus } from '../lib/utils';
-import { bekreftPlikt, brev, editAvvik, editDok, editLeietaker, nyPlikt, setMatrise } from '../lib/actions';
+import { bekreftPlikt, brev, editAvvik, editDok, editLeietaker, nyPlikt, setMatrise, leggTilStandardPlikter } from '../lib/actions';
+import { PLIKTER, STD_PLIKTER } from '../lib/catalog';
 import { AvvikTable, DokTable, LeieTable, TaskTable } from '../components/tables';
 import { Chip, Empty, FileLink } from '../components/ui';
 import { Search, Sel, eiendomOpts, useFilter } from './common';
@@ -70,10 +71,10 @@ export function LeietakerView({ id }: { id: string }) {
       <div className="card"><h2>Vedlikeholdsansvar etter leieavtalen</h2><table className="small"><tbody>{cats.map(k => <tr key={k}><td style={{ padding: '5px 8px 5px 0' }}>{k}</td><td style={{ padding: '4px 0', width: 120 }}>
         <select value={mx[k] || 'Eier'} onChange={e => setMatrise(id, k, e.target.value)} style={{ border: '1px solid var(--line2)', borderRadius: 6, padding: '3px 6px', width: '100%' }}>{['Eier', 'Leietaker', 'Delt', 'Ikke aktuelt'].map(o => <option key={o}>{o}</option>)}</select></td></tr>)}</tbody></table></div>
     </div>
-    <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Internkontroll og plikter</h2><button className="btn sm" onClick={() => nyPlikt(id)}>+ Legg til plikt</button></div>
+    <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Internkontroll og plikter<Hjelp id="ik.underpunkt" /></h2>{(() => { const mangler = STD_PLIKTER.filter(k => !(l.plikter || []).some((p: any) => p.key === k)); return mangler.length > 0 && <button className="btn sm pri" onClick={() => leggTilStandardPlikter(id)} title={mangler.map(k => PLIKTER[k].n).join('\n')}>+ Legg til {mangler.length} manglende standardplikter</button>; })()}<button className="btn sm" onClick={() => nyPlikt(id)}>+ Legg til plikt</button></div>
       <div className="tbl-wrap"><table><thead><tr><th>Plikt</th><th>Hjemmel</th><th>Frekvens</th><th>Sist bekreftet</th><th>Neste</th><th>Status</th><th /></tr></thead><tbody>
         {(l.plikter || []).length ? l.plikter.map((p: any, i: number) => { const s = pliktStatus(p); const d = p.dokId && byId('dokumenter', p.dokId);
-          return <tr key={p.key + i}><td>{p.navn}{p.komm && <div className="small muted">{p.komm}</div>}{d?.fil && <div className="small"><FileLink fil={d.fil} /></div>}</td><td className="small muted">{p.hjemmel}</td><td className="small">{intTxt(p.frekvens)}</td>
+          const dk = PLIKTER[p.key]?.dok || []; return <tr key={p.key + i}><td>{p.navn}{dk.length > 0 && <div className="small" style={{ color: (p.sjekk || []).length >= dk.length ? 'var(--green)' : 'var(--muted)' }}>Sjekkliste: {(p.sjekk || []).length} av {dk.length} dokumenter mottatt</div>}{p.komm && <div className="small muted">{p.komm}</div>}{d?.fil && <div className="small"><FileLink fil={d.fil} /></div>}</td><td className="small muted">{p.hjemmel}</td><td className="small">{intTxt(p.frekvens)}</td>
             <td className="small">{fd(p.sist)}{p.form && <div className="muted">{p.form}</div>}</td><td className="small">{s.nx ? fd(s.nx) : '–'}</td><td><Chip c={s.c}>{s.t}</Chip></td><td><button className="btn sm" onClick={() => bekreftPlikt(id, i)}>Registrer</button></td></tr>; })
           : <tr><td colSpan={7} className="muted">Ingen plikter registrert.</td></tr>}
       </tbody></table></div></div>

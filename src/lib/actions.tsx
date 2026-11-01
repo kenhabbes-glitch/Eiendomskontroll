@@ -4,15 +4,16 @@ import React, { useState } from 'react';
 import { SERVICEAVTALE, TG_DEF, KG_DEF } from './catalog';
 import { levetidRef, midt, spenn } from './ns3451';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
-import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb } from './store';
+import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore } from './store';
 import { leieAreal, m2, FELLES_AVTALE } from './utils';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst, standardTagger, taggerFor } from './utils';
+import { ikDekning } from './utils';
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
 import { openPlan } from '../views/Arealer';
 import { AoPanel, HendelseListe, aoSnapshot } from './arbeidsordre';
 import { adresseFelter, brregData, enhetStatus, seEiendomUrl, virksomhetFraNaering, rensOrgnr } from './oppslag';
-import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip, DueChip, TaggChips, TaggVelger, type Field } from '../components/ui';
+import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip, DueChip, TaggChips, TaggVelger, Chip, type Field } from '../components/ui';
 
 const go = (p: string) => { location.hash = '#/' + p; };
 const eOpts = () => sortBy(S.eiendommer, e => e.navn).map(e => [e.id, e.navn] as [string, string]);
@@ -405,10 +406,50 @@ export function utfor(id: string) {
     },
   });
 }
+// Underpunkt per leietaker for eierkontroller som er koblet til leietakernes plikter
+function IkUnderpunkter({ o, close }: { o: Rec; close: () => void }) {
+  useStore();
+  const d = ikDekning(o, MALER); if (!d) return null;
+  return <>
+    <h3 style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 4 }}>Leietakernes dokumentasjon<Hjelp id="ik.underpunkt" size={15} />{o.malKey === 'brannovelse_bygg' && <Hjelp id="brannovelse" size={15} />}
+      <span className="grow" /><Chip c={d.n && d.nOk === d.n ? 'green' : d.nOk ? 'amber' : 'red'}>{d.nOk} av {d.n} leietakere</Chip></h3>
+    <p className="small muted" style={{ marginTop: -4 }}>Gjelder dokumentasjon bekreftet {d.fra ? 'fra ' + fd(d.fra) : 'i perioden'}. Kontrollen kvitteres ut automatisk når alle leietakere er dokumentert.</p>
+    {d.n ? <div className="tbl-wrap"><table><thead><tr><th>Leietaker</th><th>Plikter</th><th /></tr></thead><tbody>
+      {d.rader.map(r => <tr key={r.l.id}>
+        <td style={{ verticalAlign: 'top', whiteSpace: 'nowrap' }}><span style={{ color: r.ok ? 'var(--green)' : 'var(--red)', fontWeight: 700, marginRight: 6 }}>{r.ok ? '✓' : '○'}</span><a href={'#/leietaker/' + r.l.id} onClick={() => close()}>{r.l.navn}</a>
+          <div className="small muted" style={{ paddingLeft: 18 }}>{r.pl.filter(x => x.ok).length} av {r.pl.length} dokumentert</div></td>
+        <td>{r.pl.length ? r.pl.map(x => <div key={x.idx} className="small" style={{ display: 'flex', gap: 6, alignItems: 'baseline', marginBottom: 3 }}>
+          <span style={{ color: x.ok ? 'var(--green)' : 'var(--muted)' }}>{x.ok ? '✓' : '○'}</span>
+          <a href="#" onClick={e => { e.preventDefault(); bekreftPlikt(r.l.id, x.idx); }} style={{ color: 'inherit' }}>{x.p.navn}</a>
+          <span className="muted" style={{ whiteSpace: 'nowrap' }}>{x.p.sist ? fd(x.p.sist) + (!x.ok && x.s.o === 0 ? ' · forrige periode' : x.s.o === 2 ? ' · forfalt' : '') : 'mangler'}</span></div>)
+          : <span className="small muted">Ingen relevante plikter registrert – <a href={'#/leietaker/' + r.l.id} onClick={() => close()}>legg til</a></span>}</td>
+        <td style={{ verticalAlign: 'top' }}>{canEdit() && r.pl.some(x => !x.ok) && <button className="btn sm" onClick={() => { const f = r.pl.find(x => !x.ok)!; bekreftPlikt(r.l.id, f.idx); }}>Registrer</button>}</td></tr>)}
+    </tbody></table></div> : <p className="muted small">Ingen aktive leietakere på eiendommen.</p>}
+  </>;
+}
+
+// Kvitter ut eierkontroller automatisk når alle leietakere har dokumentert de koblede pliktene i perioden
+let autoKjorer = false;
+export async function autoKvitterIK() {
+  if (autoKjorer || !canEdit()) return; autoKjorer = true;
+  try {
+    for (const o of S.oppgaver) {
+      if (o.aktiv === false || !MALER[o.malKey]?.pl) continue;
+      const d = ikDekning(o, MALER); if (!d || !d.n || d.nOk < d.n) continue;
+      const dato = d.rader.flatMap(r => r.pl.map(x => x.p.sist)).filter(Boolean).sort().pop() || today();
+      const komm = `Kvittert ut automatisk: alle ${d.n} leietakere har dokumentert (${d.rader.map(r => r.l.navn).join(', ')}).`;
+      const h = [{ dato, av: 'Automatisk', res: 'OK – ingen avvik', komm, auto: true }, ...(o.historikk || [])].slice(0, 80);
+      await save('oppgaver', { ...o, historikk: h, sistUtfort: dato, nesteFrist: addInt(dato, o.intervall) });
+      toast(`«${o.navn}» er kvittert ut automatisk – alle leietakere har dokumentert`);
+    }
+  } finally { autoKjorer = false; }
+}
+
 export function visOppgave(id: string) {
   const o = byId('oppgaver', id); if (!o) return;
   showModal(o.navn, close => <>
     <dl className="dl"><dt>Eiendom</dt><dd>{eNavn(o.eiendomId)}</dd>{o.anleggId && <><dt>System</dt><dd>{aNavn(o.anleggId)}</dd></>}<dt>Type</dt><dd>{o.type} · {o.kategori}</dd><dt>Intervall</dt><dd>{intTxt(o.intervall)}</dd><dt>Neste frist</dt><dd><DueChip s={o.nesteFrist} /></dd><dt>Utføres av</dt><dd>{o.utfores || '–'}</dd><dt>Ansvar</dt><dd>{o.ansvar || 'Eier'}{o.leietakerId ? ' – ' + lNavn(o.leietakerId) : ''}</dd><dt>Hjemmel</dt><dd>{o.hjemmel || '–'}</dd>{o.notat && <><dt>Notater</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{o.notat}</dd></>}</dl>
+    <IkUnderpunkter o={o} close={close} />
     <h3 style={{ marginTop: 18 }}>Historikk</h3>
     {(o.historikk || []).length ? <div className="log">{o.historikk.map((h: any, i: number) => { const d = h.dokId && byId('dokumenter', h.dokId); return <div key={i}><span className="lt">{fd(h.dato)}</span> · <b>{h.res}</b>{h.av ? ' · ' + h.av : ''}{h.komm && <><br />{h.komm}</>}{d?.fil && <><br /><FileLink fil={d.fil} /></>}{(() => { const n = Math.max((h.avvik || []).length, S.avvik.filter(a => a.oppgaveId === o.id && a.oppdaget === h.dato).length); return n > 0 ? <><br /><span className="muted small">{n} avvik registrert</span></> : null; })()}{!(h.avvik || []).length && !S.avvik.some(a => a.oppgaveId === o.id && a.oppdaget === h.dato) && h.res === 'Avvik funnet' && <><br /><a href="#" className="small" onClick={e => { e.preventDefault(); close(); editAvvik(undefined, { eiendomId: o.eiendomId, anleggId: o.anleggId || '', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, oppdaget: h.dato, beskrivelse: h.komm || '', ansvar: o.ansvar || 'Eier', leietakerId: o.leietakerId || '' }); }}>Ingen avvik ble opprettet – registrer avvik fra denne kontrollen</a></>}</div>; })}</div> : <p className="muted">Ikke registrert utført ennå.</p>}
   </>, { foot: close => <>{canEdit() && <button className="btn" onClick={() => { close(); editOppgave(id); }}>Rediger</button>}<span className="grow" /><button className="btn pri" onClick={() => { close(); utfor(id); }}>Registrer utført</button></> });
@@ -538,7 +579,12 @@ export function editLeietaker(id?: string, preset: any = {}) {
 }
 export function bekreftPlikt(lid: string, idx: number) {
   const l = byId('leietakere', lid)!; const p = (l.plikter || [])[idx]; if (!p) return;
+  const dok = PLIKTER[p.key]?.dok || [];
   const fields: Field[] = [
+    ...(dok.length ? [{ k: 'sjekk', type: 'custom', label: 'Sjekkliste – dokumentasjon som skal innhentes', def: p.sjekk || [], help: 'ik.sjekkliste',
+      render: (v: any, set: any) => <div className="note small" style={{ color: 'var(--ink)' }}>{dok.map(t => { const on = (v.sjekk || []).includes(t); return <label key={t} style={{ display: 'flex', gap: 8, alignItems: 'start', margin: '3px 0', cursor: 'pointer', fontWeight: 400 }}>
+        <input type="checkbox" checked={on} onChange={() => set({ sjekk: on ? v.sjekk.filter((x: string) => x !== t) : [...(v.sjekk || []), t] })} style={{ marginTop: 3 }} />{t}</label>; })}
+        <div className="muted" style={{ marginTop: 4 }}>{(v.sjekk || []).length} av {dok.length} punkter mottatt</div></div> } as Field] : []),
     { k: 'sist', label: 'Bekreftet / dokumentert dato', type: 'date', def: today(), half: true },
     { k: 'form', label: 'Form', type: 'select', options: ['Skriftlig bekreftelse', 'Dokumentasjon mottatt', 'Kontrollert på befaring', 'Muntlig'], def: 'Skriftlig bekreftelse', half: true },
     { k: 'komm', label: 'Kommentar', type: 'textarea', def: p.komm || '' }, { k: 'fil', label: 'Dokumentasjon fra leietaker', type: 'file' },
@@ -548,11 +594,19 @@ export function bekreftPlikt(lid: string, idx: number) {
     title: p.navn, fields, top: <p className="muted small" style={{ marginTop: 0 }}>{p.hjemmel}{p.bekreftetAvLeietaker ? ` · Sist bekreftet av leietaker ${fd(p.sist)}` : ''}</p>,
     extraFoot: close => <button className="btn danger" onClick={async () => { if (await confirmBox('Fjerne denne plikten fra leietakeren?', 'Fjern')) { const pl = l.plikter.slice(); pl.splice(idx, 1); await save('leietakere', { ...l, plikter: pl }); close(); } }}>Fjern plikt</button>,
     onSave: async x => {
-      const pl = l.plikter.slice(); const np: Rec = { ...p, sist: x.sist, form: x.form, komm: x.komm, frekvens: { n: +x.in || 1, enhet: x.ie }, ikkeRelevant: x.ikkeRelevant, bekreftetAvLeietaker: false };
+      if (dok.length && !x.ikkeRelevant && (x.sjekk || []).length < dok.length && !(await confirmBox(`Bare ${(x.sjekk || []).length} av ${dok.length} punkter i sjekklisten er krysset av. Registrere plikten som dokumentert likevel?`, 'Registrer'))) return false;
+      const pl = l.plikter.slice(); const np: Rec = { ...p, sist: x.sist, form: x.form, komm: x.komm, sjekk: x.sjekk || [], frekvens: { n: +x.in || 1, enhet: x.ie }, ikkeRelevant: x.ikkeRelevant, bekreftetAvLeietaker: false };
       if (x.fil) { const f = await uploadFile(x.fil, l.eiendomId, l.id); if (f) np.dokId = await save('dokumenter', { eiendomId: l.eiendomId, leietakerId: l.id, type: 'Leietakers IK-dokumentasjon', tittel: p.navn + ' – ' + l.navn, dato: x.sist, fil: f }); }
-      pl[idx] = np; await save('leietakere', { ...l, plikter: pl }); toast('Bekreftelse registrert');
+      pl[idx] = np; await save('leietakere', { ...l, plikter: pl }); toast('Bekreftelse registrert'); setTimeout(autoKvitterIK, 300);
     },
   });
+}
+export async function leggTilStandardPlikter(lid: string) {
+  const l = byId('leietakere', lid)!; const have = (l.plikter || []).map((p: any) => p.key);
+  const nye = STD_PLIKTER.filter(k => !have.includes(k)).map(k => ({ key: k, navn: PLIKTER[k].n, hjemmel: PLIKTER[k].h, frekvens: { n: 1, enhet: 'år' }, sist: '' }));
+  // Oppdater også hjemmel/tekst på eksisterende standardplikter
+  const oppd = (l.plikter || []).map((p: any) => PLIKTER[p.key] ? { ...p, navn: PLIKTER[p.key].n, hjemmel: PLIKTER[p.key].h } : p);
+  await save('leietakere', { ...l, plikter: [...oppd, ...nye] }); toast(nye.length ? `La til ${nye.length} plikter: ${nye.map(p => p.navn.split(' ')[0]).join(', ')}` : 'Pliktene er oppdatert – ingen manglet');
 }
 export function nyPlikt(lid: string) {
   const l = byId('leietakere', lid)!; const have = (l.plikter || []).map((p: any) => p.key);

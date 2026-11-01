@@ -111,6 +111,22 @@ For TG2, TG3 og TGIU settes også konsekvensgrad (KG).` },
 
 Hvis leiekontrakten fastsetter fellesarealet (som m², prosent av fellesarealet eller prosentvis påslag), sammenlignes det med det faktiske. Differansen er over- eller underdekning, og kan vises i kroner.` },
 
+  'ik.underpunkt': { gruppe: 'Begreper', tittel: 'Leietakernes dokumentasjon (underpunkter)', tekst: `Noen av eiers kontroller er koblet til leietakernes plikter, for eksempel «Innhente bekreftelse på leietakers internkontroll og vedlikehold» og «Brannøvelse – samordnet evakueringsøvelse».
+
+- Hver aktiv leietaker på eiendommen vises som et underpunkt med sine plikter.
+- Et underpunkt er grønt når alle relevante plikter er bekreftet i perioden (siden forrige utkvittering) og ikke er forfalt.
+- Når alle leietakerne er grønne, kvitteres kontrollen ut automatisk, og neste frist settes.
+- Bekreftelser kan registreres av eier/forvalter, eller av leietaker selv i leietakerportalen.
+- Plikter merket «Ikke relevant» for en leietaker teller ikke med.` },
+  'ik.sjekkliste': { gruppe: 'Begreper', tittel: 'Sjekkliste for dokumentasjon', tekst: `Hver plikt har en sjekkliste over dokumentasjonen som bør innhentes fra leietaker, for eksempel branninstruks, deltakerliste fra brannøvelse eller risikovurdering i HMS-internkontrollen. Kryss av etter hvert som dokumentasjonen kommer inn, og legg ved filene. Du blir varslet hvis du registrerer en plikt som dokumentert uten at alle punktene er krysset av.` },
+  'brannovelse': { gruppe: 'Begreper', tittel: 'Brannøvelser – hva krever regelverket?', tekst: `Forskrift om brannforebygging § 12 pålegger virksomheten som bruker bygget å drive systematisk brannsikkerhetsarbeid, med rutiner for kunnskap om brann, en branninstruks for varsling, evakuering/redning og slokking, og brannøvelser og opplæring av alle ansatte. Etter § 13 skal dette dokumenteres.
+
+- Forskriften angir ikke et fast antall øvelser. Omfang og hyppighet skal tilpasses risiko og hvor komplisert bygget er. Minst én øvelse i året er vanlig praksis, og ofte høyere for bygg med mange personer eller sårbare brukere.
+- I bygg med flere leietakere må øvelser samordnes mellom eier og leietakerne (internkontrollforskriften § 6, arbeidsmiljøloven § 2-2).
+- Appen har derfor både en plikt for hver leietaker («Brannøvelse gjennomført og ansatte opplært») og en kontroll for eier («Brannøvelse – samordnet evakueringsøvelse for bygget») som viser status for hver leietaker.
+
+Kontroller alltid mot gjeldende forskrift og DSBs veiledning.` },
+
   // ---------------- Skjemafelt (kobles automatisk på feltnøkkel)
   'felt.tfmSys': { gruppe: 'Skjemafelt', tittel: 'TFM systemkode', tekst: `Systemkoden fra NS 3451, normalt tre sifre (f.eks. 360 luftbehandling, 443 nødlys). Koden bestemmer hovedgruppen systemet vises under, og hvilken levetid som foreslås.` },
   'felt.tfmLop': { gruppe: 'Skjemafelt', tittel: 'Systemløpenummer', tekst: `Skiller like systemer i samme bygg fra hverandre: 360.001, 360.002 osv. Foreslås automatisk.` },

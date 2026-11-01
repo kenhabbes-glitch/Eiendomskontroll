@@ -183,3 +183,21 @@ export function toCsv(rows: any[][]) { return rows.map(r => r.map(csvCell).join(
 // Kostnad satt fra nettsøk (forslag) og ikke endret siden
 export const erForslag = (o?: any) => !!(o && o.kostKilde?.type === 'forslag' && +o.kost > 0 && +o.kost === +o.kostKilde.belop);
 export const harForslag = (a: any) => erForslag(a) || sysKomp(a).some(erForslag);
+
+// ---- Leietakernes dokumentasjon knyttet til en eierkontroll (f.eks. «Innhente bekreftelse på leietakers internkontroll»)
+// Hver aktiv leietaker på eiendommen er et underpunkt. Et underpunkt er OK når alle relevante plikter er bekreftet i perioden.
+export type IkRad = { l: Rec; pl: { p: any; idx: number; ok: boolean; s: ReturnType<typeof pliktStatus> }[]; ok: boolean };
+export function ikDekning(o: Rec, MALER: Record<string, any>): { rader: IkRad[]; n: number; nOk: number; fra: string } | null {
+  const koblet = MALER[o.malKey]?.pl; if (!koblet) return null;
+  const iv = o.intervall || { n: 1, enhet: 'år' };
+  const periodeStart = o.nesteFrist ? addInt(o.nesteFrist, { n: -(+iv.n || 1), enhet: iv.enhet }) : '';
+  const etterSist = o.sistUtfort ? addDays(o.sistUtfort, 1) : '';
+  const fra = [periodeStart, etterSist].filter(Boolean).sort().pop() || '';
+  const lt = S.leietakere.filter(l => l.eiendomId === o.eiendomId && (!l.slutt || l.slutt >= today()));
+  const rader: IkRad[] = sortBy(lt, l => l.navn || '').map(l => {
+    const pl = (l.plikter || []).map((p: any, idx: number) => ({ p, idx })).filter(({ p }: any) => !p.ikkeRelevant && (koblet === 'alle' || koblet.includes(p.key)))
+      .map(({ p, idx }: any) => { const s = pliktStatus(p); return { p, idx, s, ok: !!p.sist && s.o === 0 && (!fra || p.sist >= fra) }; });
+    return { l, pl, ok: pl.length > 0 && pl.every((x: any) => x.ok) };
+  });
+  return { rader, n: rader.length, nOk: rader.filter(r => r.ok).length, fra };
+}

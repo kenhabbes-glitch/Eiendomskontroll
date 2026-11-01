@@ -1,5 +1,6 @@
 import React, { type ReactNode } from 'react';
-import { KOMP, DOK_PAAKREVD, AV_LUKKET, SERVICEAVTALE } from '../lib/catalog';
+import { KOMP, DOK_PAAKREVD, AV_LUKKET, SERVICEAVTALE, MALER } from '../lib/catalog';
+import { ikDekning } from '../lib/utils';
 import { S, canEdit, save } from '../lib/store';
 import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2, sysKostNaa, sysKostUtskift, sysKostTip, kompAar, egetAar, sysNaaverdi, kompNaaverdi, nvTip, saStatus, taggerFor, erForslag, harForslag } from '../lib/utils';
 const justTip = (a: any) => { const y = Math.max(compYear(a) || YEAR, YEAR); return `${kostTip(a)}. Prisjustert med KPI til utskiftingsåret ${y}.`; };
@@ -34,7 +35,7 @@ export function TaskTable({ list, showE = true, group = true }: { list: Rec[]; s
     }
     rows.push(<tr key={o.id} className="click" onClick={() => visOppgave(o.id)}>
       <td><DueChip s={o.nesteFrist} /></td>
-      <td><b style={{ fontWeight: 500 }}>{o.navn}</b>{o.anleggId && <div className="small muted">{aNavn(o.anleggId)}</div>}</td>
+      <td><b style={{ fontWeight: 500 }}>{o.navn}</b>{o.anleggId && <div className="small muted">{aNavn(o.anleggId)}</div>}{(() => { const d = ikDekning(o, MALER); return d && d.n > 0 ? <div className="small" style={{ color: d.nOk === d.n ? 'var(--green)' : 'var(--amber)' }}>{d.nOk} av {d.n} leietakere dokumentert</div> : null; })()}</td>
       {showE && <td>{eNavn(o.eiendomId)}</td>}
       <td><span className="tag">{o.type}</span><div className="small muted">{o.kategori}</div></td>
       <td className="small">{intTxt(o.intervall)}</td>

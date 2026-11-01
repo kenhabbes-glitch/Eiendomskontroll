@@ -1,7 +1,7 @@
 // Katalog: kontrollmaler, systemtyper med levetid, TFM-koder, leietakerplikter m.m.
 // Hjemler og intervaller er veiledende – kontroller mot gjeldende regelverk.
 export type Intervall = { n: number; enhet: 'uke' | 'mnd' | 'år' };
-export type Mal = { n: string; k: string; t: string; h: string; i: [number, 'uke' | 'mnd' | 'år']; u: string; lvl: 'e' | 'a'; b?: string };
+export type Mal = { n: string; k: string; t: string; h: string; i: [number, 'uke' | 'mnd' | 'år']; u: string; lvl: 'e' | 'a'; b?: string; pl?: string[] | 'alle' };
 export type KompType = { n: string; g: string; l: number; m?: string[] };
 
 export const MALER: Record<string, Mal> = {
@@ -9,8 +9,9 @@ export const MALER: Record<string, Mal> = {
   brann_dok:{n:"Brannteknisk dokumentasjon og branntegninger – årlig gjennomgang",k:"Brann",t:"Lovpålagt",h:"Forskrift om brannforebygging (FOB) §§ 4–5, § 10",i:[1,"år"],u:"Eier",lvl:"e",b:"Kontroller at brannkonsept, branntegninger og rømningsplaner er oppdatert og i samsvar med faktisk bruk og planløsning."},
   vernerunde_brann:{n:"Brannvernrunde fellesareal (rømningsveier, skilting, slokkeutstyr)",k:"Brann",t:"Egenkontroll",h:"FOB § 5",i:[3,"mnd"],u:"Driftsansvarlig",lvl:"e"},
   samordning:{n:"Samordning med leietakere (brann og HMS) – årlig møte/gjennomgang",k:"Internkontroll",t:"Lovpålagt",h:"Internkontrollforskriften § 6; arbeidsmiljøloven § 2-2; FOB",i:[1,"år"],u:"Eier",lvl:"e"},
+  brannovelse_bygg:{n:"Brannøvelse – samordnet evakueringsøvelse for bygget (eier og leietakere)",k:"Brann",t:"Samordning",h:"FOB § 12: brannøvelser og opplæring av alle ansatte (plikt for hver virksomhet som bruker bygget), dokumenteres etter § 13. Samordning mellom eier og leietakere: internkontrollforskriften § 6, aml. § 2-2. Omfang og hyppighet tilpasses risiko – minst årlig er vanlig praksis",i:[1,"år"],u:"Eier / brannvernansvarlig sammen med leietakerne",lvl:"e",pl:["brannovelse"]},
   eier_ik:{n:"Eiers internkontroll – årlig gjennomgang",k:"Internkontroll",t:"Lovpålagt",h:"Internkontrollforskriften § 5 nr. 8; FOB § 10",i:[1,"år"],u:"Eier",lvl:"e"},
-  leietaker_ik:{n:"Innhente bekreftelse på leietakers internkontroll og vedlikehold",k:"Internkontroll",t:"Egenkontroll",h:"Internkontrollforskriften §§ 5–6; leieavtalen",i:[1,"år"],u:"Eier",lvl:"e"},
+  leietaker_ik:{n:"Innhente bekreftelse på leietakers internkontroll og vedlikehold",k:"Internkontroll",t:"Egenkontroll",h:"Internkontrollforskriften §§ 5–6; FOB § 13 (brukers dokumentasjon); leieavtalen",i:[1,"år"],u:"Eier",lvl:"e",pl:"alle"},
   energiattest:{n:"Energiattest – fornyelse",k:"Energi",t:"Lovpålagt",h:"Energimerkeforskriften – yrkesbygg over 1000 m² skal ha gyldig energiattest synlig oppslått; attest gyldig i 10 år",i:[10,"år"],u:"Energirådgiver",lvl:"e"},
   tilstand:{n:"Tilstandsvurdering (NS 3424) og revisjon av vedlikeholdsplan",k:"Bygg",t:"Anbefalt",h:"NS 3424 / NS 3454",i:[5,"år"],u:"Rådgiver",lvl:"e"},
   uteomrade:{n:"Utvendig vernerunde (fasade, tak, adkomst, belysning, skilt)",k:"Bygg",t:"Egenkontroll",h:"Eiers aktsomhets- og vedlikeholdsplikt",i:[6,"mnd"],u:"Driftsansvarlig",lvl:"e"},
@@ -50,7 +51,7 @@ export const MALER: Record<string, Mal> = {
   trykk:{n:"Trykkpåkjent utstyr – periodisk kontroll",k:"Annet",t:"Lovpålagt",h:"Forskrift om håndtering av trykkpåkjent utstyr (intervall avhenger av kategori)",i:[1,"år"],u:"Kontrollorgan",lvl:"a"},
   lekeplass:{n:"Lekeplassutstyr – årlig hovedinspeksjon",k:"Annet",t:"Lovpålagt",h:"Forskrift om sikkerhet ved lekeplassutstyr; NS-EN 1176-7",i:[1,"år"],u:"Sertifisert inspektør",lvl:"a"},
 };
-export const PROP_MALER=["brann_dok","vernerunde_brann","samordning","eier_ik","leietaker_ik","energiattest","tilstand","uteomrade","snoeis","radon"];
+export const PROP_MALER=["brann_dok","vernerunde_brann","samordning","brannovelse_bygg","eier_ik","leietaker_ik","energiattest","tilstand","uteomrade","snoeis","radon"];
 export const KOMP: Record<string, KompType> = {
   tak_asfalt:{n:"Tak – asfaltbelegg/takpapp",g:"2 Bygning",l:25,m:["tak_inspeksjon"]},
   tak_folie:{n:"Tak – PVC/folie/membran",g:"2 Bygning",l:25,m:["tak_inspeksjon"]},
@@ -124,20 +125,23 @@ export const TFM_KODER: [string, string][] = [["AA","Bærende/romdannende konstr
  ["RB","Bevegelsesdetektor"],["RD","Differansetrykkgiver"],["RE","Elektrisk måling"],["RF","Mengdemåler"],["RH","Fuktgiver"],["RK","Kortleser"],["RP","Trykkgiver/manometer"],["RT","Temperaturgiver"],["RY","Røyk-/gassdetektor (brannmelder, CO₂)"],
  ["SB","Reguleringsventil"],["SC","Motorstyrt stengeventil"],["SG","Tilbakeslagsventil"],["SJ","Trykkreduksjons-/alarmventil (sprinkler)"],["SM","Manuell stengeventil"],["SQ","VAV-regulator"],["SR","Reguleringsspjeld"],["SS","Stengespjeld"],["SV","Strupeventil"],["SZ","Brann-/røykspjeld"],
  ["UB","Blandebatteri"],["UE","Stikkontakt/uttak"],["UH","Høyttaler"],["UN","Nødlys/ledelys"],["UO","Slangetrommel (brannslange)"],["UP","Lysarmatur"],["UZ","Dyse/sprinklerhode"],["XF","Vern (sikring, jordfeilbryter)"],["XM","Elektromotor"],["XQ","Effektbryter"],["XS","Bryter/trykknapp"]];
-export const PLIKTER: Record<string, { n: string; h: string }> = {
-  brannvernleder:{n:"Ansvarlig for brannsikkerhet (brannvernleder) utpekt og meldt til eier",h:"FOB kap. 3 (brukers plikter)"},
-  brann_syst:{n:"Systematisk brannsikkerhetsarbeid dokumentert (egenkontroller, rutiner)",h:"FOB §§ 12–13"},
-  brannovelse:{n:"Brannøvelse og opplæring av ansatte gjennomført",h:"FOB kap. 3; internkontrollforskriften"},
-  hms_ik:{n:"HMS-internkontroll etablert (risikovurdering, handlingsplan, årlig gjennomgang)",h:"Internkontrollforskriften § 5"},
-  samordningsavtale:{n:"Samordningsavtale brann/HMS signert og gjeldende",h:"Internkontrollforskriften § 6; aml. § 2-2"},
-  el_egne:{n:"Egne elektriske installasjoner og utstyr kontrollert",h:"FEL; internkontrollforskriften"},
-  vedlikehold:{n:"Vedlikehold iht. leieavtalen utført (innvendig, egne anlegg)",h:"Leieavtalen"},
-  forsikring:{n:"Gyldig forsikring for innbo/løsøre og ansvar",h:"Leieavtalen"},
-  endring:{n:"Ingen endret bruk/ombygging uten varsel til eier",h:"Pbl. § 20-1; leieavtalen"},
-  fett:{n:"Fettutskiller tømt og dokumentert (servering)",h:"Forurensningsforskriften kap. 15A / kommunal forskrift"},
-  fgass_egen:{n:"Egne kjøle-/fryseanlegg – lekkasjekontroll dokumentert",h:"Produktforskriften kap. 6a"},
+// Leietakers plikter. dok = sjekkliste over dokumentasjon eier bør innhente / leietaker bør kunne legge fram.
+export const PLIKTER: Record<string, { n: string; h: string; dok?: string[] }> = {
+  brannvernleder:{n:"Ansvarlig for brannsikkerhet (brannvernleder) utpekt og meldt til eier",h:"FOB § 12 (ansvarsforhold før og under brann)",dok:["Navn og kontaktinfo til brannvernleder/brannansvarlig","Stedfortreder","Dato meldt skriftlig til eier"]},
+  branninstruks:{n:"Branninstruks fastsatt og gjort kjent for alle ansatte",h:"FOB § 12 (instruks for varsling, evakuering/redning og slokking)",dok:["Branninstruks for virksomheten (varsling, evakuering/redning, slokking)","Bekreftelse på at instruksen er formidlet til alle ansatte","Rømningsplan/oppslag i egne lokaler"]},
+  brannovelse:{n:"Brannøvelse gjennomført og ansatte opplært",h:"FOB § 12 (brannøvelser og opplæring av alle ansatte) og § 13 (dokumentasjon)",dok:["Dato og type øvelse (evakuering, praktisk slokking, teoretisk)","Deltakerliste","Evaluering med læringspunkter og tiltak","Opplæring av nyansatte og vikarer (dato/liste)","Plan for neste øvelse"]},
+  rommingsvei:{n:"Rømningsveier i egne lokaler holdes frie, merket og funksjonelle",h:"FOB § 11 (rømningsveiene skal opprettholde sin funksjon)",dok:["Egenkontroll/sjekkliste for rømningsveier og nødutganger","Kontroll av slokkeutstyr i egne lokaler (tilgjengelig, ikke tildekket)","Avvik og tiltak"]},
+  brann_syst:{n:"Systematisk brannsikkerhetsarbeid dokumentert (mål, rutiner, egenkontroller)",h:"FOB §§ 12–13",dok:["Mål og plan for brannsikkerhetsarbeidet","Rutiner for brannsikker drift (f.eks. varme arbeider, avfall, elektrisk utstyr)","Gjennomførte egenkontroller i perioden","Avviksliste med lukking","Årlig gjennomgang av brannvernarbeidet"]},
+  hms_ik:{n:"HMS-internkontroll etablert (risikovurdering, handlingsplan, årlig gjennomgang)",h:"Internkontrollforskriften § 5",dok:["Mål for helse, miljø og sikkerhet","Oversikt over ansvar, oppgaver og myndighet (organisering)","Kartlegging og risikovurdering med handlingsplan","Rutiner for å avdekke, rette og forebygge avvik","Oversikt over relevante lover og forskrifter","Dokumentert årlig gjennomgang av internkontrollen (§ 5 nr. 8)"]},
+  samordningsavtale:{n:"Samordningsavtale brann/HMS signert og gjeldende",h:"Internkontrollforskriften § 6; aml. § 2-2",dok:["Signert samordningsavtale","Kontaktpersoner for brann og HMS","Dato for siste samordningsmøte"]},
+  el_egne:{n:"Egne elektriske installasjoner og utstyr kontrollert",h:"FEL; internkontrollforskriften",dok:["Oversikt over egne el-anlegg og utstyr","Kontrollrapport / internkontroll el for egne installasjoner","Termografirapport hvis forsikringen krever det"]},
+  vedlikehold:{n:"Vedlikehold iht. leieavtalen utført (innvendig, egne anlegg)",h:"Leieavtalen",dok:["Bekreftelse på utført vedlikehold iht. ansvarsfordelingen","Servicerapporter for anlegg leietaker har ansvar for"]},
+  forsikring:{n:"Gyldig forsikring for innbo/løsøre og ansvar",h:"Leieavtalen",dok:["Forsikringsbevis/polise med gyldighetsdato"]},
+  endring:{n:"Ingen endret bruk/ombygging uten varsel til eier",h:"Pbl. § 20-1; leieavtalen",dok:["Skriftlig bekreftelse på at det ikke er gjort endringer, eller varsel/søknad og ansvarsrett ved ombygging"]},
+  fett:{n:"Fettutskiller tømt og dokumentert (servering)",h:"Forurensningsforskriften kap. 15A / kommunal forskrift",dok:["Tømmebevis fra godkjent firma","Kontroll/serviceattest"]},
+  fgass_egen:{n:"Egne kjøle-/fryseanlegg – lekkasjekontroll dokumentert",h:"Produktforskriften kap. 6a",dok:["Lekkasjekontrollrapport fra sertifisert kuldetekniker","Servicelogg for anlegget"]},
 };
-export const STD_PLIKTER=["brannvernleder","brann_syst","brannovelse","hms_ik","samordningsavtale","el_egne","vedlikehold","forsikring","endring"];
+export const STD_PLIKTER=["brannvernleder","branninstruks","brannovelse","rommingsvei","brann_syst","hms_ik","samordningsavtale","el_egne","vedlikehold","forsikring","endring"];
 export const VEDL_KAT: [string, string][] = [
   ["Tak, fasader, vinduer og utvendig vedlikehold","Eier"],
   ["Bærende konstruksjoner","Eier"],

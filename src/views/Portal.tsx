@@ -1,4 +1,5 @@
 import React from 'react';
+import { PLIKTER } from '../lib/catalog';
 import { Hjelp } from '../components/Hjelp';
 import { AV_LUKKET, VEDL_KAT } from '../lib/catalog';
 import { S, bump, feiltekst, save, sb, state, toast, uploadFile, useStore } from '../lib/store';
@@ -32,8 +33,10 @@ function bekreft(l: any, p: any) {
   formModal({
     title: p.navn, saveTxt: 'Bekreft',
     top: <p className="small muted" style={{ marginTop: 0 }}>{p.hjemmel}. Ved å bekrefte erklærer du at plikten er ivaretatt for virksomheten. Legg gjerne ved dokumentasjon.</p>,
-    fields: [{ k: 'dato', label: 'Dato', type: 'date', def: today(), half: true }, { k: 'komm', label: 'Kommentar', type: 'textarea', ph: 'F.eks. navn på brannvernleder, dato for øvelse …' }, { k: 'fil', label: 'Dokumentasjon (valgfritt)', type: 'file' }],
+    fields: [...((PLIKTER[p.key]?.dok || []).length ? [{ k: 'sjekk', type: 'custom', label: 'Dette skal dokumenteres', def: [], render: (v: any, set: any) => <div className="note small" style={{ color: 'var(--ink)' }}>{PLIKTER[p.key].dok!.map(t => { const on = (v.sjekk || []).includes(t); return <label key={t} style={{ display: 'flex', gap: 8, alignItems: 'start', margin: '3px 0', cursor: 'pointer', fontWeight: 400 }}><input type="checkbox" checked={on} onChange={() => set({ sjekk: on ? v.sjekk.filter((x: string) => x !== t) : [...(v.sjekk || []), t] })} style={{ marginTop: 3 }} />{t}</label>; })}<div className="muted" style={{ marginTop: 4 }}>Kryss av for det som er på plass, og legg ved dokumentasjonen under.</div></div> } as any] : []),
+      { k: 'dato', label: 'Dato', type: 'date', def: today(), half: true }, { k: 'komm', label: 'Kommentar', type: 'textarea', ph: 'F.eks. navn på brannvernleder, dato for øvelse …' }, { k: 'fil', label: 'Dokumentasjon (valgfritt)', type: 'file' }],
     onSave: async v => {
+      if ((v.sjekk || []).length) v.komm = [v.komm, 'På plass: ' + v.sjekk.join('; ')].filter(Boolean).join('\n');
       let dokId: string | null = null;
       if (v.fil) { const f = await uploadFile(v.fil, l.eiendomId, l.id); if (f) dokId = await save('dokumenter', { eiendomId: l.eiendomId, leietakerId: l.id, type: 'Leietakers IK-dokumentasjon', tittel: p.navn + ' – ' + l.navn, dato: v.dato, fil: f }); }
       const { error } = await sb.rpc('bekreft_plikt', { p_key: p.key, p_dato: v.dato, p_kommentar: v.komm || '', p_dok: dokId });

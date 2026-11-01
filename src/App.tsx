@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { autoKvitterIK } from './lib/actions';
 import { canEdit, configured, initAuth, isAdmin, isStaff, isTenant, isUtforer, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
 import { activeTasks, dUntil, openAvvik } from './lib/utils';
 import { ModalHost, Tip, Toast } from './components/ui';
@@ -66,6 +67,8 @@ export default function App() {
   useEffect(() => { initAuth(); }, []);
   useStore();
   const r = useRoute();
+  // Kvitter ut eierkontroller automatisk når alle leietakere har dokumentert (sjekkes når data endres)
+  useEffect(() => { if (state.ready && state.me && canEdit()) { const t = setTimeout(() => autoKvitterIK(), 800); return () => clearTimeout(t); } }, [state.version, state.ready]);
   if (!configured) return <Setup />;
   if (!state.ready) return <div className="login"><div className="card"><p>Laster …</p></div></div>;
   if (state.recovery && state.me) return <SetPassword />;
