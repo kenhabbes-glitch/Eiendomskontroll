@@ -106,6 +106,7 @@ function LeverandorSok({ v, set, kind, sysKode }: { v: any; set: (x: any) => voi
       {!String(v.fabrikat || '').trim() && <span className="muted">Fyll inn fabrikat/modell først.</span>}</div>
     {err && <div style={{ color: 'var(--red)', marginTop: 4 }}>{err}</div>}
     {res?.resultat && <div style={{ marginTop: 6 }}>
+      {res.utenSok && <div style={{ color: '#9a5b00', marginBottom: 4 }}>⚠ Google-søk var ikke tilgjengelig på gratisnivået for denne modellen. Tallene er modellens generelle kunnskap, ikke leverandørens egne data. Bruk dem med ekstra forsiktighet.</div>}
       {res.resultat.produkt && <div className="muted">Tolket som: {res.resultat.produkt}{res.dato ? ` · søkt ${fd(res.dato)}` : ''}{res.motor ? ` · ${res.motor}` : ''}</div>}
       <div style={{ marginTop: 4 }}>Levetid: {L?.aar || L?.min ? <><b>{L.aar || `${L.min}–${L.max}`} år</b>{L.type ? ` (${L.type})` : ''}{L.kilde_url && <> · <a href={L.kilde_url} target="_blank" rel="noopener noreferrer">kilde</a></>}{L.kommentar && <span className="muted"> – {L.kommentar}</span>}
         {' '}<button type="button" className="btn sm" onClick={() => set({ levetid: L.aar || Math.round((L.min + L.max) / 2), levetidKilde: `leverandør (${res.resultat.produkt || v.fabrikat})` })}>Bruk</button></> : <span className="muted">ikke funnet</span>}</div>

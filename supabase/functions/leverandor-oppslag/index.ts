@@ -2,7 +2,7 @@
 // Søker på nett (Google Gemini + Google Search; ev. Anthropic som reserve) etter leverandørens antatte levetid
 // og utskiftings-/retrofitkostnad for et fabrikat/modell. Kun admin/forvalter.
 // Krever hemmeligheten GEMINI_API_KEY (gratis i Google AI Studio) i Supabase → Edge Functions → Secrets.
-// Valgfritt: GEMINI_MODEL (standard gemini-2.5-flash), ANTHROPIC_API_KEY (brukes bare hvis Gemini-nøkkel mangler).
+// Valgfritt: GEMINI_MODEL (standard: nyeste tilgjengelige Flash-modell), ANTHROPIC_API_KEY (brukes bare hvis Gemini-nøkkel mangler).
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const CORS = {
@@ -24,6 +24,22 @@ Svar til slutt KUN med ett JSON-objekt (ingen tekst før/etter, ingen markdown) 
 "retrofit":{"belop_nok":number|null,"omfang":string,"kilde_url":string|null,"kommentar":string}|null,
 "usikkerhet":"lav"|"middels"|"høy","notat":string}
 Skriv tekstfeltene på norsk og kort.`;
+
+// Finn nyeste tilgjengelige «gemini-X.Y-flash» (ikke lite/preview/live/image/tts) for denne nøkkelen
+async function nyesteFlash(key: string): Promise<string> {
+  try {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000', { headers: { 'x-goog-api-key': key } });
+    const j = await r.json();
+    const kand = (j.models || [])
+      .filter((m: any) => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map((m: any) => String(m.name).replace('models/', ''))
+      .map((n: string) => ({ n, v: n.match(/^gemini-(\d+(?:\.\d+)?)-flash(?:-latest)?$/) }))
+      .filter((x: any) => x.v)
+      .sort((a: any, b: any) => parseFloat(b.v[1]) - parseFloat(a.v[1]) || a.n.length - b.n.length);
+    if (kand.length) return kand[0].n;
+  } catch { /* faller tilbake */ }
+  return 'gemini-flash-latest';
+}
 
 function plukkJson(t: string) {
   const s = t.indexOf('{'), e = t.lastIndexOf('}');
@@ -59,27 +75,32 @@ Deno.serve(async (req) => {
 
     const kilder = new Map<string, string>();
     let tekst = ''; let motor = '';
+    let utenSok = false;
     if (gKey) {
-      // Google Gemini med Google Search-grounding (gratisnivå: gemini-2.5-flash, inntil 500 søk/døgn)
-      motor = Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash';
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${motor}:generateContent`, {
+      // Google Gemini med Google Search-grounding. Modellen velges automatisk (nyeste Flash) med mindre GEMINI_MODEL er satt.
+      motor = Deno.env.get('GEMINI_MODEL') || await nyesteFlash(gKey);
+      const kall = (medSok: boolean) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${motor}:generateContent`, {
         method: 'POST',
         headers: { 'x-goog-api-key': gKey, 'content-type': 'application/json' },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM }] },
+          systemInstruction: { parts: [{ text: SYSTEM + (medSok ? '' : '\nDu har IKKE tilgang til nettsøk nå. Svar ut fra generell kunnskap, sett alle kilde_url til null og usikkerhet til "høy".') }] },
           contents: [{ role: 'user', parts: [{ text: linjer }] }],
-          tools: [{ google_search: {} }],
-          generationConfig: { temperature: 0.2 },
+          ...(medSok ? { tools: [{ google_search: {} }] } : {}),
         }),
       });
-      const j = await r.json();
+      let r = await kall(true); let j = await r.json();
       if (!r.ok) {
-        const m = j?.error?.message || String(r.status);
-        if (r.status === 429) return svar({ error: 'Gratiskvoten hos Google er brukt opp for i dag (nullstilles kl. 09 norsk tid). Prøv igjen senere. (' + m.slice(0, 120) + ')' }, 429);
-        return svar({ error: 'Google Gemini: ' + m }, 502);
+        const m = String(j?.error?.message || r.status);
+        // Gratisnivået gir ikke Google-søk på alle modeller (kvote 0 / ikke støttet) → prøv uten søk
+        if (r.status === 429 || /search|grounding|tool/i.test(m)) {
+          const r2 = await kall(false); const j2 = await r2.json();
+          if (r2.ok) { r = r2; j = j2; utenSok = true; }
+          else if (r2.status === 429) return svar({ error: 'Gratiskvoten hos Google er brukt opp for nå. Prøv igjen senere (døgnkvoten nullstilles ca. kl. 09 norsk tid).' }, 429);
+          else return svar({ error: `Google Gemini (${motor}): ` + (j2?.error?.message || r2.status) }, 502);
+        } else return svar({ error: `Google Gemini (${motor}): ` + m }, 502);
       }
       const c = j.candidates?.[0];
-      tekst = (c?.content?.parts || []).map((x: any) => x.text || '').join('');
+      tekst = (c?.content?.parts || []).filter((x: any) => !x.thought).map((x: any) => x.text || '').join('');
       for (const g of c?.groundingMetadata?.groundingChunks || []) if (g.web?.uri) kilder.set(g.web.uri, g.web.title || g.web.uri);
     } else {
       motor = 'claude-sonnet-5-5';
@@ -102,7 +123,7 @@ Deno.serve(async (req) => {
     }
     const resultat = plukkJson(tekst);
     if (!resultat) return svar({ error: 'Fikk ikke tolket svaret. Prøv igjen eller skriv fabrikat/modell mer presist.', raa: tekst.slice(0, 500) }, 502);
-    return svar({ resultat, motor, kilder: [...kilder].map(([url, title]) => ({ url, title })) });
+    return svar({ resultat, motor, utenSok, kilder: [...kilder].map(([url, title]) => ({ url, title })) });
   } catch (e) {
     return svar({ error: String((e as Error)?.message || e) }, 500);
   }
