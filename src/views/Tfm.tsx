@@ -8,8 +8,16 @@ import { Search, Sel, eiendomOpts, useFilter } from './common';
 import { Pin } from '../components/tables';
 import { openPlan } from './Arealer';
 
+const HOVEDGRUPPER: Record<string, string> = { '1': 'Felleskostnader', '2': 'Bygning', '3': 'VVS-installasjoner', '4': 'Elkraftinstallasjoner', '5': 'Tele og automatisering', '6': 'Andre installasjoner', '7': 'Utendørs' };
+const APEN_KEY = 'tfmApen';
+function useApen() {
+  const [apen, setA] = React.useState<Record<string, boolean>>(() => { try { return JSON.parse(localStorage.getItem(APEN_KEY) || '{}'); } catch { return {}; } });
+  const lagre = (n: Record<string, boolean>) => { setA(n); try { localStorage.setItem(APEN_KEY, JSON.stringify(n)); } catch { } };
+  return { apen, toggle: (k: string) => lagre({ ...apen, [k]: !apen[k] }), settApen: (ks: string[], v: boolean) => { const n = { ...apen }; ks.forEach(k => { if (v) n[k] = true; else delete n[k]; }); lagre(n); } };
+}
+
 export function TfmRegister() {
-  useStore();
+  useStore(); const { apen, toggle, settApen } = useApen();
   const [f, setF] = useFilter('tfm', { e: '', k: '', q: '' });
   let rows: any[] = [];
   S.anlegg.forEach(a => {
@@ -18,8 +26,16 @@ export function TfmRegister() {
   });
   if (f.e) rows = rows.filter(r => r.e === f.e); if (f.k === 's') rows = rows.filter(r => r.kind === 's'); if (f.k === 'k') rows = rows.filter(r => r.kind === 'k'); if (f.k === 'mangler') rows = rows.filter(r => r.kind === 's' && !r.o.tfmSys); if (f.k === 'uplassert') rows = rows.filter(r => !r.o.pos);
   if (f.q) { const q = f.q.toLowerCase(); rows = rows.filter(r => (r.code + ' ' + r.navn + ' ' + r.fab + ' ' + (r.plass || '')).toLowerCase().includes(q)); }
-  rows.sort((a, b) => (eNavn(a.e) + a.sort).localeCompare(eNavn(b.e) + b.sort));
+  const nk = (r: any) => { const sys = r.kind === 's' ? r.o : S.anlegg.find(a => a.id === r.o.anleggId); return (sys?.tfmSys || '999') + '.' + pad(sys?.tfmLop) + '|' + eNavn(r.e) + '|' + (sys?.id || '') + '|' + (r.kind === 's' ? '' : '~' + (r.o.kode || '') + pad(r.o.lop)); };
+  rows.sort((a, b) => nk(a).localeCompare(nk(b)));
   const mis = S.anlegg.filter(a => !a.tfmSys).length;
+  // Gruppering etter hovedgruppe i NS 3451 (første siffer i systemkoden)
+  const sysFor = (r: any) => r.kind === 's' ? r.o : S.anlegg.find(a => a.id === r.o.anleggId);
+  const hg = (r: any) => String(sysFor(r)?.tfmSys || '')[0] || '';
+  const grupper = [...new Set(rows.map(hg))].sort((x, y) => (x || '9z').localeCompare(y || '9z')).map(k => ({ k, n: k ? HOVEDGRUPPER[k] || 'Hovedgruppe ' + k : 'Uten TFM-kode', rader: rows.filter(r => hg(r) === k) }));
+  const tving = !!f.q || f.k === 'k';
+  const avFor = (r: any) => openAvvik().filter(a => r.kind === 's' ? a.anleggId === r.o.id && !a.komponentId : a.komponentId === r.o.id).length;
+  const alleNokler = () => [...grupper.map(g => 'g' + g.k), ...rows.filter(r => r.kind === 's').map(r => 's' + r.o.id)];
   const csv = () => {
     const L: any[][] = [['TFM-kode', 'Type', 'Betegnelse', 'Eiendom', 'Fabrikat', 'Plassering', 'Serienr', 'Installert år', 'Levetid', 'Tilstand', ...(canEdit() ? ['Kostnad'] : [])]];
     sortBy(S.anlegg, a => eNavn(a.eiendomId) + (a.tfmSys || '999') + pad(a.tfmLop)).forEach(a => {
@@ -33,12 +49,23 @@ export function TfmRegister() {
     <div className="toolbar"><Search value={f.q} onChange={q => setF({ q })} ph="Søk TFM-kode, f.eks. 360.001-JV …" w={280} /><Sel value={f.e} onChange={e => setF({ e })} opts={eiendomOpts()} empty="Alle eiendommer" />
       <Sel value={f.k} onChange={k => setF({ k })} opts={[['s', 'Bare systemer'], ['k', 'Bare komponenter'], ['mangler', 'Systemer uten TFM-kode'], ['uplassert', 'Ikke plassert på tegning']]} empty="Systemer og komponenter" /><span className="muted small">{rows.length} rader</span>
       {f.e && (() => { const T = sortBy(S.tegninger.filter(t => t.eiendomId === f.e), t => +t.etasje || 0); return T.length ? <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>{T.map(t => <button key={t.id} className="btn sm" onClick={() => openPlan(t.id, { mode: 'tfm' })}>Systemkart: {t.navn}</button>)}</span> : null; })()}</div>
-    {rows.length ? <div className="tbl-wrap"><table><thead><tr><th>TFM-kode</th><th>Betegnelse</th><th>Eiendom</th><th>Fabrikat</th><th>Plassering</th><th className="num">År</th><th>Tilstand</th><th className="num">Åpne avvik</th></tr></thead><tbody>
-      {rows.slice(0, 800).map(r => { const av = openAvvik().filter(a => r.kind === 's' ? a.anleggId === r.o.id && !a.komponentId : a.komponentId === r.o.id).length;
-        return <tr key={r.o.id} className={'click ' + (r.kind === 's' ? 'sysrow' : '')} onClick={() => r.kind === 's' ? editAnlegg(r.o.id) : editKomponent(r.o.id)}>
-          <td className={'mono ' + (r.kind === 'k' ? 'small' : '')} style={r.kind === 's' ? { fontWeight: 600, whiteSpace: 'nowrap' } : { paddingLeft: 24, whiteSpace: 'nowrap' }}>{r.code || '–'}<Pin o={r.o} /></td><td>{r.navn}</td><td className="small">{eNavn(r.e)}</td><td className="small">{r.fab}</td><td className="small">{r.plass}</td><td className="num">{r.aar || '–'}</td><td><TgChip t={r.o.tg} /></td>
-          <td className="num">{av ? <span style={{ color: 'var(--red)', fontWeight: 600 }}>{av}</span> : 0}</td></tr>; })}
-    </tbody></table></div> : <div className="card"><Empty t="Ingen systemer eller komponenter">Registrer systemer under en eiendom, eller bruk «Importer TFM-liste» der.</Empty></div>}
-    {rows.length > 800 && <p className="small muted">Viser 800 av {rows.length}. Bruk søk eller filter.</p>}
+    {rows.length ? <><div className="toolbar" style={{ marginTop: -4 }}><button className="btn sm" onClick={() => settApen(alleNokler(), true)}>▾ Vis alle</button><button className="btn sm" onClick={() => settApen(alleNokler(), false)}>▸ Skjul alle</button>{tving && <span className="small muted">Søk/filter er aktivt – alt vises utvidet</span>}</div>
+      <div className="tbl-wrap"><table><thead><tr><th>TFM-kode</th><th>Betegnelse</th><th>Eiendom</th><th>Fabrikat</th><th>Plassering</th><th className="num">År</th><th>Tilstand</th><th className="num">Åpne avvik</th></tr></thead><tbody>
+      {grupper.map(g => { const gOpen = tving || !!apen['g' + g.k]; const nS = g.rader.filter(r => r.kind === 's').length, nK = g.rader.filter(r => r.kind === 'k').length; const gAv = g.rader.reduce((s0, r) => s0 + avFor(r), 0);
+        return <React.Fragment key={'g' + g.k}>
+          <tr className="click grp" onClick={() => !tving && toggle('g' + g.k)} style={{ background: 'var(--bg2, #eef0ec)' }}>
+            <td colSpan={7} style={{ fontWeight: 700 }}><span style={{ display: 'inline-block', width: 18, color: 'var(--muted)' }}>{gOpen ? '▾' : '▸'}</span><span className="mono" style={{ marginRight: 8 }}>{g.k || '–'}</span>{g.n}<span className="small muted" style={{ fontWeight: 400, marginLeft: 10 }}>{nS} system{nS === 1 ? '' : 'er'}{nK ? ` · ${nK} komponent${nK === 1 ? '' : 'er'}` : ''}</span></td>
+            <td className="num">{gAv ? <span style={{ color: 'var(--red)', fontWeight: 600 }}>{gAv}</span> : 0}</td></tr>
+          {gOpen && g.rader.map(r => { const av = avFor(r);
+            if (r.kind === 'k' && !tving && !apen['s' + r.o.anleggId] && g.rader.some(x => x.kind === 's' && x.o.id === r.o.anleggId)) return null;
+            const ks = r.kind === 's' ? g.rader.filter(x => x.kind === 'k' && x.o.anleggId === r.o.id).length : 0; const sOpen = tving || !!apen['s' + r.o.id];
+            return <tr key={r.o.id} className={'click ' + (r.kind === 's' ? 'sysrow' : '')} onClick={() => r.kind === 's' ? editAnlegg(r.o.id) : editKomponent(r.o.id)}>
+              <td className={'mono ' + (r.kind === 'k' ? 'small' : '')} style={r.kind === 's' ? { fontWeight: 600, whiteSpace: 'nowrap', paddingLeft: 22 } : { paddingLeft: 58, whiteSpace: 'nowrap' }}>
+                {r.kind === 's' && <span onClick={e => { e.stopPropagation(); if (ks && !tving) toggle('s' + r.o.id); }} title={ks ? (sOpen ? 'Skjul komponenter' : 'Vis komponenter') : ''} style={{ display: 'inline-block', width: 22, cursor: ks ? 'pointer' : 'default', color: 'var(--muted)', fontFamily: 'sans-serif' }}>{ks ? (sOpen ? '▾' : '▸') : ''}</span>}
+                {r.code || '–'}<Pin o={r.o} />{r.kind === 's' && ks > 0 && !sOpen && <span className="small muted" style={{ fontWeight: 400, marginLeft: 6, fontFamily: 'sans-serif' }}>({ks})</span>}</td>
+              <td>{r.navn}</td><td className="small">{eNavn(r.e)}</td><td className="small">{r.fab}</td><td className="small">{r.plass}</td><td className="num">{r.aar || '–'}</td><td><TgChip t={r.o.tg} /></td>
+              <td className="num">{av ? <span style={{ color: 'var(--red)', fontWeight: 600 }}>{av}</span> : 0}</td></tr>; })}
+        </React.Fragment>; })}
+    </tbody></table></div></> : <div className="card"><Empty t="Ingen systemer eller komponenter">Registrer systemer under en eiendom, eller bruk «Importer TFM-liste» der.</Empty></div>}
   </>;
 }
