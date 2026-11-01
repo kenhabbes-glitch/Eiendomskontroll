@@ -161,6 +161,13 @@ Kontroller alltid mot gjeldende forskrift og DSBs veiledning.` },
 - Dokumenter registreres under «Dokumenter» og får NS 3451-kode automatisk ut fra dokumenttypen (f.eks. brannkonsept → 17, FDV → 19, ferdigattest → 12). Koden kan overstyres i dokumentet.
 - I «Systemer og komponenter (TFM)» vises gruppe 1 som en oversikt over eiendommens dokumenter, sortert på 10–19, slik at hele NS 3451-strukturen er samlet ett sted.` },
 
+  'kontroller.generer': { gruppe: 'Begreper', tittel: 'Generer / utvid kontrollplan', tekst: `Knappen går gjennom eiendommen og foreslår kontroller som mangler i kontrollplanen. Den oppretter ingenting før du har valgt og trykket «Opprett valgte».
+
+- Faste kontroller for eiendommen: brannteknisk dokumentasjon, brannvernrunde, samordning med leietakere, samordnet brannøvelse, eiers internkontroll, innhenting av leietakers dokumentasjon, energiattest, tilstandsvurdering, utvendig vernerunde, snø og is, radon.
+- Standardkontroller for hvert registrert system (f.eks. årlig kontroll og månedlig egenkontroll av brannalarm), der de mangler.
+- Kontroller som allerede finnes, vises ikke. Knappen er derfor trygg å bruke når som helst – f.eks. etter at du har registrert nye systemer, eller etter at appen har fått nye kontrollmaler.
+- Du velger første frist for de nye kontrollene. Er en kontroll utført tidligere, registrerer du den etterpå med «Utført», så beregnes neste frist riktig.` },
+
   // ---------------- Skjemafelt (kobles automatisk på feltnøkkel)
   'felt.tfmSys': { gruppe: 'Skjemafelt', tittel: 'TFM systemkode', tekst: `Systemkoden fra NS 3451, normalt tre sifre (f.eks. 360 luftbehandling, 443 nødlys). Koden bestemmer hovedgruppen systemet vises under, og hvilken levetid som foreslås.` },
   'felt.tfmLop': { gruppe: 'Skjemafelt', tittel: 'Systemløpenummer', tekst: `Skiller like systemer i samme bygg fra hverandre: 360.001, 360.002 osv. Foreslås automatisk.` },
