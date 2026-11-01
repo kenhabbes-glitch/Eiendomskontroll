@@ -82,11 +82,11 @@ function LevetidHjelp({ v, set, sysKode, typeLev }: { v: any; set: (x: any) => v
 }
 
 function LeverandorSok({ v, set, kind, sysKode }: { v: any; set: (x: any) => void; kind: 'a' | 'k'; sysKode?: string }) {
-  const [busy, setBusy] = useState(false); const [res, setRes] = useState<any>(v.leverandorData || null); const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false); const [sek, setSek] = useState(0); const [res, setRes] = useState<any>(v.leverandorData || null); const [err, setErr] = useState('');
   if (!canEdit()) return null;
   const r = levetidRef(sysKode); const sys = kind === 'k' ? byId('anlegg', v.anleggId) : v;
   const sok = async () => {
-    setBusy(true); setErr('');
+    setBusy(true); setErr(''); setSek(0); const t0 = Date.now(); const tm = setInterval(() => setSek(Math.round((Date.now() - t0) / 1000)), 1000);
     try {
       const { data, error } = await (sb as any).functions.invoke('leverandor-oppslag', { body: {
         fabrikat: v.fabrikat, betegnelse: v.navn || '', systemtype: KOMP[sys?.type]?.n || '', komponent: kind === 'k' ? (TFM_KODER.find(c => c[0] === String(v.kode || '').toUpperCase())?.[1] || v.kode || '') : '',
@@ -95,18 +95,19 @@ function LeverandorSok({ v, set, kind, sysKode }: { v: any; set: (x: any) => voi
       if (data?.error) throw new Error(data.error);
       const d = { ...data, dato: today() }; setRes(d); set({ leverandorData: d });
     } catch (e: any) { setErr(e.message || String(e)); }
-    setBusy(false);
+    clearInterval(tm); setBusy(false);
   };
   const L = res?.resultat?.levetid, U = res?.resultat?.utskifting, RF = res?.resultat?.retrofit;
   const kr = (n: any) => Math.round(+n).toLocaleString('nb-NO') + ' kr';
   const brukKost = (o: any, type: string) => set({ kost: Math.round(+o.belop_nok), kostAar: YEAR, kostKilde: { type: 'forslag', hva: type, kilde: o.kilde_url || '', omfang: o.omfang || '', dato: today(), belop: Math.round(+o.belop_nok) } });
   return <div className="note small" style={{ color: 'var(--ink)' }}>
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><b>Leverandørdata fra nett</b>
-      <button type="button" className="btn sm" disabled={busy || !String(v.fabrikat || '').trim()} onClick={sok}>{busy ? 'Søker med Google …' : res ? 'Søk på nytt' : 'Søk etter levetid og kostnad'}</button>
-      {!String(v.fabrikat || '').trim() && <span className="muted">Fyll inn fabrikat/modell først.</span>}</div>
+      <button type="button" className="btn sm" disabled={busy || !String(v.fabrikat || '').trim()} onClick={sok}>{busy ? `Søker med Google … ${sek} s` : res ? 'Søk på nytt' : 'Søk etter levetid og kostnad'}</button>
+      {!String(v.fabrikat || '').trim() && <span className="muted">Fyll inn fabrikat/modell først.</span>}
+      {busy && <span className="muted">Vanligvis 10–40 sekunder. Du kan fortsette å fylle ut skjemaet.</span>}</div>
     {err && <div style={{ color: 'var(--red)', marginTop: 4 }}>{err}</div>}
     {res?.resultat && <div style={{ marginTop: 6 }}>
-      {res.utenSok && <div style={{ color: '#9a5b00', marginBottom: 4 }}>⚠ Google-søk var ikke tilgjengelig på gratisnivået for denne modellen. Tallene er modellens generelle kunnskap, ikke leverandørens egne data. Bruk dem med ekstra forsiktighet.</div>}
+      {res.utenSok && <div style={{ color: '#9a5b00', marginBottom: 4 }}>⚠ Google-søk var ikke tilgjengelig (gratisnivået) eller tok for lang tid. Tallene er modellens generelle kunnskap, ikke leverandørens egne data. Bruk dem med ekstra forsiktighet.</div>}
       {res.resultat.produkt && <div className="muted">Tolket som: {res.resultat.produkt}{res.dato ? ` · søkt ${fd(res.dato)}` : ''}{res.motor ? ` · ${res.motor}` : ''}</div>}
       <div style={{ marginTop: 4 }}>Levetid: {L?.aar || L?.min ? <><b>{L.aar || `${L.min}–${L.max}`} år</b>{L.type ? ` (${L.type})` : ''}{L.kilde_url && <> · <a href={L.kilde_url} target="_blank" rel="noopener noreferrer">kilde</a></>}{L.kommentar && <span className="muted"> – {L.kommentar}</span>}
         {' '}<button type="button" className="btn sm" onClick={() => set({ levetid: L.aar || Math.round((L.min + L.max) / 2), levetidKilde: `leverandør (${res.resultat.produkt || v.fabrikat})` })}>Bruk</button></> : <span className="muted">ikke funnet</span>}</div>

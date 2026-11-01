@@ -41,6 +41,24 @@ async function nyesteFlash(key: string): Promise<string> {
   return 'gemini-flash-latest';
 }
 
+// Huskes mellom kall i samme instans
+let modellCache: { navn: string; tid: number } | null = null;
+let sokAvslatt = 0; // tidspunkt da Google sist avslo søk (gratisnivå) – da hopper vi rett til uten søk en stund
+
+// Begrens «tenking» – standardnivået på nyere Gemini gjør søket svært tregt
+function tenking(modell: string) {
+  const v = parseFloat(modell.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || '0');
+  if (v >= 3) return { thinkingConfig: { thinkingLevel: 'low' } };
+  if (v >= 2.5) return { thinkingConfig: { thinkingBudget: 0 } };
+  return {};
+}
+
+async function medTidsfrist(url: string, init: RequestInit, ms: number) {
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms);
+  try { return await fetch(url, { ...init, signal: ac.signal }); }
+  finally { clearTimeout(t); }
+}
+
 function plukkJson(t: string) {
   const s = t.indexOf('{'), e = t.lastIndexOf('}');
   if (s < 0 || e < s) return null;
@@ -78,26 +96,40 @@ Deno.serve(async (req) => {
     let utenSok = false;
     if (gKey) {
       // Google Gemini med Google Search-grounding. Modellen velges automatisk (nyeste Flash) med mindre GEMINI_MODEL er satt.
-      motor = Deno.env.get('GEMINI_MODEL') || await nyesteFlash(gKey);
-      const kall = (medSok: boolean) => fetch(`https://generativelanguage.googleapis.com/v1beta/models/${motor}:generateContent`, {
+      if (!Deno.env.get('GEMINI_MODEL') && (!modellCache || Date.now() - modellCache.tid > 6 * 3600e3)) modellCache = { navn: await nyesteFlash(gKey), tid: Date.now() };
+      motor = Deno.env.get('GEMINI_MODEL') || modellCache!.navn;
+      const kall = (medSok: boolean, ms: number) => medTidsfrist(`https://generativelanguage.googleapis.com/v1beta/models/${motor}:generateContent`, {
         method: 'POST',
         headers: { 'x-goog-api-key': gKey, 'content-type': 'application/json' },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: SYSTEM + (medSok ? '' : '\nDu har IKKE tilgang til nettsøk nå. Svar ut fra generell kunnskap, sett alle kilde_url til null og usikkerhet til "høy".') }] },
           contents: [{ role: 'user', parts: [{ text: linjer }] }],
           ...(medSok ? { tools: [{ google_search: {} }] } : {}),
+          generationConfig: { temperature: 0.2, maxOutputTokens: 4096, ...tenking(motor) },
         }),
-      });
-      let r = await kall(true); let j = await r.json();
+      }, ms);
+      const t0 = Date.now();
+      let r: Response; let j: any;
+      const provSok = Date.now() - sokAvslatt > 3600e3;
+      try {
+        if (!provSok) throw new Error('hopper over søk');
+        r = await kall(true, 45000); j = await r.json();
+      } catch (_e) {
+        // Tidsavbrudd eller søk avslått nylig → gå direkte til svar uten søk
+        r = new Response(null, { status: 408 }); j = { error: { message: 'search timeout' } };
+      }
       if (!r.ok) {
         const m = String(j?.error?.message || r.status);
-        // Gratisnivået gir ikke Google-søk på alle modeller (kvote 0 / ikke støttet) → prøv uten søk
-        if (r.status === 429 || /search|grounding|tool/i.test(m)) {
-          const r2 = await kall(false); const j2 = await r2.json();
+        // Gratisnivået gir ikke Google-søk på alle modeller (kvote 0 / ikke støttet), eller søket tok for lang tid → prøv uten søk
+        if (r.status === 429 || r.status === 408 || /search|grounding|tool/i.test(m)) {
+          if (r.status !== 408) sokAvslatt = Date.now();
+          let r2: Response, j2: any;
+          try { r2 = await kall(false, Math.max(20000, 140000 - (Date.now() - t0))); j2 = await r2.json(); }
+          catch { return svar({ error: 'Google svarte ikke i tide. Prøv igjen om litt.' }, 504); }
           if (r2.ok) { r = r2; j = j2; utenSok = true; }
           else if (r2.status === 429) return svar({ error: 'Gratiskvoten hos Google er brukt opp for nå. Prøv igjen senere (døgnkvoten nullstilles ca. kl. 09 norsk tid).' }, 429);
           else return svar({ error: `Google Gemini (${motor}): ` + (j2?.error?.message || r2.status) }, 502);
-        } else return svar({ error: `Google Gemini (${motor}): ` + m }, 502);
+        } else { if (/not found|no longer available|not supported for generateContent/i.test(m)) modellCache = null; return svar({ error: `Google Gemini (${motor}): ` + m }, 502); }
       }
       const c = j.candidates?.[0];
       tekst = (c?.content?.parts || []).filter((x: any) => !x.thought).map((x: any) => x.text || '').join('');
