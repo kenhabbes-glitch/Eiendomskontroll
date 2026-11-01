@@ -163,7 +163,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   const T = useRef<Rec>({ ...clone(t0), soner: clone(t0?.soner || []) }).current;
   const [, setTick] = useState(0); const rr = () => setTick(x => x + 1);
   const tfmMode = opts.mode === 'tfm';
-  const st = useRef({ lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, tool: opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '' }).current;
+  const st = useRef({ visPlassert: false, flyttOk: (opts.placeId || '') as string, lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, tool: opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '' }).current;
   const [vb, setVb] = useState({ x: 0, y: 0, w: T.w || 1000, h: T.h || 800 });
   const svgRef = useRef<SVGSVGElement>(null);
   const src = useFileUrl(T.fil?.path);
@@ -215,7 +215,12 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
     st.shift = e.shiftKey; const p = pt(e); const tg = e.target as Element; const hdl = tg.getAttribute('data-h'); const zid = tg.getAttribute('data-z');
     const mid = (tg.closest && tg.closest('[data-m]')?.getAttribute('data-m')) || null;
     if (mid && e.button === 0 && (st.tool === 'velg' || st.tool === 'plasser')) { st.selM = mid; st.sel = null; if (!ro) { st.drag = { t: 'm', id: mid, cx: e.clientX, cy: e.clientY, moved: false }; svgRef.current!.setPointerCapture(e.pointerId); } rr(); return; }
-    if (st.tool === 'plasser' && e.button === 0 && !ro) { const it = findItem(st.placeId); if (!it) { toast('Velg først hva som skal plasseres i listen til høyre'); return; } lagrePos(it, { tegningId: T.id, x: Math.round(p[0] * 10) / 10, y: Math.round(p[1] * 10) / 10 }).then(() => { toast(itemKode(it) + ' plassert'); }); st.selM = it.o.id; const nx = (it.kind === 'v' ? [] : items).find(i => !i.o.pos && i.o.id !== it.o.id); st.placeId = nx ? nx.o.id : ''; rr(); return; }
+    if (st.tool === 'plasser' && e.button === 0 && !ro) { const it = findItem(st.placeId); if (!it) { toast('Velg først hva som skal plasseres i listen til høyre'); return; }
+      if (it.o.pos && st.flyttOk !== it.o.id) { const fra = byId('tegninger', it.o.pos.tegningId)?.navn || 'en annen tegning'; const pos = [p[0], p[1]];
+        confirmBox(`${itemKode(it)} ${itemNavn(it)} er allerede plassert ${it.o.pos.tegningId === T.id ? 'på denne tegningen' : 'på ' + fra}. Vil du flytte den hit? Den forrige plasseringen fjernes.`, 'Flytt hit').then(ok => { if (!ok) return; st.flyttOk = it.o.id;
+          lagrePos(it, { tegningId: T.id, x: Math.round(pos[0] * 10) / 10, y: Math.round(pos[1] * 10) / 10 }).then(() => toast(`${itemKode(it)} flyttet hit fra ${it.o.pos?.tegningId === T.id ? 'forrige plassering' : fra}`)); st.selM = it.o.id; st.placeId = ''; rr(); });
+        return; }
+      lagrePos(it, { tegningId: T.id, x: Math.round(p[0] * 10) / 10, y: Math.round(p[1] * 10) / 10 }).then(() => { toast(itemKode(it) + ' plassert'); }); st.selM = it.o.id; const nx = (it.kind === 'v' ? [] : items).find(i => !i.o.pos && i.o.id !== it.o.id); st.placeId = nx ? nx.o.id : ''; rr(); return; }
     if (e.button === 1 || st.space || (st.tool === 'velg' && hdl == null && !zid)) { st.drag = { t: 'pan', cx: e.clientX, cy: e.clientY, vb0: { ...vb }, moved: false }; svgRef.current!.setPointerCapture(e.pointerId); return; }
     if (st.tool === 'velg') { if (st.selM) { st.selM = null; rr(); } if (hdl != null && !ro) { st.drag = { t: 'v', i: +hdl }; svgRef.current!.setPointerCapture(e.pointerId); return; } if (zid) { st.sel = zid; rr(); return; } }
     if (e.button !== 0 || ro) return;
@@ -288,9 +293,13 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
       </svg></div>
       <div className="pside">
         {st.tool === 'plasser' && <><h3>Plasser på tegningen</h3>
-          {items.length + avItems.length ? <><select value={st.placeId} onChange={e => { st.placeId = e.target.value; rr(); }}><option value="">– velg system, komponent eller avvik –</option>
-            {avItems.length > 0 && <optgroup label="Åpne avvik">{avItems.map(i => <option key={i.o.id} value={i.o.id}>{itemKode(i) + ' ' + itemNavn(i) + (i.o.pos ? (i.o.pos.tegningId === T.id ? ' ✓' : ' (annen tegning)') : '')}</option>)}</optgroup>}
-            {items.length > 0 && <optgroup label="Systemer og komponenter">{items.map(i => <option key={i.o.id} value={i.o.id}>{(i.kind === 'k' ? '   ' : '') + itemKode(i) + ' ' + itemNavn(i) + (i.o.pos ? (i.o.pos.tegningId === T.id ? ' ✓' : ' (annen tegning)') : '')}</option>)}</optgroup>}</select>
+          {items.length + avItems.length ? <><select value={st.placeId} onChange={e => { st.placeId = e.target.value; st.flyttOk = ''; rr(); }}><option value="">– velg system, komponent eller avvik –</option>
+            {(() => { const vis = (i: MItem) => st.visPlassert || !i.o.pos || i.o.id === st.placeId; const lab = (i: MItem) => i.o.pos ? (i.o.pos.tegningId === T.id ? ' – plassert her (flyttes)' : ` – plassert på ${byId('tegninger', i.o.pos.tegningId)?.navn || 'annen tegning'} (flyttes)`) : ''; const A = avItems.filter(vis), I = items.filter(vis);
+              return <>{A.length > 0 && <optgroup label="Åpne avvik">{A.map(i => <option key={i.o.id} value={i.o.id}>{itemKode(i) + ' ' + itemNavn(i) + lab(i)}</option>)}</optgroup>}
+                {I.length > 0 && <optgroup label={st.visPlassert ? 'Systemer og komponenter' : 'Systemer og komponenter som ikke er plassert'}>{I.map(i => <option key={i.o.id} value={i.o.id}>{(i.kind === 'k' ? '   ' : '') + itemKode(i) + ' ' + itemNavn(i) + lab(i)}</option>)}</optgroup>}
+                {!A.length && !I.length && <option disabled>Alt er plassert – kryss av for å vise plasserte</option>}</>; })()}</select>
+            <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'flex-start', margin: '4px 0 6px', fontWeight: 400 }}><input type="checkbox" style={{ width: 'auto', margin: '2px 0 0' }} checked={st.visPlassert} onChange={e => { st.visPlassert = e.target.checked; if (!e.target.checked && findItem(st.placeId)?.o.pos && st.flyttOk !== st.placeId) st.placeId = ''; rr(); }} />Vis også plasserte (flyttes fra forrige plassering)</label>
+            {(() => { const it = findItem(st.placeId); if (!it?.o.pos) return null; const fra = it.o.pos.tegningId === T.id ? 'denne tegningen' : byId('tegninger', it.o.pos.tegningId)?.navn || 'en annen tegning'; return <div className="note small" style={{ color: 'var(--amber)', margin: '0 0 8px' }}>⚠ {itemKode(it)} er allerede plassert på {fra}. Klikker du på tegningen, flyttes den hit og den forrige plasseringen fjernes.</div>; })()}
             <p className="small muted" style={{ margin: '0 0 8px' }}>{st.placeId ? 'Klikk på tegningen der den skal stå.' + (findItem(st.placeId)?.kind !== 'v' ? ' Neste uplasserte velges automatisk.' : '') : 'Velg hva som skal plasseres.'} {items.filter(i => !i.o.pos).length} av {items.length} systemer/komponenter og {avItems.filter(i => !i.o.pos).length} av {avItems.length} åpne avvik er ikke plassert.</p></>
             : <p className="small muted">Ingen systemer eller åpne avvik på eiendommen.</p>}</>}
         {(() => { const i = findItem(st.selM); if (!i || i.kind !== 'v') return null; const a = i.o; const sys = a.anleggId ? byId('anlegg', a.anleggId) : null; const kc = a.komponentId ? byId('komponenter', a.komponentId) : null; const tp = a.tildeltId ? S.profiles.find(p => p.id === a.tildeltId) : null;
@@ -300,7 +309,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
               {(tp || a.tildeltId) && <div className="muted">Tildelt: {tp ? tp.navn || tp.epost : a.tildeltId === state.me?.id ? 'deg' : 'bruker'}</div>}
               {a.frist && <div className="muted">Frist: {a.frist.split('-').reverse().join('.')}</div>}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}><button className="btn sm" onClick={() => isUtforer() ? (close(), location.hash = '#/arbeidsordre/' + a.id) : editAvvik(a.id)}>Åpne</button>
-              {!ro && <button className="btn sm" onClick={() => { st.tool = 'plasser'; st.placeId = a.id; rr(); }}>Flytt</button>}
+              {!ro && <button className="btn sm" onClick={() => { st.tool = 'plasser'; st.placeId = a.id; st.flyttOk = a.id; rr(); }}>Flytt</button>}
               {!ro && <button className="btn sm danger" onClick={async () => { await lagrePos(i, null); st.selM = null; rr(); }}>Fjern fra tegning</button>}</div></>; })()}
         {(() => { const i = findItem(st.selM); if (!i || i.kind === 'v') return null; const av = openAvvik().filter(a => i.kind === 'a' ? a.anleggId === i.o.id && !a.komponentId : a.komponentId === i.o.id); const sys = i.kind === 'k' ? byId('anlegg', i.o.anleggId) : null; const info = [i.o.fabrikat, i.o.plassering, i.o.aar ? 'installert ' + i.o.aar : '', i.o.tg].filter(Boolean);
           return <><h3>{i.kind === 'a' ? 'System' : 'Komponent'}</h3>
@@ -308,7 +317,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
               {info.length > 0 && <div className="muted">{info.join(' · ')}</div>}
               {av.length > 0 && <div style={{ color: 'var(--red)', marginTop: 4 }}>{av.length} åpne avvik: {av.slice(0, 3).map(a => '#' + a.nr + ' ' + a.tittel).join(', ')}</div>}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}><button className="btn sm" onClick={() => i.kind === 'a' ? editAnlegg(i.o.id) : editKomponent(i.o.id)}>Åpne</button>
-              {!ro && <button className="btn sm" onClick={() => { st.tool = 'plasser'; st.placeId = i.o.id; rr(); }}>Flytt</button>}
+              {!ro && <button className="btn sm" onClick={() => { st.tool = 'plasser'; st.placeId = i.o.id; st.flyttOk = i.o.id; rr(); }}>Flytt</button>}
               {!ro && <button className="btn sm danger" onClick={async () => { await lagrePos(i, null); st.selM = null; rr(); }}>Fjern fra tegning</button>}</div></>; })()}
         {st.lagM && markers.length > 0 && <><h3>Tegnforklaring</h3><div className="small">{FAG.filter(f => markers.some(m => itemFag(m) === f[0])).map(f => <div key={f[0]} style={{ display: 'flex', gap: 6, alignItems: 'center' }}><span className="sw" style={{ background: f[2] }} />{f[0]} {f[1]}</div>)}<div className="muted" style={{ marginTop: 4 }}>■ system · ● komponent · rød ring = åpne avvik</div></div></>}
         {st.lagV && avMarkers.length > 0 && <div className="small" style={{ marginTop: 6 }}><span style={{ color: '#b42318' }}>▲</span> åpent avvik · <span style={{ color: '#b07a00' }}>▲</span> utført, til kontroll</div>}
