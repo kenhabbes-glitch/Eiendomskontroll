@@ -1,4 +1,5 @@
 // Skjemaer og handlinger (opprett/rediger/slett) som brukes fra flere visninger.
+import { Hjelp } from '../components/Hjelp';
 import React, { useState } from 'react';
 import { SERVICEAVTALE, TG_DEF, KG_DEF } from './catalog';
 import { levetidRef, midt, spenn } from './ns3451';
@@ -73,7 +74,7 @@ function LevetidHjelp({ v, set, sysKode, typeLev }: { v: any; set: (x: any) => v
   const r = levetidRef(sysKode); const ed = canEdit(); const t = midt(r?.tek || null), f = midt(r?.fun || null);
   const kilde = v.levetidKilde as string | undefined;
   return <div className="note small" style={{ color: 'var(--ink)', marginTop: -4 }}>
-    {r ? <><b>Ledetråd NS 3451</b> <span className="muted">({r.kode} {r.navn})</span>: teknisk levetid <b>{spenn(r.tek)}</b>, funksjonell <b>{spenn(r.fun)}</b>.
+    {r ? <><b>Ledetråd NS 3451<Hjelp id="levetid" size={15} /></b> <span className="muted">({r.kode} {r.navn})</span>: teknisk levetid <b>{spenn(r.tek)}</b>, funksjonell <b>{spenn(r.fun)}</b>.
       {ed && <span style={{ display: 'inline-flex', gap: 6, marginLeft: 6, flexWrap: 'wrap' }}>{t && <button type="button" className="btn sm" onClick={() => set({ levetid: t, levetidKilde: `NS 3451 ${r.kode} teknisk` })}>Bruk teknisk ({t} år)</button>}{f && <button type="button" className="btn sm" onClick={() => set({ levetid: f, levetidKilde: `NS 3451 ${r.kode} funksjonell` })}>Bruk funksjonell ({f} år)</button>}</span>}</>
       : <span className="muted">Ingen NS 3451-referanse for {sysKode ? 'koden ' + sysKode : 'systemet (mangler TFM-kode)'}.</span>}
     {typeLev ? <span className="muted"> · Veiledende for typen: {typeLev} år.</span> : null}
@@ -106,7 +107,7 @@ function LeverandorSok({ v, set, kind, sysKode }: { v: any; set: (x: any) => voi
   const kr = (n: any) => Math.round(+n).toLocaleString('nb-NO') + ' kr';
   const brukKost = (o: any, type: string) => set({ kost: Math.round(+o.belop_nok), kostAar: YEAR, kostKilde: { type: 'forslag', hva: type, kilde: o.kilde_url || '', omfang: o.omfang || '', dato: today(), belop: Math.round(+o.belop_nok) } });
   return <div className="note small" style={{ color: 'var(--ink)' }}>
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><b>Leverandørdata fra nett</b>
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><b>Leverandørdata fra nett<Hjelp id="leverandorsok" size={15} /></b>
       <button type="button" className="btn sm" disabled={busy || !String(v.fabrikat || '').trim()} onClick={sok}>{busy ? `Søker med Google … ${sek} s` : res ? 'Søk på nytt' : 'Søk etter levetid og kostnad'}</button>
       {!String(v.fabrikat || '').trim() && <span className="muted">Fyll inn fabrikat/modell først.</span>}
       {busy && <span className="muted">Vanligvis 10–40 sekunder. Du kan fortsette å fylle ut skjemaet.</span>}</div>
@@ -128,7 +129,7 @@ function LeverandorSok({ v, set, kind, sysKode }: { v: any; set: (x: any) => voi
 
 function KostFlagg({ v }: { v: any }) {
   const k = v.kostKilde; if (!k || k.type !== 'forslag' || +v.kost !== +k.belop) return null;
-  return <div className="small" style={{ marginTop: -4, color: '#9a5b00' }}><span style={{ background: '#fff4e5', borderRadius: 9, padding: '0 7px', fontWeight: 600 }}>FORSLAG</span> Kostnaden er et anslag fra nettsøk ({k.hva?.toLowerCase()}{k.omfang ? ': ' + k.omfang : ''}, {fd(k.dato)}){k.kilde && <> · <a href={k.kilde} target="_blank" rel="noopener noreferrer">kilde</a></>}. Kontroller mot tilbud. Endrer du beløpet, fjernes merket.</div>;
+  return <div className="small" style={{ marginTop: -4, color: '#9a5b00' }}><span style={{ background: '#fff4e5', borderRadius: 9, padding: '0 7px', fontWeight: 600 }}>FORSLAG</span><Hjelp id="forslag" size={14} /> Kostnaden er et anslag fra nettsøk ({k.hva?.toLowerCase()}{k.omfang ? ': ' + k.omfang : ''}, {fd(k.dato)}){k.kilde && <> · <a href={k.kilde} target="_blank" rel="noopener noreferrer">kilde</a></>}. Kontroller mot tilbud. Endrer du beløpet, fjernes merket.</div>;
 }
 
 // Plassering av system/komponent på tegning

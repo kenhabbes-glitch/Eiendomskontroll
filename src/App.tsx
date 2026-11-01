@@ -12,6 +12,7 @@ import { Vedlikehold } from './views/Vedlikehold';
 import { TfmRegister } from './views/Tfm';
 import { Arealer } from './views/Arealer';
 import { Regelverk } from './views/Regelverk';
+import { HjelpSide } from './views/HjelpSide';
 import { Brukere, DataAdmin } from './views/Brukere';
 import { Portal } from './views/Portal';
 import { Profil } from './views/Profil';
@@ -42,12 +43,13 @@ const I: Record<string, string> = {
   innstillinger: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
   arbeidsordre: 'M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.8-3.8a6 6 0 01-7.9 7.9l-6.9 6.9a2.1 2.1 0 01-3-3l6.9-6.9a6 6 0 017.9-7.9z',
   logg: 'M12 8v4l3 3M3.05 11a9 9 0 11.5 4M3 4v5h5',
+  hjelp: 'M12 22a10 10 0 100-20 10 10 0 000 20zM9.1 9a3 3 0 015.8 1c0 2-3 3-3 3M12 17h.01',
   data: 'M4 7c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 7v10c0 1.7 3.6 3 8 3s8-1.3 8-3V7M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
 };
 
 function navFor(): [string, string][] {
-  if (isTenant()) return [['portal', 'Mitt leieforhold'], ['regelverk', 'Plikter og regelverk']];
-  if (isUtforer()) return [['arbeidsordre', 'Mine arbeidsordre']];
+  if (isTenant()) return [['portal', 'Mitt leieforhold'], ['regelverk', 'Plikter og regelverk'], ['hjelp', 'Hjelp']];
+  if (isUtforer()) return [['arbeidsordre', 'Mine arbeidsordre'], ['hjelp', 'Hjelp']];
   const n: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['kontroller', 'Kontrollplan'], ['avvik', 'Avvik'], ['arbeidsordre', 'Mine arbeidsordre']];
   if (canEdit()) n.push(['leietakere', 'Leietakere']);
   n.push(['tfm', 'TFM-register'], ['arealer', 'Tegninger og arealer'], ['dokumenter', 'Dokumenter']);
@@ -56,6 +58,7 @@ function navFor(): [string, string][] {
   if (canEdit()) n.push(['innstillinger', 'Innstillinger']);
   if (canEdit()) n.push(['logg', 'Hendelseslogg']);
   if (isAdmin()) n.push(['brukere', 'Brukere og roller'], ['data', 'Import og eksport']);
+  n.push(['hjelp', 'Hjelp']);
   return n;
 }
 
@@ -96,6 +99,7 @@ export default function App() {
     case 'dokumenter': body = <Dokumenter />; break;
     case 'vedlikehold': body = <Vedlikehold />; break;
     case 'regelverk': body = <Regelverk />; break;
+    case 'hjelp': body = <HjelpSide id={r.id} />; break;
     case 'brukere': body = <Brukere />; break;
     case 'data': body = <DataAdmin />; break;
     case 'portal': body = <Portal />; break;

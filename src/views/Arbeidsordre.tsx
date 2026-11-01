@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Hjelp } from '../components/Hjelp';
 import { AV_LUKKET } from '../lib/catalog';
 import { S, aoApi, canEdit, fileUrl, isStaff, isUtforer, loadData, loadMe, sb, state, toast, useStore } from '../lib/store';
 import { byId, fd, sortBy, type Rec } from '../lib/utils';
@@ -21,7 +22,7 @@ export function ArbeidsordreListe({ id }: { id?: string }) {
   const ord: Record<string, number> = { Kritisk: 0, 'Høy': 1, Middels: 2, Lav: 3 };
   L = L.slice().sort((a, b) => (+(a.status === 'Utført – til kontroll') - +(b.status === 'Utført – til kontroll')) || (ord[a.alv] - ord[b.alv]) || String(a.frist || '9').localeCompare(String(b.frist || '9')));
   return <>
-    <div className="head"><div className="grow"><h1>{f.v === 'alle' && staff ? 'Tildelte arbeidsordre' : 'Mine arbeidsordre'}</h1><p className="sub">Avvik som er tildelt {f.v === 'alle' && staff ? 'brukere' : 'deg'}. Åpne en arbeidsordre for å se plassering, starte jobben, laste opp bilder og kvittere ut.</p></div></div>
+    <div className="head"><div className="grow"><h1>{f.v === 'alle' && staff ? 'Tildelte arbeidsordre' : 'Mine arbeidsordre'}<Hjelp id="side.arbeidsordre" /></h1><p className="sub">Avvik som er tildelt {f.v === 'alle' && staff ? 'brukere' : 'deg'}. Åpne en arbeidsordre for å se plassering, starte jobben, laste opp bilder og kvittere ut.</p></div></div>
     <div className="toolbar">{staff && <Sel value={f.v} onChange={v => setF({ v })} opts={[['mine', 'Tildelt meg'], ['alle', 'Alle tildelte']]} />}
       <Sel value={f.st} onChange={st => setF({ st })} opts={[['aktive', 'Aktive'], ['utfort', 'Utført – til kontroll'], ['lukket', 'Lukket'], ['alle', 'Alle']]} /><span className="small muted">{L.length} arbeidsordre</span>
       {'Notification' in window && Notification.permission === 'default' && <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => Notification.requestPermission()}>Slå på varsler i nettleseren</button>}</div>
@@ -157,7 +158,7 @@ export function Hendelseslogg() {
   const TAB: Record<string, string> = { eiendommer: 'Eiendom', leietakere: 'Leietaker', systemer: 'System', komponenter: 'Komponent', oppgaver: 'Kontroll', avvik: 'Avvik', dokumenter: 'Dokument', tegninger: 'Tegning', profiles: 'Bruker', hendelse: 'Hendelse' };
   let R = L || []; if (f.q) { const q = f.q.toLowerCase(); R = R.filter(h => JSON.stringify(h).toLowerCase().includes(q)); }
   return <>
-    <div className="head"><div className="grow"><h1>Hendelseslogg</h1><p className="sub">Alle endringer i databasen logges automatisk med tid og bruker, i tillegg til hendelser som e-post sendt og PDF lastet ned.</p></div></div>
+    <div className="head"><div className="grow"><h1>Hendelseslogg<Hjelp id="side.logg" /></h1><p className="sub">Alle endringer i databasen logges automatisk med tid og bruker, i tillegg til hendelser som e-post sendt og PDF lastet ned.</p></div></div>
     <div className="toolbar"><input placeholder="Søk …" value={f.q} onChange={e => setF({ q: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px', width: 220 }} />
       <Sel value={f.e} onChange={e => setF({ e })} opts={sortBy(S.eiendommer, e => e.navn).map(e => [e.id, e.navn] as [string, string])} empty="Alle eiendommer" />
       <Sel value={f.t} onChange={t => setF({ t })} opts={Object.entries(TAB)} empty="Alle typer" /><span className="small muted">{R.length} hendelser</span></div>

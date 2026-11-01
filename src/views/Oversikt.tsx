@@ -1,4 +1,5 @@
 import React from 'react';
+import { Hjelp } from '../components/Hjelp';
 import { DOK_PAAKREVD } from '../lib/catalog';
 import { S, canEdit, isAdmin, state, useStore } from '../lib/store';
 import { activeTasks, compRest, docCoverage, dUntil, eNavn, fd, openAvvik, pliktStatus, sortBy, today } from '../lib/utils';
@@ -37,7 +38,7 @@ export function Oversikt() {
   ].sort((a, b) => String(a.d).localeCompare(String(b.d)));
 
   return <>
-    <div className="head"><div className="grow"><h1>Oversikt</h1><p className="sub">{S.eiendommer.length} eiendommer{ed ? ` · ${S.leietakere.length} leietakere` : ''} · {T.length} aktive kontroller · status per {fd(today())}</p></div><button className="btn" onClick={() => editAvvik()}>+ Meld avvik</button></div>
+    <div className="head"><div className="grow"><h1>Oversikt<Hjelp id="side.oversikt" /></h1><p className="sub">{S.eiendommer.length} eiendommer{ed ? ` · ${S.leietakere.length} leietakere` : ''} · {T.length} aktive kontroller · status per {fd(today())}</p></div><button className="btn" onClick={() => editAvvik()}>+ Meld avvik</button></div>
     <div className="kpis">
       {K(forf.length, 'Forfalte kontroller', `${d30.length} forfaller neste 30 dager`, forf.length ? 'bad' : 'ok', 'kontroller')}
       {K(OA.length, 'Åpne avvik', `${krit.length} kritiske/høye · ${avForf.length} over frist`, avForf.length || krit.length ? 'bad' : OA.length ? 'warn' : 'ok', 'avvik')}

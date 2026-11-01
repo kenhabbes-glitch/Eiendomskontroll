@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Hjelp } from '../components/Hjelp';
 import { S, aoApi, isAdmin, saveInnst, toast, useStore } from '../lib/store';
 import { KPI_STANDARD, RENTE_STANDARD, YEAR, kpiFaktor, kpiInnst, nok, renteInnst } from '../lib/utils';
 
@@ -24,7 +25,7 @@ export function Innstillinger() {
   const prev = (y: number) => { const v = modus === 'aar' ? num(aar[String(y)] ?? '') : null; return v ?? (num(fast) ?? KPI_STANDARD); };
   let fakt = 1; const eks = [5, 10, 15, 20].map(n => { fakt = 1; for (let y = YEAR + 1; y <= YEAR + n; y++) fakt *= 1 + prev(y) / 100; return [n, fakt] as [number, number]; });
   return <>
-    <div className="head"><div className="grow"><h1>Innstillinger</h1><p className="sub">Felles forutsetninger for beregninger i programmet</p></div></div>
+    <div className="head"><div className="grow"><h1>Innstillinger<Hjelp id="side.innstillinger" /></h1><p className="sub">Felles forutsetninger for beregninger i programmet</p></div></div>
     {S.innstMangler && <div className="banner">Databasetabellen for innstillinger mangler. Kjør <a href={SQL_URL} target="_blank" rel="noopener noreferrer">002_innstillinger.sql</a> i Supabase (SQL Editor → New query → lim inn → Run), og last siden på nytt. Inntil da brukes {KPI_STANDARD} % per år.</div>}
     <div className="card" style={{ maxWidth: 900 }}>
       <h2>KPI for prisjustering av utskiftingskostnader</h2>

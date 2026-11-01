@@ -1,4 +1,5 @@
 import React from 'react';
+import { Hjelp } from '../components/Hjelp';
 import { AV_LUKKET, VEDL_KAT } from '../lib/catalog';
 import { S, bump, feiltekst, save, sb, state, toast, uploadFile, useStore } from '../lib/store';
 import { addDays, byId, fd, intTxt, pliktStatus, sortBy, today, leieAreal, m2 } from '../lib/utils';
@@ -67,7 +68,7 @@ export function Portal() {
   const pl = (l.plikter || []).filter((p: any) => !p.ikkeRelevant); const mangler = pl.filter((p: any) => pliktStatus(p).o >= 1);
   const mx = l.matrise || {};
   return <>
-    <div className="portalhero"><div className="head" style={{ marginBottom: 0 }}><div className="grow"><h1>{l.navn}</h1><p className="sub">{e.navn}{e.adresse ? ' · ' + e.adresse : ''}{l.lokale ? ' · ' + l.lokale : ''}</p></div><button className="btn pri" onClick={() => meldAvvik(l)}>+ Meld avvik eller feil</button></div>
+    <div className="portalhero"><div className="head" style={{ marginBottom: 0 }}><div className="grow"><h1>{l.navn}<Hjelp id="side.portal" /></h1><p className="sub">{e.navn}{e.adresse ? ' · ' + e.adresse : ''}{l.lokale ? ' · ' + l.lokale : ''}</p></div><button className="btn pri" onClick={() => meldAvvik(l)}>+ Meld avvik eller feil</button></div>
       <div className="kpis" style={{ marginTop: 14, marginBottom: 0 }}>
         <div className={'kpi ' + (mangler.length ? 'warn' : 'ok')} style={{ cursor: 'default' }}><div className="l">Plikter som må bekreftes</div><div className="v">{mangler.length}</div><div className="s">av {pl.length} plikter</div></div>
         <div className="kpi" style={{ cursor: 'default' }}><div className="l">Åpne meldinger</div><div className="v">{apne.length}</div><div className="s">{A.length - apne.length} avsluttet</div></div>

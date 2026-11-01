@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Hjelp } from './Hjelp';
+import { HJELP } from '../lib/hjelpTekster';
 import { bump, feiltekst, fileUrl, toast, toasts, useStore, type Fil } from '../lib/store';
 import { dUntil, fd } from '../lib/utils';
 
@@ -83,11 +85,14 @@ export function textModal(title: string, text: string, note?: string) {
 
 // ---------------- generisk skjema
 export type Opt = string | [string, string];
+// Hjelp-ikon for et skjemafelt: eksplisitt f.help, ellers automatisk «felt.<nøkkel>» hvis det finnes tekst
+const hq = (f: { k: string; help?: string | false }) => { if (f.help === false) return null; const id = f.help || (f.k === 'tagger' ? 'tagger' : 'felt.' + f.k); return HJELP[id] ? <Hjelp id={id} size={15} /> : null; };
+
 export type Field = {
   k: string; label?: string; type?: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'checkbox' | 'file' | 'sec' | 'custom' | 'email';
   options?: Opt[] | (() => Opt[]); groups?: () => [string, Opt[]][]; empty?: string; half?: boolean; req?: boolean; hint?: string; ph?: string;
   show?: (v: any) => boolean; dl?: [string, string][]; mono?: boolean; def?: any; accept?: string;
-  render?: (v: any, set: (patch: any) => void) => ReactNode;
+  render?: (v: any, set: (patch: any) => void) => ReactNode; help?: string | false;
 };
 export type FormOpts = {
   title: string; fields: Field[]; values?: any; wide?: boolean; saveTxt?: string;
@@ -113,9 +118,9 @@ function FormBody({ o, close }: { o: FormOpts; close: () => void }) {
         {o.fields.map(f => {
           if (f.show && !f.show(v)) return null;
           const id = 'f_' + f.k; const cls = `fld ${f.half ? 'half' : ''} ${f.type === 'checkbox' ? 'cb' : ''}`;
-          if (f.type === 'sec') return <div key={f.k} className="fld secth">{f.label}</div>;
-          if (f.type === 'custom') return <div key={f.k} className={cls}>{f.label && <label>{f.label}</label>}{f.render?.(v, set)}{f.hint && <div className="hint">{f.hint}</div>}</div>;
-          if (f.type === 'checkbox') return <div key={f.k} className={cls}><input type="checkbox" id={id} checked={!!v[f.k]} disabled={o.readOnly} onChange={e => set({ [f.k]: e.target.checked })} /><label htmlFor={id}>{f.label}</label></div>;
+          if (f.type === 'sec') return <div key={f.k} className="fld secth">{f.label}{hq(f)}</div>;
+          if (f.type === 'custom') return <div key={f.k} className={cls}>{f.label && <label>{f.label}{hq(f)}</label>}{f.render?.(v, set)}{f.hint && <div className="hint">{f.hint}</div>}</div>;
+          if (f.type === 'checkbox') return <div key={f.k} className={cls}><input type="checkbox" id={id} checked={!!v[f.k]} disabled={o.readOnly} onChange={e => set({ [f.k]: e.target.checked })} /><label htmlFor={id}>{f.label}</label>{hq(f)}</div>;
           let inp: ReactNode;
           if (f.type === 'select') {
             const op = typeof f.options === 'function' ? f.options() : f.options || [];
@@ -132,7 +137,7 @@ function FormBody({ o, close }: { o: FormOpts; close: () => void }) {
               onChange={e => set({ [f.k]: f.type === 'number' ? (e.target.value === '' ? '' : +e.target.value) : e.target.value })} />
             {f.dl && <datalist id={'dl_' + f.k}>{f.dl.map(([a, b]) => <option key={a} value={a}>{b}</option>)}</datalist>}
           </>;
-          return <div key={f.k} className={cls}><label htmlFor={id}>{f.label}{f.req ? ' *' : ''}</label>{inp}{f.hint && <div className="hint">{f.hint}</div>}</div>;
+          return <div key={f.k} className={cls}><label htmlFor={id}>{f.label}{f.req ? ' *' : ''}{hq(f)}</label>{inp}{f.hint && <div className="hint">{f.hint}</div>}</div>;
         })}
       </form>
       {o.bottom?.(v)}

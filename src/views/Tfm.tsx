@@ -1,4 +1,5 @@
 import React from 'react';
+import { Hjelp } from '../components/Hjelp';
 import { KOMP } from '../lib/catalog';
 import { S, canEdit, useStore } from '../lib/store';
 import { eNavn, openAvvik, pad, sortBy, tfmKomp, tfmSys, toCsv } from '../lib/utils';
@@ -39,7 +40,7 @@ export function TfmRegister() {
     textModal('TFM-register som CSV', toCsv(L), 'Semikolonseparert – lim inn i Excel eller lagre som .csv.');
   };
   return <>
-    <div className="head"><div className="grow"><h1>TFM-register</h1><p className="sub">Systemer og komponenter merket etter tverrfaglig merkesystem · {S.anlegg.length} systemer · {S.komponenter.length} komponenter{mis > 0 && <span style={{ color: 'var(--amber)' }}> · {mis} systemer mangler kode</span>}</p></div><button className="btn" onClick={csv}>Kopier som regneark (CSV)</button></div>
+    <div className="head"><div className="grow"><h1>TFM-register<Hjelp id="side.tfm" /></h1><p className="sub">Systemer og komponenter merket etter tverrfaglig merkesystem · {S.anlegg.length} systemer · {S.komponenter.length} komponenter{mis > 0 && <span style={{ color: 'var(--amber)' }}> · {mis} systemer mangler kode</span>}</p></div><button className="btn" onClick={csv}>Kopier som regneark (CSV)</button></div>
     <div className="toolbar"><Search value={f.q} onChange={q => setF({ q })} ph="Søk TFM-kode, f.eks. 360.001-JV …" w={280} /><Sel value={f.e} onChange={e => setF({ e })} opts={eiendomOpts()} empty="Alle eiendommer" />
       <Sel value={f.k} onChange={k => setF({ k })} opts={[['s', 'Bare systemer'], ['k', 'Bare komponenter'], ['mangler', 'Systemer uten TFM-kode'], ['uplassert', 'Ikke plassert på tegning']]} empty="Systemer og komponenter" /><Sel value={f.t} onChange={t => setF({ t })} opts={[...new Set([...TAGGER.map(x => x[0]), ...S.anlegg.flatMap(a => taggerFor(a, 'a'))])].map(x => [x, x] as [string, string])} empty="Alle tagger" /><Sel value={f.tg} onChange={tg => setF({ tg })} opts={[['TG3', 'Bare TG3'], ['TG23', 'TG2 og TG3'], ['TG1', 'TG1'], ['TG0', 'TG0'], ['TGIU', 'TGIU'], ['ingen', 'Ikke vurdert']]} empty="Alle tilstander" /><span className="muted small">{rows.length} rader</span>
       {f.e && (() => { const T = sortBy(S.tegninger.filter(t => t.eiendomId === f.e), t => +t.etasje || 0); return T.length ? <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>{T.map(t => <button key={t.id} className="btn sm" onClick={() => openPlan(t.id, { mode: 'tfm' })}>Systemkart: {t.navn}</button>)}</span> : null; })()}</div>

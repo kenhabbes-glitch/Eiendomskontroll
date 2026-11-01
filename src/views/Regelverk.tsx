@@ -1,4 +1,5 @@
 import React from 'react';
+import { Hjelp } from '../components/Hjelp';
 import { KATS, KOMP, MALER, PLIKTER, TFM_KODER } from '../lib/catalog';
 import { isTenant } from '../lib/store';
 import { intTxt } from '../lib/utils';
@@ -16,7 +17,7 @@ const Li = ({ h }: { h: string }) => <li dangerouslySetInnerHTML={{ __html: h }}
 
 export function Regelverk() {
   if (isTenant()) return <>
-    <div className="head"><div className="grow"><h1>Plikter og regelverk</h1><p className="sub">Hva som forventes av deg som leietaker</p></div></div>
+    <div className="head"><div className="grow"><h1>Plikter og regelverk<Hjelp id="side.regelverk" /></h1><p className="sub">Hva som forventes av deg som leietaker</p></div></div>
     <div className="grid g2">
       <div className="card rules"><h3>Brannsikkerhet (forskrift om brannforebygging kap. 3)</h3><ul><Li h="Utpek en ansvarlig for brannsikkerheten i virksomheten og meld navnet til eier." /><Li h="Sørg for at ansatte får opplæring og at det gjennomføres brannøvelser." /><Li h="Hold rømningsveier frie, og meld fra om feil på brannalarm, nødlys, branndører eller slokkeutstyr." /><Li h="Dokumenter rutiner og egenkontroller." /></ul></div>
       <div className="card rules"><h3>Internkontroll (HMS)</h3><ul><Li h="Virksomheten skal ha systematisk HMS-arbeid med risikovurdering og årlig gjennomgang (internkontrollforskriften § 5)." /><Li h="Samordning med eier og andre virksomheter i bygget avtales skriftlig (§ 6)." /></ul></div>
@@ -26,7 +27,7 @@ export function Regelverk() {
   </>;
   const byK: Record<string, any[]> = {}; Object.values(MALER).forEach(m => { (byK[m.k] = byK[m.k] || []).push(m); });
   return <>
-    <div className="head"><div className="grow"><h1>Regelverk og eiers plikter</h1><p className="sub">Hva som hviler på eier av næringseiendom, og grunnlaget for malene i programmet</p></div></div>
+    <div className="head"><div className="grow"><h1>Regelverk og eiers plikter<Hjelp id="side.regelverk" /></h1><p className="sub">Hva som hviler på eier av næringseiendom, og grunnlaget for malene i programmet</p></div></div>
     <div className="note" style={{ marginBottom: 16 }}>Oversikten er et arbeidsverktøy, ikke juridisk rådgivning. Krav og intervaller avhenger av byggets bruk, størrelse og anleggenes utførelse, og regelverket endres. Kontroller mot <a href="https://lovdata.no" target="_blank" rel="noopener noreferrer">Lovdata</a>, DSB, DiBK, NVE og Miljødirektoratet, og mot krav fra forsikringsselskapet.</div>
     <div className="grid g2">{SEK.map(([t, l]) => <div key={t} className="card rules"><h3>{t}</h3><ul>{l.map((h, i) => <Li key={i} h={h} />)}</ul></div>)}</div>
     <div className="sec"><h2>Tverrfaglig merkesystem (TFM)</h2><div className="card rules"><p style={{ marginTop: 0 }}>Systemer og komponenter registreres med TFM-kode, slik at samme ID brukes på merkeskilt, tegninger, FDV-dokumentasjon, servicerapporter og i avvik.</p>

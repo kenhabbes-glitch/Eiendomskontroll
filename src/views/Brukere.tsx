@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Hjelp } from '../components/Hjelp';
 import { COLS, ROLLER, S, adminApi, reloadAdmin, rolleNavn, sb, save, removeDoc, state, toast, useStore, type Col, feiltekst } from '../lib/store';
 import { eNavn, fdt, lNavn, sortBy, today } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, openModal, showModal, textModal, type Field } from '../components/ui';
@@ -81,7 +82,7 @@ export function Brukere() {
   if (f.q) { const q = f.q.toLowerCase(); L = L.filter(p => ((p.navn || '') + ' ' + (p.epost || '')).toLowerCase().includes(q)); }
   const venter = S.profiles.filter(p => p.rolle === 'ingen' && p.aktiv);
   return <>
-    <div className="head"><div className="grow"><h1>Brukere og roller</h1><p className="sub">{S.profiles.length} brukere · Rollen bestemmer hva brukeren kan se og gjøre, og tilgangen håndheves i databasen</p></div><button className="btn" onClick={testbrukere}>Testbrukere</button><button className="btn pri" onClick={() => inviter()}>+ Inviter bruker</button></div>
+    <div className="head"><div className="grow"><h1>Brukere og roller<Hjelp id="side.brukere" /></h1><p className="sub">{S.profiles.length} brukere · Rollen bestemmer hva brukeren kan se og gjøre, og tilgangen håndheves i databasen</p></div><button className="btn" onClick={testbrukere}>Testbrukere</button><button className="btn pri" onClick={() => inviter()}>+ Inviter bruker</button></div>
     {venter.length > 0 && <div className="banner info">{venter.length} bruker(e) venter på å få tildelt rolle.</div>}
     <div className="toolbar"><Search value={f.q} onChange={q => setF({ q })} /><Sel value={f.r} onChange={r => setF({ r })} opts={ROLLER.map(r => [r[0], r[1]] as [string, string])} empty="Alle roller" /><span className="muted small">{L.length} brukere</span></div>
     {L.length ? <div className="tbl-wrap"><table><thead><tr><th>Navn</th><th>E-post</th><th>Rolle</th><th>Tilgang</th><th>Status</th><th>Opprettet</th></tr></thead><tbody>
@@ -124,7 +125,7 @@ export function DataAdmin() {
       }}>Importer</button></div></> });
   };
   return <>
-    <div className="head"><div className="grow"><h1>Import og eksport</h1><p className="sub">Sikkerhetskopi og flytting av data</p></div></div>
+    <div className="head"><div className="grow"><h1>Import og eksport<Hjelp id="side.data" /></h1><p className="sub">Sikkerhetskopi og flytting av data</p></div></div>
     <div className="grid g2">
       <div className="card"><h2>Eksporter</h2><p className="small muted">Alle data du har tilgang til som JSON. Supabase tar i tillegg daglig sikkerhetskopi av databasen på betalte planer.</p><button className="btn" onClick={eksport}>Eksporter alle data</button></div>
       <div className="card"><h2>Importer</h2><p className="small muted">Hent inn data fra prototypen («Sikkerhetskopi og data» → «Kopier alle data») eller fra en eksport. Tegninger må lastes opp på nytt.</p><button className="btn pri" disabled={!!busy} onClick={importer}>{busy || 'Importer data'}</button></div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Hjelp } from '../components/Hjelp';
 import { DOK_LEIE, VEDL_KAT } from '../lib/catalog';
 import { S, isAdmin, useStore } from '../lib/store';
 import { leieAreal, byId, eNavn, fd, intTxt, m2, pliktStatus } from '../lib/utils';
@@ -30,7 +31,7 @@ export function Leietakere() {
   let L = S.leietakere.slice(); if (f.e) L = L.filter(l => l.eiendomId === f.e);
   if (f.q) { const q = f.q.toLowerCase(); L = L.filter(l => (l.navn + ' ' + (l.orgnr || '') + ' ' + (l.kontakt || '')).toLowerCase().includes(q)); }
   return <>
-    <div className="head"><div className="grow"><h1>Leietakere</h1><p className="sub">Leieavtaler, vedlikeholdsansvar og oppfølging av leietakers internkontroll</p></div><button className="btn" onClick={() => sjekkAlle(L)}>Sjekk status i Brønnøysund</button><button className="btn pri" onClick={() => editLeietaker()}>+ Ny leietaker</button></div>
+    <div className="head"><div className="grow"><h1>Leietakere<Hjelp id="side.leietakere" /></h1><p className="sub">Leieavtaler, vedlikeholdsansvar og oppfølging av leietakers internkontroll</p></div><button className="btn" onClick={() => sjekkAlle(L)}>Sjekk status i Brønnøysund</button><button className="btn pri" onClick={() => editLeietaker()}>+ Ny leietaker</button></div>
     <div className="toolbar"><Search value={f.q} onChange={q => setF({ q })} /><Sel value={f.e} onChange={e => setF({ e })} opts={eiendomOpts()} empty="Alle eiendommer" /></div>
     <LeieTable list={L} />
   </>;

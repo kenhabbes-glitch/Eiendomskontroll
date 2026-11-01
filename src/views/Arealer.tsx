@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Hjelp } from '../components/Hjelp';
 import { S, canEdit, deleteFile, fileUrl, save, removeDoc, toast, uploadFile, useStore } from '../lib/store';
 
 /** Lagrer beregnet leieareal (inkl. andel fellesareal) på leietakerne til eiendommen */
@@ -425,9 +426,9 @@ export function Arealer() {
   useStore();
   const [f, setF] = useFilter('areal', { e: '' });
   const e = f.e && byId('eiendommer', f.e) ? f.e : sortBy(S.eiendommer, x => x.navn)[0]?.id;
-  if (!S.eiendommer.length) return <><h1>Tegninger og arealer</h1><div className="card"><Empty t="Ingen eiendommer" /></div></>;
+  if (!S.eiendommer.length) return <><h1>Tegninger og arealer<Hjelp id="side.arealer" /></h1><div className="card"><Empty t="Ingen eiendommer" /></div></>;
   return <>
-    <div className="head"><div className="grow"><h1>Tegninger og arealer</h1><p className="sub">Plantegninger med målestokk og oppmålte arealer – arealoppgaven beregnes automatisk</p></div></div>
+    <div className="head"><div className="grow"><h1>Tegninger og arealer<Hjelp id="side.arealer" /></h1><p className="sub">Plantegninger med målestokk og oppmålte arealer – arealoppgaven beregnes automatisk</p></div></div>
     <div className="toolbar"><Sel value={e} onChange={v => setF({ e: v })} opts={eiendomOpts()} /></div>
     <ArealSection eid={e} />
   </>;

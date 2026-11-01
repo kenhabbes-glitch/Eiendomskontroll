@@ -1,4 +1,5 @@
 import React from 'react';
+import { Hjelp } from '../components/Hjelp';
 import { KATS, TYPER } from '../lib/catalog';
 import { S, canEdit, useStore } from '../lib/store';
 import { aNavn, dUntil } from '../lib/utils';
@@ -16,7 +17,7 @@ export function Kontrollplan() {
   if (f.st === 'forfalt') L = L.filter(o => d(o) < 0); if (f.st === '30') L = L.filter(o => d(o) <= 30); if (f.st === '90') L = L.filter(o => d(o) <= 90);
   if (f.q) { const q = f.q.toLowerCase(); L = L.filter(o => (o.navn + ' ' + (o.hjemmel || '') + ' ' + (o.utfores || '') + ' ' + aNavn(o.anleggId)).toLowerCase().includes(q)); }
   return <>
-    <div className="head"><div className="grow"><h1>Kontrollplan</h1><p className="sub">Lovpålagte kontroller, egenkontroller og service – på tvers av eiendommene</p></div>{canEdit() && <button className="btn pri" onClick={() => editOppgave()}>+ Ny kontroll</button>}</div>
+    <div className="head"><div className="grow"><h1>Kontrollplan<Hjelp id="side.kontroller" /></h1><p className="sub">Lovpålagte kontroller, egenkontroller og service – på tvers av eiendommene</p></div>{canEdit() && <button className="btn pri" onClick={() => editOppgave()}>+ Ny kontroll</button>}</div>
     <div className="toolbar"><Search value={f.q} onChange={q => setF({ q })} />
       <Sel value={f.st} onChange={st => setF({ st })} opts={[['aktive', 'Alle aktive'], ['forfalt', 'Forfalte'], ['30', 'Forfaller ≤ 30 dager'], ['90', 'Forfaller ≤ 90 dager'], ['alle', 'Inkl. inaktive']]} />
       <Sel value={f.e} onChange={e => setF({ e })} opts={eiendomOpts()} empty="Alle eiendommer" />
