@@ -86,11 +86,15 @@ Første siffer i systemkoden er hovedgruppen: 2 Bygning, 3 VVS, 4 Elkraft, 5 Tel
   'levetid': { gruppe: 'Begreper', tittel: 'Levetid (teknisk og funksjonell)', tekst: `Teknisk levetid er hvor lenge en bygningsdel fungerer før den må skiftes. Funksjonell levetid er hvor lenge den dekker behovet (krav, bruk, energi) før den bør skiftes, selv om den fortsatt virker.
 
 Appen foreslår levetid fra en NS 3451-referansetabell. Bruk teknisk levetid som utgangspunkt, og funksjonell der krav eller bruk endrer seg raskt. Du kan alltid overstyre.` },
-  'naaverdi': { gruppe: 'Begreper', tittel: 'Nåverdi og kalkulasjonsrente', tekst: `Nåverdi er hva en fremtidig kostnad er verdt i dag. Den er lavere enn kostnaden fordi penger satt av i dag kan forrente seg fram til utskiftingen.
+  'naaverdi': { gruppe: 'Begreper', tittel: 'Hva er nåverdi?', tekst: `Nåverdi er hva en fremtidig kostnad er verdt i dag. Den svarer på spørsmålet: hvor mye må jeg sette av i dag for å ha nok penger når utskiftingen kommer?
 
-Eksempel: 712 880 kr i 2038 med 6 % rente har nåverdi ca. 354 000 kr. Setter du av det beløpet i dag med 6 % avkastning, har du nok i 2038.
+- Først prisjusteres kostnaden med KPI fram til utskiftingsåret («Kostnad ved utskifting»).
+- Deretter diskonteres den tilbake til i dag med kalkulasjonsrenten: nåverdi = fremtidig kostnad ÷ (1 + rente)^antall år.
+- Nåverdien blir lavere enn dagens kostnad når renten er høyere enn prisstigningen, fordi pengene du setter av kan forrente seg i mellomtiden.
 
-Renten settes under Innstillinger.` },
+Eksempel: En utskifting som koster 712 880 kr i 2038 har med 6 % rente en nåverdi på ca. 354 000 kr. Setter du av 354 000 kr i dag og får 6 % avkastning hvert år, har du 712 880 kr i 2038.
+
+Nåverdi gjør det mulig å sammenligne og summere utskiftinger som skjer i ulike år, f.eks. for å vurdere hva vedlikeholdsetterslepet er verdt i dag eller hvor mye som bør avsettes. Kalkulasjonsrenten settes under Innstillinger.` },
   'kpi': { gruppe: 'Begreper', tittel: 'Prisjustering (KPI)', tekst: `Kostnader legges inn i kroneverdien for et bestemt år (prisnivå). Fram til utskiftingsåret justeres de med KPI-satsen fra Innstillinger, slik at «kostnad ved utskifting» viser forventet pris det året.` },
   'tg': { gruppe: 'Begreper', tittel: 'Tilstandsgrad (NS 3424)', tekst: `- TG0: ingen avvik.
 - TG1: mindre eller moderate avvik, normal slitasje.

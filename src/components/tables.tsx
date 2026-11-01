@@ -1,4 +1,5 @@
 import React, { type ReactNode } from 'react';
+import { Hjelp } from './Hjelp';
 import { KOMP, DOK_PAAKREVD, AV_LUKKET, SERVICEAVTALE, MALER } from '../lib/catalog';
 import { ikDekning } from '../lib/utils';
 import { S, canEdit, save } from '../lib/store';
@@ -88,7 +89,7 @@ function SysKost({ a }: { a: Rec }) {
 export function AnleggTable({ list, showE = false }: { list: Rec[]; showE?: boolean }) {
   if (!list.length) return <Wrap><Empty t="Ingen systemer eller bygningsdeler registrert" /></Wrap>;
   const L = sortBy(list, a => (KOMP[a.type]?.g || '') + '|' + aNavn(a.id)); const ok = canEdit();
-  return <Wrap><table><thead><tr><th>System / bygningsdel</th>{showE && <th>Eiendom</th>}<th className="num">Installert år</th><th className="num">Levetid</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}{ok && <th className="num">Nåverdi</th>}<th>Kontroller</th></tr></thead><tbody>
+  return <Wrap><table><thead><tr><th>System / bygningsdel</th>{showE && <th>Eiendom</th>}<th className="num">Installert år</th><th className="num">Levetid</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}{ok && <th className="num">Nåverdi<Hjelp id="naaverdi" size={14} /></th>}<th>Kontroller</th></tr></thead><tbody>
     {L.map(a => { const k = KOMP[a.type] || ({} as any); const r = compRest(a); const n = S.oppgaver.filter(o => o.anleggId === a.id && o.aktiv !== false); const due = n.filter(o => (dUntil(o.nesteFrist) as number) < 0).length;
       return <tr key={a.id} className="click" onClick={() => editAnlegg(a.id)}>
         <td>{a.tfmSys && <span className="mono small">{tfmSys(a)} </span>}<b style={{ fontWeight: 500 }}>{a.navn || k.n}</b><div className="small muted">{a.navn ? k.n : k.g}{a.fabrikat ? ' · ' + a.fabrikat : ''}</div></td>
@@ -136,7 +137,7 @@ export function TfmTree({ list, q, onNewKomp }: { list: Rec[]; q: string; onNewK
       <td colSpan={ncol} style={{ fontWeight: 700 }}><span style={{ display: 'inline-block', width: 18, color: 'var(--muted)' }}>{gOpen ? '▾' : '▸'}</span><span className="mono" style={{ marginRight: 8 }}>{k || '–'}</span>{k ? HOVEDGRUPPER[k] || 'Hovedgruppe ' + k : 'Uten TFM-kode'}<span className="small muted" style={{ fontWeight: 400, marginLeft: 10 }}>{G.nS} system{G.nS === 1 ? '' : 'er'}{G.nK ? ` · ${G.nK} komponent${G.nK === 1 ? '' : 'er'}` : ''}</span></td></tr>);
     if (gOpen) rows.push(...G.rader); });
   return <><div className="toolbar" style={{ marginTop: -4 }}><button className="btn sm" onClick={() => settApen(alle, true)}>▾ Vis alle</button><button className="btn sm" onClick={() => settApen(alle, false)}>▸ Skjul alle</button>{tving && <span className="small muted">Søk er aktivt – alt vises utvidet</span>}</div>
-  <Wrap><table><thead><tr><th>TFM-kode</th><th>System / komponent</th><th className="num">Installert år</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}{ok && <th className="num">Nåverdi</th>}<th>Kontroller</th><th /></tr></thead>
+  <Wrap><table><thead><tr><th>TFM-kode</th><th>System / komponent</th><th className="num">Installert år</th><th className="num">Utskiftings­år</th><th>Restlevetid</th><th>Tilstand</th>{ok && <th className="num">Kostnad i dag</th>}{ok && <th className="num">Kostnad ved utskifting</th>}{ok && <th className="num">Nåverdi<Hjelp id="naaverdi" size={14} /></th>}<th>Kontroller</th><th /></tr></thead>
     <tbody>{rows.length ? rows : <tr><td colSpan={11} className="muted">Ingen treff.</td></tr>}</tbody></table></Wrap></>;
 }
 

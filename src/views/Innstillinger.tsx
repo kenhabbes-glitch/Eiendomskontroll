@@ -59,7 +59,7 @@ function RenteKort({ ro }: { ro: boolean }) {
   const lagre = async () => { if (isNaN(r) || r < 0 || r > 30) { toast('Skriv inn en rente mellom 0 og 30 %'); return; } setBusy(true); try { await saveInnst('rente', { sats: r }); toast('Kalkulasjonsrente lagret'); } catch { } setBusy(false); };
   const kpi = kpiInnst().fast;
   return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}>
-    <h2>Kalkulasjonsrente for nåverdi</h2>
+    <h2>Kalkulasjonsrente for nåverdi<Hjelp id="naaverdi" /></h2>
     <p className="small muted" style={{ marginTop: -4 }}>Nåverdien viser hva fremtidige utskiftinger er verdt i dag: kostnaden prisjusteres med KPI frem til utskiftingsåret og diskonteres tilbake til {YEAR} med denne renten. Siden kostnadene er KPI-justert (nominelle), bør renten også være nominell. Realrenten er omtrent kalkulasjonsrente minus KPI{!isNaN(r) ? ` – nå ca. ${(r - kpi).toLocaleString('nb-NO', { maximumFractionDigits: 2 })} %` : ''}.</p>
     <div className="form" style={{ maxWidth: 420 }}><div className="fld half"><label>Kalkulasjonsrente (% per år)</label><input value={v} readOnly={ro} onChange={e => setV(e.target.value)} inputMode="decimal" placeholder={String(RENTE_STANDARD)} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px' }} /></div></div>
     {!isNaN(r) && <div className="note small">Eksempel: 1 000 000 kr som må betales om 10 år har nåverdi {nok(1e6 / Math.pow(1 + r / 100, 10))}, om 20 år {nok(1e6 / Math.pow(1 + r / 100, 20))}.</div>}
