@@ -17,11 +17,13 @@ Brukeren oppgir fabrikat/modell for et teknisk system eller en komponent. Søk p
 1) leverandørens/produsentens antatte eller oppgitte levetid (teknisk levetid i år, evt. intervall),
 2) en forventet utskiftingskostnad i NOK eks. mva for utstyr + montasje i Norge (dagens prisnivå),
 3) evt. en retrofit-/oppgraderingskostnad dersom det er et realistisk alternativ til full utskifting.
+4) produsentens anbefalte periodiske vedlikehold/ettersyn for modellen (f.eks. filterbytte, rengjøring, funksjonstest, service), med intervall. Bare det leverandøren faktisk anbefaler eller som er bransjestandard for denne typen – maks 6 punkter.
 Vær ærlig: hvis du ikke finner tall, sett null. Ikke finn på kilder: kilde_url skal bare være en nettadresse du faktisk har sett i søkeresultatene, ellers null. Kostnader er alltid anslag.
 Svar til slutt KUN med ett JSON-objekt (ingen tekst før/etter, ingen markdown) på formen:
 {"produkt":string,"levetid":{"aar":number|null,"min":number|null,"max":number|null,"type":"teknisk"|"funksjonell"|"garanti"|"ukjent","kilde_url":string|null,"kommentar":string},
 "utskifting":{"belop_nok":number|null,"omfang":string,"kilde_url":string|null,"kommentar":string},
 "retrofit":{"belop_nok":number|null,"omfang":string,"kilde_url":string|null,"kommentar":string}|null,
+"vedlikehold":[{"oppgave":string,"intervall_n":number,"intervall_enhet":"uke"|"mnd"|"år","utfores":string,"kilde_url":string|null}],
 "usikkerhet":"lav"|"middels"|"høy","notat":string}
 Skriv tekstfeltene på norsk og kort.`;
 

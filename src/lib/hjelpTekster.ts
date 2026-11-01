@@ -134,6 +134,17 @@ Hvis leiekontrakten fastsetter fellesarealet (som m², prosent av fellesarealet 
 
 Kontroller alltid mot gjeldende forskrift og DSBs veiledning.` },
 
+  'kontroller.system': { gruppe: 'Begreper', tittel: 'Kontroller som opprettes for et system', tekst: `Når du legger til et system, foreslår appen kontroller ut fra systemtypen: lovpålagte kontroller (f.eks. årlig kontroll av brannalarm, sprinkler, nødlys, heis), egenkontroller (f.eks. månedlig test av nødlys, ukentlig sprinklerkontroll) og service etter leverandørens anbefaling. Hjemmel og intervall står under hver kontroll.
+
+- Alle er krysset av som standard. Fjern de som ikke er relevante.
+- På et eksisterende system ser du hvilke standardkontroller som finnes (✓) og hvilke som mangler. Kryss av og lagre for å opprette dem.
+- Intervallene er veiledende. Juster dem etter anleggets FDV-dokumentasjon og serviceavtale.` },
+  'kontroller.leverandor': { gruppe: 'Begreper', tittel: 'Leverandørens anbefalte vedlikehold', tekst: `Søket etter leverandørdata henter også vedlikeholdet produsenten anbefaler for modellen (f.eks. filterbytte, rengjøring, service), med intervall.
+
+- Kryss av for de du vil følge opp, og lagre. De opprettes som kontroller av typen «Leverandøranbefaling», med første frist om 30 dager.
+- For komponenter knyttes kontrollen til systemet, med komponentkoden i navnet.
+- Kontroller mot FDV-dokumentasjonen. Uten Google-søk er anbefalingene generelle og mindre sikre.` },
+
   // ---------------- Skjemafelt (kobles automatisk på feltnøkkel)
   'felt.tfmSys': { gruppe: 'Skjemafelt', tittel: 'TFM systemkode', tekst: `Systemkoden fra NS 3451, normalt tre sifre (f.eks. 360 luftbehandling, 443 nødlys). Koden bestemmer hovedgruppen systemet vises under, og hvilken levetid som foreslås.` },
   'felt.tfmLop': { gruppe: 'Skjemafelt', tittel: 'Systemløpenummer', tekst: `Skiller like systemer i samme bygg fra hverandre: 360.001, 360.002 osv. Foreslås automatisk.` },

@@ -122,10 +122,23 @@ function LeverandorSok({ v, set, kind, sysKode }: { v: any; set: (x: any) => voi
         <span style={{ background: '#fff4e5', color: '#9a5b00', borderRadius: 9, padding: '0 7px', fontWeight: 600 }}>FORSLAG</span> {lab}: <b>{kr(o.belop_nok)}</b>{o.omfang && <span className="muted"> – {o.omfang}</span>}{o.kilde_url && <> · <a href={o.kilde_url} target="_blank" rel="noopener noreferrer">kilde</a></>}
         {' '}<button type="button" className="btn sm" onClick={() => brukKost(o, lab)}>Bruk som kostnadsforslag</button></div>)}
       {!U?.belop_nok && !RF?.belop_nok && <div className="muted" style={{ marginTop: 4 }}>Fant ingen kostnad.</div>}
+      {Array.isArray(res.resultat.vedlikehold) && res.resultat.vedlikehold.length > 0 && <div style={{ marginTop: 8 }}>
+        <b>Leverandørens anbefalte vedlikehold</b><Hjelp id="kontroller.leverandor" size={14} /><div className="muted">Kryss av for å opprette som kontroller når du lagrer{kind === 'k' ? ' (knyttes til systemet)' : ''}.</div>
+        {res.resultat.vedlikehold.map((o: any, j: number) => { const sel = (v.levMk || []).some((x: any) => x.oppgave === o.oppgave); const fins = S.oppgaver.some(t => t.anleggId === (kind === 'k' ? v.anleggId : v.id) && t.navn === (kind === 'k' && v.kode ? `${o.oppgave} (-${v.kode}${pad(v.lop)})` : o.oppgave));
+          return <label key={j} style={{ display: 'flex', gap: 8, alignItems: 'start', margin: '4px 0', fontWeight: 400, cursor: fins ? 'default' : 'pointer' }}>
+            {fins ? <span style={{ color: 'var(--green)', fontWeight: 700, width: 14 }}>✓</span> : <input type="checkbox" checked={sel} style={{ marginTop: 3 }} onChange={() => set({ levMk: sel ? (v.levMk || []).filter((x: any) => x.oppgave !== o.oppgave) : [...(v.levMk || []), { ...o, oppgave: kind === 'k' && v.kode ? `${o.oppgave} (-${v.kode}${pad(v.lop)})` : o.oppgave, produkt: res.resultat.produkt }] })} />}
+            <span>{o.oppgave} <span className="muted">· {intTxt({ n: +o.intervall_n || 1, enhet: o.intervall_enhet || 'år' })}{o.utfores ? ' · ' + o.utfores : ''}{fins ? ' · finnes allerede' : ''}</span>{o.kilde_url && <> · <a href={o.kilde_url} target="_blank" rel="noopener noreferrer">kilde</a></>}</span></label>; })}
+      </div>}
       {res.resultat.usikkerhet && <div className="muted" style={{ marginTop: 4 }}>Usikkerhet: {res.resultat.usikkerhet}. {res.resultat.notat || ''}</div>}
       {res.kilder?.length > 0 && <details style={{ marginTop: 4 }}><summary>Kilder ({res.kilder.length})</summary>{res.kilder.slice(0, 8).map((k: any, i: number) => <div key={i}><a href={k.url} target="_blank" rel="noopener noreferrer">{k.title || k.url}</a></div>)}</details>}
     </div>}
   </div>;
+}
+
+// Kontroll basert på leverandørens anbefalte vedlikehold (fra nettsøket)
+export function levTask(o: any, eiendomId: string, anleggId: string, frist: string) {
+  const enh = ['uke', 'mnd', 'år'].includes(o.intervall_enhet) ? o.intervall_enhet : 'år';
+  return { eiendomId, anleggId, navn: o.oppgave, kategori: o.kategori || 'Leverandør', type: 'Leverandøranbefaling', hjemmel: 'Leverandørens anbefaling' + (o.produkt ? ' – ' + o.produkt : '') + (o.kilde_url ? ' (' + o.kilde_url + ')' : ''), intervall: { n: Math.max(1, +o.intervall_n || 1), enhet: enh }, utfores: o.utfores || 'Servicefirma', ansvar: 'Eier', nesteFrist: frist, aktiv: true, historikk: [], kilde: 'leverandor' };
 }
 
 function KostFlagg({ v }: { v: any }) {
@@ -204,6 +217,12 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'plass', type: 'custom', label: 'Plassering på tegning', render: v => <PlasseringFelt kind="a" id={id} eiendomId={v.eiendomId} close={() => closeRef.c?.()} /> },
     { k: 'notat', label: 'Notater', type: 'textarea' },
   ];
+  // Eksisterende system: vis standardkontroller for typen og hvilke som mangler
+  if (id && !ro) fields.push({ k: 'mkNy', type: 'custom', label: 'Standardkontroller for denne typen', help: 'kontroller.system', def: [], render: (v, set) => {
+    const ms = KOMP[v.type]?.m || []; if (!ms.length) return <div className="muted small">Ingen standardkontroller for denne typen.</div>;
+    return <div className="checks">{ms.map(k => { const fins = S.oppgaver.find(o => o.anleggId === id && o.malKey === k && o.aktiv !== false);
+      return <label key={k} style={{ opacity: fins ? .75 : 1 }}>{fins ? <span style={{ color: 'var(--green)', fontWeight: 700, width: 16, display: 'inline-block' }}>✓</span> : <input type="checkbox" checked={(v.mkNy || []).includes(k)} onChange={e => set({ mkNy: e.target.checked ? [...(v.mkNy || []), k] : (v.mkNy || []).filter((x: string) => x !== k) })} />}
+        <span><span className="ct">{MALER[k].n}</span><br /><span className="cs">{fins ? `Finnes – neste frist ${fd(fins.nesteFrist)}` : 'Mangler – kryss av for å opprette'} · {MALER[k].t} · {intTxt({ n: MALER[k].i[0], enhet: MALER[k].i[1] })} · {MALER[k].h}</span></span></label>; })}</div>; } });
   if (!id) fields.push(
     { k: 'mk', type: 'custom', label: 'Kontroller som opprettes for dette systemet', hint: 'Du kan justere hver kontroll senere.', render: (v, set) => { const ms = KOMP[v.type]?.m || []; return ms.length ? <div className="checks">{ms.map(k => <label key={k}><input type="checkbox" checked={(v.mk || []).includes(k)} onChange={e => set({ mk: e.target.checked ? [...(v.mk || []), k] : (v.mk || []).filter((x: string) => x !== k) })} /><span><span className="ct">{MALER[k].n}</span><br /><span className="cs">{MALER[k].t} · {intTxt({ n: MALER[k].i[0], enhet: MALER[k].i[1] })} · {MALER[k].h}</span></span></label>)}</div> : <div className="muted small">Ingen standardkontroller for denne typen.</div>; } },
     { k: 'forste', label: 'Første frist for nye kontroller', type: 'date', half: true });
@@ -225,7 +244,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
       if (await confirmBox(`Slette systemet${kc.length ? ` og ${kc.length} komponenter` : ''}? Tilknyttede kontroller beholdes, men mister koblingen.`)) { await removeDoc('anlegg', id); close(); }
     }}>Slett</button> : null,
     onSave: async v => {
-      const mk: string[] = v.mk || []; const forste = v.forste || today(); delete v.mk; delete v.forste; delete v.prev; delete v.beregn;
+      const mk: string[] = [...(v.mk || []), ...(v.mkNy || [])]; const forste = v.forste || addDays(today(), 30); const levMk: any[] = v.levMk || []; delete v.mk; delete v.mkNy; delete v.levMk; delete v.forste; delete v.prev; delete v.beregn;
       if (v.kost && !v.kostAar) v.kostAar = YEAR;
       v.tfmSys = String(v.tfmSys || '').replace(/\D/g, ''); v.tfmLop = v.tfmSys ? pad(String(v.tfmLop || '1').replace(/\D/g, '') || 1) : '';
       const dup = v.tfmSys && S.anlegg.find(x => x.id !== id && x.eiendomId === v.eiendomId && x.tfmSys === v.tfmSys && pad(x.tfmLop) === v.tfmLop);
@@ -233,7 +252,8 @@ export function editAnlegg(id?: string, eiendomId?: string) {
       delete v.plass; delete v.saInfo; delete v.tgInfo; delete v.secTg; delete v.secDrift; delete v.levHjelp; delete v.levSok; delete v.kostFlagg; if (v.kostKilde && +v.kost !== +v.kostKilde.belop) v.kostKilde = undefined; const fersk = id ? byId('anlegg', id) : null;
       const nid = await save('anlegg', { ...a, ...v, pos: fersk ? fersk.pos ?? null : a.pos ?? null, mk: undefined, forste: undefined });
       for (const k of mk) await save('oppgaver', taskFromMal(k, MALER, v.eiendomId, nid, forste));
-      toast(mk.length ? `Lagret og opprettet ${mk.length} kontroller` : 'Lagret');
+      for (const o of levMk) await save('oppgaver', levTask(o, v.eiendomId, nid, forste));
+      const n = mk.length + levMk.length; toast(n ? `Lagret og opprettet ${n} kontroller` : 'Lagret');
     },
   });
 }
@@ -272,7 +292,8 @@ export function editKomponent(id?: string, anleggId?: string) {
       if (!x.navn) x.navn = TFM_KODER.find(c => c[0] === x.kode)?.[1] || '';
       const dup = S.komponenter.find(z => z.id !== id && z.anleggId === x.anleggId && String(z.kode || '').toUpperCase() === x.kode && pad(z.lop) === x.lop);
       if (dup) { toast('Komponentkoden er allerede brukt i dette systemet'); return false; }
-      delete x.plass; delete x.tgInfo; delete x.secTg; delete x.levHjelp; delete x.levSok; delete x.kostFlagg; if (x.kostKilde && +x.kost !== +x.kostKilde.belop) x.kostKilde = undefined; const fersk = id ? byId('komponenter', id) : null;
+      const levMk: any[] = x.levMk || []; delete x.levMk; delete x.plass; delete x.tgInfo; delete x.secTg; delete x.levHjelp; delete x.levSok; delete x.kostFlagg; if (x.kostKilde && +x.kost !== +x.kostKilde.belop) x.kostKilde = undefined; const fersk = id ? byId('komponenter', id) : null;
+      { const sy = byId('anlegg', x.anleggId); for (const o of levMk) if (sy) await save('oppgaver', levTask(o, sy.eiendomId, sy.id, addDays(today(), 30))); } if (levMk.length) toast(`Opprettet ${levMk.length} kontroller fra leverandørens anbefaling`);
       const a = byId('anlegg', x.anleggId); await save('komponenter', { ...k, ...x, pos: fersk ? fersk.pos ?? null : k.pos ?? null, eiendomId: a ? a.eiendomId : k.eiendomId }); toast('Komponent lagret');
     },
   });
