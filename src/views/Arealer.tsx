@@ -21,7 +21,7 @@ import { editAnlegg, editAvvik, editKomponent } from '../lib/actions';
 import { state, isUtforer } from '../lib/store';
 import { AlvChip, FileLink, StChip } from '../components/ui';
 import { arealRapport } from '../lib/arealRapport';
-import { ENHETER, dwgTilBilde } from '../lib/dwg';
+import { ENHETER, dwgTilBilde, lagStil, rasteriser } from '../lib/dwg';
 
 // ---------- systemer/komponenter som markører på tegning
 export const FAG: [string, string, string][] = [['2', 'Bygning', '#8a5a2b'], ['3', 'VVS', '#2457a6'], ['4', 'Elkraft', '#b07a00'], ['5', 'Tele og automasjon', '#b42318'], ['6', 'Andre installasjoner', '#7b3fa0'], ['7', 'Utendørs', '#5b6b00']];
@@ -58,7 +58,7 @@ export function editTegning(id?: string, eid?: string) {
   const fields: any[] = [{ k: 'eiendomId', label: 'Eiendom', type: 'select', options: eiendomOpts, req: true },
     { k: 'navn', label: 'Navn på tegning / etasje', req: true, half: true, ph: '1. etasje' }, { k: 'etasje', label: 'Etasjenummer (sortering)', type: 'number', half: true, hint: 'Kjeller = -1, U1 = 0 osv.' }];
   if (id && t.kilde) fields.push({ k: 'kildeInfo', type: 'custom', render: () => <div className="note small" style={{ color: 'var(--ink)' }}>Original DWG: <FileLink fil={t.kilde} />{t.cad?.enhet ? ` · enhet ${t.cad.enhet}` : ''}{t.cad?.bredde ? ` · ca. ${Math.round(t.cad.bredde * 10) / 10} × ${Math.round(t.cad.hoyde * 10) / 10} m` : ''}{t.cad?.advarsler?.length ? <div style={{ color: 'var(--amber)', marginTop: 4 }}>Ikke vist: {t.cad.advarsler.join('; ')}</div> : null}
-    <div style={{ marginTop: 6 }}><button type="button" className="btn sm" onClick={() => lesDwgPaaNytt(t.id)}>Les inn DWG på nytt</button> <span className="muted">Bruker siste versjon av DWG-leseren.</span></div></div> });
+    <div style={{ marginTop: 6 }}>{t.cad?.svg && <><button type="button" className="btn sm pri" onClick={() => dwgLag(t.id)}>Lag i DWG ({(t.cad.lag || []).length})</button> </>}<button type="button" className="btn sm" onClick={() => lesDwgPaaNytt(t.id)}>Les inn DWG på nytt</button> <span className="muted">Bruker siste versjon av DWG-leseren.</span></div></div> });
   const erCad = (x: any) => /\.dwg$/i.test(x?.fil?.name || '');
   if (!id) fields.push({ k: 'fil', label: 'Plantegning (DWG, PDF, PNG eller JPG)', type: 'file', req: true, accept: '.dwg,.pdf,.png,.jpg,.jpeg,.webp' },
     { k: 'side', label: 'Sidenummer i PDF', type: 'number', half: true, hint: 'Bare for PDF med flere sider', show: (x: any) => /\.pdf$/i.test(x?.fil?.name || '') },
@@ -77,7 +77,8 @@ export function editTegning(id?: string, eid?: string) {
           const kilde = await uploadFile(f, x.eiendomId, undefined, f.name);
           const fil = await uploadFile(blob as any, x.eiendomId, undefined, navn); if (!fil) return false;
           const skala = { a: [w * 0.02, h * 0.995], b: [w * 0.98, h * 0.995], m: Math.round(w * 0.96 * r.mpp * 1000) / 1000 };
-          const nid = await save('tegninger', { eiendomId: x.eiendomId, navn: x.navn, etasje: x.etasje, fil, kilde, w, h, soner: [], skala, cad: { enhet: r.enhet, bredde: r.bredde, hoyde: r.hoyde, advarsler: r.advarsler } });
+          const svgfil = await uploadFile(new Blob([r.svg], { type: 'image/svg+xml' }) as any, x.eiendomId, undefined, navn.replace(/\.png$/, '.svg'));
+          const nid = await save('tegninger', { eiendomId: x.eiendomId, navn: x.navn, etasje: x.etasje, fil, kilde, w, h, soner: [], skala, cad: { enhet: r.enhet, bredde: r.bredde, hoyde: r.hoyde, advarsler: r.advarsler, vb: r.vb, svg: svgfil, lag: r.lag, skjult: [], omriss: false } });
           if (r.advarsler.length) setTimeout(() => textModal('DWG – innhold som ikke vises', 'Tegningen er lest, men dette kunne ikke vises:\n\n• ' + r.advarsler.join('\n• ') + '\n\nRåd:\n• Xref: åpne tegningen i AutoCAD og bruk «Bind» (eller eTransmit) så eksterne tegninger blir en del av filen.\n• Proxy-objekter (AutoCAD Architecture, MagiCAD m.fl.): bruk «Export to AutoCAD» / «-EXPORTTOAUTOCAD», eller «Explode», og lagre på nytt.\n• Alternativt: plott tegningen til PDF og last opp PDF-en.', 'Lagre som ny DWG fra CAD-programmet og last opp på nytt, eller bruk PDF.'), 600);
           toast(`DWG lest. Målestokk satt automatisk (enhet ${r.enhet}, ca. ${r.bredde.toLocaleString('nb-NO', { maximumFractionDigits: 1 })} × ${r.hoyde.toLocaleString('nb-NO', { maximumFractionDigits: 1 })} m). Kontroller med «Mål avstand».`);
           setTimeout(() => openPlan(nid), 150); return;
@@ -93,6 +94,44 @@ export function editTegning(id?: string, eid?: string) {
   });
 }
 
+// ---------- Lag i DWG (skru av/på)
+export function dwgLag(tid: string) { openModal({ wide: true, render: close => <DwgLag tid={tid} close={close} /> }); }
+function DwgLag({ tid, close }: { tid: string; close: () => void }) {
+  const t = byId('tegninger', tid)!; const cad = t.cad || {};
+  const [svg, setSvg] = useState(''); const [skjult, setSkjult] = useState<string[]>(cad.skjult || []); const [omriss, setOmriss] = useState(!!cad.omriss); const [q, setQ] = useState(''); const [busy, setBusy] = useState(''); const [prev, setPrev] = useState('');
+  useEffect(() => { (async () => { try { const u = await fileUrl(cad.svg.path); setSvg(await (await fetch(u)).text()); } catch { toast('Kunne ikke hente DWG-data'); } })(); }, []);
+  useEffect(() => { if (!svg) return; const v = cad.vb; const doc = svg.replace(/<svg([^>]*?)viewBox="[^"]*"/, `<svg$1viewBox="${v.x} ${v.y} ${v.w} ${v.h}"`).replace(/<\/svg>\s*$/, `<style>${lagStil(skjult, omriss)}</style></svg>`);
+    const u = URL.createObjectURL(new Blob([doc], { type: 'image/svg+xml' })); setPrev(u); return () => URL.revokeObjectURL(u); }, [svg, skjult.join('|'), omriss]);
+  const lag: { navn: string; antall: number }[] = cad.lag || []; const vis = lag.filter(l => !q || l.navn.toLowerCase().includes(q.toLowerCase()));
+  const veksle = (n: string) => setSkjult(skjult.includes(n) ? skjult.filter(x => x !== n) : [...skjult, n]);
+  const bruk = async () => {
+    setBusy('Tegner …');
+    try {
+      const blob = await rasteriser(svg, cad.vb, t.w, t.h, skjult, omriss);
+      const fil = await uploadFile(blob as any, t.eiendomId, undefined, (t.kilde?.navn || 'tegning').replace(/\.dwg$/i, '') + '.png'); if (!fil) { setBusy(''); return; }
+      const gml = t.fil; await save('tegninger', { ...byId('tegninger', tid)!, fil, cad: { ...cad, skjult, omriss } }); await deleteFile(gml);
+      toast(skjult.length ? `${skjult.length} lag skjult` : 'Alle lag vises'); close();
+    } catch (e: any) { toast('Feil: ' + (e?.message || e)); }
+    setBusy('');
+  };
+  return <>
+    <div className="mh"><h2>Lag i DWG – {t.navn}</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
+    <div className="mb"><div style={{ display: 'grid', gridTemplateColumns: 'minmax(240px, 320px) 1fr', gap: 16 }}>
+      <div>
+        <input placeholder="Søk lag …" value={q} onChange={e => setQ(e.target.value)} style={{ width: '100%', border: '1px solid var(--line2)', borderRadius: 8, padding: '6px 10px', marginBottom: 6 }} />
+        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}><button className="btn sm" onClick={() => setSkjult(skjult.filter(n => !vis.some(l => l.navn === n)))}>Vis alle</button><button className="btn sm" onClick={() => setSkjult([...new Set([...skjult, ...vis.map(l => l.navn)])])}>Skjul alle</button></div>
+        <div style={{ maxHeight: 440, overflow: 'auto', border: '1px solid var(--line2)', borderRadius: 8, padding: '4px 8px' }}>
+          {vis.map(l => <label key={l.navn} className="small" style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '2px 0' }}><input type="checkbox" checked={!skjult.includes(l.navn)} onChange={() => veksle(l.navn)} /><span style={{ flex: 1, wordBreak: 'break-all' }}>{l.navn || '(uten navn)'}</span><span className="muted">{l.antall}</span></label>)}
+          {!vis.length && <p className="small muted">Ingen lag.</p>}</div>
+        <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8 }}><input type="checkbox" checked={omriss} onChange={e => setOmriss(e.target.checked)} />Vis skravur bare som omriss</label>
+        <p className="small muted">Fjern haken for lag som ligger i veien, f.eks. arealskravur, møblering eller rutenett. Målestokk, arealer og markører beholdes.</p>
+      </div>
+      <div style={{ border: '1px solid var(--line2)', borderRadius: 8, background: '#fff', minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{prev ? <img src={prev} alt="" style={{ maxWidth: '100%', maxHeight: 520 }} /> : <span className="muted small">Laster forhåndsvisning …</span>}</div>
+    </div></div>
+    <div className="mf"><button className="btn" onClick={close}>Avbryt</button><button className="btn pri" disabled={!!busy || !svg} onClick={bruk}>{busy || 'Bruk'}</button></div>
+  </>;
+}
+
 async function lesDwgPaaNytt(id: string) {
   const t = byId('tegninger', id); if (!t?.kilde) return;
   if ((t.soner || []).length && !(await confirmBox(`Tegningen har ${(t.soner || []).length} oppmålte arealer. Når DWG-en leses inn på nytt kan utsnittet endre seg, slik at arealer og markører må kontrolleres/flyttes. Fortsette?`))) return;
@@ -101,7 +140,9 @@ async function lesDwgPaaNytt(id: string) {
     const r = await dwgTilBilde(new File([b], t.kilde.navn || 'tegning.dwg'), 'auto');
     const fil = await uploadFile(r.blob as any, t.eiendomId, undefined, (t.kilde.navn || 'tegning').replace(/\.dwg$/i, '') + '.png'); if (!fil) return;
     const gml = t.fil; const skala = { a: [r.w * 0.02, r.h * 0.995], b: [r.w * 0.98, r.h * 0.995], m: Math.round(r.w * 0.96 * r.mpp * 1000) / 1000 };
-    await save('tegninger', { ...t, fil, w: r.w, h: r.h, skala, cad: { enhet: r.enhet, bredde: r.bredde, hoyde: r.hoyde, advarsler: r.advarsler } }); await deleteFile(gml); await syncArealer(t.eiendomId);
+    const svgfil = await uploadFile(new Blob([r.svg], { type: 'image/svg+xml' }) as any, t.eiendomId, undefined, (t.kilde.navn || 'tegning').replace(/\.dwg$/i, '') + '.svg');
+    if (t.cad?.svg) await deleteFile(t.cad.svg);
+    await save('tegninger', { ...t, fil, w: r.w, h: r.h, skala, cad: { enhet: r.enhet, bredde: r.bredde, hoyde: r.hoyde, advarsler: r.advarsler, vb: r.vb, svg: svgfil, lag: r.lag, skjult: [], omriss: false } }); await deleteFile(gml); await syncArealer(t.eiendomId);
     toast('DWG lest inn på nytt'); setTimeout(() => openPlan(id), 150);
   } catch (e: any) { toast('Kunne ikke lese DWG: ' + (e?.message || e)); }
 }
@@ -271,6 +312,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
               {!ro && <button className="btn sm danger" onClick={async () => { await lagrePos(i, null); st.selM = null; rr(); }}>Fjern fra tegning</button>}</div></>; })()}
         {st.lagM && markers.length > 0 && <><h3>Tegnforklaring</h3><div className="small">{FAG.filter(f => markers.some(m => itemFag(m) === f[0])).map(f => <div key={f[0]} style={{ display: 'flex', gap: 6, alignItems: 'center' }}><span className="sw" style={{ background: f[2] }} />{f[0]} {f[1]}</div>)}<div className="muted" style={{ marginTop: 4 }}>■ system · ● komponent · rød ring = åpne avvik</div></div></>}
         {st.lagV && avMarkers.length > 0 && <div className="small" style={{ marginTop: 6 }}><span style={{ color: '#b42318' }}>▲</span> åpent avvik · <span style={{ color: '#b07a00' }}>▲</span> utført, til kontroll</div>}
+        {T.cad?.svg && !ro && <div style={{ marginTop: 12 }}><button className="btn sm" onClick={() => dwgLag(T.id)}>Lag i DWG ({(T.cad.lag || []).length}){(T.cad.skjult || []).length ? ` · ${(T.cad.skjult || []).length} skjult` : ''}</button></div>}
         <h3>Målestokk</h3>
         {st.scale.length === 2 ? <><label className="small">Lengde mellom punktene (meter)</label><input id="scM" type="number" step="any" placeholder="F.eks. 12.4" value={scM} onChange={e => setScM(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') saveScale(); }} />
           <div style={{ display: 'flex', gap: 6 }}><button className="btn sm pri" onClick={saveScale}>Lagre målestokk</button><button className="btn sm" onClick={() => { st.scale = []; rr(); }}>Avbryt</button></div></>

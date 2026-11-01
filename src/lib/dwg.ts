@@ -33,6 +33,25 @@ function robustUtstrekning(svg: SVGSVGElement) {
   return isFinite(x0) ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
 }
 
+/** Lager stilark for visning: skjulte lag, og skravur som omriss om ønsket */
+export function lagStil(skjult: string[] = [], omriss = false) {
+  const esc = (n: string) => n.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return (skjult.length ? skjult.map(n => n === '0' ? `svg > g [data-l="0"]` : `[data-l="${esc(n)}"]`).join(',') + '{display:none!important}' : '') + (omriss ? '[data-h]{fill:none!important;stroke:#1d2320!important}' : '');
+}
+
+/** Gjør SVG-teksten (fra lesDwg) om til PNG med gitt utsnitt og størrelse */
+export async function rasteriser(svgTekst: string, vb: { x: number; y: number; w: number; h: number }, W: number, H: number, skjult: string[] = [], omriss = false) {
+  const doc = new DOMParser().parseFromString(svgTekst, 'image/svg+xml'); const svg = doc.documentElement;
+  const stil = doc.createElementNS('http://www.w3.org/2000/svg', 'style'); stil.textContent = lagStil(skjult, omriss); svg.appendChild(stil);
+  svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`); svg.setAttribute('width', String(W)); svg.setAttribute('height', String(H)); svg.setAttribute('preserveAspectRatio', 'none');
+  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }));
+  try {
+    const img = new Image(); await new Promise((ok, feil) => { img.onload = ok; img.onerror = () => feil(new Error('Kunne ikke tegne opp DWG-en')); img.src = url; });
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d')!; g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.drawImage(img, 0, 0, W, H);
+    return await new Promise<Blob>((ok, feil) => cv.toBlob(b => b ? ok(b) : feil(new Error('Kunne ikke lage bilde')), 'image/png'));
+  } finally { URL.revokeObjectURL(url); }
+}
+
 export async function dwgTilBilde(f: File, enhet = 'auto', maks = 6000) {
   const type = /\.dxf$/i.test(f.name) ? 'dxf' : 'dwg';
   const r = await lesFil(f, type);
@@ -41,22 +60,29 @@ export async function dwgTilBilde(f: File, enhet = 'auto', maks = 6000) {
   const doc = new DOMParser().parseFromString(svgTekst, 'image/svg+xml'); const svg = doc.documentElement as unknown as SVGSVGElement;
   if (svg.nodeName !== 'svg') throw new Error('Tegningen kunne ikke tolkes');
   const stil = doc.createElementNS('http://www.w3.org/2000/svg', 'style');
-  stil.textContent = '*{vector-effect:non-scaling-stroke}g,line,polyline,polygon,path,circle,ellipse,rect{stroke:#1d2320!important}text{fill:#1d2320!important;stroke:none!important}';
+  stil.textContent = '*{vector-effect:non-scaling-stroke}g,line,polyline,polygon,path,circle,ellipse,rect{stroke:#1d2320!important}text{fill:#1d2320!important;stroke:none!important}[data-stor]{fill:#e9ebe7!important;fill-opacity:1!important}';
   svg.insertBefore(stil, svg.firstChild);
   // Mål opp i DOM-en for å finne fornuftige yttergrenser
   const holder = document.createElement('div'); holder.style.cssText = 'position:fixed;left:-20000px;top:0;width:2000px;height:2000px;visibility:hidden';
   svg.setAttribute('width', '2000'); svg.setAttribute('height', '2000'); holder.appendChild(document.importNode(svg, true)); document.body.appendChild(holder);
   let vb: { x: number; y: number; w: number; h: number } | null = null;
-  try { vb = robustUtstrekning(holder.firstElementChild as SVGSVGElement); } finally { holder.remove(); }
+  try {
+    const live = holder.firstElementChild as SVGSVGElement;
+    vb = robustUtstrekning(live);
+    // Store heltrukne skravurer (typisk arealmarkering) tegnes lyst, så de ikke dekker tegningen
+    const total = live.getBoundingClientRect(); const flate = Math.max(1, total.width * total.height);
+    const liveH = Array.from(live.querySelectorAll(':scope > g [data-h="s"]')); const docH = Array.from(svg.querySelectorAll(':scope > g [data-h="s"]'));
+    if (liveH.length === docH.length) liveH.forEach((el, i) => { const b = (el as Element).getBoundingClientRect(); if (b.width * b.height > flate * 0.004) docH[i].setAttribute('data-stor', '1'); });
+  } finally { holder.remove(); }
   if (!vb || !(vb.w > 0) || !(vb.h > 0)) { const v = (svg.getAttribute('viewBox') || '0 0 0 0').split(/\s+/).map(Number); vb = { x: v[0], y: v[1], w: v[2], h: v[3] }; }
   if (!(vb.w > 0 && vb.h > 0)) throw new Error('Fant ingen tegningselementer i modellområdet');
   const marg = Math.max(vb.w, vb.h) * 0.02; vb = { x: vb.x - marg, y: vb.y - marg, w: vb.w + 2 * marg, h: vb.h + 2 * marg };
   const W = vb.w >= vb.h ? maks : Math.round(maks * vb.w / vb.h), H = vb.w >= vb.h ? Math.round(maks * vb.h / vb.w) : maks;
-  svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`); svg.setAttribute('width', String(W)); svg.setAttribute('height', String(H)); svg.setAttribute('preserveAspectRatio', 'none');
-  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }));
-  const img = new Image(); await new Promise((ok, feil) => { img.onload = ok; img.onerror = () => feil(new Error('Kunne ikke tegne opp DWG-en')); img.src = url; });
-  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d')!; g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.drawImage(img, 0, 0, W, H); URL.revokeObjectURL(url);
-  const blob: Blob = await new Promise((ok, feil) => cv.toBlob(b => b ? ok(b) : feil(new Error('Kunne ikke lage bilde')), 'image/png'));
+  const ferdigSvg = new XMLSerializer().serializeToString(svg);
+  const blob = await rasteriser(ferdigSvg, vb, W, H);
+  // Lag med antall objekter
+  const tell: Record<string, number> = {}; for (const m of ferdigSvg.matchAll(/data-l="([^"]*)"/g)) { const n = m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&'); tell[n] = (tell[n] || 0) + 1; }
+  const lag = Object.entries(tell).sort((a, b) => a[0].localeCompare(b[0], 'nb')).map(([navn, antall]) => ({ navn, antall }));
   // Enhet → meter per piksel
   let enhetNavn = '', perEnhet = 0;
   if (enhet !== 'auto') { const e = ENHETER.find(x => x[0] === enhet)!; enhetNavn = e[0]; perEnhet = e[2]; }
@@ -67,5 +93,5 @@ export async function dwgTilBilde(f: File, enhet = 'auto', maks = 6000) {
   const advarsler: string[] = [];
   Object.entries(r.ukjente || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 4).forEach(([t, n]) => advarsler.push(`${n} ${NAVN[t] || t}`));
   if (r.xref?.length) advarsler.unshift(`${r.xref.length} ekstern referanse (xref): ${r.xref.slice(0, 3).join(', ')}`);
-  return { blob, w: W, h: H, mpp: vb.w / W * perEnhet, enhet: enhetNavn, bredde: vb.w * perEnhet, hoyde: vb.h * perEnhet, advarsler };
+  return { blob, w: W, h: H, mpp: vb.w / W * perEnhet, enhet: enhetNavn, bredde: vb.w * perEnhet, hoyde: vb.h * perEnhet, advarsler, svg: ferdigSvg, vb, lag };
 }
