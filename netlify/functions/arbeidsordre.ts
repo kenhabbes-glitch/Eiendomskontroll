@@ -5,12 +5,16 @@
 // eller Resend (RESEND_API_KEY). Avsender settes i EPOST_FRA. Svar går til den som sendte (eller EPOST_SVAR).
 // Uten nøkkel returneres teksten, og appen åpner brukerens eget e-postprogram.
 import { createClient } from '@supabase/supabase-js';
-import nodemailer from 'nodemailer';
 
 const json = (status: number, body: any) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const esc = (s: any) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
 
 export default async (req: Request) => {
+  try { return await handler(req); }
+  catch (e: any) { console.error('arbeidsordre-feil', e); return json(500, { error: 'Serverfeil: ' + (e?.message || String(e)) }); }
+};
+
+const handler = async (req: Request) => {
   if (req.method !== 'POST') return json(405, { error: 'Bare POST' });
   const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim().replace(/\/(rest|auth|storage)\/v1.*$/i, '').replace(/\/+$/, '');
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -51,7 +55,8 @@ export default async (req: Request) => {
     const fra = o.fraNavn ? `"${o.fraNavn.replace(/"/g, '')}" <${o.fraEpost}>` : o.fraEpost; const replyTo = o.svarTil || svarTil || undefined;
     if (o.metode === 'smtp') {
       try {
-        const t = nodemailer.createTransport({ host: o.smtpHost, port: o.smtpPort, secure: o.smtpPort === 465, auth: { user: o.smtpUser, pass: o.passord.replace(/\s+/g, '') } });
+        const nm: any = await import('nodemailer'); const nodemailer = nm.default || nm; // lastes først når det trengs
+        const t = nodemailer.createTransport({ host: o.smtpHost, port: o.smtpPort, secure: o.smtpPort === 465, auth: { user: o.smtpUser, pass: o.passord.replace(/\s+/g, '') }, connectionTimeout: 7000, greetingTimeout: 5000, socketTimeout: 8000 });
         await t.sendMail({ from: fra, to: til, replyTo, subject: emne, text: tekst, html, attachments: vedlegg ? [{ filename: vedlegg.navn, content: vedlegg.base64, encoding: 'base64', contentType: 'application/pdf' }] : undefined });
         return { sendt: true };
       } catch (e: any) { return { sendt: false, grunn: 'E-post feilet (SMTP): ' + (e?.response || e?.message || e) }; }

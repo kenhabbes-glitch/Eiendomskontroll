@@ -20,3 +20,5 @@
 
 [functions]
   node_bundler = "esbuild"
+  # nodemailer bruker dynamiske require() som ikke tåler bundling – lastes fra node_modules ved kjøring
+  external_node_modules = ["nodemailer"]
