@@ -203,3 +203,13 @@ export const TYPE_TAGGER: Record<string, string[]> = {
 };
 /** Standardtagg ut fra hovedgruppe i NS 3451 når typen ikke har egne */
 export const NS_TAGG: Record<string, string> = { '2': 'Bygning', '3': 'VVS', '4': 'Elektro', '5': 'Tele/IKT', '6': 'Bygning', '7': 'Utomhus' };
+
+/* Tilstandsgrader etter NS 3424 (Tilstandsanalyse av byggverk). Beskrivelsene er en forenklet gjengivelse. */
+export const TG_DEF: [string, string, string][] = [
+  ['TG0', 'Ingen avvik', 'Tilstanden tilsvarer referansenivået eller bedre. Ingen symptomer på avvik.'],
+  ['TG1', 'Mindre eller moderate avvik', 'Normal slitasje og vedlikeholdt, eller avvik/mangel på dokumentasjon som ikke er vesentlig.'],
+  ['TG2', 'Vesentlige avvik', 'Sterkt nedslitt, vesentlig skade eller redusert funksjon, kort gjenværende brukstid, mangelfullt utført/vedlikeholdt eller vesentlig dokumentasjon mangler.'],
+  ['TG3', 'Stort eller alvorlig avvik', 'Total eller nært forestående funksjonssvikt, behov for strakstiltak eller fare for liv og helse.'],
+  ['TGIU', 'Ikke undersøkt', 'Ikke tilgjengelig for inspeksjon og mangler dokumentasjon, samtidig som mulig avvik kan gi vesentlige konsekvenser.'],
+];
+export const KG_DEF: [string, string][] = [['KG0', 'Ingen konsekvens'], ['KG1', 'Små og middels konsekvenser'], ['KG2', 'Middels store konsekvenser'], ['KG3', 'Store og alvorlige konsekvenser']];

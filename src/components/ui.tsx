@@ -16,7 +16,7 @@ export function DueChip({ s }: { s?: string }) {
 }
 export const AlvChip = ({ a }: { a?: string }) => <Chip c={({ Kritisk: 'red', 'Høy': 'orange', Middels: 'amber', Lav: 'blue' } as any)[a || ''] || ''}>{a || '–'}</Chip>;
 export const StChip = ({ s }: { s?: string }) => <Chip c={({ Ny: 'blue', 'Under vurdering': 'blue', Planlagt: 'amber', 'Under utbedring': 'amber', 'Utført – til kontroll': 'green', Utsatt: 'orange', Rettet: 'green', Avvist: '', Lukket: 'green' } as any)[s || 'Ny'] || ''}>{s || 'Ny'}</Chip>;
-export const TgChip = ({ t }: { t?: string }) => t ? <Chip c={({ TG0: 'green', TG1: 'green', TG2: 'amber', TG3: 'red' } as any)[t] || ''}>{t}</Chip> : <span className="muted">–</span>;
+export const TgChip = ({ t }: { t?: string }) => t ? <Chip c={({ TG0: 'green', TG1: 'green', TG2: 'amber', TG3: 'red', TGIU: 'blue' } as any)[t] || ''}>{t}</Chip> : <span className="muted">–</span>;
 export function RestChip({ r }: { r: number | null }) {
   if (r === null) return <span className="muted small">–</span>;
   if (r <= 0) return <Chip c="red">{r === 0 ? 'Utløper i år' : `Overskredet ${-r} år`}</Chip>;

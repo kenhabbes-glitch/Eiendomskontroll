@@ -173,7 +173,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   const T = useRef<Rec>({ ...clone(t0), soner: clone(t0?.soner || []) }).current;
   const [, setTick] = useState(0); const rr = () => setTick(x => x + 1);
   const tfmMode = opts.mode === 'tfm';
-  const st = useRef({ tagg: (opts.tagg || '') as string, fokus: new Set<string>(opts.fokus || (opts.focus ? [opts.focus] : [])), visPlassert: false, flyttOk: (opts.placeId || '') as string, lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, tool: opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '' }).current;
+  const st = useRef({ tgF: '', tagg: (opts.tagg || '') as string, fokus: new Set<string>(opts.fokus || (opts.focus ? [opts.focus] : [])), visPlassert: false, flyttOk: (opts.placeId || '') as string, lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, tool: opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '' }).current;
   const [vb, setVb] = useState({ x: 0, y: 0, w: T.w || 1000, h: T.h || 800 });
   const svgRef = useRef<SVGSVGElement>(null);
   const src = useFileUrl(T.fil?.path);
@@ -182,7 +182,8 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   const items: MItem[] = [...sortBy(S.anlegg.filter(a => a.eiendomId === T.eiendomId), a => (a.tfmSys || '999') + pad(a.tfmLop)).flatMap(a => [{ kind: 'a', o: a } as MItem, ...sortBy(S.komponenter.filter(k => k.anleggId === a.id), k => (k.kode || '') + pad(k.lop)).map(k => ({ kind: 'k', o: k } as MItem))])];
   const avItems: MItem[] = sortBy(S.avvik.filter(a => a.eiendomId === T.eiendomId && (!AV_LUKKET.includes(a.status) || a.id === opts.focus || a.id === opts.placeId)), a => -(a.nr || 0)).map(a => ({ kind: 'v', o: a } as MItem));
   const itemTagger = (i: MItem) => i.kind === 'v' ? (i.o.komponentId ? taggerFor(byId('komponenter', i.o.komponentId), 'k') : taggerFor(byId('anlegg', i.o.anleggId), 'a')) : taggerFor(i.o, i.kind as any);
-  const filt = (i: MItem) => i.o.pos?.tegningId === T.id && (!st.fag || itemFag(i) === st.fag) && (!st.tagg || itemTagger(i).includes(st.tagg));
+  const tgOk = (i: MItem) => { if (!st.tgF || i.kind === 'v') return true; const tg = i.o.tg || ''; return st.tgF === 'TG23' ? ['TG2', 'TG3'].includes(tg) : st.tgF === 'ingen' ? !tg : tg === st.tgF; };
+  const filt = (i: MItem) => i.o.pos?.tegningId === T.id && (!st.fag || itemFag(i) === st.fag) && (!st.tagg || itemTagger(i).includes(st.tagg)) && tgOk(i);
   const markers = items.filter(filt);
   const avMarkers = avItems.filter(filt);
   const brukteTagger = [...new Set(items.filter(i => i.o.pos?.tegningId === T.id).flatMap(itemTagger))];
@@ -277,6 +278,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
         <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={st.lagV} onChange={e => { st.lagV = e.target.checked; rr(); }} />Avvik</label>
         <select value={st.fag} onChange={e => { st.fag = e.target.value; rr(); }} style={{ border: '1px solid var(--line2)', borderRadius: 7, padding: '5px 6px', fontSize: 12.5 }}><option value="">Alle fag</option>{FAG.map(f => <option key={f[0]} value={f[0]}>{f[0]} {f[1]}</option>)}</select>
         <select value={st.tagg} onChange={e => { st.tagg = e.target.value; rr(); }} style={{ border: '1px solid var(--line2)', borderRadius: 7, padding: '5px 6px', fontSize: 12.5, marginTop: 4, color: st.tagg ? taggFarge(st.tagg) : undefined, fontWeight: st.tagg ? 600 : 400 }}><option value="">Alle tagger</option>{[...new Set([...TAGGER.map(t => t[0]), ...brukteTagger])].map(t => <option key={t} value={t}>{t}{brukteTagger.includes(t) ? '' : ' (ingen her)'}</option>)}</select>
+        <select value={st.tgF} onChange={e => { st.tgF = e.target.value; rr(); }} style={{ border: '1px solid var(--line2)', borderRadius: 7, padding: '5px 6px', fontSize: 12.5, marginTop: 4, fontWeight: st.tgF ? 600 : 400 }}><option value="">Alle tilstandsgrader</option><option value="TG3">Bare TG3</option><option value="TG23">TG2 og TG3</option><option value="TG1">TG1</option><option value="TG0">TG0</option><option value="TGIU">TGIU – ikke undersøkt</option><option value="ingen">Ikke vurdert</option></select>
         {st.fokus.size > 0 && <button className="btn sm" style={{ marginTop: 4 }} onClick={() => { st.fokus = new Set(); rr(); }}>Fjern utheving</button>}
         <hr /><button onClick={() => setVb({ x: 0, y: 0, w: T.w, h: T.h })}>Tilpass til vindu</button><div className="phelp">{HELP[st.tool]}</div>
       </div>
@@ -293,7 +295,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
             {on && <circle cx={x} cy={y} r={R0 * 2.1} fill={col} fillOpacity={.18} />}
             {av > 0 && <circle cx={x} cy={y} r={R0 * 1.55} fill="none" stroke="#b42318" strokeWidth={2.5} vectorEffect="non-scaling-stroke" />}
             {i.kind === 'a' ? <rect x={x - R0} y={y - R0} width={R0 * 2} height={R0 * 2} rx={R0 * .3} fill={col} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" /> : <circle cx={x} cy={y} r={R0} fill={col} stroke="#fff" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
-            <text x={x} y={y - R0 - 4 * kk} textAnchor="middle" fontSize={fs * .85} fontFamily="IBM Plex Mono,monospace" fontWeight={600} fill={col} stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{itemKode(i)}</text></g>; })}
+            <text x={x} y={y - R0 - 4 * kk} textAnchor="middle" fontSize={fs * .85} fontFamily="IBM Plex Mono,monospace" fontWeight={600} fill={col} stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{itemKode(i)}{['TG2', 'TG3'].includes(i.o.tg) && <tspan fill={i.o.tg === 'TG3' ? '#b42318' : '#b07a00'}> {i.o.tg}</tspan>}</text></g>; })}
         {st.lagV && avMarkers.map(i => { const isDrag = st.drag?.t === 'm' && st.drag.id === i.o.id && st.mpos; const x = isDrag ? st.mpos![0] : i.o.pos.x, y = isDrag ? st.mpos![1] : i.o.pos.y; const on = st.selM === i.o.id || st.fokus.has(i.o.id); const R0 = 10 * kk; const lukket = AV_LUKKET.includes(i.o.status); const col = lukket ? '#1f6f5c' : i.o.status === 'Utført – til kontroll' ? '#b07a00' : '#b42318';
           return <g key={'v' + i.o.id} data-m={i.o.id} style={{ cursor: ro ? 'pointer' : 'move' }}>
             {on && <circle cx={x} cy={y - R0 * .2} r={R0 * 2.2} fill={col} fillOpacity={.18} />}

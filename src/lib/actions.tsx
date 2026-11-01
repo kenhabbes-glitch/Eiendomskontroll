@@ -1,6 +1,6 @@
 // Skjemaer og handlinger (opprett/rediger/slett) som brukes fra flere visninger.
 import React, { useState } from 'react';
-import { SERVICEAVTALE } from './catalog';
+import { SERVICEAVTALE, TG_DEF, KG_DEF } from './catalog';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state } from './store';
 import { leieAreal, m2, FELLES_AVTALE } from './utils';
@@ -15,7 +15,16 @@ import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip
 const go = (p: string) => { location.hash = '#/' + p; };
 const eOpts = () => sortBy(S.eiendommer, e => e.navn).map(e => [e.id, e.navn] as [string, string]);
 export const UTBEDRER: [string, string][] = [['Eier', 'Eier / drift (felles)'], ['Leietaker', 'Leietaker'], ['Leverandør/entreprenør', 'Serviceselskap / leverandør']];
-const TG_OPTS: [string, string][] = [['', 'Ikke vurdert'], ['TG0', 'TG0 – ingen symptomer'], ['TG1', 'TG1 – svake symptomer'], ['TG2', 'TG2 – middels kraftige symptomer'], ['TG3', 'TG3 – kraftige symptomer']];
+const TG_OPTS: [string, string][] = [['', 'Ikke vurdert'], ...TG_DEF.map(t => [t[0], `${t[0]} – ${t[1].toLowerCase()}`] as [string, string])];
+// Felles felt for tilstandsvurdering etter NS 3424 (system og komponent)
+const tgFelt = (): Field[] => [
+  { k: 'tg', label: 'Tilstandsgrad (NS 3424)', type: 'select', options: TG_OPTS, half: true },
+  { k: 'tgdato', label: 'Tilstand vurdert dato', type: 'date', half: true },
+  { k: 'tgInfo', type: 'custom', render: v => { const d = TG_DEF.find(t => t[0] === v.tg); return d ? <div className="note small" style={{ color: 'var(--ink)', marginTop: -4 }}><b>{d[0]} – {d[1]}:</b> {d[2]}</div> : null; } },
+  { k: 'kg', label: 'Konsekvensgrad (KG)', type: 'select', options: [['', '–'], ...KG_DEF.map(k => [k[0], `${k[0]} – ${k[1].toLowerCase()}`] as [string, string])], half: true, show: x => ['TG2', 'TG3', 'TGIU'].includes(x.tg), hint: 'For TG2, TG3 og TGIU: konsekvens for sikkerhet, helse, miljø eller økonomi' },
+  { k: 'tgVurdertAv', label: 'Vurdert av', half: true, show: x => !!x.tg, ph: 'Navn / firma' },
+  { k: 'tgKomm', label: 'Tilstandsbeskrivelse / begrunnelse', type: 'textarea', show: x => !!x.tg, ph: 'Hva er observert, årsak og anbefalt tiltak' },
+];
 
 // ================= EIENDOM =================
 export function editEiendom(id?: string) {
@@ -111,11 +120,13 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'prev', type: 'custom', render: v => { const e = byId('eiendommer', v.eiendomId); return <div className="note mono" style={{ fontSize: 14, color: 'var(--ink)' }}>{v.tfmSys ? `${e?.tfmBygg ? '+' + e.tfmBygg : ''}=${v.tfmSys}.${pad(v.tfmLop || 1)}` : '(ingen TFM-kode)'}</div>; } },
     { k: 'navn', label: 'Betegnelse / plassering', half: true, ph: 'F.eks. Ventilasjon kontorfløy' }, { k: 'fabrikat', label: 'Fabrikat / modell', half: true },
     { k: 'aar', label: 'Installert/utskiftet år', type: 'number', half: true }, { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Tomt = veiledende levetid for typen' },
-    { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true, hint: 'La stå tom for å bruke beregnet år' }, { k: 'tg', label: 'Tilstandsgrad (NS 3424)', type: 'select', options: TG_OPTS, half: true },
+    { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true, hint: 'La stå tom for å bruke beregnet år' },
     ...(isStaff() && canEdit() ? [{ k: 'kost', label: 'Sentralkost på systemnivå (kr)', type: 'number', half: true, hint: 'F.eks. sentral, styring, kabling. Komponentene summeres i tillegg.' } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR, hint: 'Året beløpet er anslått i' } as Field] : []),
     { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} typeLevetid={KOMP[v.type]?.l} sysId={id || ''} /> },
+    { k: 'secTg', label: 'Tilstand', type: 'sec' }, ...tgFelt(),
+    { k: 'secDrift', label: 'Drift', type: 'sec' },
     { k: 'ansvar', label: 'Ansvar for vedlikehold', type: 'select', options: ['Eier', 'Leietaker', 'Delt'], half: true },
-    { k: 'leverandor', label: 'Serviceleverandør / avtale', half: true }, { k: 'tgdato', label: 'Tilstand vurdert dato', type: 'date', half: true },
+    { k: 'leverandor', label: 'Serviceleverandør / avtale', half: true },
     { k: 'saInfo', type: 'custom', render: v => { const kr = SERVICEAVTALE[v.type]; if (!kr) return null; const st = id ? saStatus({ ...a, id }, kr) : { s: kr.n === 'lov' ? 'no' : 'anb', d: null };
       return <div className="note small" style={{ color: 'var(--ink)' }}><b>Serviceavtale: {kr.n === 'lov' ? 'lovkrav' : 'anbefalt'}</b> – <span className="muted">{kr.h}.</span><br />
         {st.s === 'na' ? 'Markert som ikke relevant.' : st.d ? <>Registrert: <b>{st.d.tittel}</b>{st.d.gyldigTil ? ` · gyldig til ${fd(st.d.gyldigTil)}` : ''}{st.s === 'exp' && <b style={{ color: 'var(--red)' }}> · UTLØPT</b>}</> : <span style={{ color: kr.n === 'lov' ? 'var(--red)' : undefined }}>Ingen serviceavtale registrert.</span>}
@@ -147,7 +158,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
       v.tfmSys = String(v.tfmSys || '').replace(/\D/g, ''); v.tfmLop = v.tfmSys ? pad(String(v.tfmLop || '1').replace(/\D/g, '') || 1) : '';
       const dup = v.tfmSys && S.anlegg.find(x => x.id !== id && x.eiendomId === v.eiendomId && x.tfmSys === v.tfmSys && pad(x.tfmLop) === v.tfmLop);
       if (dup) { toast(`TFM-koden =${v.tfmSys}.${v.tfmLop} er allerede brukt på «${dup.navn || KOMP[dup.type]?.n}»`); return false; }
-      delete v.plass; delete v.saInfo; const fersk = id ? byId('anlegg', id) : null;
+      delete v.plass; delete v.saInfo; delete v.tgInfo; delete v.secTg; delete v.secDrift; const fersk = id ? byId('anlegg', id) : null;
       const nid = await save('anlegg', { ...a, ...v, pos: fersk ? fersk.pos ?? null : a.pos ?? null, mk: undefined, forste: undefined });
       for (const k of mk) await save('oppgaver', taskFromMal(k, MALER, v.eiendomId, nid, forste));
       toast(mk.length ? `Lagret og opprettet ${mk.length} kontroller` : 'Lagret');
@@ -172,9 +183,9 @@ export function editKomponent(id?: string, anleggId?: string) {
     { k: 'serienr', label: 'Serienummer', half: true }, { k: 'aar', label: 'Installert år', type: 'number', half: true },
     { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Tomt = skiftes sammen med systemet' }, { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true },
     { k: 'plass', type: 'custom', label: 'Plassering på tegning', render: v => <PlasseringFelt kind="k" id={id} eiendomId={byId('anlegg', v.anleggId)?.eiendomId || k.eiendomId} close={() => closeRefK.c?.()} /> },
-    { k: 'tg', label: 'Tilstandsgrad', type: 'select', options: TG_OPTS, half: true },
     ...(canEdit() ? [{ k: 'kost', label: 'Utskiftingskostnad (kr)', type: 'number', half: true } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR } as Field] : []),
     { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} kompAv={v.anleggId} /> },
+    { k: 'secTg', label: 'Tilstand', type: 'sec' }, ...tgFelt(),
     { k: 'notat', label: 'Notater', type: 'textarea' }];
   const closeRefK: { c?: () => void } = {};
   closeRefK.c = formModal({
@@ -186,7 +197,7 @@ export function editKomponent(id?: string, anleggId?: string) {
       if (!x.navn) x.navn = TFM_KODER.find(c => c[0] === x.kode)?.[1] || '';
       const dup = S.komponenter.find(z => z.id !== id && z.anleggId === x.anleggId && String(z.kode || '').toUpperCase() === x.kode && pad(z.lop) === x.lop);
       if (dup) { toast('Komponentkoden er allerede brukt i dette systemet'); return false; }
-      delete x.plass; const fersk = id ? byId('komponenter', id) : null;
+      delete x.plass; delete x.tgInfo; delete x.secTg; const fersk = id ? byId('komponenter', id) : null;
       const a = byId('anlegg', x.anleggId); await save('komponenter', { ...k, ...x, pos: fersk ? fersk.pos ?? null : k.pos ?? null, eiendomId: a ? a.eiendomId : k.eiendomId }); toast('Komponent lagret');
     },
   });
