@@ -5,24 +5,65 @@ import { byId, fd, today, type Rec } from '../lib/utils';
 import { PLIKTER } from '../lib/catalog';
 import { confirmBox, copyText, FileLink, formModal, showModal, type Field } from '../components/ui';
 import { autoKvitterIK, vurderPliktRef } from '../lib/actions';
+import { lagPakke, lesPakke, pakkeNavn, blobTilBase64, type ImportResultat } from '../lib/sjekklistePakke';
+import { uploadFile, isStaff } from '../lib/store';
+
+export async function lastNedPakke(l: Rec, frist: string) {
+  const b = await lagPakke(l, frist); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = pakkeNavn(l) + '.zip'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+// ---------- Eier: importer utfylt pakke (ZIP, eller xlsx + filer)
+export function importerPakke(lid: string) {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true; inp.accept = '.zip,.xlsx,.pdf,.jpg,.jpeg,.png,.docx,.doc,.xls';
+  inp.onchange = async () => {
+    const l = byId('leietakere', lid)!; const filer = [...(inp.files || [])]; if (!filer.length) return;
+    let r: ImportResultat; try { r = await lesPakke(l, filer); } catch (e: any) { toast('Kunne ikke lese filen: ' + (e.message || e)); return; }
+    if (!r.plikter.length) { toast('Fant ingen utfylte punkter eller filer i pakken'); return; }
+    showModal('Importer sjekkliste fra ' + l.navn, () => <>
+      <p className="small muted" style={{ marginTop: 0 }}>Pliktene under legges inn som <b>til godkjenning</b>. Du går gjennom og godkjenner hver enkelt etterpå (eller sender tilbake).</p>
+      {r.advarsler.map(a => <div key={a} className="note small" style={{ color: 'var(--amber)' }}>{a}</div>)}
+      <div className="tbl-wrap"><table><thead><tr><th>Plikt</th><th>Sjekkliste</th><th>Dato</th><th className="num">Filer</th></tr></thead><tbody>
+        {r.plikter.map(p => <tr key={p.key}><td>{p.navn}{p.komm && <div className="small muted" style={{ whiteSpace: 'pre-wrap' }}>{p.komm}</div>}</td><td className="small" style={{ color: p.sjekk.length >= p.antall ? 'var(--green)' : 'var(--amber)' }}>{p.sjekk.length} av {p.antall}</td><td className="small">{p.dato ? fd(p.dato) : '–'}</td><td className="num small" title={p.filer.map(f => f.name).join('\n')}>{p.filer.length}</td></tr>)}
+      </tbody></table></div>
+      {r.ukjenteFiler.length > 0 && <details className="small" style={{ marginTop: 8 }}><summary>Filer som ikke ble lest inn ({r.ukjenteFiler.length})</summary>{r.ukjenteFiler.map(f => <div key={f} className="muted">{f}</div>)}</details>}
+    </>, { foot: close => <><span className="grow" /><button className="btn" onClick={close}>Avbryt</button><button className="btn pri" onClick={async e => {
+      const btn = e.currentTarget; btn.disabled = true; btn.textContent = 'Laster opp …';
+      try {
+        const l2 = byId('leietakere', lid)!; const pl = (l2.plikter || []).slice();
+        for (const p of r.plikter) {
+          const ids: string[] = [];
+          for (const f of p.filer) { const up = await uploadFile(f, l2.eiendomId, l2.id); if (up) ids.push(await save('dokumenter', { eiendomId: l2.eiendomId, leietakerId: l2.id, type: 'Leietakers IK-dokumentasjon', tittel: p.navn + ' – ' + f.name, dato: p.dato || today(), fil: up })); }
+          pl[p.idx] = { ...pl[p.idx], status: 'til_godkjenning', innsendt: { dato: p.dato || today(), komm: p.komm, sjekk: p.sjekk, dokId: ids[0] || null, dokIds: ids, tid: new Date().toISOString(), av: 'Import fra fil' }, tilbakemelding: null };
+        }
+        await save('leietakere', { ...l2, plikter: pl }); close(); toast(`${r.plikter.length} plikter lest inn – klare til godkjenning`);
+      } catch (err: any) { toast('Import feilet: ' + (err.message || err)); btn.disabled = false; btn.textContent = 'Importer'; }
+    }}>Importer {r.plikter.length} plikter</button></> });
+  };
+  inp.click();
+}
 
 // ---------- Eier: send sjekklisten
 export function sendSjekkliste(lid: string) {
   const l = byId('leietakere', lid)!; const s = l.sjekklisteSendt;
   const fields: Field[] = [
+    { k: 'maate', label: 'Hvordan skal leietaker svare?', type: 'select', def: 'lenke', options: [['lenke', 'Lenke – fylles ut i Eiendomskontroll (leietaker får egen bruker)'], ['fil', 'Fil – Excel-sjekkliste og mapper (ZIP) på e-post, returneres og importeres'], ['begge', 'Begge – lenke og fil']] },
     { k: 'epost', label: 'E-post til leietakers kontaktperson', type: 'email', def: l.epost || '', req: true },
     { k: 'frist', label: 'Svarfrist', type: 'date', def: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })(), half: true },
     { k: 'melding', label: 'Melding (valgfri)', type: 'textarea', ph: 'Standardtekst brukes hvis feltet er tomt' },
   ];
   formModal({
     title: 'Send sjekkliste til ' + l.navn, fields, saveTxt: 'Send',
+    extraFoot: () => <button className="btn" type="button" onClick={() => lastNedPakke(l, '')} title="Last ned ZIP med Excel-sjekkliste og mapper – send den selv">⇩ Last ned pakken</button>,
     top: <p className="small muted" style={{ marginTop: 0 }}>Leietaker får en lenke på e-post. Via lenken opprettes en leietakerbruker (eller de logger inn), krysser av i sjekklisten for hver plikt og laster opp dokumentasjon. Innsendt dokumentasjon havner hos deg til godkjenning.{s ? ` Sist sendt ${fd(s.tid)} til ${s.til}.` : ''}</p>,
     onSave: async x => {
       try {
-        const r = await aoApi({ action: 'lt_send', leietaker_id: lid, epost: x.epost, frist: x.frist, melding: x.melding, lenkeBase: location.origin });
+        let vedlegg: any;
+        if (x.maate !== 'lenke') { const b = await lagPakke(l, x.frist); vedlegg = { navn: pakkeNavn(l) + '.zip', base64: await blobTilBase64(b), type: 'application/zip' }; }
+        const r = await aoApi({ action: 'lt_send', leietaker_id: lid, epost: x.epost, frist: x.frist, melding: x.melding, lenkeBase: location.origin, maate: x.maate, vedlegg });
+        if (!r.sendt && vedlegg) lastNedPakke(l, x.frist);
         if (r.sendt) { toast('Sjekklisten er sendt til ' + r.til); return; }
         showModal('Send sjekklisten selv', () => <>
-          <p className="small">{r.grunn || 'E-post er ikke satt opp.'} Kopier teksten under, eller åpne den i e-postprogrammet ditt.</p>
+          <p className="small">{r.grunn || 'E-post er ikke satt opp.'} Kopier teksten under, eller åpne den i e-postprogrammet ditt.{vedlegg ? ' Sjekklistepakken (ZIP) er lastet ned – legg den ved e-posten.' : ''}</p>
           <textarea readOnly value={r.tekst} style={{ width: '100%', height: 260, fontSize: 12.5 }} />
         </>, { foot: () => <><button className="btn" onClick={() => copyText(r.tekst)}>Kopier tekst</button><button className="btn" onClick={() => copyText(r.lenke)}>Kopier lenke</button><span className="grow" /><a className="btn pri" href={`mailto:${encodeURIComponent(r.til)}?subject=${encodeURIComponent(r.emne)}&body=${encodeURIComponent(r.tekst)}`}>Åpne i e-post</a></> });
       } catch (e: any) { toast(e.message); return false; }
@@ -33,13 +74,13 @@ export function sendSjekkliste(lid: string) {
 // ---------- Eier: vurder innsendt plikt
 export function vurderPlikt(lid: string, idx: number) {
   const l = byId('leietakere', lid)!; const p = (l.plikter || [])[idx]; const i = p?.innsendt; if (!p || !i) return;
-  const dok = PLIKTER[p.key]?.dok || []; const d = i.dokId && byId('dokumenter', i.dokId);
+  const dok = PLIKTER[p.key]?.dok || [];
   const lagre = async (np: Rec) => { const pl = l.plikter.slice(); pl[idx] = np; await save('leietakere', { ...l, plikter: pl }); };
   showModal('Vurder: ' + p.navn, () => <>
     <p className="small muted" style={{ marginTop: 0 }}>{l.navn} · sendt inn {fd(i.tid)}{i.av ? ' av ' + i.av : ''} · {p.hjemmel}</p>
     {dok.length > 0 && <><h3>Sjekkliste</h3><div className="note small" style={{ color: 'var(--ink)' }}>{dok.map(t => { const on = (i.sjekk || []).includes(t); return <div key={t} style={{ margin: '3px 0' }}><span style={{ color: on ? 'var(--green)' : 'var(--red)', fontWeight: 700, marginRight: 6 }}>{on ? '✓' : '✕'}</span>{t}</div>; })}
       <div className="muted" style={{ marginTop: 4 }}>{(i.sjekk || []).length} av {dok.length} punkter krysset av</div></div></>}
-    <dl className="dl" style={{ marginTop: 12 }}><dt>Dato</dt><dd>{fd(i.dato)}</dd><dt>Kommentar</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{i.komm || '–'}</dd><dt>Dokumentasjon</dt><dd>{d?.fil ? <FileLink fil={d.fil} /> : <span className="muted">Ingen fil lastet opp</span>}</dd></dl>
+    <dl className="dl" style={{ marginTop: 12 }}><dt>Dato</dt><dd>{fd(i.dato)}</dd><dt>Kommentar</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{i.komm || '–'}</dd><dt>Dokumentasjon</dt><dd>{(() => { const D = ((i.dokIds as string[] | undefined) || (i.dokId ? [i.dokId] : [])).map(x => byId('dokumenter', x)).filter(x => x?.fil); return D.length ? D.map(x => <div key={x!.id}><FileLink fil={x!.fil} /></div>) : <span className="muted">Ingen fil lastet opp</span>; })()}</dd></dl>
   </>, { foot: close => <>
     <button className="btn" onClick={async () => {
       close();

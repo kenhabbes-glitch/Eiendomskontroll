@@ -50,7 +50,7 @@ const handler = async (req: Request) => {
     if (env('RESEND_API_KEY')) return { metode: 'resend', fraNavn: d.fraNavn || n || 'Eiendomskontroll', fraEpost: e || 'onboarding@resend.dev', svarTil: d.svarTil || env('EPOST_SVAR'), smtpHost: '', smtpPort: 0, smtpUser: '', passord: env('RESEND_API_KEY'), kilde: 'netlify' };
     return { metode: '', fraNavn: d.fraNavn || '', fraEpost: '', svarTil: d.svarTil || '', smtpHost: '', smtpPort: 0, smtpUser: '', passord: '', kilde: '' };
   };
-  const sendEpost = async (til: string, emne: string, html: string, tekst: string, vedlegg?: { navn: string; base64: string }, svarTil?: string, o0?: Oppsett) => {
+  const sendEpost = async (til: string, emne: string, html: string, tekst: string, vedlegg?: { navn: string; base64: string; type?: string }, svarTil?: string, o0?: Oppsett) => {
     const o = o0 || await hentOppsett();
     if (!o.metode) return { sendt: false, grunn: 'E-post er ikke satt opp (Innstillinger → E-post for arbeidsordre)' };
     const fra = o.fraNavn ? `"${o.fraNavn.replace(/"/g, '')}" <${o.fraEpost}>` : o.fraEpost; const replyTo = o.svarTil || svarTil || undefined;
@@ -58,7 +58,7 @@ const handler = async (req: Request) => {
       try {
         const nm: any = await import('nodemailer'); const nodemailer = nm.default || nm; // lastes først når det trengs
         const t = nodemailer.createTransport({ host: o.smtpHost, port: o.smtpPort, secure: o.smtpPort === 465, auth: { user: o.smtpUser, pass: o.passord.replace(/\s+/g, '') }, connectionTimeout: 7000, greetingTimeout: 5000, socketTimeout: 8000 });
-        await t.sendMail({ from: fra, to: til, replyTo, subject: emne, text: tekst, html, attachments: vedlegg ? [{ filename: vedlegg.navn, content: vedlegg.base64, encoding: 'base64', contentType: 'application/pdf' }] : undefined });
+        await t.sendMail({ from: fra, to: til, replyTo, subject: emne, text: tekst, html, attachments: vedlegg ? [{ filename: vedlegg.navn, content: vedlegg.base64, encoding: 'base64', contentType: vedlegg.type || 'application/pdf' }] : undefined });
         return { sendt: true };
       } catch (e: any) { return { sendt: false, grunn: 'E-post feilet (SMTP): ' + (e?.response || e?.message || e) }; }
     }
@@ -191,8 +191,10 @@ const handler = async (req: Request) => {
     const til = String(body.epost || '').trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(til)) return json(400, { error: 'Ugyldig e-postadresse' });
     const base = typeof body.lenkeBase === 'string' && /^https?:\/\//.test(body.lenkeBase) ? body.lenkeBase.replace(/\/+$/, '') : '';
     const { data: fins } = await admin.from('profiles').select('id, rolle, leietaker_id').eq('epost', til).maybeSingle();
+    const maate = ['fil', 'begge'].includes(body.maate) ? body.maate : 'lenke';
     let lenke = `${base}/#/portal`;
-    if (!(fins && fins.rolle === 'leietaker' && fins.leietaker_id === l.id)) {
+    if (maate === 'fil') lenke = '';
+    else if (!(fins && fins.rolle === 'leietaker' && fins.leietaker_id === l.id)) {
       const { data: inv, error } = await admin.from('lt_invitasjon').insert({ leietaker_id: l.id, epost: til, opprettet_av: p.id }).select().single();
       if (error) return json(500, { error: 'Kunne ikke lage invitasjon (er 005_sjekkliste.sql kjørt?): ' + error.message });
       lenke = `${base}/#/lt/${inv.token}`;
@@ -202,14 +204,17 @@ const handler = async (req: Request) => {
     const frist = body.frist ? String(body.frist).split('-').reverse().join('.') : '';
     const melding = String(body.melding || ''); const avs = p.navn || p.epost;
     const emne = `Sjekkliste brann og internkontroll – ${d.navn || ''}${en ? ' (' + en + ')' : ''}`;
-    const tekst = [`Hei,`, '', melding || `Som utleier følger vi opp at leietakerne i ${en || 'bygget'} ivaretar sine plikter etter forskrift om brannforebygging og internkontrollforskriften. Vi ber dere fylle ut sjekklisten og laste opp dokumentasjon.`, frist ? `\nFrist: ${frist}` : '', '', 'Punkter:', ...pl.map((x: any) => '- ' + x.navn), '', `Fyll ut her:\n${lenke}`, '', `Hilsen ${avs}`].filter(x => x !== null).join('\n');
+    const filTekst = 'Vedlagt ligger en ZIP-fil med sjekklisten (Excel) og én mappe per punkt. Fyll ut Excel-arket, legg dokumentasjonen i riktig mappe, zip mappen og send den tilbake som svar på denne e-posten.';
+    const tekst = [`Hei,`, '', melding || `Som utleier følger vi opp at leietakerne i ${en || 'bygget'} ivaretar sine plikter etter forskrift om brannforebygging og internkontrollforskriften. Vi ber dere fylle ut sjekklisten og legge ved dokumentasjon.`, frist ? `\nFrist: ${frist}` : '', '', 'Punkter:', ...pl.map((x: any) => '- ' + x.navn), '', maate !== 'lenke' ? filTekst : '', lenke ? `${maate === 'begge' ? 'Eller fyll ut på nett' : 'Fyll ut her'}:\n${lenke}` : '', '', `Hilsen ${avs}`].filter(x => x !== null).join('\n');
     const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1d2320"><p style="font-size:12px;color:#6b736d;margin:0">SJEKKLISTE</p><h2 style="margin:4px 0 12px">Brann og internkontroll – ${esc(d.navn)}</h2>
       <p>${esc(melding || `Som utleier følger vi opp at leietakerne i ${en || 'bygget'} ivaretar sine plikter etter forskrift om brannforebygging og internkontrollforskriften. Vi ber dere fylle ut sjekklisten og laste opp dokumentasjon.`).replace(/\n/g, '<br>')}</p>
       ${frist ? `<p><b>Frist: ${esc(frist)}</b></p>` : ''}<ul>${pl.map((x: any) => `<li>${esc(x.navn)}</li>`).join('')}</ul>
-      <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Åpne sjekklisten</a></p>
-      <p style="font-size:12px;color:#6b736d">Via lenken oppretter du bruker (eller logger inn), krysser av for dokumentasjonen og laster opp filer. Utleier går gjennom og godkjenner.<br>Sendt av ${esc(avs)}.</p></div>`;
-    const r = await sendEpost(til, emne, html, tekst, undefined, p.epost || undefined);
-    await ltLogg(p, l, `Sjekkliste ${r.sendt ? 'sendt' : 'klargjort'} til ${til} (${d.navn || ''})`);
+      ${maate !== 'lenke' ? `<p style="background:#fff8e1;padding:10px 12px;border-radius:8px"><b>Vedlagt sjekkliste (ZIP):</b> ${esc(filTekst)}</p>` : ''}
+      ${lenke ? `<p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${maate === 'begge' ? 'Eller fyll ut på nett' : 'Åpne sjekklisten'}</a></p>
+      <p style="font-size:12px;color:#6b736d">Via lenken oppretter du bruker (eller logger inn), krysser av for dokumentasjonen og laster opp filer. Utleier går gjennom og godkjenner.</p>` : ''}<p style="font-size:12px;color:#6b736d">Sendt av ${esc(avs)}.</p></div>`;
+    const vedlegg = maate !== 'lenke' && body.vedlegg && typeof body.vedlegg.base64 === 'string' && body.vedlegg.base64.length < 4_000_000 ? { navn: String(body.vedlegg.navn || 'Sjekkliste.zip').slice(0, 120), base64: body.vedlegg.base64, type: 'application/zip' } : undefined;
+    const r = await sendEpost(til, emne, html, tekst, vedlegg, p.epost || undefined);
+    await ltLogg(p, l, `Sjekkliste (${maate === 'fil' ? 'Excel-pakke' : maate === 'begge' ? 'lenke og Excel-pakke' : 'lenke'}) ${r.sendt ? 'sendt' : 'klargjort'} til ${til} (${d.navn || ''})`);
     await admin.from('leietakere').update({ data: { ...d, sjekklisteSendt: { tid: new Date().toISOString(), til, av: avs, frist: body.frist || '' } } }).eq('id', l.id);
     return json(200, { ...r, til, lenke, emne, tekst });
   }
