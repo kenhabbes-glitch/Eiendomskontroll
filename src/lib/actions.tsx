@@ -3,9 +3,10 @@ import { Hjelp } from '../components/Hjelp';
 import React, { useState } from 'react';
 import { SERVICEAVTALE, TG_DEF, KG_DEF, NS_DOK } from './catalog';
 import { levetidRef, midt, spenn } from './ns3451';
-import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
+import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore, kanRedigereE, kanDrifteE, mineOrg, oppdaterNiva } from './store';
 import { leieAreal, m2, FELLES_AVTALE } from './utils';
+import { alleMaler, finnMal, kopi, kontraktKey, fordeling, pliktKeysFor, OMR, ANS_VALG } from './kontrakt';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst, standardTagger, taggerFor } from './utils';
 import { ikDekning } from './utils';
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
@@ -244,7 +245,9 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} typeLevetid={KOMP[v.type]?.l} sysId={id || ''} /> },
     { k: 'secTg', label: 'Tilstand', type: 'sec' }, ...tgFelt(),
     { k: 'secDrift', label: 'Drift', type: 'sec' },
-    { k: 'ansvar', label: 'Ansvar for vedlikehold', type: 'select', options: ['Eier', 'Leietaker', 'Delt'], half: true },
+    { k: 'ansvar', label: 'Ansvar for drift og vedlikehold', type: 'select', options: ['Eier', 'Leietaker', 'Delt'], half: true },
+    { k: 'utskiftAnsvar', label: 'Ansvar for utskifting', type: 'select', options: ['Eier', 'Leietaker', 'Delt'], empty: 'Som drift', half: true },
+    { k: 'leietakerId', label: 'Betjener leietaker', type: 'select', options: (v?: any) => S.leietakere.filter(l => l.eiendomId === (v?.eiendomId ?? a.eiendomId)).map(l => [l.id, l.navn] as [string, string]), empty: '– Felles / hele bygget', half: true, hint: 'Systemer som bare betjener ett leieobjekt følger den leietakerens kontrakt' },
     { k: 'leverandor', label: 'Serviceleverandør / avtale', half: true },
     { k: 'saInfo', type: 'custom', render: v => { const kr = SERVICEAVTALE[v.type]; if (!kr) return null; const st = id ? saStatus({ ...a, id }, kr) : { s: kr.n === 'lov' ? 'no' : 'anb', d: null };
       return <div className="note small" style={{ color: 'var(--ink)' }}><b>Serviceavtale: {kr.n === 'lov' ? 'lovkrav' : 'anbefalt'}</b> – <span className="muted">{kr.h}.</span><br />
@@ -618,7 +621,10 @@ export function editLeietaker(id?: string, preset: any = {}) {
         {leieAreal({ ...l, eiendomId: v.eiendomId, arealOverstyrt: '' }).adv.map((a, j) => <div key={j} style={{ color: 'var(--amber)', marginTop: 4 }}>⚠ {a}</div>)}</div>; } },
     { k: 'sec', label: 'Leieavtale', type: 'sec' },
     { k: 'start', label: 'Avtalestart', type: 'date', half: true }, { k: 'slutt', label: 'Avtaleutløp', type: 'date', half: true },
-    { k: 'avtaletype', label: 'Avtalemal', type: 'select', options: ['Standard næringsleiekontrakt (Norsk Eiendom)', 'Standard leieavtale (Huseierne)', 'Egen mal', 'Annet'], empty: '–', half: true },
+    { k: 'kontrakt', label: 'Kontraktstype', type: 'select', options: () => alleMaler().map(m => [m.key, m.n] as [string, string]), def: kontraktKey(l), help: 'kontrakt.type',
+      hint: 'Styrer ansvarsfordelingen og hvilke plikter leietakeren får. Kan justeres punkt for punkt etter kontrakten.' },
+    { k: 'heleBygget', label: 'Leietaker leier hele bygget (alle systemer omfattes av kontrakten)', type: 'checkbox' },
+    { k: 'avtaletype', label: 'Avtalemal / dokument', half: true, ph: 'F.eks. Norsk Eiendom bare hus 2023' },
     { k: 'varsel', label: 'Varslingsfrist fornyelse (mnd før utløp)', type: 'number', half: true },
     { k: 'sec2', label: 'Kontakt', type: 'sec' },
     { k: 'kontakt', label: 'Kontaktperson', half: true }, { k: 'brannvernleder', label: 'Leietakers brannvernleder', half: true },
@@ -632,11 +638,16 @@ export function editLeietaker(id?: string, preset: any = {}) {
       if (x.orgnr && rensOrgnr(x.orgnr).length === 9 && x.brreg?.orgnr !== rensOrgnr(x.orgnr)) { const b = await brregData(x.orgnr).catch(() => null); if (b) { x.brreg = b; if (!x.virksomhet) x.virksomhet = virksomhetFraNaering(b.naeringKode); } }
       const o: Rec = { ...l, ...x };
       if (!id) {
-        const keys = STD_PLIKTER.slice(); if (x.virksomhet === 'Servering') keys.push('fett', 'fgass_egen'); if (x.virksomhet === 'Butikk/handel') keys.push('fgass_egen');
-        o.plikter = keys.map(k => ({ key: k, navn: PLIKTER[k].n, hjemmel: PLIKTER[k].h, frekvens: { n: 1, enhet: 'år' }, sist: '' }));
-        o.matrise = Object.fromEntries(VEDL_KAT.map(([k, v]) => [k, v]));
+        o.ansvar = kopi(finnMal(o.kontrakt).f);
+        o.plikter = pliktKeysFor(o).map(k => ({ key: k, navn: PLIKTER[k].n, hjemmel: PLIKTER[k].h, frekvens: { n: 1, enhet: 'år' }, sist: '' }));
+      } else if (o.kontrakt !== kontraktKey(l)) {
+        if (await confirmBox(`Kontraktstypen er endret til «${finnMal(o.kontrakt).n}». Erstatte ansvarsfordelingen med malen? Justeringer du har gjort per punkt blir overskrevet.`, 'Bruk malen')) o.ansvar = kopi(finnMal(o.kontrakt).f);
+        else o.ansvar = fordeling(l);
+        (o as any)._etter = true;
       }
+      const etter = (o as any)._etter; delete (o as any)._etter;
       const nid = await save('leietakere', o); toast('Leietaker lagret'); if (!id) go('leietaker/' + nid);
+      if (etter && id) setTimeout(() => import('../views/Kontrakt').then(m => m.oppdaterEtterKontrakt(id)), 200);
     },
   });
 }
@@ -666,7 +677,7 @@ export function bekreftPlikt(lid: string, idx: number) {
 }
 export async function leggTilStandardPlikter(lid: string) {
   const l = byId('leietakere', lid)!; const have = (l.plikter || []).map((p: any) => p.key);
-  const nye = STD_PLIKTER.filter(k => !have.includes(k)).map(k => ({ key: k, navn: PLIKTER[k].n, hjemmel: PLIKTER[k].h, frekvens: { n: 1, enhet: 'år' }, sist: '' }));
+  const nye = pliktKeysFor(l).filter(k => !have.includes(k)).map(k => ({ key: k, navn: PLIKTER[k].n, hjemmel: PLIKTER[k].h, frekvens: { n: 1, enhet: 'år' }, sist: '' }));
   // Oppdater også hjemmel/tekst på eksisterende standardplikter
   const oppd = (l.plikter || []).map((p: any) => PLIKTER[p.key] ? { ...p, navn: PLIKTER[p.key].n, hjemmel: PLIKTER[p.key].h } : p);
   await save('leietakere', { ...l, plikter: [...oppd, ...nye] }); toast(nye.length ? `La til ${nye.length} plikter: ${nye.map(p => p.navn.split(' ')[0]).join(', ')}` : 'Pliktene er oppdatert – ingen manglet');
@@ -690,7 +701,7 @@ export function brev(lid: string) {
   const pl = (l.plikter || []).map((p: any) => ({ p, s: pliktStatus(p) })).filter((x: any) => x.s.o > 0);
   const av = openAvvik().filter(a => a.leietakerId === l.id && a.ansvar === 'Leietaker');
   const oppg = activeTasks().filter(o => o.ansvar === 'Leietaker' && o.leietakerId === l.id && (dUntil(o.nesteFrist) as number) <= 60);
-  const lt = Object.entries(l.matrise || {}).filter(([, v]) => v === 'Leietaker').map(([k]) => k);
+  const fo = fordeling(l); const lt = OMR.filter(o => fo[o.k].v === 'Leietaker' || fo[o.k].u === 'Leietaker').map(o => o.n + (fo[o.k].v === 'Leietaker' && fo[o.k].u === 'Leietaker' ? ' (vedlikehold og utskifting)' : fo[o.k].v === 'Leietaker' ? ' (drift og vedlikehold)' : ' (utskifting)'));
   const frist = fd(addDays(today(), 30));
   let t = `Emne: Oppfølging av internkontroll og vedlikehold – ${l.lokale ? l.lokale + ', ' : ''}${e.navn || ''}\n\nHei${l.kontakt ? ' ' + l.kontakt : ''},\n\nSom eier av ${e.navn || 'eiendommen'}${e.adresse ? ' (' + e.adresse + ')' : ''} følger vi opp brannsikkerhet, internkontroll og vedlikehold i samarbeid med leietakerne, jf. internkontrollforskriften § 6, forskrift om brannforebygging og leieavtalen.\n\n`;
   if (pl.length) { t += `Vi ber om bekreftelse og eventuell dokumentasjon på følgende innen ${frist}:\n`; pl.forEach(({ p }: any) => { t += `• ${p.navn}${p.sist ? ` (sist bekreftet ${fd(p.sist)})` : ''}\n`; }); t += `\nDere kan bekrefte og laste opp dokumentasjon direkte i Eiendomskontroll når dere er logget inn.\n\n`; }

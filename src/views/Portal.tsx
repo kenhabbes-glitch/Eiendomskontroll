@@ -1,7 +1,8 @@
 import React from 'react';
 import { PLIKTER } from '../lib/catalog';
 import { Hjelp } from '../components/Hjelp';
-import { AV_LUKKET, VEDL_KAT } from '../lib/catalog';
+import { AV_LUKKET } from '../lib/catalog';
+import { AnsvarPortal } from './Kontrakt';
 import { S, bump, feiltekst, save, sb, state, toast, uploadFile, useStore } from '../lib/store';
 import { addDays, byId, fd, intTxt, pliktStatus, pliktVis, sortBy, today, leieAreal, m2 } from '../lib/utils';
 import { AlvChip, Chip, Empty, FileLink, StChip, formModal, showModal } from '../components/ui';
@@ -70,7 +71,6 @@ export function Portal() {
   const apne = A.filter(a => !AV_LUKKET.includes(a.status));
   const D = S.dokumenter.filter(d => d.leietakerId === l.id);
   const pl = (l.plikter || []).filter((p: any) => !p.ikkeRelevant); const mangler = pl.filter((p: any) => pliktStatus(p).o >= 1 && p.status !== 'til_godkjenning');
-  const mx = l.matrise || {};
   return <>
     <div className="portalhero"><div className="head" style={{ marginBottom: 0 }}><div className="grow"><h1>{l.navn}<Hjelp id="side.portal" /></h1><p className="sub">{e.navn}{e.adresse ? ' · ' + e.adresse : ''}{l.lokale ? ' · ' + l.lokale : ''}</p></div><button className="btn pri" onClick={() => meldAvvik(l)}>+ Meld avvik eller feil</button></div>
       <div className="kpis" style={{ marginTop: 14, marginBottom: 0 }}>
@@ -88,7 +88,7 @@ export function Portal() {
       {A.map(a => <tr key={a.id} className="click" onClick={() => visAvvik(a)}><td className="num muted">{a.nr}</td><td><b style={{ fontWeight: 500 }}>{a.tittel}</b></td><td><AlvChip a={a.alv} /></td><td><StChip s={a.status} /></td><td className="small">{fd(a.oppdaget)}</td><td className="small">{a.ansvar === 'Leietaker' ? <Chip c="amber">Dere</Chip> : 'Utleier'}</td></tr>)}
     </tbody></table></div> : <div className="tbl-wrap"><Empty t="Ingen meldinger">Bruk «Meld avvik eller feil» når noe må utbedres.</Empty></div>}</div>
     <div className="grid g2 sec">
-      <div className="card"><h2>Vedlikeholdsansvar etter leieavtalen</h2><table className="small"><tbody>{VEDL_KAT.map(([k]) => <tr key={k}><td style={{ padding: '5px 8px 5px 0' }}>{k}</td><td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{mx[k] === 'Leietaker' ? 'Dere' : mx[k] === 'Delt' ? 'Delt' : mx[k] === 'Ikke aktuelt' ? '–' : 'Utleier'}</td></tr>)}</tbody></table></div>
+      <AnsvarPortal l={l} />
       <div className="card"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Dokumenter</h2><button className="btn sm" onClick={() => lastOpp(l)}>+ Last opp</button></div>
         {D.length ? <div className="list">{sortBy(D, d => d.dato || '').reverse().map(d => <div key={d.id} className="li" style={{ cursor: 'default' }}><div className="grow"><div className="lt">{d.fil ? <FileLink fil={d.fil}>{d.tittel}</FileLink> : d.tittel}</div><div className="ls">{d.type} · {fd(d.dato)}</div></div></div>)}</div> : <p className="muted small">Ingen dokumenter.</p>}</div>
     </div>

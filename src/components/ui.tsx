@@ -90,7 +90,7 @@ const hq = (f: { k: string; help?: string | false }) => { if (f.help === false) 
 
 export type Field = {
   k: string; label?: string; type?: 'text' | 'number' | 'date' | 'select' | 'textarea' | 'checkbox' | 'file' | 'sec' | 'custom' | 'email';
-  options?: Opt[] | (() => Opt[]); groups?: () => [string, Opt[]][]; empty?: string; half?: boolean; req?: boolean; hint?: string; ph?: string;
+  options?: Opt[] | ((v?: any) => Opt[]); groups?: () => [string, Opt[]][]; empty?: string; half?: boolean; req?: boolean; hint?: string; ph?: string;
   show?: (v: any) => boolean; dl?: [string, string][]; mono?: boolean; def?: any; accept?: string;
   render?: (v: any, set: (patch: any) => void) => ReactNode; help?: string | false;
 };
@@ -123,7 +123,7 @@ function FormBody({ o, close }: { o: FormOpts; close: () => void }) {
           if (f.type === 'checkbox') return <div key={f.k} className={cls}><input type="checkbox" id={id} checked={!!v[f.k]} disabled={o.readOnly} onChange={e => set({ [f.k]: e.target.checked })} /><label htmlFor={id}>{f.label}</label>{hq(f)}</div>;
           let inp: ReactNode;
           if (f.type === 'select') {
-            const op = typeof f.options === 'function' ? f.options() : f.options || [];
+            const op = typeof f.options === 'function' ? f.options(v) : f.options || [];
             const optEl = (x: Opt) => { const [a, b] = Array.isArray(x) ? x : [x, x]; return <option key={a} value={a}>{b}</option>; };
             inp = <select id={id} value={v[f.k] ?? ''} disabled={o.readOnly} onChange={e => set({ [f.k]: e.target.value })}>
               {f.empty !== undefined && <option value="">{f.empty}</option>}

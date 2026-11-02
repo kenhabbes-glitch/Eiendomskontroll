@@ -1,7 +1,9 @@
 import React from 'react';
 import { kanRedigereE } from '../lib/store';
 import { Hjelp } from '../components/Hjelp';
-import { DOK_LEIE, VEDL_KAT } from '../lib/catalog';
+import { DOK_LEIE } from '../lib/catalog';
+import { AnsvarKort } from './Kontrakt';
+import { finnMal, kontraktKey, pliktKeysFor } from '../lib/kontrakt';
 import { S, isAdmin, useStore } from '../lib/store';
 import { leieAreal, byId, eNavn, fd, intTxt, m2, pliktStatus } from '../lib/utils';
 import { bekreftPlikt, brev, editAvvik, editDok, editLeietaker, nyPlikt, setMatrise, leggTilStandardPlikter } from '../lib/actions';
@@ -45,14 +47,13 @@ export function LeietakerView({ id }: { id: string }) {
   useStore();
   const l = byId('leietakere', id);
   if (!l) return <Empty t="Fant ikke leietakeren"><a href="#/leietakere">Tilbake</a></Empty>;
-  const mx = l.matrise || {}; const cats = [...VEDL_KAT.map(x => x[0]), ...Object.keys(mx).filter(k => !VEDL_KAT.some(x => x[0] === k))];
   const A = S.avvik.filter(a => a.leietakerId === id); const D = S.dokumenter.filter(d => d.leietakerId === id); const T = S.oppgaver.filter(o => o.leietakerId === id && o.aktiv !== false);
   const la = leieAreal(l);
   const users = S.profiles.filter(p => p.leietaker_id === id);
   const dl: [string, React.ReactNode][] = ([
     ['Eiendom', <a href={'#/eiendom/' + l.eiendomId}>{eNavn(l.eiendomId)}</a>], ['Leieobjekt', l.lokale],
     ['Leieareal', la.verdi !== null ? <><b>{m2(la.verdi)}</b> <span className="muted small">{la.kilde === 'maalt' ? `fra tegninger (eksklusivt ${m2(la.p!.eks)} + andel fellesareal ${m2(la.p!.fe + la.p!.fb)})` : la.kilde === 'overstyrt' ? (la.p ? `overstyrt · oppmålt ${m2(la.p.tot)}` : 'overstyrt manuelt') : 'registrert manuelt'}</span>{la.adv.map((a, i) => <div key={i} className="small" style={{ color: 'var(--amber)' }}>⚠ {a}</div>)}</> : <span className="muted">Ikke registrert</span>],
-    ['Org.nr.', l.orgnr], ['Virksomhet', l.virksomhet], ['Avtaleperiode', l.start || l.slutt ? fd(l.start) + ' – ' + fd(l.slutt) : ''], ['Avtalemal', l.avtaletype],
+    ['Org.nr.', l.orgnr], ['Virksomhet', l.virksomhet], ['Avtaleperiode', l.start || l.slutt ? fd(l.start) + ' – ' + fd(l.slutt) : ''], ['Kontraktstype', finnMal(kontraktKey(l)).n + (l.heleBygget ? ' · hele bygget' : '') + (l.avtaletype ? ' · ' + l.avtaletype : '')],
     ['Kontakt', [l.kontakt, l.epost, l.tlf].filter(Boolean).join(' · ')], ['Brannvernleder', l.brannvernleder]] as [string, React.ReactNode][]).filter(x => x[1]);
   const docMiss = DOK_LEIE.filter(t => !D.some(d => d.type === t));
   return <>
@@ -71,10 +72,9 @@ export function LeietakerView({ id }: { id: string }) {
           <dl className="dl">{([['Org.nr.', b.orgnr], ['Organisasjonsform', b.orgform], ['Næring', b.naering], ['Ansatte', b.ansatte != null ? String(b.ansatte) : ''], ['Forretningsadresse', b.adresse], ['Daglig leder', b.dagligLeder], ['Styreleder', b.styreleder], ['Stiftet', b.stiftet ? fd(b.stiftet) : ''], ['Kontakt', [b.epost, b.telefon].filter(Boolean).join(' · ')]] as [string, string][]).filter(x => x[1]).map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl>
           <p className="small" style={{ marginBottom: 0 }}><a href={`https://virksomhet.brreg.no/nb/oppslag/enheter/${b.orgnr}`} target="_blank" rel="noopener noreferrer">Se i Brønnøysundregistrene</a></p></>; })()
           : <p className="small muted" style={{ margin: 0 }}>{rensOrgnr(l.orgnr || '').length === 9 ? 'Ikke hentet ennå.' : 'Legg inn org.nr. for å hente opplysninger og overvåke status (konkurs, avvikling).'}</p>}</div>
-      <div className="card"><h2>Vedlikeholdsansvar etter leieavtalen</h2><table className="small"><tbody>{cats.map(k => <tr key={k}><td style={{ padding: '5px 8px 5px 0' }}>{k}</td><td style={{ padding: '4px 0', width: 120 }}>
-        <select value={mx[k] || 'Eier'} onChange={e => setMatrise(id, k, e.target.value)} style={{ border: '1px solid var(--line2)', borderRadius: 6, padding: '3px 6px', width: '100%' }}>{['Eier', 'Leietaker', 'Delt', 'Ikke aktuelt'].map(o => <option key={o}>{o}</option>)}</select></td></tr>)}</tbody></table></div>
     </div>
-    <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Internkontroll og plikter<Hjelp id="ik.underpunkt" /><Hjelp id="ik.send" /></h2>{(() => { const mangler = STD_PLIKTER.filter(k => !(l.plikter || []).some((p: any) => p.key === k)); return mangler.length > 0 && <button className="btn sm pri" onClick={() => leggTilStandardPlikter(id)} title={mangler.map(k => PLIKTER[k].n).join('\n')}>+ Legg til {mangler.length} manglende standardplikter</button>; })()}<button className="btn sm" onClick={() => nyPlikt(id)}>+ Legg til plikt</button><button className="btn sm" onClick={() => sendSjekkliste(id)} title="Send lenke eller Excel-pakke til leietaker for utfylling">✉ Send sjekkliste til leietaker</button><button className="btn sm" onClick={() => importerPakke(id)} title="Les inn utfylt Excel-sjekkliste og mapper (ZIP) fra leietaker">⇪ Importer utfylt sjekkliste</button></div>
+    <AnsvarKort l={l} />
+    <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Internkontroll og plikter<Hjelp id="ik.underpunkt" /><Hjelp id="ik.send" /></h2>{(() => { const mangler = pliktKeysFor(l).filter(k => !(l.plikter || []).some((p: any) => p.key === k)); return mangler.length > 0 && <button className="btn sm pri" onClick={() => leggTilStandardPlikter(id)} title={mangler.map(k => PLIKTER[k].n).join('\n')}>+ Legg til {mangler.length} manglende plikter</button>; })()}<button className="btn sm" onClick={() => nyPlikt(id)}>+ Legg til plikt</button><button className="btn sm" onClick={() => sendSjekkliste(id)} title="Send lenke eller Excel-pakke til leietaker for utfylling">✉ Send sjekkliste til leietaker</button><button className="btn sm" onClick={() => importerPakke(id)} title="Les inn utfylt Excel-sjekkliste og mapper (ZIP) fra leietaker">⇪ Importer utfylt sjekkliste</button></div>
       <div className="tbl-wrap"><table><thead><tr><th>Plikt</th><th>Hjemmel</th><th>Frekvens</th><th>Sist bekreftet</th><th>Neste</th><th>Status</th><th /></tr></thead><tbody>
         {(l.plikter || []).length ? l.plikter.map((p: any, i: number) => { const s = pliktStatus(p); const d = p.dokId && byId('dokumenter', p.dokId);
           const dk = PLIKTER[p.key]?.dok || []; return <tr key={p.key + i}><td>{p.navn}{dk.length > 0 && <div className="small" style={{ color: (p.sjekk || []).length >= dk.length ? 'var(--green)' : 'var(--muted)' }}>Sjekkliste: {(p.sjekk || []).length} av {dk.length} dokumenter mottatt</div>}{p.komm && <div className="small muted">{p.komm}</div>}{d?.fil && <div className="small"><FileLink fil={d.fil} /></div>}</td><td className="small muted">{p.hjemmel}</td><td className="small">{intTxt(p.frekvens)}</td>

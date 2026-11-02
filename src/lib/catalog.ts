@@ -161,6 +161,15 @@ export const PLIKTER: Record<string, { n: string; h: string; dok?: string[] }> =
   endring:{n:"Ingen endret bruk/ombygging uten varsel til eier",h:"Pbl. § 20-1; leieavtalen",dok:["Skriftlig bekreftelse på at det ikke er gjort endringer, eller varsel/søknad og ansvarsrett ved ombygging"]},
   fett:{n:"Fettutskiller tømt og dokumentert (servering)",h:"Forurensningsforskriften kap. 15A / kommunal forskrift",dok:["Tømmebevis fra godkjent firma","Kontroll/serviceattest"]},
   fgass_egen:{n:"Egne kjøle-/fryseanlegg – lekkasjekontroll dokumentert",h:"Produktforskriften kap. 6a",dok:["Lekkasjekontrollrapport fra sertifisert kuldetekniker","Servicelogg for anlegget"]},
+  // Plikter som følger av kontraktstypen (leietaker drifter tekniske anlegg / bygget)
+  serviceavtaler:{n:"Serviceavtaler og periodisk service på tekniske anlegg leietaker drifter",h:"Leieavtalen; FOB § 6 (vedlikehold av byggverk og installasjoner)",dok:["Oversikt over anlegg og serviceleverandører","Gyldige serviceavtaler","Servicerapporter for perioden","Avvik fra service og hvordan de er lukket"]},
+  fdv:{n:"FDV-dokumentasjon holdes oppdatert etter service og endringer",h:"Leieavtalen; TEK17 § 4-1",dok:["Oppdatert FDV for anlegg som er endret eller skiftet","Oversikt over endringer i perioden"]},
+  brann_anlegg:{n:"Kontroll og service av brannalarm, sprinkler, nødlys og slokkere",h:"FOB § 6 og § 10; NS 3960, NS-EN 12845, NS-EN 50172",dok:["Årlig kontrollrapport brannalarm (FG-godkjent)","Sprinkler – årlig kontroll og service","Nødlys – årlig kontroll og funksjonstest","Håndslokkere og brannslanger – kontroll","Egenkontroll-logg (månedlig/kvartalsvis)"]},
+  el_hoved:{n:"Internkontroll og periodisk kontroll av el-anlegget",h:"FEL § 10; FOB § 6",dok:["Kontrollrapport for el-anlegget","Termografirapport","Avviksliste med lukking"]},
+  utvendig:{n:"Utvendig vedlikehold (tak, fasade, vinduer) utført og dokumentert",h:"Leieavtalen; pbl. § 31-3 (byggverk holdes i stand)",dok:["Takinspeksjon / rapport (sluk, membran, beslag)","Dokumentasjon på utført vedlikehold av fasade og vinduer","Plan for kommende vedlikehold"]},
+  heis_kontroll:{n:"Heis – serviceavtale og periodisk sakkyndig kontroll",h:"Forskrift om heis (DSB/TEK); NS-EN 13015",dok:["Serviceavtale med heisfirma","Rapport fra periodisk sakkyndig kontroll","Lukking av pålegg"]},
+  uteareal:{n:"Snømåking, strøing og vedlikehold av uteareal",h:"Leieavtalen; vegtrafikkloven/ansvar for fallulykker",dok:["Avtale om brøyting og strøing","Logg eller bekreftelse for vintersesongen"]},
+  utskiftingsplan:{n:"Plan for utskifting av bygningsdeler og anlegg leietaker har ansvar for",h:"Leieavtalen",dok:["Langsiktig vedlikeholds- og utskiftingsplan","Dokumentasjon på utførte utskiftinger","Oppdatert FDV etter utskifting"]},
 };
 export const STD_PLIKTER=["brannvernleder","branninstruks","brannovelse","rommingsvei","brann_syst","hms_ik","samordningsavtale","el_egne","vedlikehold","forsikring","endring"];
 export const VEDL_KAT: [string, string][] = [

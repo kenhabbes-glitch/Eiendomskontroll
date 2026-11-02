@@ -134,6 +134,22 @@ Hvis leiekontrakten fastsetter fellesarealet (som m², prosent av fellesarealet 
 - Når alle leietakerne er grønne, kvitteres kontrollen ut automatisk, og neste frist settes.
 - Bekreftelser kan registreres av eier/forvalter, eller av leietaker selv i leietakerportalen.
 - Plikter merket «Ikke relevant» for en leietaker teller ikke med.` },
+  'kontrakt.type': { gruppe: 'Begreper', tittel: 'Kontraktstype og ansvarsfordeling', tekst: `Kontraktstypen bestemmer hvem som har ansvaret for drift og vedlikehold og hvem som har ansvaret for utskifting, område for område. Det styrer hvilke plikter leietakeren får, og hvem kontrollene på systemene ligger hos.
+
+- Standard leieavtale for lokaler: eier har bygget, fellesanlegg og utskifting; leietaker har innvendig vedlikehold i leieobjektet.
+- Trippel netto: leietaker drifter og vedlikeholder bygget og de tekniske anleggene, eier skifter ut. En variant lar eier beholde tak, fasade og bærende.
+- Bare hus: leietaker har både vedlikehold og utskifting, også utvendig. Eier har bare utskifting av bærende konstruksjoner.
+- Egendefinert: fyll inn slik kontrakten sier.
+
+Kontrakter varierer, så hvert punkt kan justeres. Punkter som avviker fra malen, får gul ramme, og du kan skrive inn kontraktspunktet (f.eks. § 9.2). En fordeling du bruker flere ganger, lagrer du med «Lagre som egen mal».
+
+«Eier, leietaker betaler» betyr at eier utfører arbeidet og viderefakturerer, vanlig i trippel netto.
+
+Trykk «Oppdater plikter og kontroller» for å ta fordelingen i bruk. Du ser først hva som endres og kan fjerne haken på det som skal stå urørt:
+- Nye plikter legges til, f.eks. serviceavtaler, kontroll av brannanlegg og el, utvendig vedlikehold og utskiftingsplan.
+- Systemer som omfattes, får nytt ansvar for drift og utskifting, og kontrollene flyttes til leietaker eller tilbake til eier.
+
+Systemer omfattes når de er knyttet til leietakeren («Betjener leietaker» på systemet), eller alle systemer når leietaker leier hele bygget. Koblingen mellom system og område går via NS 3451-koden.` },
   'ik.send': { gruppe: 'Begreper', tittel: 'Sende sjekklisten til leietaker', tekst: `På leietakersiden trykker du «Send sjekkliste til leietaker». Leietaker får en e-post med lenke.
 
 - Første gang oppretter leietaker en bruker via lenken. Brukeren gir bare tilgang til eget leieforhold.
