@@ -36,7 +36,7 @@ export function TaskTable({ list, showE = true, group = true }: { list: Rec[]; s
     }
     rows.push(<tr key={o.id} className="click" onClick={() => visOppgave(o.id)}>
       <td><DueChip s={o.nesteFrist} /></td>
-      <td><b style={{ fontWeight: 500 }}>{o.navn}</b>{o.anleggId && <div className="small muted">{aNavn(o.anleggId)}</div>}{(() => { const d = ikDekning(o, MALER); return d && d.n > 0 ? <div className="small" style={{ color: d.nOk === d.n ? 'var(--green)' : 'var(--amber)' }}>{d.nOk} av {d.n} leietakere dokumentert</div> : null; })()}</td>
+      <td><b style={{ fontWeight: 500 }}>{o.navn}</b>{o.innrapport && <> <Chip c="blue">Rapport til godkjenning</Chip></>}{o.aoSendt && o.aoSendt.frist === o.nesteFrist && !o.innrapport && <span className="small muted" title={`Arbeidsordre sendt ${fd(o.aoSendt.dato)} til ${o.aoSendt.til}`}> ✉</span>}{o.ao?.auto && !(o.aoSendt && o.aoSendt.frist === o.nesteFrist) && <span className="small muted" title={`Arbeidsordre sendes automatisk ${o.ao.dager || 0} dager før frist til ${o.ao.epost}`}> ⏱</span>}{o.anleggId && <div className="small muted">{aNavn(o.anleggId)}</div>}{(() => { const d = ikDekning(o, MALER); return d && d.n > 0 ? <div className="small" style={{ color: d.nOk === d.n ? 'var(--green)' : 'var(--amber)' }}>{d.nOk} av {d.n} leietakere dokumentert</div> : null; })()}</td>
       {showE && <td>{eNavn(o.eiendomId)}</td>}
       <td><span className="tag">{o.type}</span><div className="small muted">{o.kategori}</div></td>
       <td className="small">{intTxt(o.intervall)}</td>

@@ -19,6 +19,7 @@ import { Brukere, DataAdmin } from './views/Brukere';
 import { Portal } from './views/Portal';
 import { Profil } from './views/Profil';
 import { Innstillinger } from './views/Innstillinger';
+import { KoLenke } from './views/KontrollAo';
 import { AoLenke, ArbeidsordreListe, Hendelseslogg, mineAo } from './views/Arbeidsordre';
 import { LtLenke } from './views/Sjekkliste';
 
@@ -81,6 +82,7 @@ export default function App() {
   if (state.recovery && state.me) return <SetPassword />;
   if (r.v === 'ao' && r.id) return <><AoLenke token={r.id} /><Toast /></>;
   if (r.v === 'lt' && r.id) return <><LtLenke token={r.id} /><Toast /></>;
+  if (r.v === 'ko' && r.id) return <><KoLenke token={r.id} /><Toast /></>;
   if (!state.me) return <Login />;
   if (state.me.rolle === 'ingen' && !state.me.plattform) return <NoAccess />;
 

@@ -264,5 +264,116 @@ const handler = async (req: Request) => {
     return json(200, { ok: true });
   }
 
+
+  // ================= Arbeidsordre for kontroller/service (oppgaver) =================
+  const hentOppg = async (id: string) => { const { data } = await admin.from('oppgaver').select('*').eq('id', id).maybeSingle(); return data; };
+  const datoNo = (d?: string) => d ? String(d).split('-').reverse().join('.') : '';
+  const koLogg = (p: any, o: any, tekst: string, org?: string | null) => admin.from('hendelseslogg').insert({ bruker_id: p?.id || null, bruker: p ? (p.navn || p.epost) : 'Automatisk', tabell: 'hendelse', rad_id: o.id, eiendom_id: o.eiendom_id, org_id: org || null, handling: 'arbeidsordre', tekst });
+  const koSnapshot = async (o: any) => {
+    const d = o.data || {};
+    const { data: e } = await admin.from('eiendommer').select('data, eier_org_id').eq('id', o.eiendom_id).maybeSingle();
+    const { data: sy } = d.anleggId ? await admin.from('systemer').select('data').eq('id', d.anleggId).maybeSingle() : { data: null as any };
+    const { data: org } = e?.eier_org_id ? await admin.from('organisasjoner').select('navn').eq('id', e.eier_org_id).maybeSingle() : { data: null as any };
+    const ed = e?.data || {}; const sd = sy?.data || {};
+    const sys = sy ? `${ed.tfmBygg ? '+' + ed.tfmBygg : ''}${sd.tfmSys ? '=' + sd.tfmSys + '.' + String(sd.tfmLop || 1).padStart(3, '0') : ''} ${sd.navn || ''}${sd.fabrikat ? ' (' + sd.fabrikat + ')' : ''}`.trim() : '';
+    return { org: e?.eier_org_id || null, orgNavn: org?.navn || '', eiendom: ed.navn || '', adresse: [ed.adresse, [ed.postnr, ed.poststed].filter(Boolean).join(' ')].filter(Boolean).join(', '), system: sys, kontakt: ed.kontaktLeverandor || ed.driftsansvarlig || '' };
+  };
+  const koTekst = (o: any, sn: any, lenke: string, melding: string, avsender: string) => {
+    const d = o.data || {};
+    const rader: [string, string][] = [['Eiendom', [sn.eiendom, sn.adresse].filter(Boolean).join(', ')], ['System', sn.system], ['Oppdrag', d.navn], ['Type', [d.type, d.kategori].filter(Boolean).join(' · ')], ['Planlagt / frist', datoNo(d.nesteFrist)], ['Grunnlag', d.hjemmel || ''], ['Kontakt på stedet', sn.kontakt]];
+    const tekst = [`Arbeidsordre – ${d.navn}`, '', melding ? melding + '\n' : '', ...rader.filter(r => r[1]).map(r => `${r[0]}: ${r[1]}`), d.notat ? '\nSjekkpunkter / merknader:\n' + d.notat : '', '',
+      `Når jobben er utført: registrer dato, resultat og last opp servicerapport her (ingen innlogging):\n${lenke}`, '', `Sendt av ${avsender}`].filter(x => x !== '').join('\n');
+    const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1d2320">
+      <p style="font-size:12px;color:#6b736d;margin:0">ARBEIDSORDRE – ${esc((d.type || 'kontroll').toUpperCase())}</p><h2 style="margin:4px 0 12px">${esc(d.navn)}</h2>
+      ${melding ? `<p>${esc(melding).replace(/\n/g, '<br>')}</p>` : ''}
+      <table style="border-collapse:collapse;font-size:14px">${rader.filter(r => r[1]).map(r => `<tr><td style="padding:3px 14px 3px 0;color:#6b736d;vertical-align:top">${r[0]}</td><td style="padding:3px 0">${esc(r[1])}</td></tr>`).join('')}</table>
+      ${d.notat ? `<p style="margin-top:12px"><b>Sjekkpunkter / merknader</b><br>${esc(d.notat).replace(/\n/g, '<br>')}</p>` : ''}
+      <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Registrer utført og last opp rapport</a></p>
+      <p style="font-size:12px;color:#6b736d">Lenken krever ingen innlogging. Oppdragsgiver går gjennom rapporten før kontrollen registreres som utført.<br>Sendt av ${esc(avsender)}.</p></div>`;
+    return { emne: `Arbeidsordre: ${d.navn}${sn.eiendom ? ' – ' + sn.eiendom : ''}${d.nesteFrist ? ' (' + datoNo(d.nesteFrist) + ')' : ''}`, tekst, html };
+  };
+  // Lager lenke, sender e-post og merker kontrollen som sendt for gjeldende frist
+  const koSend = async (o: any, til: string, melding: string, base: string, p: any | null) => {
+    const d = o.data || {}; const sn = await koSnapshot(o);
+    const { data: inv, error } = await admin.from('ko_invitasjon').insert({ oppgave_id: o.id, eiendom_id: o.eiendom_id, epost: til, frist: d.nesteFrist || null, opprettet_av: p?.id || null, auto: !p }).select().single();
+    if (error) return { sendt: false, grunn: 'Kunne ikke lage lenke (er 008_kontroll_arbeidsordre.sql kjørt?): ' + error.message };
+    const lenke = `${base}/#/ko/${inv.token}`;
+    const avsender = p ? `${p.navn || p.epost}${sn.orgNavn ? ', ' + sn.orgNavn : ''}` : (sn.orgNavn || 'Eiendomskontroll');
+    const m = koTekst(o, sn, lenke, melding, avsender);
+    const r = await sendEpost(til, m.emne, m.html, m.tekst, undefined, p?.epost || undefined, await hentOppsett(sn.org || (p ? await minOrg(p) : null)));
+    const fersk = (await hentOppg(o.id))?.data || d;
+    if (r.sendt) await admin.from('oppgaver').update({ data: { ...fersk, aoSendt: { frist: d.nesteFrist || '', dato: new Date().toISOString(), til, auto: !p, av: p ? (p.navn || p.epost) : 'Automatisk' } } }).eq('id', o.id);
+    await koLogg(p, o, `Arbeidsordre «${d.navn}» ${r.sendt ? 'sendt' : 'klargjort'}${!p ? ' automatisk' : ''} til ${til}${d.nesteFrist ? ' (frist ' + datoNo(d.nesteFrist) + ')' : ''}${r.sendt ? '' : ' – ' + (r as any).grunn}`, sn.org);
+    return { ...r, til, lenke, emne: m.emne, tekst: m.tekst };
+  };
+
+  if (body.action === 'ko_send') {
+    const p = await hvem(); if (!p) return json(401, { error: 'Ikke innlogget' });
+    const o = await hentOppg(body.oppgave_id); if (!o) return json(404, { error: 'Fant ikke kontrollen' });
+    if (!(await harEiendom(p, o.eiendom_id))) return json(403, { error: 'Du har ikke tilgang til eiendommen' });
+    const til = String(body.epost || '').trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(til)) return json(400, { error: 'Ugyldig e-postadresse' });
+    const base = typeof body.lenkeBase === 'string' && /^https?:\/\//.test(body.lenkeBase) ? body.lenkeBase.replace(/\/+$/, '') : (process.env.URL || '');
+    return json(200, await koSend(o, til, String(body.melding || '').slice(0, 2000), base, p));
+  }
+
+  // Daglig automatisk utsending (kalles av den planlagte funksjonen ko-auto)
+  if (body.action === 'ko_auto') {
+    const forventet = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('ko-auto:' + key)).then(b => Buffer.from(b).toString('hex'));
+    if (req.headers.get('x-ek-cron') !== forventet) return json(403, { error: 'Ikke tillatt' });
+    const base = (process.env.URL || '').replace(/\/+$/, '');
+    const { data: L } = await admin.from('oppgaver').select('*').eq('data->ao->>auto', 'true');
+    const idag = new Date(); idag.setUTCHours(0, 0, 0, 0); const ut: any[] = [];
+    for (const o of L || []) {
+      const d = o.data || {}; const ao = d.ao || {};
+      if (d.aktiv === false || !d.nesteFrist || !/^\S+@\S+\.\S+$/.test(ao.epost || '')) continue;
+      if (d.aoSendt?.frist === d.nesteFrist) continue; // allerede sendt for denne fristen
+      const send = new Date(d.nesteFrist + 'T00:00:00Z'); send.setUTCDate(send.getUTCDate() - Math.max(0, Math.min(365, +ao.dager || 14)));
+      if (send > idag) continue;
+      const { data: e } = await admin.from('eiendommer').select('eier_org_id, organisasjoner!inner(aktiv)').eq('id', o.eiendom_id).maybeSingle();
+      if (!(e as any)?.organisasjoner?.aktiv) continue;
+      const r = await koSend(o, String(ao.epost).toLowerCase(), String(ao.melding || ''), base, null);
+      ut.push({ id: o.id, til: ao.epost, sendt: r.sendt, grunn: (r as any).grunn });
+    }
+    return json(200, { ok: true, behandlet: ut.length, ut });
+  }
+
+  // Servicefirmaet åpner lenken (ingen innlogging)
+  const hentKo = async (token: string) => { if (!/^[0-9a-f-]{36}$/i.test(String(token || ''))) return null; const { data } = await admin.from('ko_invitasjon').select('*').eq('token', token).maybeSingle(); return data; };
+  if (body.action === 'ko_info') {
+    const inv = await hentKo(body.token); if (!inv) return json(404, { error: 'Lenken er ugyldig eller kontrollen er slettet' });
+    const o = await hentOppg(inv.oppgave_id); if (!o) return json(404, { error: 'Kontrollen finnes ikke lenger' });
+    const d = o.data || {}; const sn = await koSnapshot(o);
+    return json(200, { navn: d.navn, type: d.type, kategori: d.kategori, frist: inv.frist || d.nesteFrist, hjemmel: d.hjemmel || '', notat: d.notat || '', eiendom: sn.eiendom, adresse: sn.adresse, system: sn.system, kontakt: sn.kontakt, oppdragsgiver: sn.orgNavn, epost: inv.epost, innsendt: inv.innsendt, utdatert: !!(inv.frist && d.nesteFrist && inv.frist !== d.nesteFrist && !inv.innsendt) });
+  }
+  if (body.action === 'ko_opplasting') {
+    const inv = await hentKo(body.token); if (!inv || inv.innsendt) return json(403, { error: 'Lenken er ugyldig eller allerede brukt' });
+    const navn = String(body.navn || 'fil').replace(/[^\w.\-æøåÆØÅ]+/g, '_').slice(-80);
+    const path = `${inv.eiendom_id}/ko/${inv.oppgave_id}/${crypto.randomUUID()}-${navn}`;
+    const { data, error } = await admin.storage.from('filer').createSignedUploadUrl(path);
+    if (error) return json(500, { error: 'Kunne ikke klargjøre opplasting: ' + error.message });
+    return json(200, { path, token: data.token });
+  }
+  if (body.action === 'ko_innsend') {
+    const inv = await hentKo(body.token); if (!inv) return json(404, { error: 'Lenken er ugyldig' });
+    if (inv.innsendt) return json(409, { error: 'Rapporten er allerede sendt inn via denne lenken' });
+    const o = await hentOppg(inv.oppgave_id); if (!o) return json(404, { error: 'Kontrollen finnes ikke lenger' });
+    const pre = `${inv.eiendom_id}/ko/${inv.oppgave_id}/`;
+    const filer = (Array.isArray(body.filer) ? body.filer : []).slice(0, 20).filter((f: any) => typeof f?.path === 'string' && f.path.startsWith(pre) && !f.path.includes('..'))
+      .map((f: any) => ({ path: f.path, navn: String(f.navn || '').slice(0, 120), type: String(f.type || '').slice(0, 80), str: +f.str || 0 }));
+    const dato = /^\d{4}-\d{2}-\d{2}$/.test(body.dato) ? body.dato : new Date().toISOString().slice(0, 10);
+    const res = ['OK – ingen avvik', 'Avvik funnet', 'Ikke utført / utsatt'].includes(body.res) ? body.res : 'OK – ingen avvik';
+    const rapport = { token: inv.token, mottatt: new Date().toISOString(), dato, av: String(body.av || '').slice(0, 160), firma: String(body.firma || '').slice(0, 160), epost: inv.epost, res, komm: String(body.komm || '').slice(0, 4000),
+      avvik: (Array.isArray(body.avvik) ? body.avvik : []).map((x: any) => String(x || '').trim().slice(0, 300)).filter(Boolean).slice(0, 30), nesteDato: /^\d{4}-\d{2}-\d{2}$/.test(body.nesteDato || '') ? body.nesteDato : '', filer };
+    const fersk = (await hentOppg(o.id))!.data || {};
+    await admin.from('oppgaver').update({ data: { ...fersk, innrapport: rapport } }).eq('id', o.id);
+    await admin.from('ko_invitasjon').update({ innsendt: rapport.mottatt, svar: rapport }).eq('token', inv.token);
+    const sn = await koSnapshot(o);
+    await koLogg({ id: null, navn: `${rapport.av || inv.epost}${rapport.firma ? ' (' + rapport.firma + ')' : ''}` }, o, `Servicerapport mottatt for «${fersk.navn}»: ${res}${rapport.avvik.length ? `, ${rapport.avvik.length} avvik` : ''}, ${filer.length} vedlegg – venter på godkjenning`, sn.org);
+    // Varsle den som sendte arbeidsordren (eller ingen, hvis automatisk og uten mottaker)
+    if (inv.opprettet_av) { const { data: av } = await admin.from('profiles').select('epost').eq('id', inv.opprettet_av).maybeSingle();
+      if (av?.epost) await sendEpost(av.epost, `Rapport mottatt: ${fersk.navn} – ${sn.eiendom}`, `<p>${esc(rapport.av || inv.epost)}${rapport.firma ? ' (' + esc(rapport.firma) + ')' : ''} har registrert <b>${esc(fersk.navn)}</b> på ${esc(sn.eiendom)} som utført ${esc(datoNo(dato))}: ${esc(res)}.</p><p>Gå til kontrollen i Eiendomskontroll for å godkjenne.</p>`, `${rapport.av || inv.epost} har registrert ${fersk.navn} på ${sn.eiendom} som utført ${datoNo(dato)}: ${res}. Gå til kontrollen i Eiendomskontroll for å godkjenne.`, undefined, undefined, await hentOppsett(sn.org)); }
+    return json(200, { ok: true });
+  }
+
   return json(400, { error: 'Ukjent handling' });
 };

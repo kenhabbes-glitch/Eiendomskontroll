@@ -134,6 +134,15 @@ Hvis leiekontrakten fastsetter fellesarealet (som m², prosent av fellesarealet 
 - Når alle leietakerne er grønne, kvitteres kontrollen ut automatisk, og neste frist settes.
 - Bekreftelser kan registreres av eier/forvalter, eller av leietaker selv i leietakerportalen.
 - Plikter merket «Ikke relevant» for en leietaker teller ikke med.` },
+  'ko.arbeidsordre': { gruppe: 'Begreper', tittel: 'Arbeidsordre til servicefirma', tekst: `En kontroll kan sendes som arbeidsordre på e-post til servicefirmaet, enten manuelt («Send arbeidsordre» i kontrollen) eller automatisk et valgt antall dager før fristen.
+
+- Arbeidsordren inneholder eiendom og adresse, system (TFM), frist, grunnlag (hjemmel) og sjekkpunktene fra «Notater / sjekkpunkter».
+- Servicefirmaet får en lenke der de registrerer utført dato, resultat, avvik og laster opp servicerapport og bilder – uten å opprette bruker.
+- Rapporten legges på kontrollen som «Til godkjenning» og vises under «Krever handling nå» på oversikten. Du godkjenner (kontrollen registreres som utført, filene lagres som servicerapport, avvik opprettes) eller avviser.
+
+Automatisk sending: slå på «Send automatisk før frist» under «Rediger» på kontrollen, og velg antall dager. Utsendingen kjøres hver morgen. Den sendes én gang per frist; når kontrollen registreres utført og får ny frist, sendes neste arbeidsordre automatisk før den.
+
+E-post til servicefirmaet kan også legges inn på systemet («E-post til servicefirma»), så brukes den for alle kontrollene på systemet. E-posten sendes fra organisasjonens oppsett under Administrasjon → Innstillinger.` },
   'kontrakt.type': { gruppe: 'Begreper', tittel: 'Kontraktstype og ansvarsfordeling', tekst: `Kontraktstypen bestemmer hvem som har ansvaret for drift og vedlikehold og hvem som har ansvaret for utskifting, område for område. Det styrer hvilke plikter leietakeren får, og hvem kontrollene på systemene ligger hos.
 
 - Standard leieavtale for lokaler: eier har bygget, fellesanlegg og utskifting; leietaker har innvendig vedlikehold i leieobjektet.
