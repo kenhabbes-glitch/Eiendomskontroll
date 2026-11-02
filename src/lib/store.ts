@@ -108,7 +108,10 @@ export async function save(col: Col, obj: any): Promise<string> {
   const row = toRow(col, o); const t = TABLES[col].table;
   const res = exists
     ? await sb.from(t).update({ ...row, id: undefined }).eq('id', o.id).select().single()
-    : await sb.from(t).insert(row).select().single();
+    : col === 'eiendommer'
+      // Ny eiendom: tilgangen opprettes av en trigger i samme operasjon og er ikke synlig for RETURNING – lagre først, hent etterpå
+      ? await sb.from(t).insert(row).then(async r => r.error ? r as any : await sb.from(t).select().eq('id', o.id).single())
+      : await sb.from(t).insert(row).select().single();
   if (res.error) { toast('Lagring feilet: ' + feiltekst(res.error)); throw res.error; }
   apply(col, 'upsert', fromRow(col, res.data));
   return o.id;
