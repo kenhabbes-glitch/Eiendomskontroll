@@ -26,7 +26,7 @@ export const rolleNavn = (r?: string) => ROLLER.find(x => x[0] === r)?.[1] || r 
 // ---- Tabeller: app-navn → databasetabell og kolonner utenfor data-jsonb
 type ColMap = Record<string, string>;
 export const TABLES = {
-  eiendommer: { table: 'eiendommer', cols: {} as ColMap },
+  eiendommer: { table: 'eiendommer', cols: { eierOrgId: 'eier_org_id', portefoljeId: 'portefolje_id' } as ColMap },
   leietakere: { table: 'leietakere', cols: { eiendomId: 'eiendom_id' } as ColMap },
   anlegg: { table: 'systemer', cols: { eiendomId: 'eiendom_id' } as ColMap },
   komponenter: { table: 'komponenter', cols: { eiendomId: 'eiendom_id', anleggId: 'system_id' } as ColMap },
@@ -38,11 +38,13 @@ export const TABLES = {
 export type Col = keyof typeof TABLES;
 export const COLS = Object.keys(TABLES) as Col[];
 
-export const S: Record<Col, any[]> & { profiles: any[]; tilganger: any[]; innst: Record<string, any>; innstMangler: boolean } = {
+export type Niva = 'skriv' | 'drift' | 'les' | 'service';
+export const S: Record<Col, any[]> & { profiles: any[]; tilganger: any[]; innst: Record<string, any>; innstMangler: boolean; orgs: any[]; medlemmer: any[]; portefoljer: any[]; oppdrag: any[]; niva: Record<string, Niva>; primarOrg: string } = {
   eiendommer: [], leietakere: [], anlegg: [], komponenter: [], oppgaver: [], avvik: [], dokumenter: [], tegninger: [], profiles: [], tilganger: [], innst: {}, innstMangler: false,
+  orgs: [], medlemmer: [], portefoljer: [], oppdrag: [], niva: {}, primarOrg: '',
 };
 
-export type Me = { id: string; epost: string; navn: string; rolle: Rolle; leietakerId?: string | null; aktiv: boolean };
+export type Me = { id: string; epost: string; navn: string; rolle: Rolle; leietakerId?: string | null; aktiv: boolean; plattform?: boolean };
 export const state = { me: null as Me | null, ready: false, loading: false, error: '', recovery: false, version: 0 };
 if (FRA_LENKE) state.recovery = true;
 
@@ -137,7 +139,7 @@ async function loadInnst() {
   S.innstMangler = false; S.innst = Object.fromEntries((data || []).map((r: any) => [r.nokkel, r.data]));
 }
 export async function saveInnst(nokkel: string, data: any) {
-  const { error } = await sb.from('innstillinger').upsert({ nokkel, data });
+  const { error } = await sb.from('innstillinger').upsert({ nokkel, data, ...(S.primarOrg ? { org_id: S.primarOrg } : {}) });
   if (error) { toast('Lagring feilet: ' + feiltekst(error)); throw error; }
   S.innst[nokkel] = data; bump();
 }
@@ -150,6 +152,7 @@ export async function loadData() {
       S.profiles = await loadAll('profiles');
       S.tilganger = await loadAll('eiendom_tilgang');
     }
+    if (state.me && state.me.rolle !== 'leietaker') await loadOrg();
   } catch (e: any) { state.error = 'Kunne ikke laste data: ' + feiltekst(e); }
   state.loading = false; bump();
   if (channel) sb.removeChannel(channel);
@@ -164,14 +167,26 @@ export async function loadData() {
     if (p.eventType === 'DELETE') apply('profiles', 'delete', { id: p.old.id }); else { apply('profiles', 'upsert', p.new); if (p.new.id === state.me?.id) setMe(p.new); }
   });
   channel.on('postgres_changes', { event: '*', schema: 'public', table: 'eiendom_tilgang' }, () => { reloadTilgang(); });
+  ['organisasjoner', 'org_medlem', 'portefoljer', 'oppdrag'].forEach(t => channel.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => reloadOrg()));
   if (!S.innstMangler) channel.on('postgres_changes', { event: '*', schema: 'public', table: 'innstillinger' }, (p: any) => { if (p.new?.nokkel) { S.innst[p.new.nokkel] = p.new.data; bump(); } });
   channel.subscribe();
 }
 let tilgT: any = 0;
 function reloadTilgang() { clearTimeout(tilgT); tilgT = setTimeout(async () => { const prev = S.tilganger.filter(t => t.user_id === state.me?.id).length; S.tilganger = await loadAll('eiendom_tilgang'); const now = S.tilganger.filter(t => t.user_id === state.me?.id).length; if (prev !== now && state.me?.rolle !== 'admin') loadData(); else bump(); }, 400); }
+// ---- organisasjoner, porteføljer, oppdrag og tilgangsnivå per eiendom
+async function loadOrg() {
+  const tryLoad = async (t: string) => { try { return await loadAll(t); } catch { return []; } };
+  const [orgs, med, port, opp] = await Promise.all(['organisasjoner', 'org_medlem', 'portefoljer', 'oppdrag'].map(tryLoad));
+  S.orgs = orgs; S.medlemmer = med; S.portefoljer = port; S.oppdrag = opp;
+  const { data: niv } = await sb.rpc('mine_tilganger'); S.niva = Object.fromEntries((niv || []).map((r: any) => [r.eiendom_id, r.niva]));
+  const { data: po } = await sb.rpc('min_primar_org'); S.primarOrg = po || '';
+}
+export async function oppdaterNiva() { const { data: niv } = await sb.rpc('mine_tilganger'); S.niva = Object.fromEntries((niv || []).map((r: any) => [r.eiendom_id, r.niva])); bump(); }
+let orgT: any = 0;
+export function reloadOrg() { clearTimeout(orgT); orgT = setTimeout(async () => { const før = JSON.stringify(S.niva); await loadOrg(); if (JSON.stringify(S.niva) !== før) loadData(); else bump(); }, 400); }
 function setMe(p: any) {
   const prevRolle = state.me?.rolle;
-  state.me = { id: p.id, epost: p.epost, navn: p.navn, rolle: p.aktiv ? p.rolle : 'ingen', leietakerId: p.leietaker_id, aktiv: p.aktiv };
+  state.me = { id: p.id, epost: p.epost, navn: p.navn, rolle: p.aktiv ? p.rolle : 'ingen', leietakerId: p.leietaker_id, aktiv: p.aktiv, plattform: !!p.plattform_admin };
   bump(); if (prevRolle && prevRolle !== state.me.rolle) loadData();
 }
 let loadedFor = '';
@@ -182,7 +197,7 @@ export async function loadMe() {
   if (error || !data) { state.me = { id: session.user.id, epost: session.user.email || '', navn: '', rolle: 'ingen', aktiv: false }; }
   else setMe(data);
   state.ready = true; bump();
-  if (state.me && state.me.rolle !== 'ingen' && loadedFor !== state.me.id + state.me.rolle) { loadedFor = state.me.id + state.me.rolle; loadData(); }
+  if (state.me && (state.me.rolle !== 'ingen' || state.me.plattform) && loadedFor !== state.me.id + state.me.rolle) { loadedFor = state.me.id + state.me.rolle; loadData(); }
 }
 export function initAuth() {
   if (!configured) { state.ready = true; bump(); return; }
@@ -192,13 +207,22 @@ export function initAuth() {
   });
   loadMe();
 }
-export async function signOut() { if (channel) sb.removeChannel(channel); await sb.auth.signOut(); COLS.forEach(c => S[c] = []); S.profiles = []; S.tilganger = []; state.me = null; loadedFor = ''; bump(); location.hash = ''; }
+export async function signOut() { if (channel) sb.removeChannel(channel); await sb.auth.signOut(); COLS.forEach(c => S[c] = []); S.profiles = []; S.tilganger = []; S.orgs = []; S.medlemmer = []; S.portefoljer = []; S.oppdrag = []; S.niva = {}; S.primarOrg = ''; state.me = null; loadedFor = ''; bump(); location.hash = ''; }
 
 // ---- roller (styrer hva som vises; databasen håndhever tilgangen)
 export const role = () => state.me?.rolle || 'ingen';
-export const isAdmin = () => role() === 'admin';
-export const canEdit = () => role() === 'admin' || role() === 'forvalter';
+export const isAdmin = () => role() === 'admin' || !!state.me?.plattform;
+export const isPlattform = () => !!state.me?.plattform;
+// Har redigeringstilgang til minst én eiendom (eller er admin/forvalter i en eierorganisasjon og kan opprette)
+export const canEdit = () => (role() === 'admin' || role() === 'forvalter') && (Object.values(S.niva).includes('skriv') || mineOrg(['admin', 'forvalter']).some(o => o.type === 'eier') || !Object.keys(S.niva).length);
 export const isStaff = () => ['admin', 'forvalter', 'tekniker'].includes(role());
+// Tilgangsnivå på en konkret eiendom (databasen håndhever det samme)
+export const nivaE = (eid?: string): Niva | '' => (eid && S.niva[eid]) || '';
+export const kanRedigereE = (eid?: string) => nivaE(eid) === 'skriv';
+export const kanDrifteE = (eid?: string) => ['skriv', 'drift'].includes(nivaE(eid));
+// Mine organisasjoner (med min rolle)
+export const mineOrg = (roller?: string[]) => S.medlemmer.filter(m => m.user_id === state.me?.id && m.aktiv && (!roller || roller.includes(m.rolle))).map(m => ({ ...(S.orgs.find(o => o.id === m.org_id) || { id: m.org_id, navn: '?' }), minRolle: m.rolle, alleBygg: m.alle_bygg })).filter(o => o.aktiv !== false);
+export const orgNavn = (id?: string) => S.orgs.find(o => o.id === id)?.navn || '';
 export const isTenant = () => role() === 'leietaker';
 export const isUtforer = () => role() === 'utforer';
 
@@ -231,4 +255,4 @@ export async function adminApi(body: any) {
   if (!r.ok) throw new Error(j.error || 'Feil ' + r.status);
   return j;
 }
-export async function reloadAdmin() { S.profiles = await loadAll('profiles'); S.tilganger = await loadAll('eiendom_tilgang'); bump(); }
+export async function reloadAdmin() { S.profiles = await loadAll('profiles'); S.tilganger = await loadAll('eiendom_tilgang'); await loadOrg(); bump(); }

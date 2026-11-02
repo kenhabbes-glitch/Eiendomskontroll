@@ -28,20 +28,25 @@ const handler = async (req: Request) => {
     if (!token) return null; const { data } = await admin.auth.getUser(token); if (!data?.user) return null;
     const { data: p } = await admin.from('profiles').select('*').eq('id', data.user.id).single(); return p ? { ...p, epost: (p.epost || data.user.email || '').toLowerCase() } : null;
   };
-  const harEiendom = async (p: any, eid: string) => {
-    if (!p || !p.aktiv) return false; if (p.rolle === 'admin') return true;
-    if (!['forvalter', 'tekniker'].includes(p.rolle)) return false;
-    const { data } = await admin.from('eiendom_tilgang').select('eiendom_id').eq('user_id', p.id).eq('eiendom_id', eid); return !!data?.length;
-  };
+  // Tilgang avgjøres av databasens tilgangsfunksjon (organisasjon, oppdrag og tildeling)
+  const niva = async (p: any, eid: string) => { if (!p || !p.aktiv) return null; const { data } = await admin.rpc('niva_for', { p_uid: p.id, eid }); return data as string | null; };
+  const harEiendom = async (p: any, eid: string) => ['skriv', 'drift'].includes((await niva(p, eid)) || '');
+  const kanRedigere = async (p: any, eid: string) => (await niva(p, eid)) === 'skriv';
+  // Organisasjonen e-post sendes på vegne av: den som sender sin primære organisasjon
+  const minOrg = async (p: any): Promise<string | null> => {
+    const { data } = await admin.from('org_medlem').select('org_id, rolle, opprettet, organisasjoner!inner(type, aktiv)').eq('user_id', p.id).eq('aktiv', true);
+    const L = (data || []).filter((m: any) => m.organisasjoner?.aktiv).sort((a: any, b: any) => (b.rolle === 'admin' ? 1 : 0) - (a.rolle === 'admin' ? 1 : 0) || (b.organisasjoner.type === 'eier' ? 1 : 0) - (a.organisasjoner.type === 'eier' ? 1 : 0) || String(a.opprettet).localeCompare(String(b.opprettet)));
+    return L[0]?.org_id || null;
+  };;
   const logg = (p: any, a: any, tekst: string) => admin.from('hendelseslogg').insert({ bruker_id: p?.id || null, bruker: p ? (p.navn || p.epost) : 'System', tabell: 'hendelse', rad_id: a.id, eiendom_id: a.eiendom_id, handling: 'arbeidsordre', tekst });
   const leggTilAvvikLogg = async (a: any, k: string, av: string) => { const d = a.data || {}; const l = [...(d.logg || []), { t: new Date().toISOString(), s: d.status, k, av }]; await admin.from('avvik').update({ data: { ...d, logg: l } }).eq('id', a.id); };
   const hentAvvik = async (id: string) => { const { data } = await admin.from('avvik').select('*').eq('id', id).single(); return data; };
 
   // E-postoppsett: fra appens Innstillinger (tabellen epost_oppsett), ellers miljøvariabler i Netlify.
   type Oppsett = { metode: 'smtp' | 'resend' | ''; fraNavn: string; fraEpost: string; svarTil: string; smtpHost: string; smtpPort: number; smtpUser: string; passord: string; kilde: string };
-  const hentOppsett = async (): Promise<Oppsett> => {
+  const hentOppsett = async (org?: string | null): Promise<Oppsett> => {
     const env = (k: string) => (process.env[k] || '').trim();
-    const { data: r } = await admin.from('epost_oppsett').select('*').eq('id', 1).maybeSingle();
+    const { data: r } = org ? await admin.from('epost_oppsett').select('*').eq('org_id', org).maybeSingle() : { data: null as any };
     const d = r?.data || {};
     if (d.metode && r?.hemmelig) return { metode: d.metode, fraNavn: d.fraNavn || '', fraEpost: d.fraEpost || d.smtpUser || '', svarTil: d.svarTil || '', smtpHost: d.smtpHost || 'smtp.gmail.com', smtpPort: +d.smtpPort || 465, smtpUser: d.smtpUser || '', passord: r.hemmelig, kilde: 'app' };
     const parse = (f: string) => { const m = f.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>\s*$/); return m ? [m[1].trim(), m[2].trim()] : ['', f.trim()]; };
@@ -70,23 +75,26 @@ const handler = async (req: Request) => {
 
   // ---------- E-postoppsett (bare administrator)
   if (body.action === 'epost_hent' || body.action === 'epost_lagre' || body.action === 'epost_test') {
-    const p = await hvem(); if (!p || p.rolle !== 'admin' || !p.aktiv) return json(403, { error: 'Bare administrator kan endre e-postoppsettet' });
+    const p = await hvem(); if (!p || !p.aktiv) return json(403, { error: 'Ikke innlogget' });
+    const org = String(body.org_id || '') || await minOrg(p);
+    const { data: mm } = org ? await admin.from('org_medlem').select('rolle, aktiv').eq('org_id', org).eq('user_id', p.id).maybeSingle() : { data: null as any };
+    if (!mm || !mm.aktiv || mm.rolle !== 'admin') return json(403, { error: 'Bare administrator i organisasjonen kan endre e-postoppsettet' });
     if (body.action === 'epost_hent') {
-      const { data: r, error } = await admin.from('epost_oppsett').select('*').eq('id', 1).maybeSingle();
+      const { data: r, error } = await admin.from('epost_oppsett').select('*').eq('org_id', org).maybeSingle();
       if (error) return json(500, { error: 'Tabellen epost_oppsett mangler – kjør 004_epost.sql i Supabase' });
-      const o = await hentOppsett();
+      const o = await hentOppsett(org);
       return json(200, { data: r?.data || {}, harHemmelig: !!r?.hemmelig, aktiv: { metode: o.metode, kilde: o.kilde, fra: o.fraEpost } });
     }
     if (body.action === 'epost_lagre') {
       const d = body.data || {}; const ren = { metode: ['smtp', 'resend'].includes(d.metode) ? d.metode : '', fraNavn: String(d.fraNavn || '').slice(0, 120), fraEpost: String(d.fraEpost || '').trim().slice(0, 200), svarTil: String(d.svarTil || '').trim().slice(0, 200), smtpHost: String(d.smtpHost || '').trim(), smtpPort: +d.smtpPort || 465, smtpUser: String(d.smtpUser || '').trim() };
-      const { data: gml } = await admin.from('epost_oppsett').select('hemmelig').eq('id', 1).maybeSingle();
+      const { data: gml } = await admin.from('epost_oppsett').select('hemmelig').eq('org_id', org).maybeSingle();
       const hemmelig = typeof body.hemmelig === 'string' && body.hemmelig.trim() ? body.hemmelig.trim() : body.slettHemmelig ? null : gml?.hemmelig ?? null;
-      const { error } = await admin.from('epost_oppsett').upsert({ id: 1, data: ren, hemmelig, endret: new Date().toISOString(), endret_av: p.id });
+      const { error } = await admin.from('epost_oppsett').upsert({ org_id: org, data: ren, hemmelig, endret: new Date().toISOString(), endret_av: p.id });
       if (error) return json(500, { error: 'Kunne ikke lagre: ' + error.message });
-      await admin.from('hendelseslogg').insert({ bruker_id: p.id, bruker: p.navn || p.epost, tabell: 'hendelse', handling: 'innstilling', tekst: `E-postoppsett endret (${ren.metode || 'av'}, avsender ${ren.fraNavn} <${ren.fraEpost}>)${typeof body.hemmelig === 'string' && body.hemmelig.trim() ? ', nytt passord/nøkkel' : ''}` });
+      await admin.from('hendelseslogg').insert({ bruker_id: p.id, bruker: p.navn || p.epost, tabell: 'hendelse', handling: 'innstilling', org_id: org, tekst: `E-postoppsett endret (${ren.metode || 'av'}, avsender ${ren.fraNavn} <${ren.fraEpost}>)${typeof body.hemmelig === 'string' && body.hemmelig.trim() ? ', nytt passord/nøkkel' : ''}` });
       return json(200, { ok: true });
     }
-    const o = await hentOppsett();
+    const o = await hentOppsett(org);
     const r = await sendEpost(p.epost, 'Test fra Eiendomskontroll', `<p>Dette er en test av e-postoppsettet.</p><p>Avsender: ${esc(o.fraNavn)} &lt;${esc(o.fraEpost)}&gt;<br>Svar går til: ${esc(o.svarTil || p.epost)}</p>`, `Dette er en test av e-postoppsettet.\nAvsender: ${o.fraNavn} <${o.fraEpost}>`, undefined, p.epost, o);
     return json(200, { ...r, til: p.epost });
   }
@@ -134,7 +142,7 @@ const handler = async (req: Request) => {
     }
     const m = aoTekst(a, lenke, String(body.melding || ''), p.navn || p.epost);
     const vedlegg = typeof body.pdf === 'string' && body.pdf.length < 8_000_000 ? { navn: `Arbeidsordre avvik ${a.nr}.pdf`, base64: body.pdf } : undefined;
-    const r = await sendEpost(til, m.emne, m.html, m.tekst, vedlegg, p.epost || undefined);
+    const r = await sendEpost(til, m.emne, m.html, m.tekst, vedlegg, p.epost || undefined, await hentOppsett(await minOrg(p)));
     const hva = body.action === 'inviter' ? `Arbeidsordre ${r.sendt ? 'sendt' : 'klargjort'} på e-post til ${til}` : `Varsel om tildeling ${r.sendt ? 'sendt' : 'klargjort'} på e-post til ${til}`;
     await logg(p, a, hva); if (r.sendt) await leggTilAvvikLogg(a, hva, p.navn || p.epost);
     return json(200, { ...r, til, lenke, emne: m.emne, tekst: m.tekst });
@@ -185,9 +193,9 @@ const handler = async (req: Request) => {
 
   // Eier/forvalter sender sjekklisten til leietaker på e-post (lenke til portalen, evt. med registrering)
   if (body.action === 'lt_send') {
-    const p = await hvem(); if (!p || !['admin', 'forvalter'].includes(p.rolle)) return json(403, { error: 'Bare administrator/forvalter kan sende sjekklisten' });
+    const p = await hvem(); if (!p) return json(401, { error: 'Ikke innlogget' });
     const l = await hentLt(body.leietaker_id); if (!l) return json(404, { error: 'Fant ikke leietakeren' });
-    if (!(await harEiendom(p, l.eiendom_id))) return json(403, { error: 'Du har ikke tilgang til eiendommen' });
+    if (!(await kanRedigere(p, l.eiendom_id))) return json(403, { error: 'Du har ikke redigeringstilgang til eiendommen' });
     const til = String(body.epost || '').trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(til)) return json(400, { error: 'Ugyldig e-postadresse' });
     const base = typeof body.lenkeBase === 'string' && /^https?:\/\//.test(body.lenkeBase) ? body.lenkeBase.replace(/\/+$/, '') : '';
     const { data: fins } = await admin.from('profiles').select('id, rolle, leietaker_id').eq('epost', til).maybeSingle();
@@ -213,7 +221,7 @@ const handler = async (req: Request) => {
       ${lenke ? `<p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${maate === 'begge' ? 'Eller fyll ut på nett' : 'Åpne sjekklisten'}</a></p>
       <p style="font-size:12px;color:#6b736d">Via lenken oppretter du bruker (eller logger inn), krysser av for dokumentasjonen og laster opp filer. Utleier går gjennom og godkjenner.</p>` : ''}<p style="font-size:12px;color:#6b736d">Sendt av ${esc(avs)}.</p></div>`;
     const vedlegg = maate !== 'lenke' && body.vedlegg && typeof body.vedlegg.base64 === 'string' && body.vedlegg.base64.length < 4_000_000 ? { navn: String(body.vedlegg.navn || 'Sjekkliste.zip').slice(0, 120), base64: body.vedlegg.base64, type: 'application/zip' } : undefined;
-    const r = await sendEpost(til, emne, html, tekst, vedlegg, p.epost || undefined);
+    const r = await sendEpost(til, emne, html, tekst, vedlegg, p.epost || undefined, await hentOppsett(await minOrg(p)));
     await ltLogg(p, l, `Sjekkliste (${maate === 'fil' ? 'Excel-pakke' : maate === 'begge' ? 'lenke og Excel-pakke' : 'lenke'}) ${r.sendt ? 'sendt' : 'klargjort'} til ${til} (${d.navn || ''})`);
     await admin.from('leietakere').update({ data: { ...d, sjekklisteSendt: { tid: new Date().toISOString(), til, av: avs, frist: body.frist || '' } } }).eq('id', l.id);
     return json(200, { ...r, til, lenke, emne, tekst });

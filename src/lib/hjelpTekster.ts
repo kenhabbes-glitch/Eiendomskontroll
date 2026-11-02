@@ -65,13 +65,25 @@ Klikk på en rad for å gå rett til saken.` },
 - Kalkulasjonsrente: brukt i nåverdiberegningen.
 - E-post: avsenderadresse og SMTP for arbeidsordre, slik at e-post ser ut til å komme fra dere.` },
   'side.logg': { gruppe: 'Sider', tittel: 'Hendelseslogg', tekst: `Alle endringer i databasen logges automatisk: hvem som gjorde hva og når. Loggen kan ikke endres i etterkant.` },
-  'side.brukere': { gruppe: 'Sider', tittel: 'Brukere og roller', tekst: `Inviter brukere og gi dem rolle.
+  'side.brukere': { gruppe: 'Sider', tittel: 'Organisasjon og tilgang', tekst: `Hver kunde er en organisasjon: gårdeier, forvalterselskap, byggdrifter eller servicefirma. Brukere ser bare data de har fått tilgang til, og reglene håndheves i databasen.
 
-- Administrator: full tilgang, også brukere og innstillinger.
-- Forvalter: redigerer alt på eiendommene.
-- Driftstekniker: ser alt, utfører kontroller og avvik.
-- Leietaker: ser bare sitt eget leieforhold og sine plikter.
-- Utfører: ekstern leverandør som bare ser arbeidsordre tildelt seg.` },
+- Brukere og tildeling: legg til ansatte med rolle (administrator, forvalter, driftstekniker, leser) og bestem hvilke bygg eller porteføljer hver person skal jobbe med. «Alle bygg» gir tilgang til alt organisasjonen har, også nye bygg.
+- Porteføljer: gårdeier grupperer egne bygg, f.eks. per selskap eller område.
+- Oppdrag: gårdeier gir et annet firma tilgang til et bygg eller en portefølje som forvaltning, drift, service (bare valgte systemer) eller innsyn. Tilgangen opphører når oppdraget avsluttes eller utløper.
+- En person kan være medlem i flere organisasjoner med ulike roller.` },
+  'portefolje': { gruppe: 'Begreper', tittel: 'Porteføljer', tekst: `En portefølje er en gruppe bygg hos samme eier, f.eks. «Sentrum», «Næringsparken» eller et eget eiendomsselskap. En eier kan ha mange porteføljer.
+
+- Gi et forvalterselskap oppdrag på en hel portefølje – nye bygg som legges i porteføljen blir automatisk med.
+- Tildel egne ansatte en portefølje i stedet for enkeltbygg.
+- Oversikten viser statistikk per eier og portefølje: avvik, forfalte kontroller, tilstand, etterslep, utskiftingsbehov 10 år og dokumentdekning.` },
+  'oppdrag': { gruppe: 'Begreper', tittel: 'Oppdrag – gi et firma tilgang', tekst: `Gårdeier bestemmer hvem utenfor egen organisasjon som får se byggene:
+
+- Forvaltning: firmaet kan redigere alt, som en egen forvalter.
+- Drift: ser hele bygget, utfører kontroller og håndterer avvik, men endrer ikke systemer, leietakere eller økonomi.
+- Service: ser bare de systemene som er valgt (med kontroller, avvik og FDV for disse), og registrerer utført service.
+- Innsyn: kan se, ikke endre.
+
+Firmaets egen administrator fordeler byggene på sine ansatte. Avsluttes eller utløper oppdraget, mister hele firmaet tilgangen umiddelbart. Firmaet kan ikke gi tilgangen videre.` },
   'side.data': { gruppe: 'Sider', tittel: 'Import og eksport', tekst: `Ta sikkerhetskopi av alle data som en fil, eller les inn data fra en tidligere kopi.` },
   'side.portal': { gruppe: 'Sider', tittel: 'Mitt leieforhold', tekst: `Her ser du leieavtalen din, hva du som leietaker har ansvar for, og hvilke plikter du må dokumentere (f.eks. internkontroll og brannvernleder). Last opp dokumentasjon og bekreft når en plikt er utført.` },
 

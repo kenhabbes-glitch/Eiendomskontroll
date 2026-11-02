@@ -1,4 +1,5 @@
 import React from 'react';
+import { kanRedigereE } from '../lib/store';
 import { Hjelp } from '../components/Hjelp';
 import { DOK_LEIE, VEDL_KAT } from '../lib/catalog';
 import { S, isAdmin, useStore } from '../lib/store';
@@ -63,7 +64,7 @@ export function LeietakerView({ id }: { id: string }) {
         {l.notat && <p className="small" style={{ whiteSpace: 'pre-wrap' }}>{l.notat}</p>}
         <h3 style={{ marginTop: 16 }}>Brukere hos leietaker</h3>
         {users.length ? <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>{users.map(u => <li key={u.id}>{u.navn || u.epost} <span className="muted">· {u.epost}{u.aktiv ? '' : ' · deaktivert'}</span></li>)}</ul> : <p className="small muted" style={{ margin: 0 }}>Ingen brukere. Leietakeren kan få egen innlogging for å melde avvik og bekrefte plikter.</p>}
-        {isAdmin() && <button className="btn sm" style={{ marginTop: 8 }} onClick={() => inviter({ rolle: 'leietaker', leietaker_id: id, epost: l.epost || '', navn: l.kontakt || '' })}>+ Inviter bruker for leietakeren</button>}
+        {kanRedigereE(l.eiendomId) && <button className="btn sm" style={{ marginTop: 8 }} onClick={() => inviter({ rolle: 'leietaker', leietaker_id: id, epost: l.epost || '', navn: l.kontakt || '' })}>+ Inviter bruker for leietakeren</button>}
       </div>
       <div className="card"><div className="toolbar" style={{ marginBottom: 6 }}><h2 style={{ margin: 0, flex: 1 }}>Brønnøysundregistrene</h2><button className="btn sm" onClick={() => oppdaterBrreg(l)}>{l.brreg ? 'Oppdater' : 'Hent opplysninger'}</button></div>
         {l.brreg ? (() => { const b = l.brreg; const st = enhetStatus(b); return <><p style={{ margin: '0 0 8px' }}><Chip c={st.c}>{st.t}</Chip> <span className="small muted">sjekket {fd(b.sjekket)}</span></p>

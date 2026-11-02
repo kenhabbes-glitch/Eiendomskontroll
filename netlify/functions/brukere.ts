@@ -1,12 +1,19 @@
-// Netlify-funksjon for brukeradministrasjon. Kjører på serveren med Supabase
-// service-nøkkel (som aldri sendes til nettleseren). Kun aktive administratorer
-// kan kalle den.
+// Netlify-funksjon for brukeradministrasjon i organisasjonsmodellen. Kjører på serveren med
+// Supabase service-nøkkel (som aldri sendes til nettleseren). Hver handling sjekker at den som
+// kaller er administrator i riktig organisasjon (eller plattformadministrator).
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 
 const json = (status: number, body: any) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+const ORG_ROLLER = ['admin', 'forvalter', 'tekniker', 'leser'];
+const ORG_TYPER = ['eier', 'forvalter', 'drift', 'service', 'annet'];
 
 export default async (req: Request) => {
+  try { return await handler(req); }
+  catch (e: any) { console.error('brukere-feil', e); return json(500, { error: 'Serverfeil: ' + (e?.message || String(e)) }); }
+};
+
+const handler = async (req: Request) => {
   if (req.method !== 'POST') return json(405, { error: 'Bare POST' });
   const url = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim().replace(/\/(rest|auth|storage)\/v1.*$/i, '').replace(/\/+$/, '');
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -17,57 +24,98 @@ export default async (req: Request) => {
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
   const { data: u, error: ue } = await admin.auth.getUser(token);
   if (ue || !u?.user) return json(401, { error: 'Ikke innlogget' });
-  const { data: me } = await admin.from('profiles').select('rolle, aktiv').eq('id', u.user.id).single();
-  if (!me || me.rolle !== 'admin' || !me.aktiv) return json(403, { error: 'Bare administratorer kan administrere brukere' });
+  const { data: me } = await admin.from('profiles').select('id, rolle, aktiv, plattform_admin, navn, epost').eq('id', u.user.id).single();
+  if (!me || !me.aktiv) return json(403, { error: 'Brukeren er ikke aktiv' });
+  const plattform = !!me.plattform_admin;
+  const erOrgAdmin = async (org: string) => {
+    if (!org) return false;
+    const { data } = await admin.from('org_medlem').select('rolle, aktiv, organisasjoner!inner(aktiv)').eq('org_id', org).eq('user_id', me.id).maybeSingle();
+    return !!(data && data.aktiv && data.rolle === 'admin' && (data as any).organisasjoner?.aktiv);
+  };
+  const niva = async (eid: string) => { const { data } = await admin.rpc('niva_for', { p_uid: me.id, eid }); return data as string | null; };
+  const logg = (org: string | null, tekst: string) => admin.from('hendelseslogg').insert({ bruker_id: me.id, bruker: me.navn || me.epost, tabell: 'hendelse', handling: 'bruker', org_id: org, tekst });
 
   let body: any; try { body = await req.json(); } catch { return json(400, { error: 'Ugyldig forespørsel' }); }
+  const redirectTo = typeof body.redirectTo === 'string' && /^https?:\/\//.test(body.redirectTo) ? body.redirectTo : undefined;
 
-  if (body.action === 'inviter') {
-    const epost = String(body.epost || '').trim().toLowerCase();
-    const rolle = String(body.rolle || '');
-    if (!/^\S+@\S+\.\S+$/.test(epost)) return json(400, { error: 'Ugyldig e-postadresse' });
-    if (!['admin', 'forvalter', 'tekniker', 'leietaker', 'utforer'].includes(rolle)) return json(400, { error: 'Ugyldig rolle' });
-    if (rolle === 'leietaker' && !body.leietaker_id) return json(400, { error: 'Leietaker mangler' });
-    const redirectTo = typeof body.redirectTo === 'string' && /^https?:\/\//.test(body.redirectTo) ? body.redirectTo : undefined;
-    const { data, error } = await admin.auth.admin.inviteUserByEmail(epost, { data: { navn: body.navn || '' }, redirectTo });
-    if (error) {
-      if (/already|registered|exists/i.test(error.message)) return json(409, { error: 'Det finnes allerede en bruker med denne e-posten. Endre rollen i brukerlisten i stedet.' });
-      return json(400, { error: error.message });
+  // Finn eller opprett bruker. Finnes e-posten fra før, gjenbrukes brukeren (kan være medlem i flere organisasjoner).
+  const finnEllerOpprett = async (epost: string, navn: string, passord?: string): Promise<{ id: string; ny: boolean }> => {
+    const { data: p } = await admin.from('profiles').select('id').eq('epost', epost).maybeSingle();
+    if (p) { if (passord) await admin.auth.admin.updateUserById(p.id, { password: passord }); return { id: p.id, ny: false }; }
+    const r = passord
+      ? await admin.auth.admin.createUser({ email: epost, password: passord, email_confirm: true, user_metadata: { navn, test: true } })
+      : await admin.auth.admin.inviteUserByEmail(epost, { data: { navn }, redirectTo });
+    if (r.error) throw new Error(r.error.message);
+    const id = r.data.user!.id;
+    await admin.from('profiles').upsert({ id, epost, navn: navn || epost, rolle: 'ingen', aktiv: true });
+    return { id, ny: true };
+  };
+
+  // Legg til/oppdater medlem i organisasjon med evt. tildelinger
+  const settMedlem = async (org: string, uid: string, rolle: string, alleBygg: boolean, tildel: any[]) => {
+    const { error } = await admin.from('org_medlem').upsert({ org_id: org, user_id: uid, rolle, alle_bygg: alleBygg, aktiv: true });
+    if (error) throw new Error(error.message);
+    const rader = (Array.isArray(tildel) ? tildel : []).map(t => ({ user_id: uid, org_id: org, eiendom_id: t.eiendom_id || null, portefolje_id: t.eiendom_id ? null : t.portefolje_id || null })).filter(t => t.eiendom_id || t.portefolje_id);
+    for (const t of rader) {
+      const { data: ok } = await admin.rpc('org_har', { p_org: org, p_eid: t.eiendom_id, p_pid: t.portefolje_id });
+      if (!ok) throw new Error('Organisasjonen har ikke tilgang til et av byggene/porteføljene');
+      const { error: te } = await admin.from('eiendom_tilgang').insert(t); if (te && te.code !== '23505') throw new Error(te.message);
     }
-    const id = data.user!.id;
-    const { error: pe } = await admin.from('profiles').upsert({ id, epost, navn: body.navn || epost, rolle, leietaker_id: rolle === 'leietaker' ? body.leietaker_id : null, aktiv: true });
-    if (pe) return json(500, { error: 'Bruker opprettet, men profilen kunne ikke lagres: ' + pe.message });
-    const eiendommer: string[] = Array.isArray(body.eiendommer) ? body.eiendommer : [];
-    if (eiendommer.length && ['forvalter', 'tekniker'].includes(rolle)) await admin.from('eiendom_tilgang').upsert(eiendommer.map(e => ({ user_id: id, eiendom_id: e })));
-    return json(200, { ok: true, id });
+  };
+
+  // ---------- Ny organisasjon (plattformadministrator)
+  if (body.action === 'ny_org') {
+    if (!plattform) return json(403, { error: 'Bare plattformadministrator kan opprette organisasjoner' });
+    const navn = String(body.navn || '').trim(); const type = ORG_TYPER.includes(body.type) ? body.type : 'eier';
+    const epost = String(body.admin_epost || '').trim().toLowerCase();
+    if (!navn) return json(400, { error: 'Mangler navn' });
+    if (!/^\S+@\S+\.\S+$/.test(epost)) return json(400, { error: 'Ugyldig e-post for administrator' });
+    const { data: org, error } = await admin.from('organisasjoner').insert({ navn, type, orgnr: String(body.orgnr || '').replace(/\s/g, '') || null }).select().single();
+    if (error) return json(500, { error: error.message });
+    try { const b = await finnEllerOpprett(epost, String(body.admin_navn || ''), body.passord ? String(body.passord) : undefined); await settMedlem(org.id, b.id, 'admin', true, []); }
+    catch (e: any) { await admin.from('organisasjoner').delete().eq('id', org.id); return json(400, { error: e.message }); }
+    await logg(org.id, `Organisasjon «${navn}» opprettet med administrator ${epost}`);
+    return json(200, { ok: true, org_id: org.id });
   }
 
-  // Testbruker med passord (ingen e-post sendes, e-posten regnes som bekreftet)
-  if (body.action === 'testbruker') {
-    const epost = String(body.epost || '').trim().toLowerCase(); const rolle = String(body.rolle || ''); const passord = String(body.passord || '');
+  // ---------- Inviter/legg til medlem i organisasjon (org-admin) eller leietakerbruker (forvalter med redigeringstilgang)
+  if (body.action === 'inviter' || body.action === 'testbruker') {
+    const epost = String(body.epost || '').trim().toLowerCase(); const navn = String(body.navn || '');
     if (!/^\S+@\S+\.\S+$/.test(epost)) return json(400, { error: 'Ugyldig e-postadresse' });
-    if (!['admin', 'forvalter', 'tekniker', 'leietaker', 'utforer'].includes(rolle)) return json(400, { error: 'Ugyldig rolle' });
-    if (passord.length < 8) return json(400, { error: 'Passordet må ha minst 8 tegn' });
-    let id = '';
-    const { data, error } = await admin.auth.admin.createUser({ email: epost, password: passord, email_confirm: true, user_metadata: { navn: body.navn || '', test: true } });
-    if (error) {
-      if (!/already|registered|exists/i.test(error.message)) return json(400, { error: error.message });
-      const { data: p } = await admin.from('profiles').select('id').eq('epost', epost).maybeSingle();
-      if (!p) return json(409, { error: 'E-posten finnes allerede, men uten profil' });
-      id = p.id; await admin.auth.admin.updateUserById(id, { password: passord });
-    } else id = data.user!.id;
-    const { error: pe } = await admin.from('profiles').upsert({ id, epost, navn: body.navn || epost, rolle, leietaker_id: rolle === 'leietaker' ? body.leietaker_id || null : null, aktiv: true });
-    if (pe) return json(500, { error: 'Profilen kunne ikke lagres: ' + pe.message });
-    await admin.from('eiendom_tilgang').delete().eq('user_id', id);
-    const eiendommer: string[] = Array.isArray(body.eiendommer) ? body.eiendommer : [];
-    if (eiendommer.length && ['forvalter', 'tekniker'].includes(rolle)) await admin.from('eiendom_tilgang').insert(eiendommer.map(e => ({ user_id: id, eiendom_id: e })));
-    return json(200, { ok: true, id });
+    const passord = body.action === 'testbruker' ? String(body.passord || '') : undefined;
+    if (passord !== undefined && passord.length < 8) return json(400, { error: 'Passordet må ha minst 8 tegn' });
+
+    if (body.rolle === 'leietaker') {
+      const { data: lt } = await admin.from('leietakere').select('id, eiendom_id').eq('id', body.leietaker_id).maybeSingle();
+      if (!lt) return json(400, { error: 'Fant ikke leietakeren' });
+      if ((await niva(lt.eiendom_id)) !== 'skriv') return json(403, { error: 'Du har ikke redigeringstilgang til leietakerens eiendom' });
+      const { data: fins } = await admin.from('profiles').select('id, rolle').eq('epost', epost).maybeSingle();
+      if (fins && fins.rolle !== 'leietaker' && fins.rolle !== 'ingen') return json(409, { error: 'E-posten tilhører en ansatt-bruker og kan ikke gjøres til leietaker' });
+      try { const b = await finnEllerOpprett(epost, navn, passord); await admin.from('profiles').update({ rolle: 'leietaker', leietaker_id: lt.id, aktiv: true }).eq('id', b.id); await logg(null, `Leietakerbruker ${epost} lagt til`); return json(200, { ok: true, id: b.id, ny: b.ny }); }
+      catch (e: any) { return json(400, { error: e.message }); }
+    }
+
+    const org = String(body.org_id || '');
+    if (!(await erOrgAdmin(org)) && !plattform) return json(403, { error: 'Bare administrator i organisasjonen kan legge til brukere' });
+    const rolle = ORG_ROLLER.includes(body.rolle) ? body.rolle : '';
+    if (!rolle) return json(400, { error: 'Ugyldig rolle' });
+    const { data: fins } = await admin.from('profiles').select('id, rolle').eq('epost', epost).maybeSingle();
+    if (fins && fins.rolle === 'leietaker') return json(409, { error: 'E-posten brukes av en leietakerbruker' });
+    try {
+      const b = await finnEllerOpprett(epost, navn, passord);
+      await settMedlem(org, b.id, rolle, !!body.alle_bygg, body.tildelinger || []);
+      await logg(org, `${b.ny ? 'Ny bruker' : 'Eksisterende bruker'} ${epost} lagt til som ${rolle}${body.alle_bygg ? ' (alle bygg)' : ''}`);
+      return json(200, { ok: true, id: b.id, ny: b.ny });
+    } catch (e: any) { return json(400, { error: e.message }); }
   }
 
+  // ---------- Slett bruker helt (bare plattformadministrator). Organisasjoner fjerner medlemmer i appen.
   if (body.action === 'slett') {
-    if (!body.user_id || body.user_id === u.user.id) return json(400, { error: 'Du kan ikke slette deg selv' });
+    if (!plattform) return json(403, { error: 'Bare plattformadministrator kan slette brukere. Fjern brukeren fra organisasjonen i stedet.' });
+    if (!body.user_id || body.user_id === me.id) return json(400, { error: 'Du kan ikke slette deg selv' });
     const { error } = await admin.auth.admin.deleteUser(body.user_id);
     if (error) return json(400, { error: error.message });
+    await logg(null, `Bruker ${body.user_id} slettet`);
     return json(200, { ok: true });
   }
 

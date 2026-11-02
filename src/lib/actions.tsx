@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { SERVICEAVTALE, TG_DEF, KG_DEF, NS_DOK } from './catalog';
 import { levetidRef, midt, spenn } from './ns3451';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER, VEDL_KAT } from './catalog';
-import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore } from './store';
+import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore, kanRedigereE, kanDrifteE, mineOrg, oppdaterNiva } from './store';
 import { leieAreal, m2, FELLES_AVTALE } from './utils';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst, standardTagger, taggerFor } from './utils';
 import { ikDekning } from './utils';
@@ -17,6 +17,9 @@ import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip
 
 const go = (p: string) => { location.hash = '#/' + p; };
 const eOpts = () => sortBy(S.eiendommer, e => e.navn).map(e => [e.id, e.navn] as [string, string]);
+// Eiendommer brukeren kan redigere (for skjema som oppretter nye poster)
+const eOptsDrift = () => sortBy(S.eiendommer.filter(e => kanDrifteE(e.id)), e => e.navn).map(e => [e.id, e.navn] as [string, string]);
+const eOptsSkriv = () => sortBy(S.eiendommer.filter(e => kanRedigereE(e.id)), e => e.navn).map(e => [e.id, e.navn] as [string, string]);
 export const UTBEDRER: [string, string][] = [['Eier', 'Eier / drift (felles)'], ['Leietaker', 'Leietaker'], ['Leverandør/entreprenør', 'Serviceselskap / leverandør']];
 const TG_OPTS: [string, string][] = [['', 'Ikke vurdert'], ...TG_DEF.map(t => [t[0], `${t[0]} – ${t[1].toLowerCase()}`] as [string, string])];
 // Felles felt for tilstandsvurdering etter NS 3424 (system og komponent)
@@ -31,8 +34,13 @@ const tgFelt = (): Field[] => [
 
 // ================= EIENDOM =================
 export function editEiendom(id?: string) {
-  const e = id ? byId('eiendommer', id)! : {} as Rec;
+  const eierOrg = mineOrg(['admin', 'forvalter']);
+  const e = id ? byId('eiendommer', id)! : { eierOrgId: (eierOrg.find(o => o.id === S.primarOrg) || eierOrg.find(o => o.type === 'eier') || eierOrg[0])?.id } as Rec;
+  if (!id && !eierOrg.length) { toast('Du må være administrator eller forvalter i en organisasjon for å opprette eiendommer'); return; }
+  const kanEie = id ? mineOrg(['admin']).some(o => o.id === e.eierOrgId) : true;
   const fields: Field[] = [
+    ...(!id && eierOrg.length > 1 ? [{ k: 'eierOrgId', label: 'Eier (organisasjon)', type: 'select', options: eierOrg.map(o => [o.id, o.navn] as [string, string]), req: true } as Field] : []),
+    { k: 'portefoljeId', label: 'Portefølje', type: 'select', options: () => sortBy(S.portefoljer.filter(p => p.eier_org_id === (e.eierOrgId || '')), p => p.navn).map(p => [p.id, p.navn] as [string, string]), empty: '(ingen portefølje)', help: 'portefolje', show: () => S.portefoljer.some(p => p.eier_org_id === e.eierOrgId) || !!id },
     { k: 'sokAdr', type: 'custom', label: 'Hent fra Kartverket', render: (v, set) => <AdresseSok onPick={a => set({ ...adresseFelter(a), navn: v.navn || a.adressetekst })} /> },
     { k: 'navn', label: 'Navn på eiendom/bygg', req: true },
     { k: 'adresse', label: 'Adresse', half: true }, { k: 'poststed', label: 'Postnr. og sted', half: true },
@@ -57,7 +65,7 @@ export function editEiendom(id?: string) {
     { k: 'notat', label: 'Notater', type: 'textarea' }];
   formModal({
     title: id ? 'Rediger eiendom' : 'Ny eiendom', fields, values: e,
-    extraFoot: close => id && state.me?.rolle === 'admin' ? <button className="btn danger" onClick={async () => {
+    extraFoot: close => id && kanEie ? <button className="btn danger" onClick={async () => {
       if (await confirmBox(`Slette «${e.navn}» med ALLE tilknyttede systemer, kontroller, avvik, dokumenter, leietakere og tegninger? Dette kan ikke angres.`)) { await removeDoc('eiendommer', id); close(); go('eiendommer'); }
     }}>Slett</button> : null,
     onSave: async v => {
@@ -65,7 +73,7 @@ export function editEiendom(id?: string) {
       const m = String(v.gnrbnr || '').match(/^\s*(\d+)\s*\/\s*(\d+)(?:\s*\/\s*(\d+))?(?:\s*\/\s*(\d+))?/);
       if (m) Object.assign(v, { gnr: +m[1], bnr: +m[2], fnr: m[3] ? +m[3] : '', snr: m[4] ? +m[4] : '' });
       if (v.eierOrgnr && rensOrgnr(v.eierOrgnr).length === 9 && v.eierBrreg?.orgnr !== rensOrgnr(v.eierOrgnr)) { const b = await brregData(v.eierOrgnr).catch(() => null); if (b) { v.eierBrreg = b; if (!v.eierNavn) v.eierNavn = b.navn; } }
-      const nid = await save('eiendommer', { ...e, ...v }); toast('Eiendom lagret'); if (!id) { go('eiendom/' + nid); setTimeout(() => generatePlan(nid, true), 300); } },
+      const nid = await save('eiendommer', { ...e, ...v }); toast('Eiendom lagret'); if (!id) { await oppdaterNiva(); go('eiendom/' + nid); setTimeout(() => generatePlan(nid, true), 300); } },
   });
 }
 
@@ -213,12 +221,12 @@ function UtskiftNote({ v, typeLevetid, sysId, kompAv }: { v: any; typeLevetid?: 
 
 const kompGroups = () => { const g: Record<string, [string, string][]> = {}; Object.entries(KOMP).forEach(([k, v]) => { (g[v.g] = g[v.g] || []).push([k, v.n]); }); return Object.entries(g) as [string, [string, string][]][]; };
 export function editAnlegg(id?: string, eiendomId?: string) {
-  const a: Rec = id ? byId('anlegg', id)! : { eiendomId: eiendomId || S.eiendommer[0]?.id, type: 'ventilasjon', ansvar: 'Eier' } as any;
-  const ro = !canEdit();
+  const a: Rec = id ? byId('anlegg', id)! : { eiendomId: eiendomId || S.eiendommer.find(e => kanRedigereE(e.id))?.id, type: 'ventilasjon', ansvar: 'Eier' } as any;
+  const ro = !kanRedigereE(a.eiendomId);
   if (!id) { a.tfmSys = TFM_DEF[a.type][0]; a.tfmLop = nextSysLop(a.eiendomId, a.tfmSys); a.mk = KOMP[a.type]?.m || []; a.forste = addDays(today(), 30); }
   const touched: Record<string, boolean> = {};
   const fields: Field[] = [
-    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true },
+    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOptsSkriv, req: true },
     { k: 'type', label: 'Type system / bygningsdel', type: 'select', groups: kompGroups },
     { k: 'tagger', type: 'custom', label: 'Tagger (fag)', render: (v, set) => <div><TaggVelger value={Array.isArray(v.tagger) ? v.tagger : standardTagger(v)} onChange={t => set({ tagger: t })} disabled={!canEdit()} />
       <div className="hint">{Array.isArray(v.tagger) ? <>Egne tagger. {canEdit() && <a href="#" onClick={e => { e.preventDefault(); set({ tagger: undefined }); }}>Bruk standard for typen</a>}</> : 'Standard ut fra typen. Komponentene arver taggene.'}</div></div> },
@@ -289,7 +297,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
 }
 export function editKomponent(id?: string, anleggId?: string) {
   const k: Rec = id ? byId('komponenter', id)! : { anleggId } as any;
-  const sys = byId('anlegg', k.anleggId) || ({} as Rec); const ro = !canEdit();
+  const sys = byId('anlegg', k.anleggId) || ({} as Rec); const ro = !kanRedigereE(sys.eiendomId);
   if (!id) { k.kode = TFM_DEF[sys.type]?.[1] || ''; k.lop = nextKompLop(k.anleggId, k.kode); k.eiendomId = sys.eiendomId; }
   const touched: Record<string, boolean> = {};
   const fields: Field[] = [
@@ -400,7 +408,7 @@ export function editOppgave(id?: string, preset: any = {}) {
   const v = { ...o, in: o.intervall?.n || 1, ie: o.intervall?.enhet || 'år' };
   const fields: Field[] = [
     { k: 'navn', label: 'Kontroll / oppgave', req: true },
-    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true },
+    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOptsSkriv, req: true, half: true },
     { k: 'anleggId', label: 'System', type: 'select', options: () => S.anlegg.filter(a => !v.eiendomId || a.eiendomId === (v as any).eiendomId).map(a => [a.id, eNavn(a.eiendomId) + ' – ' + aNavn(a.id)] as [string, string]), empty: '(Hele eiendommen)', half: true },
     { k: 'kategori', label: 'Fagområde', type: 'select', options: KATS, half: true }, { k: 'type', label: 'Type', type: 'select', options: TYPER, half: true },
     { k: 'in', label: 'Intervall', type: 'number', half: true }, { k: 'ie', label: 'Enhet', type: 'select', options: ENH, half: true },
@@ -515,7 +523,7 @@ export function editAvvik(id?: string, preset: any = {}) {
   const staff = isStaff();
   const fields: Field[] = [
     { k: 'tittel', label: 'Avvik (kort beskrivelse)', req: true },
-    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true },
+    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOptsDrift, req: true, half: true },
     { k: 'anleggId', label: 'System', type: 'select', options: () => S.anlegg.map(x => [x.id, eNavn(x.eiendomId) + ' – ' + aNavn(x.id)] as [string, string]), empty: '–', half: true, hint: 'Hovedsystemet avviket gjelder – følger med i arbeidsordren' },
     { k: 'komponentId', label: 'Komponent (TFM)', type: 'select', options: () => sortBy(S.komponenter, c => kNavn(c.id)).map(c => [c.id, eNavn(c.eiendomId) + ' – ' + kNavn(c.id)] as [string, string]), empty: '–' },
     { k: 'alv', label: 'Alvorlighet', type: 'select', options: AV_ALV, half: true }, { k: 'status', label: 'Status', type: 'select', options: AV_STATUS, half: true },
@@ -567,7 +575,7 @@ export function editDok(id?: string, preset: any = {}) {
     { k: 'tittel', label: 'Tittel', req: true },
     { k: 'type', label: 'Dokumenttype', type: 'select', options: canEdit() ? DOK_TYPER : DOK_TYPER.filter(t => !['Leieavtale', 'Forsikringspolise', 'Samordningsavtale', 'Leietakers IK-dokumentasjon'].includes(t)), half: true },
     { k: 'ns', label: 'NS 3451 dokumentgruppe', type: 'select', half: true, options: () => Object.entries(NS_DOK).map(([k, n]) => [k, k + ' ' + n] as [string, string]), empty: '(automatisk ut fra type)', help: 'ns.dok' },
-    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true },
+    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOptsDrift, req: true, half: true },
     ...(canEdit() ? [{ k: 'leietakerId', label: 'Leietaker (valgfritt)', type: 'select', options: () => S.leietakere.map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true } as Field] : []),
     { k: 'anleggId', label: 'System (valgfritt)', type: 'select', options: () => S.anlegg.map(x => [x.id, eNavn(x.eiendomId) + ' – ' + aNavn(x.id)] as [string, string]), empty: '–', half: true },
     { k: 'anleggIds', type: 'custom', label: 'Avtalen gjelder også disse systemene', render: (v, set) => { if (v.type !== 'Serviceavtale') return null; const L = sortBy(S.anlegg.filter(x => x.eiendomId === v.eiendomId && x.id !== v.anleggId), x => aNavn(x.id)); const sel: string[] = v.anleggIds || [];
@@ -598,7 +606,7 @@ export function editLeietaker(id?: string, preset: any = {}) {
       const b = await brregData(en.orgnr).catch(() => null); if (b) set({ brreg: b, ...(!v.kontakt && b.dagligLeder ? { kontakt: b.dagligLeder } : {}) }); }} /> },
     { k: 'brregInfo', type: 'custom', show: v => !!v.brreg, render: v => { const st = enhetStatus(v.brreg); return <div className="note small"><b>{v.brreg.navn}</b> {st.t && <span style={{ color: st.c === 'green' ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>· {st.t}</span>}<br />{[v.brreg.orgform, v.brreg.naering, v.brreg.ansatte != null ? v.brreg.ansatte + ' ansatte' : '', v.brreg.adresse].filter(Boolean).join(' · ')}{v.brreg.dagligLeder && <><br />Daglig leder: {v.brreg.dagligLeder}{v.brreg.styreleder ? ' · Styreleder: ' + v.brreg.styreleder : ''}</>}</div>; } },
     { k: 'navn', label: 'Leietaker (firma)', req: true, half: true }, { k: 'orgnr', label: 'Org.nr.', half: true, mono: true },
-    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOpts, req: true, half: true }, { k: 'lokale', label: 'Leieobjekt / etasje', half: true },
+    { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOptsSkriv, req: true, half: true }, { k: 'lokale', label: 'Leieobjekt / etasje', half: true },
     { k: 'arealOverstyrt', label: 'Overstyr leieareal (m²)', type: 'number', half: true, hint: 'La stå tom for å bruke arealet fra tegningene' },
     { k: 'virksomhet', label: 'Type virksomhet', type: 'select', options: ['Kontor', 'Butikk/handel', 'Servering', 'Lager/logistikk', 'Industri/verksted', 'Helse/omsorg', 'Undervisning', 'Annet'], empty: '–', half: true },
     { k: 'fellesAvtale', label: 'Kontraktfestet fellesareal', type: 'select', options: FELLES_AVTALE, half: true },

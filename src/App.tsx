@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { mineOrg } from './lib/store';
 import { autoKvitterIK } from './lib/actions';
 import { canEdit, configured, initAuth, isAdmin, isStaff, isTenant, isUtforer, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
 import { activeTasks, dUntil, openAvvik } from './lib/utils';
@@ -59,7 +60,8 @@ function navFor(): [string, string][] {
   n.push(['regelverk', 'Regelverk og plikter']);
   if (canEdit()) n.push(['innstillinger', 'Innstillinger']);
   if (canEdit()) n.push(['logg', 'Hendelseslogg']);
-  if (isAdmin()) n.push(['brukere', 'Brukere og roller'], ['data', 'Import og eksport']);
+  if (isAdmin() || mineOrg(['admin', 'forvalter']).length) n.push(['brukere', 'Organisasjon og tilgang']);
+  if (isAdmin()) n.push(['data', 'Import og eksport']);
   n.push(['hjelp', 'Hjelp']);
   return n;
 }
@@ -76,7 +78,7 @@ export default function App() {
   if (r.v === 'ao' && r.id) return <><AoLenke token={r.id} /><Toast /></>;
   if (r.v === 'lt' && r.id) return <><LtLenke token={r.id} /><Toast /></>;
   if (!state.me) return <Login />;
-  if (state.me.rolle === 'ingen') return <NoAccess />;
+  if (state.me.rolle === 'ingen' && !state.me.plattform) return <NoAccess />;
 
   const nav = navFor();
   const def = isTenant() ? 'portal' : isUtforer() ? 'arbeidsordre' : 'oversikt';

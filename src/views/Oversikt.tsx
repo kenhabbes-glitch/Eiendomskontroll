@@ -1,4 +1,6 @@
 import React from 'react';
+import { isStaff } from '../lib/store';
+import { PortefoljeStatistikk } from './Portefolje';
 import { tilGodkjenning, vurderPlikt } from './Sjekkliste';
 import { Hjelp } from '../components/Hjelp';
 import { DOK_PAAKREVD } from '../lib/catalog';
@@ -53,6 +55,7 @@ export function Oversikt() {
       <div className="card"><h2>Krever handling nå</h2>{actions.length ? <div className="list">{actions.slice(0, 12).map(x => x.el)}</div> : <p className="muted">Ingen forfalte kontroller eller kritiske avvik.</p>}{actions.length > 12 && <p className="small muted">+ {actions.length - 12} til</p>}</div>
       <div className="card"><h2>Neste 30 dager</h2>{d30.length ? <div className="list">{sortBy(d30, o => o.nesteFrist).slice(0, 12).map(o => <div key={o.id} className="li" onClick={() => visOppgave(o.id)}><DueChip s={o.nesteFrist} /><div className="grow"><div className="lt">{o.navn}</div><div className="ls">{eNavn(o.eiendomId)} · {o.utfores}</div></div></div>)}</div> : <p className="muted">Ingen kontroller forfaller de neste 30 dagene.</p>}</div>
     </div>
+    {isStaff() && <PortefoljeStatistikk />}
     <div className="sec"><h2>Status per eiendom</h2><div className="tbl-wrap"><table><thead><tr><th>Eiendom</th><th>Kategori</th><th className="num">Forfalte</th><th className="num">≤ 30 d</th><th className="num">Åpne avvik</th><th className="num">Kritisk/høy</th>{ed && <th className="num">Dok.dekning</th>}{ed && <th className="num">Leietakere</th>}</tr></thead><tbody>
       {sortBy(S.eiendommer, e => e.navn).map(e => { const t = T.filter(o => o.eiendomId === e.id); const a = OA.filter(x => x.eiendomId === e.id); const c = docCoverage(e, DOK_PAAKREVD).filter(x => x.s !== 'na'); const okk = c.filter(x => x.s === 'ok' || x.s === 'soon').length; const f = t.filter(o => (dUntil(o.nesteFrist) as number) < 0).length; const kh = a.filter(x => x.alv === 'Kritisk' || x.alv === 'Høy').length; const pct = c.length ? Math.round(okk / c.length * 100) : 100;
         return <tr key={e.id} className="click" onClick={() => go('eiendom/' + e.id)}><td><b style={{ fontWeight: 500 }}>{e.navn}</b><div className="small muted">{e.adresse}</div></td><td className="small">{e.kategori}</td>
