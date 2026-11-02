@@ -10,8 +10,9 @@ const selStil = (avvik: boolean): React.CSSProperties => ({ border: '1px solid '
 
 function AnsSel({ val, mal, ro, on }: { val: Ans; mal: Ans; ro: boolean; on: (a: Ans) => void }) {
   if (ro) return <span>{ANS_KORT[val]}</span>;
-  return <select value={val} onChange={e => on(e.target.value as Ans)} style={selStil(val !== mal)} title={val !== mal ? `Avviker fra kontraktsmalen (malen sier: ${ANS_KORT[mal]})` : undefined}>
-    {ANS_VALG.map(o => <option key={o} value={o}>{ANS_KORT[o]}</option>)}</select>;
+  return <><select value={val} onChange={e => on(e.target.value as Ans)} style={selStil(val !== mal)} title={val !== mal ? `Avviker fra standard for kontraktstypen (standard: ${ANS_KORT[mal]})` : 'Standard for kontraktstypen'}>
+    {ANS_VALG.map(o => <option key={o} value={o}>{ANS_KORT[o]}{o === mal ? ' (standard)' : ''}</option>)}</select>
+    {val !== mal && <div style={{ fontSize: 11, marginTop: 2 }} className="muted">Standard: {ANS_KORT[mal]} · <a href="#" onClick={e => { e.preventDefault(); on(mal); }}>tilbakestill</a></div>}</>;
 }
 
 export async function settCelle(lid: string, k: string, patch: Partial<Celle>) {
@@ -37,7 +38,7 @@ export function AnsvarKort({ l }: { l: any }) {
         <td><AnsSel val={c.u} mal={m.u} ro={ro} on={x => settCelle(l.id, o.k, { u: x })} /></td>
         <td>{ro ? c.p || '' : <input key={c.p || ''} defaultValue={c.p || ''} placeholder="F.eks. § 9.2" onBlur={e => e.target.value !== (c.p || '') && settCelle(l.id, o.k, { p: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 6, padding: '3px 6px', width: '100%' }} />}</td></tr>; })}
     </tbody></table></div>
-    <p className="small muted">Gul ramme betyr at punktet er justert bort fra kontraktsmalen. «Eier, leietaker betaler» betyr at eier utfører og viderefakturerer (vanlig i trippel netto).</p>
+    <p className="small muted">Tabellen er fylt ut med det som er standard for kontraktstypen. Gå gjennom kontrakten og endre punktene der den sier noe annet – skriv gjerne inn kontraktspunktet. Gul ramme betyr at punktet avviker fra standard; «tilbakestill» setter det tilbake. «Eier, leietaker betaler» betyr at eier utfører og viderefakturerer (vanlig i trippel netto).</p>
   </div>;
 }
 
