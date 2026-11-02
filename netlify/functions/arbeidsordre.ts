@@ -74,7 +74,12 @@ const handler = async (req: Request) => {
         const t = nodemailer.createTransport({ host: o.smtpHost, port: o.smtpPort, secure: o.smtpPort === 465, auth: { user: o.smtpUser, pass: o.passord.replace(/\s+/g, '') }, connectionTimeout: 7000, greetingTimeout: 5000, socketTimeout: 8000 });
         await t.sendMail({ from: fra, to: til, replyTo, subject: emne, text: tekst, html, attachments: vedlegg.length ? vedlegg.map(v => ({ filename: v.navn, content: v.base64, encoding: 'base64', contentType: v.type || 'application/pdf', ...(v.cid ? { cid: v.cid } : {}) })) : undefined });
         return { sendt: true };
-      } catch (e: any) { return { sendt: false, grunn: 'E-post feilet (SMTP): ' + (e?.response || e?.message || e) }; }
+      } catch (e: any) {
+        const m = String(e?.response || e?.message || e);
+        const hint = /5\.7\.9|Application-specific password/i.test(m) ? ' – Gmail krever et app-passord, ikke det vanlige passordet. Slå på totrinnsbekreftelse og lag et app-passord på myaccount.google.com/apppasswords, og lim det inn i passordfeltet.'
+          : /5\.7\.8|BadCredentials|Username and Password not accepted/i.test(m) ? ' – Brukernavn eller app-passord er feil. Lag et nytt app-passord og lim det inn på nytt (uten mellomrom).' : '';
+        return { sendt: false, grunn: 'E-post feilet (SMTP): ' + m + hint };
+      }
     }
     const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + o.passord, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: fra, to: [til], subject: emne, html, text: tekst, ...(replyTo ? { reply_to: replyTo } : {}), ...(vedlegg.length ? { attachments: vedlegg.map(v => ({ filename: v.navn, content: v.base64, ...(v.cid ? { content_id: v.cid } : {}) })) } : {}) }) });
