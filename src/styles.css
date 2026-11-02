@@ -29,6 +29,8 @@ a{color:var(--acc)}
 #nav a.on{background:#2c4038;color:#fff}
 #nav a .n{margin-left:auto;font-size:11px;background:#b42318;color:#fff;border-radius:9px;padding:0 6px;font-family:var(--mono)}
 #nav svg{width:16px;height:16px;flex:none;opacity:.85}
+#nav a.navsub{padding-left:28px;font-size:.95em}
+#nav a.grp .chev{width:14px;height:14px;opacity:.6}
 .sidefoot{padding:12px 14px;border-top:1px solid var(--side2);font-size:12px;color:#8fa198}
 .sidefoot button{background:none;border:1px solid #3a4b43;color:var(--sideink);border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px}
 .sidefoot button:hover{background:var(--side2)}
