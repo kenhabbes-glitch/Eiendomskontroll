@@ -1,3 +1,4 @@
+import { PersonvernBekreft, PERSONVERN_VERSJON } from '../components/Personvern';
 // Sjekkliste til leietaker: eier sender lenke, leietaker fyller ut i portalen, eier godkjenner.
 import React, { useEffect, useState } from 'react';
 import { S, aoApi, loadData, loadMe, sb, state, toast, useStore, save } from '../lib/store';
@@ -104,7 +105,7 @@ export const tilGodkjenning = () => S.leietakere.flatMap(l => (l.plikter || []).
 export function LtLenke({ token }: { token: string }) {
   useStore();
   const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [modus, setModus] = useState<'reg' | 'login'>('reg');
-  const [navn, setNavn] = useState(''); const [pw, setPw] = useState(''); const [pw2, setPw2] = useState(''); const [busy, setBusy] = useState(false);
+  const [navn, setNavn] = useState(''); const [pw, setPw] = useState(''); const [pw2, setPw2] = useState(''); const [busy, setBusy] = useState(false); const [sam, setSam] = useState(false);
   const inne = !!state.me;
   useEffect(() => { (async () => {
     try {
@@ -113,9 +114,9 @@ export function LtLenke({ token }: { token: string }) {
     } catch (e: any) { setErr(e.message); }
   })(); }, [inne]);
   const registrer = async (e: React.FormEvent) => {
-    e.preventDefault(); if (pw.length < 8) return setErr('Passordet må ha minst 8 tegn'); if (pw !== pw2) return setErr('Passordene er ikke like');
+    e.preventDefault(); if (!sam) return setErr('Du må godta personvernerklæringen'); if (pw.length < 8) return setErr('Passordet må ha minst 8 tegn'); if (pw !== pw2) return setErr('Passordene er ikke like');
     setBusy(true); setErr('');
-    try { await aoApi({ action: 'lt_registrer', token, navn, passord: pw }, false); const { error } = await sb.auth.signInWithPassword({ email: info.epost, password: pw }); if (error) throw error; }
+    try { await aoApi({ action: 'lt_registrer', token, navn, passord: pw, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); const { error } = await sb.auth.signInWithPassword({ email: info.epost, password: pw }); if (error) throw error; }
     catch (e: any) { setErr(e.message); } setBusy(false);
   };
   const logginn = async (e: React.FormEvent) => { e.preventDefault(); setBusy(true); setErr(''); const { error } = await sb.auth.signInWithPassword({ email: info.epost, password: pw }); if (error) setErr('Feil passord eller e-post'); setBusy(false); };
@@ -132,8 +133,9 @@ export function LtLenke({ token }: { token: string }) {
           <label>Navn</label><input value={navn} onChange={e => setNavn(e.target.value)} required style={inp} />
           <label>Velg passord (min. 8 tegn)</label><input type="password" value={pw} onChange={e => setPw(e.target.value)} style={inp} autoComplete="new-password" />
           <label>Gjenta passord</label><input type="password" value={pw2} onChange={e => setPw2(e.target.value)} style={inp} autoComplete="new-password" />
+          <PersonvernBekreft ok={sam} set={setSam} ansvarlig="utleier" />
           {err && <p style={{ color: 'var(--red)' }}>{err}</p>}
-          <button className="btn pri" disabled={busy} style={{ width: '100%', marginTop: 12 }}>{busy ? 'Oppretter …' : 'Opprett bruker og åpne sjekklisten'}</button>
+          <button className="btn pri" disabled={busy || !sam} style={{ width: '100%', marginTop: 10 }}>{busy ? 'Oppretter …' : 'Opprett bruker og åpne sjekklisten'}</button>
           <p className="small" style={{ textAlign: 'center' }}><a href="#" onClick={e => { e.preventDefault(); setModus('login'); setErr(''); }}>Har du allerede bruker? Logg inn</a></p></form>
         : <form onSubmit={logginn}>
           <p className="small">{info.finnes ? 'Du har allerede en bruker. Logg inn for å åpne sjekklisten.' : 'Logg inn for å åpne sjekklisten.'}</p>

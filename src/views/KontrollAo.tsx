@@ -6,6 +6,7 @@ import { addDays, byId, fd, today, tfmSys, tfmKomp, type Rec } from '../lib/util
 import { plasserteFor } from './Arealer';
 import { Chip, FileLink, openModal, confirmBox } from '../components/ui';
 import { Hjelp } from '../components/Hjelp';
+import { PersonvernBekreft, PERSONVERN_VERSJON } from '../components/Personvern';
 import { KoPanelRef, utfor } from '../lib/actions';
 import { save } from '../lib/store';
 
@@ -144,6 +145,7 @@ function SendKo({ id, close }: { id: string; close: () => void }) {
 // ---------- Lenke til servicefirmaet (#/ko/<token>) – ingen innlogging
 export function KoLenke({ token }: { token: string }) {
   const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [ferdig, setFerdig] = useState(false); const [busy, setBusy] = useState(false);
+  const [sam, setSam] = useState(false);
   const [f, setF] = useState<any>({ dato: today(), av: '', firma: '', res: 'OK – ingen avvik', komm: '', avvik: [''], nesteDato: '' }); const [filer, setFiler] = useState<File[]>([]);
   useEffect(() => { aoApi({ action: 'ko_info', token }, false).then(i => { setInfo(i); if (i.innsendt) setFerdig(true); }).catch(e => setErr(e.message)); }, [token]);
   const set = (p: any) => setF((x: any) => ({ ...x, ...p }));
@@ -151,6 +153,7 @@ export function KoLenke({ token }: { token: string }) {
     e.preventDefault(); if (!f.av.trim()) return setErr('Skriv hvem som utførte jobben');
     if (f.res === 'Avvik funnet' && !f.avvik.some((a: string) => a.trim())) return setErr('Beskriv avvikene – ett per linje');
     if (filer.some(x => x.size > 50e6)) return setErr('Hver fil kan være maks 50 MB');
+    if (!sam) return setErr('Du må godta personvernerklæringen før du sender inn');
     setBusy(true); setErr('');
     try {
       const opp: any[] = [];
@@ -160,7 +163,7 @@ export function KoLenke({ token }: { token: string }) {
         if (error) throw new Error('Opplasting feilet for ' + fil.name + ': ' + error.message);
         opp.push({ path: u.path, navn: fil.name, type: fil.type, str: fil.size });
       }
-      await aoApi({ action: 'ko_innsend', token, ...f, avvik: f.res === 'Avvik funnet' ? f.avvik : [], filer: opp }, false); setFerdig(true);
+      await aoApi({ action: 'ko_innsend', token, ...f, avvik: f.res === 'Avvik funnet' ? f.avvik : [], filer: opp, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); setFerdig(true);
     } catch (e: any) { setErr(e.message || String(e)); }
     setBusy(false);
   };
@@ -192,9 +195,10 @@ export function KoLenke({ token }: { token: string }) {
           <label>Anbefalt dato for neste service (valgfritt)</label><input type="date" value={f.nesteDato} onChange={e => set({ nesteDato: e.target.value })} style={inp} />
           <label>Servicerapport, sjekkliste og bilder</label><input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.heic,.webp,.doc,.docx,.xls,.xlsx,.txt,.csv" onChange={e => setFiler(Array.from(e.target.files || []))} />
           {filer.length > 0 && <div className="small muted">{filer.length} fil(er) valgt</div>}
+          <PersonvernBekreft ok={sam} set={setSam} ansvarlig={info.oppdragsgiver} />
           {err && <p style={{ color: 'var(--red)' }}>{err}</p>}
-          <button className="btn pri" disabled={busy} style={{ width: '100%', marginTop: 14 }}>{busy ? 'Sender inn …' : 'Send inn rapport'}</button>
-          <p className="small muted" style={{ textAlign: 'center' }}>Ingen innlogging nødvendig. Oppdragsgiver godkjenner rapporten.</p>
+          <button className="btn pri" disabled={busy || !sam} style={{ width: '100%', marginTop: 10 }}>{busy ? 'Sender inn …' : 'Send inn rapport'}</button>
+          <p className="small muted" style={{ textAlign: 'center' }}>Ingen innlogging nødvendig. Lenken er personlig{info.utloper ? ` og gjelder til ${fd(info.utloper)}` : ''}. Oppdragsgiver godkjenner rapporten.</p>
         </form>}
       </>}
   </div></div>;

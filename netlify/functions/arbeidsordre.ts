@@ -38,9 +38,16 @@ const handler = async (req: Request) => {
     const L = (data || []).filter((m: any) => m.organisasjoner?.aktiv).sort((a: any, b: any) => (b.rolle === 'admin' ? 1 : 0) - (a.rolle === 'admin' ? 1 : 0) || (b.organisasjoner.type === 'eier' ? 1 : 0) - (a.organisasjoner.type === 'eier' ? 1 : 0) || String(a.opprettet).localeCompare(String(b.opprettet)));
     return L[0]?.org_id || null;
   };;
+  const logg_ = (a: any, hvem: string, tekst: string) => admin.from('hendelseslogg').insert({ bruker_id: null, bruker: hvem, tabell: 'hendelse', rad_id: a.id, eiendom_id: a.eiendom_id, handling: 'arbeidsordre', tekst });
   const logg = (p: any, a: any, tekst: string) => admin.from('hendelseslogg').insert({ bruker_id: p?.id || null, bruker: p ? (p.navn || p.epost) : 'System', tabell: 'hendelse', rad_id: a.id, eiendom_id: a.eiendom_id, handling: 'arbeidsordre', tekst });
   const leggTilAvvikLogg = async (a: any, k: string, av: string) => { const d = a.data || {}; const l = [...(d.logg || []), { t: new Date().toISOString(), s: d.status, k, av }]; await admin.from('avvik').update({ data: { ...d, logg: l } }).eq('id', a.id); };
   const hentAvvik = async (id: string) => { const { data } = await admin.from('avvik').select('*').eq('id', id).single(); return data; };
+  // Personvern: bekreftelse kreves før eksterne sender inn opplysninger eller oppretter bruker
+  const samtykke = (b: any) => b?.samtykke === true && typeof b?.personvernVersjon === 'string' ? { versjon: String(b.personvernVersjon).slice(0, 40), tid: new Date().toISOString() } : null;
+  const SAMTYKKE_MANGLER = 'Du må lese og godta personvernerklæringen før du fortsetter.';
+  const utlopt = (inv: any) => !!inv?.utloper && new Date(inv.utloper).getTime() < Date.now();
+  const UTLOPT = 'Lenken er utløpt. Be oppdragsgiveren om å sende arbeidsordren på nytt.';
+  const orgNavnFor = async (eid: string) => { const { data: e } = await admin.from('eiendommer').select('eier_org_id').eq('id', eid).maybeSingle(); if (!e?.eier_org_id) return ''; const { data: o } = await admin.from('organisasjoner').select('navn').eq('id', e.eier_org_id).maybeSingle(); return o?.navn || ''; };
 
   // E-postoppsett: fra appens Innstillinger (tabellen epost_oppsett), ellers miljøvariabler i Netlify.
   type Oppsett = { metode: 'smtp' | 'resend' | ''; fraNavn: string; fraEpost: string; svarTil: string; smtpHost: string; smtpPort: number; smtpUser: string; passord: string; kilde: string };
@@ -133,7 +140,8 @@ const handler = async (req: Request) => {
     let til = String(body.epost || '').trim().toLowerCase(); let lenke = '';
     if (body.action === 'inviter') {
       if (!/^\S+@\S+\.\S+$/.test(til)) return json(400, { error: 'Ugyldig e-postadresse' });
-      const { data: inv, error } = await admin.from('ao_invitasjon').insert({ avvik_id: a.id, epost: til, opprettet_av: p.id }).select().single();
+      const fr = a.data?.frist ? new Date(a.data.frist + 'T00:00:00Z').getTime() + 45 * 864e5 : 0;
+      const { data: inv, error } = await admin.from('ao_invitasjon').insert({ avvik_id: a.id, epost: til, opprettet_av: p.id, utloper: new Date(Math.max(Date.now() + 60 * 864e5, fr)).toISOString() }).select().single();
       if (error) return json(500, { error: 'Kunne ikke lage invitasjon: ' + error.message });
       lenke = `${base}/#/ao/${inv.token}`;
     } else {
@@ -154,22 +162,26 @@ const handler = async (req: Request) => {
   if (body.action === 'info') {
     const { data: inv } = await admin.from('ao_invitasjon').select('*').eq('token', body.token).maybeSingle();
     if (!inv) return json(404, { error: 'Lenken er ugyldig eller avviket er slettet' });
-    const a = await hentAvvik(inv.avvik_id); const d = a?.data || {};
+    if (utlopt(inv)) return json(410, { error: UTLOPT });
+    const a = await hentAvvik(inv.avvik_id); const d = a?.data || {}; const ao = d.ao || {};
     const { data: fins } = await admin.from('profiles').select('id').eq('epost', inv.epost).maybeSingle();
-    return json(200, { epost: inv.epost, nr: a?.nr, tittel: d.tittel, eiendom: d.ao?.eiendom || '', brukt: !!inv.brukt, finnes: !!fins });
+    return json(200, { epost: inv.epost, nr: a?.nr, tittel: d.tittel, eiendom: ao.eiendom || '', adresse: ao.adresse || '', system: ao.system || '', komponent: ao.komponent || '', plassering: [ao.tegning, ao.plassering].filter(Boolean).join(' – '),
+      beskrivelse: d.beskrivelse || '', alv: d.alv || '', frist: d.frist || '', status: d.status || '', oppdragsgiver: a ? await orgNavnFor(a.eiendom_id) : '', utloper: inv.utloper, kvittert: inv.kvittert || (d.status === 'Utført – til kontroll' ? d.utfort?.t : null), brukt: !!inv.brukt, finnes: !!fins });
   }
 
   // ---------- Mottaker oppretter bruker via lenken
   if (body.action === 'registrer') {
     const { data: inv } = await admin.from('ao_invitasjon').select('*').eq('token', body.token).maybeSingle();
     if (!inv) return json(404, { error: 'Lenken er ugyldig' });
+    if (utlopt(inv)) return json(410, { error: UTLOPT });
+    const sam = samtykke(body); if (!sam) return json(400, { error: SAMTYKKE_MANGLER });
     const passord = String(body.passord || ''); if (passord.length < 8) return json(400, { error: 'Passordet må ha minst 8 tegn' });
     const { data: fins } = await admin.from('profiles').select('id').eq('epost', inv.epost).maybeSingle();
     if (fins) return json(409, { error: 'Det finnes allerede en bruker med denne e-posten. Logg inn i stedet.' });
     const { data: u, error } = await admin.auth.admin.createUser({ email: inv.epost, password: passord, email_confirm: true, user_metadata: { navn: body.navn || '' } });
     if (error || !u?.user) return json(400, { error: error?.message || 'Kunne ikke opprette bruker' });
     const navn = String(body.navn || '').trim() || inv.epost; const firma = String(body.firma || '').trim();
-    await admin.from('profiles').upsert({ id: u.user.id, epost: inv.epost, navn: firma ? `${navn} (${firma})` : navn, rolle: 'utforer', aktiv: true });
+    await admin.from('profiles').upsert({ id: u.user.id, epost: inv.epost, navn: firma ? `${navn} (${firma})` : navn, rolle: 'utforer', aktiv: true, samtykke: sam });
     const a = await hentAvvik(inv.avvik_id);
     if (a) { await admin.from('avvik').update({ tildelt_id: u.user.id }).eq('id', a.id); await leggTilAvvikLogg(a, `Bruker opprettet og arbeidsordren akseptert av ${navn}`, navn); await logg({ id: u.user.id, navn }, a, `Ekstern bruker ${inv.epost} opprettet via arbeidsordre og tildelt avviket`); }
     await admin.from('ao_invitasjon').update({ brukt: new Date().toISOString(), bruker_id: u.user.id }).eq('token', inv.token);
@@ -181,12 +193,45 @@ const handler = async (req: Request) => {
     const p = await hvem(); if (!p) return json(401, { error: 'Ikke innlogget' });
     const { data: inv } = await admin.from('ao_invitasjon').select('*').eq('token', body.token).maybeSingle();
     if (!inv) return json(404, { error: 'Lenken er ugyldig' });
+    if (utlopt(inv) && !inv.brukt) return json(410, { error: UTLOPT });
     if (inv.epost.toLowerCase() !== p.epost) return json(403, { error: `Lenken ble sendt til ${inv.epost}. Logg inn med den adressen.` });
     const a = await hentAvvik(inv.avvik_id); if (!a) return json(404, { error: 'Avviket finnes ikke lenger' });
     if (p.rolle === 'ingen') await admin.from('profiles').update({ rolle: 'utforer', aktiv: true }).eq('id', p.id);
     if (a.tildelt_id !== p.id) { await admin.from('avvik').update({ tildelt_id: p.id }).eq('id', a.id); await leggTilAvvikLogg(a, `Arbeidsordren akseptert av ${p.navn || p.epost}`, p.navn || p.epost); await logg(p, a, `Arbeidsordre akseptert av ${p.epost}`); }
     if (!inv.brukt) await admin.from('ao_invitasjon').update({ brukt: new Date().toISOString(), bruker_id: p.id }).eq('token', inv.token);
     return json(200, { ok: true, avvik_id: a.id });
+  }
+
+  // ---------- Kvittere ut avvik uten bruker (midlertidig tilgang via lenken)
+  if (body.action === 'ao_opplasting' || body.action === 'ao_kvitter') {
+    const { data: inv } = await admin.from('ao_invitasjon').select('*').eq('token', body.token).maybeSingle();
+    if (!inv) return json(404, { error: 'Lenken er ugyldig' });
+    if (utlopt(inv)) return json(410, { error: UTLOPT });
+    if (inv.kvittert) return json(409, { error: 'Arbeidsordren er allerede kvittert ut via denne lenken' });
+    const a = await hentAvvik(inv.avvik_id); if (!a) return json(404, { error: 'Avviket finnes ikke lenger' });
+    if (body.action === 'ao_opplasting') {
+      const navn = String(body.navn || 'fil').replace(/[^\w.\-æøåÆØÅ]+/g, '_').slice(-80);
+      const path = `${a.eiendom_id}/ao/${a.id}/${crypto.randomUUID()}-${navn}`;
+      const { data, error } = await admin.storage.from('filer').createSignedUploadUrl(path);
+      if (error) return json(500, { error: 'Kunne ikke klargjøre opplasting: ' + error.message });
+      return json(200, { path, token: data.token });
+    }
+    const sam = samtykke(body); if (!sam) return json(400, { error: SAMTYKKE_MANGLER });
+    const navn = String(body.navn || '').trim().slice(0, 120); if (!navn) return json(400, { error: 'Skriv navnet ditt' });
+    const firma = String(body.firma || '').trim().slice(0, 120); const komm = String(body.komm || '').trim().slice(0, 4000);
+    if (!komm) return json(400, { error: 'Beskriv hva som er gjort' });
+    const pre = `${a.eiendom_id}/ao/${a.id}/`;
+    const filer = (Array.isArray(body.filer) ? body.filer : []).slice(0, 20).filter((f: any) => typeof f?.path === 'string' && f.path.startsWith(pre) && !f.path.includes('..'))
+      .map((f: any) => ({ path: f.path, navn: String(f.navn || '').slice(0, 120), type: String(f.type || '').slice(0, 80), str: +f.str || 0 }));
+    const av = `${navn}${firma ? ' (' + firma + ')' : ''}`; const t = new Date().toISOString(); const d = a.data || {};
+    const logg = [...(d.logg || [])]; if (filer.length) logg.push({ t, s: d.status, k: `Lastet opp ${filer.length} fil${filer.length > 1 ? 'er' : ''}: ${filer.map((f: any) => f.navn).join(', ')}`, av });
+    logg.push({ t, s: 'Utført – til kontroll', k: `Kvittert utført via lenke (uten bruker) av ${av} <${inv.epost}>: ${komm}`, av });
+    await admin.from('avvik').update({ data: { ...d, status: 'Utført – til kontroll', utfort: { t, av, komm, epost: inv.epost, eksternt: true }, vedlegg: [...(d.vedlegg || []), ...filer], logg } }).eq('id', a.id);
+    await admin.from('ao_invitasjon').update({ kvittert: t, svar: { navn, firma, komm, filer, samtykke: sam } }).eq('token', inv.token);
+    await logg_(a, av, `Arbeidsordre for avvik #${a.nr} kvittert ut via lenke av ${av} <${inv.epost}> – til kontroll`);
+    if (inv.opprettet_av) { const { data: avs } = await admin.from('profiles').select('epost').eq('id', inv.opprettet_av).maybeSingle();
+      if (avs?.epost) await sendEpost(avs.epost, `Utført: avvik #${a.nr} ${d.tittel || ''}`, `<p>${esc(av)} har kvittert ut avvik <b>#${a.nr} ${esc(d.tittel)}</b> som utført:</p><p>${esc(komm).replace(/\n/g, '<br>')}</p><p>${filer.length} vedlegg. Avviket står som «Utført – til kontroll» i Eiendomskontroll.</p>`, `${av} har kvittert ut avvik #${a.nr} ${d.tittel || ''} som utført: ${komm}`, undefined, undefined, await hentOppsett((await admin.from('eiendommer').select('eier_org_id').eq('id', a.eiendom_id).maybeSingle()).data?.eier_org_id)); }
+    return json(200, { ok: true });
   }
 
   // ================= Sjekkliste til leietaker =================
@@ -233,6 +278,7 @@ const handler = async (req: Request) => {
   if (body.action === 'lt_info') {
     const { data: inv } = await admin.from('lt_invitasjon').select('*').eq('token', body.token).maybeSingle();
     if (!inv) return json(404, { error: 'Lenken er ugyldig eller utløpt' });
+    if (utlopt(inv) && !inv.brukt) return json(410, { error: 'Lenken er utløpt. Be utleier sende sjekklisten på nytt.' });
     const l = await hentLt(inv.leietaker_id); const { data: fins } = await admin.from('profiles').select('id').eq('epost', inv.epost).maybeSingle();
     return json(200, { epost: inv.epost, leietaker: l?.data?.navn || '', brukt: !!inv.brukt, finnes: !!fins });
   }
@@ -241,13 +287,15 @@ const handler = async (req: Request) => {
   if (body.action === 'lt_registrer') {
     const { data: inv } = await admin.from('lt_invitasjon').select('*').eq('token', body.token).maybeSingle();
     if (!inv) return json(404, { error: 'Lenken er ugyldig' });
+    if (utlopt(inv)) return json(410, { error: 'Lenken er utløpt. Be utleier sende sjekklisten på nytt.' });
+    const sam = samtykke(body); if (!sam) return json(400, { error: SAMTYKKE_MANGLER });
     const passord = String(body.passord || ''); if (passord.length < 8) return json(400, { error: 'Passordet må ha minst 8 tegn' });
     const { data: fins } = await admin.from('profiles').select('id').eq('epost', inv.epost).maybeSingle();
     if (fins) return json(409, { error: 'Det finnes allerede en bruker med denne e-posten. Logg inn i stedet.' });
     const { data: u, error } = await admin.auth.admin.createUser({ email: inv.epost, password: passord, email_confirm: true, user_metadata: { navn: body.navn || '' } });
     if (error || !u?.user) return json(400, { error: error?.message || 'Kunne ikke opprette bruker' });
     const navn = String(body.navn || '').trim() || inv.epost;
-    await admin.from('profiles').upsert({ id: u.user.id, epost: inv.epost, navn, rolle: 'leietaker', leietaker_id: inv.leietaker_id, aktiv: true });
+    await admin.from('profiles').upsert({ id: u.user.id, epost: inv.epost, navn, rolle: 'leietaker', leietaker_id: inv.leietaker_id, aktiv: true, samtykke: sam });
     await admin.from('lt_invitasjon').update({ brukt: new Date().toISOString(), bruker_id: u.user.id }).eq('token', inv.token);
     const l = await hentLt(inv.leietaker_id); if (l) await ltLogg({ id: u.user.id, navn }, l, `Leietakerbruker ${inv.epost} opprettet via sjekkliste-lenke`);
     return json(200, { ok: true, epost: inv.epost });
@@ -301,7 +349,8 @@ const handler = async (req: Request) => {
   // Lager lenke, sender e-post og merker kontrollen som sendt for gjeldende frist
   const koSend = async (o: any, til: string, melding: string, base: string, p: any | null) => {
     const d = o.data || {}; const sn = await koSnapshot(o);
-    const { data: inv, error } = await admin.from('ko_invitasjon').insert({ oppgave_id: o.id, eiendom_id: o.eiendom_id, epost: til, frist: d.nesteFrist || null, opprettet_av: p?.id || null, auto: !p }).select().single();
+    const frMs = d.nesteFrist ? new Date(d.nesteFrist + 'T00:00:00Z').getTime() + 45 * 864e5 : 0;
+    const { data: inv, error } = await admin.from('ko_invitasjon').insert({ oppgave_id: o.id, eiendom_id: o.eiendom_id, epost: til, frist: d.nesteFrist || null, opprettet_av: p?.id || null, auto: !p, utloper: new Date(Math.max(Date.now() + 30 * 864e5, frMs)).toISOString() }).select().single();
     if (error) return { sendt: false, grunn: 'Kunne ikke lage lenke (er 008_kontroll_arbeidsordre.sql kjørt?): ' + error.message };
     const lenke = `${base}/#/ko/${inv.token}`;
     const avsender = p ? `${p.navn || p.epost}${sn.orgNavn ? ', ' + sn.orgNavn : ''}` : (sn.orgNavn || 'Eiendomskontroll');
@@ -353,6 +402,7 @@ const handler = async (req: Request) => {
   const hentKo = async (token: string) => { if (!/^[0-9a-f-]{36}$/i.test(String(token || ''))) return null; const { data } = await admin.from('ko_invitasjon').select('*').eq('token', token).maybeSingle(); return data; };
   if (body.action === 'ko_info') {
     const inv = await hentKo(body.token); if (!inv) return json(404, { error: 'Lenken er ugyldig eller kontrollen er slettet' });
+    if (utlopt(inv) && !inv.innsendt) return json(410, { error: UTLOPT });
     const o = await hentOppg(inv.oppgave_id); if (!o) return json(404, { error: 'Kontrollen finnes ikke lenger' });
     const d = o.data || {}; const sn = await koSnapshot(o);
     const bilder: any[] = [];
@@ -360,10 +410,11 @@ const handler = async (req: Request) => {
       const path = d.aoBilder?.[k]?.path; if (!path || !String(path).startsWith(o.eiendom_id + '/')) continue;
       const { data: su } = await admin.storage.from('filer').createSignedUrl(path, 24 * 3600); if (su?.signedUrl) bilder.push({ tittel, url: su.signedUrl });
     }
-    return json(200, { bilder, tegning: d.aoBilder?.tegning || '', navn: d.navn, type: d.type, kategori: d.kategori, frist: inv.frist || d.nesteFrist, hjemmel: d.hjemmel || '', notat: d.notat || '', eiendom: sn.eiendom, adresse: sn.adresse, system: sn.system, kontakt: sn.kontakt, oppdragsgiver: sn.orgNavn, epost: inv.epost, innsendt: inv.innsendt, utdatert: !!(inv.frist && d.nesteFrist && inv.frist !== d.nesteFrist && !inv.innsendt) });
+    return json(200, { bilder, tegning: d.aoBilder?.tegning || '', navn: d.navn, type: d.type, kategori: d.kategori, frist: inv.frist || d.nesteFrist, hjemmel: d.hjemmel || '', notat: d.notat || '', eiendom: sn.eiendom, adresse: sn.adresse, system: sn.system, kontakt: sn.kontakt, oppdragsgiver: sn.orgNavn, epost: inv.epost, innsendt: inv.innsendt, utloper: inv.utloper, utdatert: !!(inv.frist && d.nesteFrist && inv.frist !== d.nesteFrist && !inv.innsendt) });
   }
   if (body.action === 'ko_opplasting') {
     const inv = await hentKo(body.token); if (!inv || inv.innsendt) return json(403, { error: 'Lenken er ugyldig eller allerede brukt' });
+    if (utlopt(inv)) return json(410, { error: UTLOPT });
     const navn = String(body.navn || 'fil').replace(/[^\w.\-æøåÆØÅ]+/g, '_').slice(-80);
     const path = `${inv.eiendom_id}/ko/${inv.oppgave_id}/${crypto.randomUUID()}-${navn}`;
     const { data, error } = await admin.storage.from('filer').createSignedUploadUrl(path);
@@ -373,6 +424,8 @@ const handler = async (req: Request) => {
   if (body.action === 'ko_innsend') {
     const inv = await hentKo(body.token); if (!inv) return json(404, { error: 'Lenken er ugyldig' });
     if (inv.innsendt) return json(409, { error: 'Rapporten er allerede sendt inn via denne lenken' });
+    if (utlopt(inv)) return json(410, { error: UTLOPT });
+    const sam = samtykke(body); if (!sam) return json(400, { error: SAMTYKKE_MANGLER });
     const o = await hentOppg(inv.oppgave_id); if (!o) return json(404, { error: 'Kontrollen finnes ikke lenger' });
     const pre = `${inv.eiendom_id}/ko/${inv.oppgave_id}/`;
     const filer = (Array.isArray(body.filer) ? body.filer : []).slice(0, 20).filter((f: any) => typeof f?.path === 'string' && f.path.startsWith(pre) && !f.path.includes('..'))
@@ -380,7 +433,7 @@ const handler = async (req: Request) => {
     const dato = /^\d{4}-\d{2}-\d{2}$/.test(body.dato) ? body.dato : new Date().toISOString().slice(0, 10);
     const res = ['OK – ingen avvik', 'Avvik funnet', 'Ikke utført / utsatt'].includes(body.res) ? body.res : 'OK – ingen avvik';
     const rapport = { token: inv.token, mottatt: new Date().toISOString(), dato, av: String(body.av || '').slice(0, 160), firma: String(body.firma || '').slice(0, 160), epost: inv.epost, res, komm: String(body.komm || '').slice(0, 4000),
-      avvik: (Array.isArray(body.avvik) ? body.avvik : []).map((x: any) => String(x || '').trim().slice(0, 300)).filter(Boolean).slice(0, 30), nesteDato: /^\d{4}-\d{2}-\d{2}$/.test(body.nesteDato || '') ? body.nesteDato : '', filer };
+      avvik: (Array.isArray(body.avvik) ? body.avvik : []).map((x: any) => String(x || '').trim().slice(0, 300)).filter(Boolean).slice(0, 30), nesteDato: /^\d{4}-\d{2}-\d{2}$/.test(body.nesteDato || '') ? body.nesteDato : '', filer, samtykke: sam };
     const fersk = (await hentOppg(o.id))!.data || {};
     await admin.from('oppgaver').update({ data: { ...fersk, innrapport: rapport } }).eq('id', o.id);
     await admin.from('ko_invitasjon').update({ innsendt: rapport.mottatt, svar: rapport }).eq('token', inv.token);

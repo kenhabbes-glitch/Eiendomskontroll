@@ -20,6 +20,7 @@ import { Portal } from './views/Portal';
 import { Profil } from './views/Profil';
 import { Innstillinger } from './views/Innstillinger';
 import { KoLenke } from './views/KontrollAo';
+import { PersonvernTekst } from './components/Personvern';
 import { AoLenke, ArbeidsordreListe, Hendelseslogg, mineAo } from './views/Arbeidsordre';
 import { LtLenke } from './views/Sjekkliste';
 
@@ -83,6 +84,7 @@ export default function App() {
   if (r.v === 'ao' && r.id) return <><AoLenke token={r.id} /><Toast /></>;
   if (r.v === 'lt' && r.id) return <><LtLenke token={r.id} /><Toast /></>;
   if (r.v === 'ko' && r.id) return <><KoLenke token={r.id} /><Toast /></>;
+  if (r.v === 'personvern') return <div className="login"><div className="card" style={{ maxWidth: 640 }}><PersonvernTekst /><p className="small"><a href="#/">Tilbake</a></p></div></div>;
   if (!state.me) return <Login />;
   if (state.me.rolle === 'ingen' && !state.me.plattform) return <NoAccess />;
 

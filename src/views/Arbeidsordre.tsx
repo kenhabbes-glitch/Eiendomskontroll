@@ -6,6 +6,7 @@ import { byId, fd, sortBy, type Rec } from '../lib/utils';
 import { AlvChip, DueChip, Empty, FileLink, StChip, openModal } from '../components/ui';
 import { AoKart, HendelseListe, hendelseTekst, lastNedAoPdf, lastOppAo, sendAo, settStatus, tildeltNavn } from '../lib/arbeidsordre';
 import { editAvvik } from '../lib/actions';
+import { PersonvernBekreft, PERSONVERN_VERSJON } from '../components/Personvern';
 import { Sel, useFilter } from './common';
 
 const aktiv = (a: Rec) => !AV_LUKKET.includes(a.status);
@@ -104,19 +105,30 @@ function kommentar(id: string) {
 // ---------------- Lenke fra e-post (#/ao/<token>)
 export function AoLenke({ token }: { token: string }) {
   useStore();
-  const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [modus, setModus] = useState<'reg' | 'login'>('reg');
+  const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [modus, setModus] = useState<'kvitter' | 'reg' | 'login'>('kvitter');
+  const [sam, setSam] = useState(false); const [komm, setKomm] = useState(''); const [filer, setFiler] = useState<File[]>([]); const [ferdig, setFerdig] = useState(false);
   const [navn, setNavn] = useState(''); const [firma, setFirma] = useState(''); const [pw, setPw] = useState(''); const [pw2, setPw2] = useState(''); const [busy, setBusy] = useState(false);
   const inne = !!state.me;
   useEffect(() => { (async () => {
     try {
       if (inne) { const r = await aoApi({ action: 'aksepter', token }); await loadMe(); await loadData(); location.hash = '#/arbeidsordre/' + r.avvik_id; return; }
-      const i = await aoApi({ action: 'info', token }, false); setInfo(i); if (i.finnes || i.brukt) setModus('login');
+      const i = await aoApi({ action: 'info', token }, false); setInfo(i); if (i.brukt) setModus('login'); if (i.kvittert) setFerdig(true);
     } catch (e: any) { setErr(e.message); }
   })(); }, [inne]);
-  const registrer = async (e: React.FormEvent) => {
-    e.preventDefault(); if (pw.length < 8) return setErr('Passordet må ha minst 8 tegn'); if (pw !== pw2) return setErr('Passordene er ikke like');
+  const kvitter = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!navn.trim()) return setErr('Skriv navnet ditt'); if (!komm.trim()) return setErr('Beskriv hva som er gjort'); if (!sam) return setErr('Du må godta personvernerklæringen');
+    if (filer.some(x => x.size > 50e6)) return setErr('Hver fil kan være maks 50 MB');
     setBusy(true); setErr('');
-    try { await aoApi({ action: 'registrer', token, navn, firma, passord: pw }, false); const { error } = await sb.auth.signInWithPassword({ email: info.epost, password: pw }); if (error) throw error; }
+    try {
+      const opp: any[] = [];
+      for (const fil of filer) { const u = await aoApi({ action: 'ao_opplasting', token, navn: fil.name }, false); const { error } = await sb.storage.from('filer').uploadToSignedUrl(u.path, u.token, fil, { contentType: fil.type || 'application/octet-stream' }); if (error) throw new Error('Opplasting feilet for ' + fil.name + ': ' + error.message); opp.push({ path: u.path, navn: fil.name, type: fil.type, str: fil.size }); }
+      await aoApi({ action: 'ao_kvitter', token, navn, firma, komm, filer: opp, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); setFerdig(true);
+    } catch (e: any) { setErr(e.message); } setBusy(false);
+  };
+  const registrer = async (e: React.FormEvent) => {
+    e.preventDefault(); if (!sam) return setErr('Du må godta personvernerklæringen'); if (pw.length < 8) return setErr('Passordet må ha minst 8 tegn'); if (pw !== pw2) return setErr('Passordene er ikke like');
+    setBusy(true); setErr('');
+    try { await aoApi({ action: 'registrer', token, navn, firma, passord: pw, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); const { error } = await sb.auth.signInWithPassword({ email: info.epost, password: pw }); if (error) throw error; }
     catch (e: any) { setErr(e.message); } setBusy(false);
   };
   const logginn = async (e: React.FormEvent) => { e.preventDefault(); setBusy(true); setErr(''); const { error } = await sb.auth.signInWithPassword({ email: info.epost, password: pw }); if (error) setErr('Feil passord eller e-post'); setBusy(false); };
@@ -126,24 +138,38 @@ export function AoLenke({ token }: { token: string }) {
     {err && !info ? <><h1>Lenken virker ikke</h1><p>{err}</p><a href="#/">Gå til innlogging</a></>
       : !info ? <p>{inne ? 'Kobler arbeidsordren til brukeren din …' : 'Henter arbeidsordren …'}</p>
       : <>
-        <h1 style={{ marginBottom: 4 }}>Avvik #{info.nr}: {info.tittel}</h1><p className="muted" style={{ marginTop: 0 }}>{info.eiendom}</p>
-        {modus === 'reg' ? <form onSubmit={registrer}>
+        <h1 style={{ marginBottom: 4 }}>Avvik #{info.nr}: {info.tittel}</h1><p className="muted" style={{ marginTop: 0 }}>{[info.eiendom, info.adresse].filter(Boolean).join(', ')}</p>
+        <dl className="dl small">{([['System', info.system], ['Komponent', info.komponent], ['Plassering', info.plassering], ['Alvorlighet', info.alv], ['Frist', info.frist ? fd(info.frist) : ''], ['Oppdragsgiver', info.oppdragsgiver]] as [string, string][]).filter(x => x[1]).map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl>
+        {info.beskrivelse && <div className="note small" style={{ whiteSpace: 'pre-wrap', color: 'var(--ink)' }}><b>Beskrivelse</b><br />{info.beskrivelse}</div>}
+        {ferdig ? <div className="note" style={{ marginTop: 14 }}><b>Takk – arbeidsordren er kvittert ut.</b><br /><span className="small">Oppdragsgiver kontrollerer arbeidet og lukker avviket. Har du spørsmål, ta kontakt med oppdragsgiver.</span></div>
+        : <><div className="tabs" style={{ margin: '14px 0 8px' }}>{([['kvitter', 'Kvitter ut uten bruker'], ...(info.finnes ? [] : [['reg', 'Opprett bruker']]), ['login', 'Logg inn']] as [string, string][]).map(([k, l]) => <a key={k} href="#" className={modus === k ? 'on' : ''} onClick={e => { e.preventDefault(); setModus(k as any); setErr(''); }}>{l}</a>)}</div>
+        {modus === 'kvitter' ? <form onSubmit={kvitter}>
+          <p className="small" style={{ marginTop: 0 }}>Kvitter ut jobben direkte, uten å opprette bruker. Lenken er personlig{info.utloper ? ` og gjelder til ${fd(info.utloper)}` : ''}.</p>
+          <label>Navn</label><input value={navn} onChange={e => setNavn(e.target.value)} required style={inp} />
+          <label>Firma</label><input value={firma} onChange={e => setFirma(e.target.value)} style={inp} />
+          <label>Hva er gjort?</label><textarea value={komm} onChange={e => setKomm(e.target.value)} required style={{ ...inp, minHeight: 80 }} placeholder="Beskriv utbedringen, materialer, målinger …" />
+          <label>Bilder og dokumentasjon</label><input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.heic,.webp,.doc,.docx,.xls,.xlsx,.txt" onChange={e => setFiler(Array.from(e.target.files || []))} />
+          <PersonvernBekreft ok={sam} set={setSam} ansvarlig={info.oppdragsgiver} />
+          {err && <p style={{ color: 'var(--red)' }}>{err}</p>}
+          <button className="btn pri" disabled={busy || !sam} style={{ width: '100%', marginTop: 10 }}>{busy ? 'Sender …' : 'Kvitter ut – utført'}</button>
+          <p className="small muted" style={{ textAlign: 'center' }}>Vil du se arbeidsordrene dine samlet og kunne følge dem opp senere? Velg «Opprett bruker».</p></form>
+        : modus === 'reg' ? <form onSubmit={registrer}>
           <p className="small">Opprett en bruker for å se arbeidsordren med plassering på tegning, kvittere ut og laste opp bilder og dokumentasjon. Brukeren gir bare tilgang til arbeidsordre som er tildelt deg.</p>
           <label>E-post</label><input value={info.epost} readOnly style={inp} />
           <label>Navn</label><input value={navn} onChange={e => setNavn(e.target.value)} required style={inp} />
           <label>Firma (valgfritt)</label><input value={firma} onChange={e => setFirma(e.target.value)} style={inp} />
           <label>Velg passord (min. 8 tegn)</label><input type="password" value={pw} onChange={e => setPw(e.target.value)} style={inp} autoComplete="new-password" />
           <label>Gjenta passord</label><input type="password" value={pw2} onChange={e => setPw2(e.target.value)} style={inp} autoComplete="new-password" />
+          <PersonvernBekreft ok={sam} set={setSam} ansvarlig={info.oppdragsgiver} />
           {err && <p style={{ color: 'var(--red)' }}>{err}</p>}
-          <button className="btn pri" disabled={busy} style={{ width: '100%', marginTop: 12 }}>{busy ? 'Oppretter …' : 'Opprett bruker og åpne'}</button>
-          <p className="small" style={{ textAlign: 'center' }}><a href="#" onClick={e => { e.preventDefault(); setModus('login'); setErr(''); }}>Har du allerede bruker? Logg inn</a></p></form>
+          <button className="btn pri" disabled={busy || !sam} style={{ width: '100%', marginTop: 10 }}>{busy ? 'Oppretter …' : 'Opprett bruker og åpne'}</button></form>
         : <form onSubmit={logginn}>
           <p className="small">{info.finnes ? 'Du har allerede en bruker. Logg inn for å åpne arbeidsordren.' : 'Logg inn for å åpne arbeidsordren.'}</p>
           <label>E-post</label><input value={info.epost} readOnly style={inp} />
           <label>Passord</label><input type="password" value={pw} onChange={e => setPw(e.target.value)} style={inp} autoComplete="current-password" />
           {err && <p style={{ color: 'var(--red)' }}>{err}</p>}
           <button className="btn pri" disabled={busy} style={{ width: '100%', marginTop: 12 }}>{busy ? 'Logger inn …' : 'Logg inn og åpne'}</button>
-          {!info.finnes && <p className="small" style={{ textAlign: 'center' }}><a href="#" onClick={e => { e.preventDefault(); setModus('reg'); setErr(''); }}>Opprett bruker i stedet</a></p>}</form>}
+          </form>}</>}
       </>}
   </div></div>;
 }
