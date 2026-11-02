@@ -218,7 +218,9 @@ På systemnivå er dette sentralkost (sentral, styring, kabling o.l.). Komponent
   'felt.risikoklasse': { gruppe: 'Skjemafelt', tittel: 'Risikoklasse (TEK)', tekst: `Risikoklasse 1–6 etter byggteknisk forskrift, ut fra bruk og hvem som oppholder seg i bygget. Påvirker krav til brannsikring.` },
   'felt.brannklasse': { gruppe: 'Skjemafelt', tittel: 'Brannklasse (TEK)', tekst: `Brannklasse 1–4 ut fra konsekvensene av brann. Står normalt i brannkonseptet.` },
   'felt.tilsyn': { gruppe: 'Skjemafelt', tittel: 'Tilsynsobjekt', tekst: `Særskilte brannobjekter etter brann- og eksplosjonsvernloven § 13 får tilsyn fra brannvesenet og har strengere krav til dokumentasjon.` },
-  'felt.avtaletype': { gruppe: 'Skjemafelt', tittel: 'Avtalemal', tekst: `Velg standardmal (f.eks. Norsk Eiendom bruttoleie eller nettoleie). Malen bestemmer hvem som har ansvar for hva, og hvilke plikter leietaker må følge opp.` },
+  'felt.avtaletype': { gruppe: 'Skjemafelt', tittel: 'Avtalemal / dokument', tekst: `Navn og utgave på kontraktsdokumentet dere har brukt, f.eks. «Standard bare-house leieavtale for næringsbygg, 2025». Feltet er til informasjon.
+
+Det er «Kontraktstype» over som styrer ansvarsfordelingen og hvilke plikter leietakeren får. Fordelingen kan justeres punkt for punkt i tabellen «Ansvarsfordeling etter leieavtalen» på leietakeren.` },
   'felt.fellesAvtale': { gruppe: 'Skjemafelt', tittel: 'Kontraktfestet fellesareal', tekst: `Hvordan leiekontrakten fastsetter leietakers andel av fellesarealet: fast antall m², prosent av fellesarealet eller prosentvis påslag på eget areal. Brukes til å beregne over- eller underdekning.` },
   'felt.in': { gruppe: 'Skjemafelt', tittel: 'Intervall', tekst: `Hvor ofte kontrollen skal gjøres. Neste frist beregnes automatisk når kontrollen registreres som utført.` },
   'felt.alv': { gruppe: 'Skjemafelt', tittel: 'Alvorlighet', tekst: `Hvor raskt avviket må lukkes. Høy alvorlighet gir kortere standardfrist og vises først i listene.` },
