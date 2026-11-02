@@ -1,8 +1,9 @@
 // Arbeidsordre for kontroller/service: send til servicefirma (manuelt eller automatisk før frist),
 // lenke uten innlogging der firmaet registrerer utført og laster opp rapport, og godkjenning hos eier.
 import React, { useEffect, useState } from 'react';
-import { S, aoApi, canEdit, kanDrifteE, sb, toast, useStore } from '../lib/store';
-import { addDays, byId, fd, today, type Rec } from '../lib/utils';
+import { S, aoApi, canEdit, kanDrifteE, sb, toast, useStore, fileUrl, uploadFile, type Fil } from '../lib/store';
+import { addDays, byId, fd, today, tfmSys, tfmKomp, type Rec } from '../lib/utils';
+import { plasserteFor } from './Arealer';
 import { Chip, FileLink, openModal, confirmBox } from '../components/ui';
 import { Hjelp } from '../components/Hjelp';
 import { KoPanelRef, utfor } from '../lib/actions';
@@ -13,10 +14,78 @@ export const koMottaker = (o: Rec) => String(o.ao?.epost || byId('anlegg', o.anl
 export const koSendesDato = (o: Rec) => o.ao?.auto && o.nesteFrist ? addDays(o.nesteFrist, -(+o.ao.dager || 0)) : '';
 export const koSendtForFrist = (o: Rec) => !!o.aoSendt && o.aoSendt.frist === o.nesteFrist;
 
+
+// ---------- Lokasjonsbilder (oversikt + zoom) fra tegningen, lagret på kontrollen og brukt i arbeidsordren
+type Pkt = { x: number; y: number; kode: string };
+function lokasjonsGrunnlag(o: Rec) {
+  const rot = o.komponentId ? byId('komponenter', o.komponentId) : o.anleggId ? byId('anlegg', o.anleggId) : null; if (!rot) return null;
+  const L = plasserteFor(rot); if (!L.length) return null;
+  const tell: Record<string, number> = {}; L.forEach(x => { tell[x.pos.tegningId] = (tell[x.pos.tegningId] || 0) + (x.id === rot.id ? 100 : 1); });
+  const tid = Object.entries(tell).sort((a, b) => b[1] - a[1])[0][0]; const t = byId('tegninger', tid); if (!t?.fil?.path) return null;
+  const pk: Pkt[] = L.filter(x => x.pos.tegningId === tid).map(x => ({ x: x.pos.x, y: x.pos.y, kode: x.anleggId && x.kode ? tfmKomp(x, true) : tfmSys(x, true) }));
+  const andre = [...new Set(L.filter(x => x.pos.tegningId !== tid).map(x => byId('tegninger', x.pos.tegningId)?.navn).filter(Boolean))] as string[];
+  return { t, pk, andre, sig: JSON.stringify([tid, t.fil.path, pk.map(p => [p.x, p.y, p.kode])]) };
+}
+async function tegnLokasjon(t: Rec, pk: Pkt[], zoom: boolean) {
+  const r = await fetch(await fileUrl(t.fil.path)); if (!r.ok) throw new Error('Kunne ikke hente tegningen'); const bmp = await createImageBitmap(await r.blob());
+  const W0 = t.w || bmp.width, H0 = t.h || bmp.height;
+  // Utsnittet for zoom (samme beregning brukes til rammen i oversikten)
+  const xs = pk.map(p => p.x), ys = pk.map(p => p.y); const bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys);
+  let zw = Math.min(W0, Math.max(Math.max(W0, H0) * 0.28, (bx1 - bx0) * 1.6)); const zh = Math.min(H0, Math.max(zw * 0.62, (by1 - by0) * 1.6)); zw = Math.min(W0, Math.max(zw, zh / 0.62));
+  const zx = Math.max(0, Math.min(W0 - zw, (bx0 + bx1) / 2 - zw / 2)), zy = Math.max(0, Math.min(H0 - zh, (by0 + by1) / 2 - zh / 2));
+  let sx = 0, sy = 0, sw = W0, sh = H0;
+  if (zoom) { sx = zx; sy = zy; sw = zw; sh = zh; }
+  const sc = Math.min(1800 / sw, 1800 / sh, zoom ? 4 : 1); const cw = Math.round(sw * sc), ch = Math.round(sh * sc);
+  const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch; const g = cv.getContext('2d')!;
+  g.fillStyle = '#fff'; g.fillRect(0, 0, cw, ch); const kx = bmp.width / W0, ky = bmp.height / H0;
+  g.drawImage(bmp, sx * kx, sy * ky, sw * kx, sh * ky, 0, 0, cw, ch);
+  const R = Math.max(cw, ch) / (zoom ? 70 : 90);
+  for (const p of pk) {
+    const px = (p.x - sx) * sc, py = (p.y - sy) * sc;
+    g.fillStyle = 'rgba(31,111,92,.18)'; g.beginPath(); g.arc(px, py, R * 3, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#1f6f5c'; g.beginPath(); g.arc(px, py, R, 0, Math.PI * 2); g.fill(); g.lineWidth = R * .35; g.strokeStyle = '#fff'; g.stroke();
+    if (zoom || pk.length <= 3) { g.font = `bold ${Math.round(R * 1.35)}px Helvetica, Arial`; const tw = g.measureText(p.kode).width; const lx = Math.min(cw - tw - R, px + R * 1.8), ly = py - R * 1.6;
+      g.fillStyle = 'rgba(255,255,255,.92)'; g.fillRect(lx - R * .4, ly - R * 1.2, tw + R * .8, R * 1.7); g.fillStyle = '#1d2320'; g.textBaseline = 'middle'; g.fillText(p.kode, lx, ly - R * .35); }
+  }
+  if (!zoom && pk.length) { // ramme som viser utsnittet i zoom-bildet
+    g.strokeStyle = '#b42318'; g.lineWidth = Math.max(2, cw / 450); g.setLineDash([g.lineWidth * 4, g.lineWidth * 3]);
+    const lw = g.lineWidth / 2; g.strokeRect(zx * sc + lw, zy * sc + lw, zw * sc - 2 * lw, zh * sc - 2 * lw); }
+  return await new Promise<Blob>((res, rej) => cv.toBlob(b => b ? res(b) : rej(new Error('bilde')), 'image/jpeg', 0.85));
+}
+/** Lager/oppdaterer lokasjonsbildene for kontrollen hvis systemet er plassert og plasseringen er endret. Returnerer om kontrollen har bilder. */
+export async function sikreLokasjonsbilder(id: string, stille = true): Promise<boolean> {
+  const o = byId('oppgaver', id); if (!o || !kanDrifteE(o.eiendomId)) return !!o?.aoBilder;
+  const g = lokasjonsGrunnlag(o);
+  if (!g) { if (o.aoBilder) await save('oppgaver', { ...o, aoBilder: null }); return false; }
+  if (o.aoBilder?.sig === g.sig) return true;
+  try {
+    const [ov, zo] = await Promise.all([tegnLokasjon(g.t, g.pk, false), tegnLokasjon(g.t, g.pk, true)]);
+    const mappe = `ko/${o.id}`;
+    const fo = await uploadFile(ov, o.eiendomId, undefined, 'lokasjon-oversikt.jpg', mappe); const fz = await uploadFile(zo, o.eiendomId, undefined, 'lokasjon-zoom.jpg', mappe);
+    if (!fo || !fz) return !!o.aoBilder;
+    await save('oppgaver', { ...byId('oppgaver', id)!, aoBilder: { sig: g.sig, tegning: g.t.navn, andre: g.andre, antall: g.pk.length, oversikt: fo, zoom: fz, laget: new Date().toISOString() } });
+    return true;
+  } catch (e: any) { if (!stille) toast('Kunne ikke lage lokasjonsbilder: ' + (e?.message || e)); return !!o.aoBilder; }
+}
+/** Kalles når et system/en komponent flyttes på tegning: oppdater bilder for kontroller med arbeidsordre */
+export async function oppdaterLokasjonFor(o: Rec) {
+  const sysId = o.anleggId && o.kode !== undefined ? o.anleggId : o.id;
+  for (const k of S.oppgaver.filter(x => (x.anleggId === sysId || x.komponentId === o.id) && (x.ao?.epost || x.aoBilder))) await sikreLokasjonsbilder(k.id);
+}
+function Lokasjon({ o }: { o: Rec }) {
+  const b = o.aoBilder; if (!b) return null;
+  return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 8, marginTop: 8 }}>
+    <figure style={{ margin: 0 }}><FileLink fil={b.oversikt}><BildeMini fil={b.oversikt} /></FileLink><figcaption className="small muted">Oversikt – {b.tegning}</figcaption></figure>
+    <figure style={{ margin: 0 }}><FileLink fil={b.zoom}><BildeMini fil={b.zoom} /></FileLink><figcaption className="small muted">Zoom – {b.antall} markering{b.antall > 1 ? 'er' : ''}{b.andre?.length ? ` · også på ${b.andre.join(', ')}` : ''}</figcaption></figure>
+  </div>;
+}
+function BildeMini({ fil }: { fil: Fil }) { const [u, setU] = useState(''); useEffect(() => { fileUrl(fil.path).then(setU); }, [fil.path]); return u ? <img src={u} style={{ width: '100%', border: '1px solid var(--line2)', borderRadius: 6, display: 'block' }} /> : <div className="muted small">…</div>; }
+
 // ---------- Panel i kontrollvisningen
 function KoPanel({ o, close }: { o: Rec; close: () => void }) {
   useStore(); o = byId('oppgaver', o.id) || o;
   const r = o.innrapport; const kan = kanDrifteE(o.eiendomId); const mott = koMottaker(o); const sd = koSendesDato(o);
+  useEffect(() => { if (kan && (o.ao?.epost || o.aoBilder)) sikreLokasjonsbilder(o.id); }, [o.id]);
   if (!kan && !r) return null;
   return <div style={{ marginTop: 16 }}>
     {r && <div className="note" style={{ color: 'var(--ink)', borderColor: 'var(--blue, #2f6fb5)', marginBottom: 10 }}>
@@ -34,6 +103,7 @@ function KoPanel({ o, close }: { o: Rec; close: () => void }) {
       <span className="muted">{o.aoSendt ? <>Sendt {fd(o.aoSendt.dato)} til {o.aoSendt.til}{o.aoSendt.auto ? ' (automatisk)' : ''}{o.aoSendt.frist !== o.nesteFrist ? ' – for forrige frist' : ''}. </> : null}
         {o.ao?.auto ? (koSendtForFrist(o) ? 'Automatisk sending er aktiv for neste frist.' : gyldig(o.ao.epost) ? <>Sendes automatisk {fd(sd < today() ? today() : sd)} til {o.ao.epost}.</> : 'Automatisk sending mangler e-post.') : !o.aoSendt ? 'Ikke sendt.' : ''}</span>
       <span className="grow" /><button className="btn sm" onClick={() => sendKo(o.id)}>✉ Send arbeidsordre{mott ? '' : ' …'}</button></div>}
+    {kan && o.aoBilder && <><div className="small muted" style={{ marginTop: 6 }}>Lokasjon som følger arbeidsordren:</div><Lokasjon o={o} /></>}
   </div>;
 }
 KoPanelRef.C = KoPanel;
@@ -47,6 +117,7 @@ function SendKo({ id, close }: { id: string; close: () => void }) {
     setBusy(true);
     try {
       if (husk && ep.trim() !== (o.ao?.epost || '')) await save('oppgaver', { ...byId('oppgaver', id)!, ao: { ...(o.ao || {}), epost: ep.trim() } });
+      await sikreLokasjonsbilder(id, false);
       const r = await aoApi({ action: 'ko_send', oppgave_id: id, epost: ep.trim(), melding: m, lenkeBase: location.origin }); setRes(r); if (r.sendt) toast('Arbeidsordren er sendt til ' + r.til);
     } catch (e: any) { toast(e.message || 'Feil'); }
     setBusy(false);
@@ -60,6 +131,7 @@ function SendKo({ id, close }: { id: string; close: () => void }) {
       <div className="form"><div className="fld"><label>Til (e-post)</label><input style={inp} type="email" value={ep} onChange={e => setEp(e.target.value)} placeholder="service@firma.no" /></div>
         <div className="fld"><label>Melding (valgfritt)</label><textarea style={{ ...inp, minHeight: 80 }} value={m} onChange={e => setM(e.target.value)} placeholder="F.eks. Avtal tidspunkt med driftsleder. Nøkkel i resepsjonen." /></div></div>
       <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={husk} onChange={e => setHusk(e.target.checked)} />Husk mottakeren på kontrollen</label>
+      {o.aoBilder ? <><p className="small" style={{ marginBottom: 0 }}>Lokasjonen på tegningen følger med (oversikt og zoom):</p><Lokasjon o={o} /></> : lokasjonsGrunnlag(o) ? <p className="small muted">Lokasjonsbilder fra tegningen lages når du sender.</p> : <p className="small muted">Systemet er ikke plassert på tegning – arbeidsordren sendes uten lokasjonsbilder.</p>}
       <p className="small muted">Frist i arbeidsordren: {fd(o.nesteFrist)}. Automatisk sending før hver frist slår du på under «Rediger».</p>
     </> : res.sendt ? <div className="note">Arbeidsordren er sendt til <b>{res.til}</b> og ført i hendelsesloggen.</div>
       : <div className="note small" style={{ color: 'var(--ink)' }}><b>E-post er ikke satt opp for organisasjonen ennå</b> (Administrasjon → Innstillinger). Arbeidsordren og lenken er laget – åpne den i ditt eget e-postprogram:<br /><br />
@@ -102,6 +174,8 @@ export function KoLenke({ token }: { token: string }) {
         <p className="muted" style={{ marginTop: 0 }}>{[info.eiendom, info.adresse].filter(Boolean).join(', ')}</p>
         <dl className="dl small">{([['System', info.system], ['Frist', info.frist ? fd(info.frist) : ''], ['Grunnlag', info.hjemmel], ['Kontakt', info.kontakt], ['Oppdragsgiver', info.oppdragsgiver]] as [string, string][]).filter(x => x[1]).map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl>
         {info.notat && <div className="note small" style={{ whiteSpace: 'pre-wrap', color: 'var(--ink)' }}><b>Sjekkpunkter / merknader</b><br />{info.notat}</div>}
+        {info.bilder?.length > 0 && <div style={{ marginTop: 12 }}><b className="small">Lokasjon{info.tegning ? ' – ' + info.tegning : ''}</b>
+          {info.bilder.map((b: any) => <figure key={b.url} style={{ margin: '6px 0 10px' }}><a href={b.url} target="_blank" rel="noopener noreferrer"><img src={b.url} alt={b.tittel} style={{ width: '100%', border: '1px solid var(--line2)', borderRadius: 6, display: 'block' }} /></a><figcaption className="small muted">{b.tittel}</figcaption></figure>)}</div>}
         {ferdig ? <div className="note" style={{ marginTop: 14 }}><b>Takk – rapporten er sendt inn.</b><br /><span className="small">Oppdragsgiver går gjennom den og registrerer kontrollen som utført. Lenken kan ikke brukes på nytt; ta kontakt med oppdragsgiver ved behov for endringer.</span></div>
         : <form onSubmit={sendInn} style={{ marginTop: 14 }}>
           {info.utdatert && <p className="small" style={{ color: 'var(--amber)' }}>Merk: Fristen er endret siden arbeidsordren ble sendt. Rapporten kan likevel sendes inn.</p>}

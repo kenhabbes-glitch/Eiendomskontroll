@@ -36,7 +36,8 @@ export function itemKode(i: MItem) { if (i.kind === 'v') return 'Avvik #' + (i.o
 export function itemNavn(i: MItem) { if (i.kind === 'v') return i.o.tittel || 'Avvik'; return i.kind === 'a' ? (i.o.navn || KOMP[i.o.type]?.n || 'System') : (i.o.navn || TFM_KODER.find(c => c[0] === (i.o.kode || '').toUpperCase())?.[1] || 'Komponent'); }
 async function lagrePos(i: MItem, pos: any) {
   if (i.kind === 'v') { const fersk = byId('avvik', i.o.id) || i.o; const t = pos ? byId('tegninger', pos.tegningId) : null; const logg = [...(fersk.logg || []), { t: new Date().toISOString(), s: fersk.status, k: pos ? (fersk.pos ? 'Flyttet på tegning ' : 'Plassert på tegning ') + (t?.navn || '') : 'Fjernet fra tegning', av: state.me?.navn || state.me?.epost }]; await save('avvik', { ...fersk, pos, logg }); return; }
-  await save(i.kind === 'a' ? 'anlegg' : 'komponenter', { ...i.o, pos }); }
+  await save(i.kind === 'a' ? 'anlegg' : 'komponenter', { ...i.o, pos });
+  const fersk = byId(i.kind === 'a' ? 'anlegg' : 'komponenter', i.o.id); if (fersk) import('./KontrollAo').then(m => m.oppdaterLokasjonFor(fersk)).catch(() => { }); }
 
 const go = (p: string) => { location.hash = '#/' + p; };
 

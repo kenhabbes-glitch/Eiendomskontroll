@@ -55,7 +55,9 @@ const handler = async (req: Request) => {
     if (env('RESEND_API_KEY')) return { metode: 'resend', fraNavn: d.fraNavn || n || 'Eiendomskontroll', fraEpost: e || 'onboarding@resend.dev', svarTil: d.svarTil || env('EPOST_SVAR'), smtpHost: '', smtpPort: 0, smtpUser: '', passord: env('RESEND_API_KEY'), kilde: 'netlify' };
     return { metode: '', fraNavn: d.fraNavn || '', fraEpost: '', svarTil: d.svarTil || '', smtpHost: '', smtpPort: 0, smtpUser: '', passord: '', kilde: '' };
   };
-  const sendEpost = async (til: string, emne: string, html: string, tekst: string, vedlegg?: { navn: string; base64: string; type?: string }, svarTil?: string, o0?: Oppsett) => {
+  type Vedlegg = { navn: string; base64: string; type?: string; cid?: string };
+  const sendEpost = async (til: string, emne: string, html: string, tekst: string, vedlegg0?: Vedlegg | Vedlegg[], svarTil?: string, o0?: Oppsett) => {
+    const vedlegg = vedlegg0 ? (Array.isArray(vedlegg0) ? vedlegg0 : [vedlegg0]) : [];
     const o = o0 || await hentOppsett();
     if (!o.metode) return { sendt: false, grunn: 'E-post er ikke satt opp (Innstillinger → E-post for arbeidsordre)' };
     const fra = o.fraNavn ? `"${o.fraNavn.replace(/"/g, '')}" <${o.fraEpost}>` : o.fraEpost; const replyTo = o.svarTil || svarTil || undefined;
@@ -63,12 +65,12 @@ const handler = async (req: Request) => {
       try {
         const nm: any = await import('nodemailer'); const nodemailer = nm.default || nm; // lastes først når det trengs
         const t = nodemailer.createTransport({ host: o.smtpHost, port: o.smtpPort, secure: o.smtpPort === 465, auth: { user: o.smtpUser, pass: o.passord.replace(/\s+/g, '') }, connectionTimeout: 7000, greetingTimeout: 5000, socketTimeout: 8000 });
-        await t.sendMail({ from: fra, to: til, replyTo, subject: emne, text: tekst, html, attachments: vedlegg ? [{ filename: vedlegg.navn, content: vedlegg.base64, encoding: 'base64', contentType: vedlegg.type || 'application/pdf' }] : undefined });
+        await t.sendMail({ from: fra, to: til, replyTo, subject: emne, text: tekst, html, attachments: vedlegg.length ? vedlegg.map(v => ({ filename: v.navn, content: v.base64, encoding: 'base64', contentType: v.type || 'application/pdf', ...(v.cid ? { cid: v.cid } : {}) })) : undefined });
         return { sendt: true };
       } catch (e: any) { return { sendt: false, grunn: 'E-post feilet (SMTP): ' + (e?.response || e?.message || e) }; }
     }
     const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: 'Bearer ' + o.passord, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: fra, to: [til], subject: emne, html, text: tekst, ...(replyTo ? { reply_to: replyTo } : {}), ...(vedlegg ? { attachments: [{ filename: vedlegg.navn, content: vedlegg.base64 }] } : {}) }) });
+      body: JSON.stringify({ from: fra, to: [til], subject: emne, html, text: tekst, ...(replyTo ? { reply_to: replyTo } : {}), ...(vedlegg.length ? { attachments: vedlegg.map(v => ({ filename: v.navn, content: v.base64, ...(v.cid ? { content_id: v.cid } : {}) })) } : {}) }) });
     if (!r.ok) { const j = await r.json().catch(() => ({})); return { sendt: false, grunn: 'E-post feilet (Resend): ' + (j.message || r.status) }; }
     return { sendt: true };
   };
@@ -278,16 +280,20 @@ const handler = async (req: Request) => {
     const sys = sy ? `${ed.tfmBygg ? '+' + ed.tfmBygg : ''}${sd.tfmSys ? '=' + sd.tfmSys + '.' + String(sd.tfmLop || 1).padStart(3, '0') : ''} ${sd.navn || ''}${sd.fabrikat ? ' (' + sd.fabrikat + ')' : ''}`.trim() : '';
     return { org: e?.eier_org_id || null, orgNavn: org?.navn || '', eiendom: ed.navn || '', adresse: [ed.adresse, [ed.postnr, ed.poststed].filter(Boolean).join(' ')].filter(Boolean).join(', '), system: sys, kontakt: ed.kontaktLeverandor || ed.driftsansvarlig || '' };
   };
-  const koTekst = (o: any, sn: any, lenke: string, melding: string, avsender: string) => {
-    const d = o.data || {};
+  const koTekst = (o: any, sn: any, lenke: string, melding: string, avsender: string, bilder = false) => {
+    const d = o.data || {}; const b = d.aoBilder;
     const rader: [string, string][] = [['Eiendom', [sn.eiendom, sn.adresse].filter(Boolean).join(', ')], ['System', sn.system], ['Oppdrag', d.navn], ['Type', [d.type, d.kategori].filter(Boolean).join(' · ')], ['Planlagt / frist', datoNo(d.nesteFrist)], ['Grunnlag', d.hjemmel || ''], ['Kontakt på stedet', sn.kontakt]];
-    const tekst = [`Arbeidsordre – ${d.navn}`, '', melding ? melding + '\n' : '', ...rader.filter(r => r[1]).map(r => `${r[0]}: ${r[1]}`), d.notat ? '\nSjekkpunkter / merknader:\n' + d.notat : '', '',
+    const tekst = [`Arbeidsordre – ${d.navn}`, '', melding ? melding + '\n' : '', ...rader.filter(r => r[1]).map(r => `${r[0]}: ${r[1]}`), d.notat ? '\nSjekkpunkter / merknader:\n' + d.notat : '', bilder && b ? `\nLokasjon: se vedlagte bilder fra tegningen ${b.tegning}.` : '', '',
       `Når jobben er utført: registrer dato, resultat og last opp servicerapport her (ingen innlogging):\n${lenke}`, '', `Sendt av ${avsender}`].filter(x => x !== '').join('\n');
     const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1d2320">
       <p style="font-size:12px;color:#6b736d;margin:0">ARBEIDSORDRE – ${esc((d.type || 'kontroll').toUpperCase())}</p><h2 style="margin:4px 0 12px">${esc(d.navn)}</h2>
       ${melding ? `<p>${esc(melding).replace(/\n/g, '<br>')}</p>` : ''}
       <table style="border-collapse:collapse;font-size:14px">${rader.filter(r => r[1]).map(r => `<tr><td style="padding:3px 14px 3px 0;color:#6b736d;vertical-align:top">${r[0]}</td><td style="padding:3px 0">${esc(r[1])}</td></tr>`).join('')}</table>
       ${d.notat ? `<p style="margin-top:12px"><b>Sjekkpunkter / merknader</b><br>${esc(d.notat).replace(/\n/g, '<br>')}</p>` : ''}
+      ${bilder && b ? `<p style="margin:16px 0 4px"><b>Lokasjon – ${esc(b.tegning)}</b>${b.andre?.length ? ` <span style="color:#6b736d">(også plassert på ${esc(b.andre.join(', '))})</span>` : ''}</p>
+        <p style="margin:4px 0"><img src="cid:lokasjon-zoom" alt="Lokasjon (zoom)" style="max-width:100%;border:1px solid #d9ddd8;border-radius:6px"></p>
+        <p style="margin:4px 0"><img src="cid:lokasjon-oversikt" alt="Lokasjon (oversikt)" style="max-width:100%;border:1px solid #d9ddd8;border-radius:6px"></p>
+        <p style="font-size:12px;color:#6b736d;margin:2px 0 0">Grønn markering viser plasseringen. Rød stiplet ramme i oversikten viser utsnittet. Bildene ligger også som vedlegg.</p>` : ''}
       <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Registrer utført og last opp rapport</a></p>
       <p style="font-size:12px;color:#6b736d">Lenken krever ingen innlogging. Oppdragsgiver går gjennom rapporten før kontrollen registreres som utført.<br>Sendt av ${esc(avsender)}.</p></div>`;
     return { emne: `Arbeidsordre: ${d.navn}${sn.eiendom ? ' – ' + sn.eiendom : ''}${d.nesteFrist ? ' (' + datoNo(d.nesteFrist) + ')' : ''}`, tekst, html };
@@ -299,8 +305,14 @@ const handler = async (req: Request) => {
     if (error) return { sendt: false, grunn: 'Kunne ikke lage lenke (er 008_kontroll_arbeidsordre.sql kjørt?): ' + error.message };
     const lenke = `${base}/#/ko/${inv.token}`;
     const avsender = p ? `${p.navn || p.epost}${sn.orgNavn ? ', ' + sn.orgNavn : ''}` : (sn.orgNavn || 'Eiendomskontroll');
-    const m = koTekst(o, sn, lenke, melding, avsender);
-    const r = await sendEpost(til, m.emne, m.html, m.tekst, undefined, p?.epost || undefined, await hentOppsett(sn.org || (p ? await minOrg(p) : null)));
+    // Lokasjonsbilder fra tegningen (laget i appen og lagret på kontrollen)
+    const vedl: Vedlegg[] = [];
+    for (const [k, cid, navn] of [['zoom', 'lokasjon-zoom', 'Lokasjon - zoom.jpg'], ['oversikt', 'lokasjon-oversikt', 'Lokasjon - oversikt.jpg']] as const) {
+      const path = d.aoBilder?.[k]?.path; if (!path || !String(path).startsWith(o.eiendom_id + '/')) continue;
+      const { data: bl } = await admin.storage.from('filer').download(path); if (bl) vedl.push({ navn, base64: Buffer.from(await bl.arrayBuffer()).toString('base64'), type: 'image/jpeg', cid });
+    }
+    const m = koTekst(o, sn, lenke, melding, avsender, vedl.length === 2);
+    const r = await sendEpost(til, m.emne, m.html, m.tekst, vedl, p?.epost || undefined, await hentOppsett(sn.org || (p ? await minOrg(p) : null)));
     const fersk = (await hentOppg(o.id))?.data || d;
     if (r.sendt) await admin.from('oppgaver').update({ data: { ...fersk, aoSendt: { frist: d.nesteFrist || '', dato: new Date().toISOString(), til, auto: !p, av: p ? (p.navn || p.epost) : 'Automatisk' } } }).eq('id', o.id);
     await koLogg(p, o, `Arbeidsordre «${d.navn}» ${r.sendt ? 'sendt' : 'klargjort'}${!p ? ' automatisk' : ''} til ${til}${d.nesteFrist ? ' (frist ' + datoNo(d.nesteFrist) + ')' : ''}${r.sendt ? '' : ' – ' + (r as any).grunn}`, sn.org);
@@ -343,7 +355,12 @@ const handler = async (req: Request) => {
     const inv = await hentKo(body.token); if (!inv) return json(404, { error: 'Lenken er ugyldig eller kontrollen er slettet' });
     const o = await hentOppg(inv.oppgave_id); if (!o) return json(404, { error: 'Kontrollen finnes ikke lenger' });
     const d = o.data || {}; const sn = await koSnapshot(o);
-    return json(200, { navn: d.navn, type: d.type, kategori: d.kategori, frist: inv.frist || d.nesteFrist, hjemmel: d.hjemmel || '', notat: d.notat || '', eiendom: sn.eiendom, adresse: sn.adresse, system: sn.system, kontakt: sn.kontakt, oppdragsgiver: sn.orgNavn, epost: inv.epost, innsendt: inv.innsendt, utdatert: !!(inv.frist && d.nesteFrist && inv.frist !== d.nesteFrist && !inv.innsendt) });
+    const bilder: any[] = [];
+    for (const [k, tittel] of [['zoom', 'Zoom på lokasjonen'], ['oversikt', 'Oversikt over tegningen']] as const) {
+      const path = d.aoBilder?.[k]?.path; if (!path || !String(path).startsWith(o.eiendom_id + '/')) continue;
+      const { data: su } = await admin.storage.from('filer').createSignedUrl(path, 24 * 3600); if (su?.signedUrl) bilder.push({ tittel, url: su.signedUrl });
+    }
+    return json(200, { bilder, tegning: d.aoBilder?.tegning || '', navn: d.navn, type: d.type, kategori: d.kategori, frist: inv.frist || d.nesteFrist, hjemmel: d.hjemmel || '', notat: d.notat || '', eiendom: sn.eiendom, adresse: sn.adresse, system: sn.system, kontakt: sn.kontakt, oppdragsgiver: sn.orgNavn, epost: inv.epost, innsendt: inv.innsendt, utdatert: !!(inv.frist && d.nesteFrist && inv.frist !== d.nesteFrist && !inv.innsendt) });
   }
   if (body.action === 'ko_opplasting') {
     const inv = await hentKo(body.token); if (!inv || inv.innsendt) return json(403, { error: 'Lenken er ugyldig eller allerede brukt' });

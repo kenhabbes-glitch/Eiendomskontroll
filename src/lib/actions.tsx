@@ -436,7 +436,7 @@ export function editOppgave(id?: string, preset: any = {}) {
     extraFoot: close => id ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette kontrollen med historikk?')) { await removeDoc('oppgaver', id); close(); } }}>Slett</button> : null,
     onSave: async x => { x.intervall = { n: +x.in || 1, enhet: x.ie }; delete x.in; delete x.ie;
       const ep = String(x.aoEpost || '').trim(); if (x.aoAuto && !/^\S+@\S+\.\S+$/.test(ep)) { toast('Fyll inn gyldig e-post til servicefirmaet for automatisk sending'); return false; }
-      x.ao = { epost: ep, auto: !!x.aoAuto, dager: Math.max(0, Math.min(365, +x.aoDager || 0)), melding: x.aoMelding || '' }; delete x.aoEpost; delete x.aoAuto; delete x.aoDager; delete x.aoMelding; delete x.aoInfo; if (x.anleggId) { const a = byId('anlegg', x.anleggId); if (a) x.eiendomId = a.eiendomId; } await save('oppgaver', { ...o, ...x }); toast('Kontroll lagret'); },
+      x.ao = { epost: ep, auto: !!x.aoAuto, dager: Math.max(0, Math.min(365, +x.aoDager || 0)), melding: x.aoMelding || '' }; delete x.aoEpost; delete x.aoAuto; delete x.aoDager; delete x.aoMelding; delete x.aoInfo; if (x.anleggId) { const a = byId('anlegg', x.anleggId); if (a) x.eiendomId = a.eiendomId; } const kid = await save('oppgaver', { ...o, ...x }); toast('Kontroll lagret'); if (x.ao?.epost) import('../views/KontrollAo').then(m => m.sikreLokasjonsbilder(kid)); },
   });
 }
 export type UtforPreset = { dato?: string; av?: string; res?: string; komm?: string; avs?: string[]; nyFrist?: string; filer?: any[]; kilde?: string };
