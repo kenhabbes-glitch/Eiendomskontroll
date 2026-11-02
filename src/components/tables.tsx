@@ -1,3 +1,4 @@
+import { TgForslagChip } from './TgKg';
 import React, { type ReactNode } from 'react';
 import { Hjelp } from './Hjelp';
 import { KOMP, DOK_PAAKREVD, AV_LUKKET, SERVICEAVTALE, MALER, NS_DOK, dokNs } from '../lib/catalog';
@@ -94,7 +95,7 @@ export function AnleggTable({ list, showE = false }: { list: Rec[]; showE?: bool
       return <tr key={a.id} className="click" onClick={() => editAnlegg(a.id)}>
         <td>{a.tfmSys && <span className="mono small">{tfmSys(a)} </span>}<b style={{ fontWeight: 500 }}>{a.navn || k.n}</b><div className="small muted">{a.navn ? k.n : k.g}{a.fabrikat ? ' · ' + a.fabrikat : ''}</div></td>
         {showE && <td>{eNavn(a.eiendomId)}</td>}<td className="num">{a.aar || '–'}</td><td className="num">{a.levetid || k.l || '–'}</td><td className="num">{compYear(a) || '–'}</td>
-        <td>{r === null ? <span className="muted small">Mangler år</span> : <RestChip r={r} />}</td><td><TgChip t={a.tg} /></td>{ok && <SysKost a={a} />}
+        <td>{r === null ? <span className="muted small">Mangler år</span> : <RestChip r={r} />}</td><td><TgChip t={a.tg} /><TgForslagChip o={a} /></td>{ok && <SysKost a={a} />}
         <td className="small">{n.length ? <>{n.length} stk{due > 0 && <> · <span style={{ color: 'var(--red)' }}>{due} forfalt</span></>}</> : <span className="muted">–</span>}</td></tr>; })}
   </tbody></table></Wrap>;
 }
@@ -119,14 +120,14 @@ export function TfmTree({ list, q, onNewKomp, eid, onDok }: { list: Rec[]; q: st
     rows.push(<tr key={a.id} className="click sysrow" onClick={() => editAnlegg(a.id)}>
       <td className="mono" style={{ fontWeight: 600, whiteSpace: 'nowrap', paddingLeft: 22 }}><span onClick={e => { stop(e); if (kl.length && !tving) toggle('s' + a.id); }} title={kl.length ? (sOpen ? 'Skjul komponenter' : 'Vis komponenter') : ''} style={{ display: 'inline-block', width: 20, cursor: kl.length ? 'pointer' : 'default', color: 'var(--muted)', fontFamily: 'sans-serif' }}>{kl.length ? (sOpen ? '▾' : '▸') : ''}</span>{tfmSys(a) || '–'}<Pin o={a} />{kl.length > 0 && !sOpen && <span className="small muted" style={{ fontWeight: 400, marginLeft: 6, fontFamily: 'sans-serif' }}>({kl.length})</span>}</td>
       <td><b style={{ fontWeight: 600 }}>{a.navn || k.n}</b> <TaggChips t={taggerFor(a, 'a')} small /><div className="small muted">{[a.navn ? k.n : k.g, a.fabrikat].filter(Boolean).join(' · ')}</div></td>
-      <td className="num">{a.aar || '–'}</td><td className="num">{compYear(a) || '–'}{a.planAar ? <div className="small muted">overstyrt</div> : null}</td><td><RestChip r={compRest(a)} /></td><td><TgChip t={a.tg} /></td>
+      <td className="num">{a.aar || '–'}</td><td className="num">{compYear(a) || '–'}{a.planAar ? <div className="small muted">overstyrt</div> : null}</td><td><RestChip r={compRest(a)} /></td><td><TgChip t={a.tg} /><TgForslagChip o={a} /></td>
       {ok && <SysKost a={a} />}
       <td className="small">{n.length ? <>{n.length} kontr.{due > 0 && <> · <span style={{ color: 'var(--red)' }}>{due} forfalt</span></>}</> : <span className="muted">–</span>}</td>
       <td style={{ whiteSpace: 'nowrap' }}>{ok && onNewKomp && <button className="btn sm" onClick={e => { stop(e); onNewKomp(a.id); }}>+ Komponent</button>}</td></tr>);
     if (sOpen) kl.forEach(c => rows.push(<tr key={c.id} className="click" onClick={() => editKomponent(c.id)}>
       <td className="mono small" style={{ paddingLeft: 58, whiteSpace: 'nowrap' }}>{'-' + (c.kode || '') + pad(c.lop) + (c.typekode ? '%' + c.typekode : '')}<Pin o={c} /></td>
       <td>{c.navn} {Array.isArray(c.tagger) && <TaggChips t={c.tagger} small />}<div className="small muted">{[c.fabrikat, c.plassering, c.serienr ? 's/n ' + c.serienr : ''].filter(Boolean).join(' · ')}</div></td>
-      <td className="num">{c.aar || '–'}</td><td className="num">{kompAar(c) || '–'}{!egetAar(c) && kompAar(c) ? <div className="small muted">følger systemet</div> : null}</td><td>{egetAar(c) ? <RestChip r={compRest(c)} /> : <span className="muted small">–</span>}</td><td><TgChip t={c.tg} /></td>
+      <td className="num">{c.aar || '–'}</td><td className="num">{kompAar(c) || '–'}{!egetAar(c) && kompAar(c) ? <div className="small muted">følger systemet</div> : null}</td><td>{egetAar(c) ? <RestChip r={compRest(c)} /> : <span className="muted small">–</span>}</td><td><TgChip t={c.tg} /><TgForslagChip o={c} /></td>
       {ok && <td className="num" data-tip={c.kost ? kostTip(c) : undefined}>{c.kost ? nok(kostNaa(c)) : '–'}{erForslag(c) && <ForslagMerke />}</td>}{ok && <td className="num" data-tip={c.kost ? `${kostTip(c)}. Prisjustert med KPI til ${Math.max(kompAar(c) || YEAR, YEAR)}.` : undefined}>{c.kost && kompAar(c) ? nok(kostJustert(c, kompAar(c))) : '–'}</td>}{ok && <td className="num" data-tip={c.kost && kompAar(c) ? nvTip(kompAar(c)) : undefined}>{c.kost && kompAar(c) ? nok(kompNaaverdi(c)) : '–'}</td>}<td /><td /></tr>));
   });
   // Hovedgruppe 1 Dokumentasjon: eiendommens dokumenter etter NS 3451 10–19 (ligger under Dokumenter, vises her for oversikt)

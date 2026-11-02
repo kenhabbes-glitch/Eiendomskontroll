@@ -1,3 +1,4 @@
+import { tgTekst } from '../components/TgKg';
 import { koTilGodkjenning } from './KontrollAo';
 import React from 'react';
 import { isStaff } from '../lib/store';
@@ -6,8 +7,8 @@ import { tilGodkjenning, vurderPlikt } from './Sjekkliste';
 import { Hjelp } from '../components/Hjelp';
 import { DOK_PAAKREVD } from '../lib/catalog';
 import { S, canEdit, isAdmin, state, useStore } from '../lib/store';
-import { activeTasks, compRest, docCoverage, dUntil, eNavn, fd, openAvvik, pliktStatus, sortBy, today } from '../lib/utils';
-import { editAvvik, editEiendom, visOppgave } from '../lib/actions';
+import { aNavn, kNavn, activeTasks, compRest, docCoverage, dUntil, eNavn, fd, openAvvik, pliktStatus, sortBy, today } from '../lib/utils';
+import { editAvvik, editEiendom, visOppgave, editAnlegg, editKomponent } from '../lib/actions';
 import { AlvChip, Chip, DueChip } from '../components/ui';
 import { enhetStatus } from '../lib/oppslag';
 
@@ -39,6 +40,7 @@ export function Oversikt() {
     ...forf.map(o => ({ d: o.nesteFrist, el: <div key={o.id} className="li" onClick={() => visOppgave(o.id)}><DueChip s={o.nesteFrist} /><div className="grow"><div className="lt">{o.navn}</div><div className="ls">{eNavn(o.eiendomId)} · {o.type}</div></div></div> })),
     ...OA.filter(a => a.alv === 'Kritisk' || (a.frist && (dUntil(a.frist) as number) < 0)).map(a => ({ d: a.frist || '0', el: <div key={a.id} className="li" onClick={() => editAvvik(a.id)}><AlvChip a={a.alv} /><div className="grow"><div className="lt">#{a.nr} {a.tittel}</div><div className="ls">{eNavn(a.eiendomId)} · {a.status} · frist {fd(a.frist)}</div></div></div> })),
     ...(ed ? S.leietakere.filter(l => l.brreg && enhetStatus(l.brreg).c !== 'green').map(l => ({ d: '0', el: <div key={'b' + l.id} className="li" onClick={() => go('leietaker/' + l.id)}><Chip c={enhetStatus(l.brreg).c}>{enhetStatus(l.brreg).t}</Chip><div className="grow"><div className="lt">{l.navn}</div><div className="ls">{eNavn(l.eiendomId)} · status i Brønnøysundregistrene per {fd(l.brreg.sjekket)}</div></div></div> })) : []),
+    ...(ed ? [...S.anlegg.map(x => ({ x, k: false })), ...S.komponenter.map(x => ({ x, k: true }))].filter(({ x }) => x.tgForslag?.tg).map(({ x, k }) => ({ d: '0', el: <div key={'tg' + x.id} className="li" onClick={() => k ? editKomponent(x.id) : editAnlegg(x.id)}><Chip c="amber">Tilstand?</Chip><div className="grow"><div className="lt">{k ? kNavn(x.id) : aNavn(x.id)}: {tgTekst(x.tgForslag.fra)} → {tgTekst(x.tgForslag)}</div><div className="ls">{eNavn(x.eiendomId)} · forslag fra {x.tgForslag.av} {fd(x.tgForslag.dato)}</div></div></div> })) : []),
     ...(ed ? koTilGodkjenning().map(o => ({ d: '0', el: <div key={'k' + o.id} className="li" onClick={() => visOppgave(o.id)}><Chip c="blue">Rapport mottatt</Chip><div className="grow"><div className="lt">{o.navn}</div><div className="ls">{eNavn(o.eiendomId)} · {o.innrapport.firma || o.innrapport.epost} · utført {fd(o.innrapport.dato)}</div></div></div> })) : []),
     ...(ed ? tilGodkjenning().map(x => ({ d: '0', el: <div key={'g' + x.l.id + x.idx} className="li" onClick={() => vurderPlikt(x.l.id, x.idx)}><Chip c="blue">Til godkjenning</Chip><div className="grow"><div className="lt">{x.p.navn}</div><div className="ls">{x.l.navn} · {eNavn(x.l.eiendomId)} · sendt {fd(x.p.innsendt.tid)}</div></div></div> })) : []),
   ].sort((a, b) => String(a.d).localeCompare(String(b.d)));

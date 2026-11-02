@@ -7,6 +7,7 @@ import { AlvChip, DueChip, Empty, FileLink, StChip, openModal } from '../compone
 import { AoKart, HendelseListe, hendelseTekst, lastNedAoPdf, lastOppAo, sendAo, settStatus, tildeltNavn } from '../lib/arbeidsordre';
 import { editAvvik } from '../lib/actions';
 import { PersonvernBekreft, PERSONVERN_VERSJON } from '../components/Personvern';
+import { TgKgVelger, type Tilstand } from '../components/TgKg';
 import { Sel, useFilter } from './common';
 
 const aktiv = (a: Rec) => !AV_LUKKET.includes(a.status);
@@ -85,14 +86,18 @@ function kvitter(id: string) {
   openModal({ render: close => <KvitterBody id={id} close={close} /> });
 }
 function KvitterBody({ id, close }: { id: string; close: () => void }) {
-  const [k, setK] = useState(''); const [fs, setFs] = useState<File[]>([]); const [busy, setBusy] = useState(false);
+  const [k, setK] = useState(''); const [fs, setFs] = useState<File[]>([]); const [busy, setBusy] = useState(false); const [tl, setTl] = useState<Tilstand>({});
+  const av = byId('avvik', id); const maal = av?.komponentId ? byId('komponenter', av.komponentId) : av?.anleggId ? byId('anlegg', av.anleggId) : null;
   const ok = async () => {
     if (!k.trim()) { toast('Skriv kort hva som er gjort'); return; } setBusy(true);
-    try { if (fs.length) await lastOppAo(id, fs); await settStatus(id, 'Utført – til kontroll', 'Kvittert utført: ' + k.trim(), { utfort: { t: new Date().toISOString(), av: state.me?.navn || state.me?.epost, komm: k.trim() } }); toast('Kvittert ut – takk!'); close(); } catch { }
+    try { if (fs.length) await lastOppAo(id, fs); await settStatus(id, 'Utført – til kontroll', 'Kvittert utført: ' + k.trim() + (tl.tg ? ` · tilstand ${tl.tg}${tl.kg ? '/' + tl.kg : ''}` : ''), { utfort: { t: new Date().toISOString(), av: state.me?.navn || state.me?.epost, komm: k.trim(), tilstand: tl.tg ? tl : undefined } });
+      let fs2 = false; if (tl.tg) { try { fs2 = !!(await aoApi({ action: 'tg_forslag', avvik_id: id, tilstand: tl })).forslag; } catch { } }
+      toast(fs2 ? 'Kvittert ut – tilstanden er sendt som forslag til endring' : 'Kvittert ut – takk!'); close(); } catch { }
     setBusy(false);
   };
   return <><div className="mh"><h2>Kvitter ut arbeidsordre</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
     <div className="mb"><div className="form"><div className="fld"><label>Hva er gjort?</label><textarea value={k} onChange={e => setK(e.target.value)} style={{ minHeight: 100, border: '1px solid var(--line2)', borderRadius: 8, padding: 8, width: '100%' }} placeholder="F.eks. Byttet defekt armatur i trapperom, testet ok." /></div>
+      {(av?.anleggId || av?.komponentId) && <div className="fld"><TgKgVelger v={tl} set={setTl} naa={maal ? { tg: maal.tg, kg: maal.kg } : undefined} hva={av?.ao?.komponent || av?.ao?.system || ''} /></div>}
       <div className="fld"><label>Bilder / dokumentasjon (valgfritt)</label><input type="file" multiple accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx" onChange={e => setFs(Array.from(e.target.files || []))} /></div></div>
       <p className="small muted">Avviket settes til «Utført – til kontroll», og eier/driftsleder kontrollerer og lukker det.</p></div>
     <div className="mf"><button className="btn" onClick={close}>Avbryt</button><button className="btn pri" disabled={busy} onClick={ok}>{busy ? 'Lagrer …' : 'Kvitter ut'}</button></div></>;
@@ -106,7 +111,7 @@ function kommentar(id: string) {
 export function AoLenke({ token }: { token: string }) {
   useStore();
   const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [modus, setModus] = useState<'kvitter' | 'reg' | 'login'>('kvitter');
-  const [sam, setSam] = useState(false); const [komm, setKomm] = useState(''); const [filer, setFiler] = useState<File[]>([]); const [ferdig, setFerdig] = useState(false);
+  const [tl, setTl] = useState<Tilstand>({}); const [sam, setSam] = useState(false); const [komm, setKomm] = useState(''); const [filer, setFiler] = useState<File[]>([]); const [ferdig, setFerdig] = useState(false);
   const [navn, setNavn] = useState(''); const [firma, setFirma] = useState(''); const [pw, setPw] = useState(''); const [pw2, setPw2] = useState(''); const [busy, setBusy] = useState(false);
   const inne = !!state.me;
   useEffect(() => { (async () => {
@@ -122,7 +127,7 @@ export function AoLenke({ token }: { token: string }) {
     try {
       const opp: any[] = [];
       for (const fil of filer) { const u = await aoApi({ action: 'ao_opplasting', token, navn: fil.name }, false); const { error } = await sb.storage.from('filer').uploadToSignedUrl(u.path, u.token, fil, { contentType: fil.type || 'application/octet-stream' }); if (error) throw new Error('Opplasting feilet for ' + fil.name + ': ' + error.message); opp.push({ path: u.path, navn: fil.name, type: fil.type, str: fil.size }); }
-      await aoApi({ action: 'ao_kvitter', token, navn, firma, komm, filer: opp, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); setFerdig(true);
+      await aoApi({ action: 'ao_kvitter', token, navn, firma, komm, filer: opp, tilstand: tl.tg ? tl : null, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); setFerdig(true);
     } catch (e: any) { setErr(e.message); } setBusy(false);
   };
   const registrer = async (e: React.FormEvent) => {
@@ -148,6 +153,7 @@ export function AoLenke({ token }: { token: string }) {
           <label>Navn</label><input value={navn} onChange={e => setNavn(e.target.value)} required style={inp} />
           <label>Firma</label><input value={firma} onChange={e => setFirma(e.target.value)} style={inp} />
           <label>Hva er gjort?</label><textarea value={komm} onChange={e => setKomm(e.target.value)} required style={{ ...inp, minHeight: 80 }} placeholder="Beskriv utbedringen, materialer, målinger …" />
+          {info.tilstand && <TgKgVelger v={tl} set={setTl} naa={info.tilstand} hva={[info.tilstand.kode, info.tilstand.navn].filter(Boolean).join(' ')} />}
           <label>Bilder og dokumentasjon</label><input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.heic,.webp,.doc,.docx,.xls,.xlsx,.txt" onChange={e => setFiler(Array.from(e.target.files || []))} />
           <PersonvernBekreft ok={sam} set={setSam} ansvarlig={info.oppdragsgiver} />
           {err && <p style={{ color: 'var(--red)' }}>{err}</p>}

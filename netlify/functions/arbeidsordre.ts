@@ -47,6 +47,23 @@ const handler = async (req: Request) => {
   const SAMTYKKE_MANGLER = 'Du må lese og godta personvernerklæringen før du fortsetter.';
   const utlopt = (inv: any) => !!inv?.utloper && new Date(inv.utloper).getTime() < Date.now();
   const UTLOPT = 'Lenken er utløpt. Be oppdragsgiveren om å sende arbeidsordren på nytt.';
+  // ---------- Tilstand (TG/KG) fra utførende: forslag til endring på systemet/komponenten
+  const TG_OK = ['TG0', 'TG1', 'TG2', 'TG3', 'TGIU'], KG_OK = ['KG0', 'KG1', 'KG2', 'KG3'];
+  const renTilstand = (t: any) => t && TG_OK.includes(t.tg) ? { tg: t.tg, kg: KG_OK.includes(t.kg) ? t.kg : '', komm: String(t.komm || '').slice(0, 2000) } : null;
+  const tgMaal = async (komponentId?: string, anleggId?: string) => {
+    if (komponentId) { const { data } = await admin.from('komponenter').select('*').eq('id', komponentId).maybeSingle(); if (data) return { tabell: 'komponenter', rad: data }; }
+    if (anleggId) { const { data } = await admin.from('systemer').select('*').eq('id', anleggId).maybeSingle(); if (data) return { tabell: 'systemer', rad: data }; }
+    return null;
+  };
+  const tgNaa = (m: any) => m ? { tg: m.rad.data?.tg || '', kg: m.rad.data?.kg || '', navn: m.rad.data?.navn || '', kode: m.tabell === 'komponenter' ? '-' + (m.rad.data?.kode || '') + String(m.rad.data?.lop || 1).padStart(3, '0') : (m.rad.data?.tfmSys ? '=' + m.rad.data.tfmSys + '.' + String(m.rad.data.tfmLop || 1).padStart(3, '0') : '') } : null;
+  const lagTgForslag = async (m: any, t: any, av: string, kilde: string, ref: any) => {
+    if (!m || !t) return false; const d = m.rad.data || {};
+    if (t.tg === (d.tg || '') && (!t.kg || t.kg === (d.kg || ''))) return false; // samme som registrert – ikke noe forslag
+    const forslag = { ...t, av: av.slice(0, 200), dato: new Date().toISOString().slice(0, 10), mottatt: new Date().toISOString(), kilde: kilde.slice(0, 200), ...ref, fra: { tg: d.tg || '', kg: d.kg || '' } };
+    await admin.from(m.tabell).update({ data: { ...d, tgForslag: forslag } }).eq('id', m.rad.id);
+    await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: av, tabell: 'hendelse', rad_id: m.rad.id, eiendom_id: m.rad.eiendom_id, handling: 'tilstand', tekst: `Forslag til endret tilstand ${d.tg || 'ikke vurdert'}${d.kg ? '/' + d.kg : ''} → ${t.tg}${t.kg ? '/' + t.kg : ''} (${kilde})` });
+    return true;
+  };
   const orgNavnFor = async (eid: string) => { const { data: e } = await admin.from('eiendommer').select('eier_org_id').eq('id', eid).maybeSingle(); if (!e?.eier_org_id) return ''; const { data: o } = await admin.from('organisasjoner').select('navn').eq('id', e.eier_org_id).maybeSingle(); return o?.navn || ''; };
 
   // E-postoppsett: fra appens Innstillinger (tabellen epost_oppsett), ellers miljøvariabler i Netlify.
@@ -171,7 +188,7 @@ const handler = async (req: Request) => {
     const a = await hentAvvik(inv.avvik_id); const d = a?.data || {}; const ao = d.ao || {};
     const { data: fins } = await admin.from('profiles').select('id').eq('epost', inv.epost).maybeSingle();
     return json(200, { epost: inv.epost, nr: a?.nr, tittel: d.tittel, eiendom: ao.eiendom || '', adresse: ao.adresse || '', system: ao.system || '', komponent: ao.komponent || '', plassering: [ao.tegning, ao.plassering].filter(Boolean).join(' – '),
-      beskrivelse: d.beskrivelse || '', alv: d.alv || '', frist: d.frist || '', status: d.status || '', oppdragsgiver: a ? await orgNavnFor(a.eiendom_id) : '', utloper: inv.utloper, kvittert: inv.kvittert || (d.status === 'Utført – til kontroll' ? d.utfort?.t : null), brukt: !!inv.brukt, finnes: !!fins });
+      beskrivelse: d.beskrivelse || '', alv: d.alv || '', frist: d.frist || '', status: d.status || '', tilstand: a ? tgNaa(await tgMaal(d.komponentId, d.anleggId)) : null, oppdragsgiver: a ? await orgNavnFor(a.eiendom_id) : '', utloper: inv.utloper, kvittert: inv.kvittert || (d.status === 'Utført – til kontroll' ? d.utfort?.t : null), brukt: !!inv.brukt, finnes: !!fins });
   }
 
   // ---------- Mottaker oppretter bruker via lenken
@@ -207,6 +224,16 @@ const handler = async (req: Request) => {
     return json(200, { ok: true, avvik_id: a.id });
   }
 
+  // ---------- Innlogget utførende foreslår tilstand ved utkvittering av avvik
+  if (body.action === 'tg_forslag') {
+    const p = await hvem(); if (!p || !p.aktiv) return json(401, { error: 'Ikke innlogget' });
+    const a = await hentAvvik(body.avvik_id); if (!a) return json(404, { error: 'Fant ikke avviket' });
+    if (a.tildelt_id !== p.id && !(await harEiendom(p, a.eiendom_id))) return json(403, { error: 'Ingen tilgang' });
+    const tl = renTilstand(body.tilstand); if (!tl) return json(400, { error: 'Ugyldig tilstandsgrad' });
+    const ok = await lagTgForslag(await tgMaal(a.data?.komponentId, a.data?.anleggId), tl, p.navn || p.epost, `Avvik #${a.nr} kvittert ut`, { avvikId: a.id });
+    return json(200, { ok: true, forslag: ok });
+  }
+
   // ---------- Kvittere ut avvik uten bruker (midlertidig tilgang via lenken)
   if (body.action === 'ao_opplasting' || body.action === 'ao_kvitter') {
     const { data: inv } = await admin.from('ao_invitasjon').select('*').eq('token', body.token).maybeSingle();
@@ -232,7 +259,9 @@ const handler = async (req: Request) => {
     const logg = [...(d.logg || [])]; if (filer.length) logg.push({ t, s: d.status, k: `Lastet opp ${filer.length} fil${filer.length > 1 ? 'er' : ''}: ${filer.map((f: any) => f.navn).join(', ')}`, av });
     logg.push({ t, s: 'Utført – til kontroll', k: `Kvittert utført via lenke (uten bruker) av ${av} <${inv.epost}>: ${komm}`, av });
     await admin.from('avvik').update({ data: { ...d, status: 'Utført – til kontroll', utfort: { t, av, komm, epost: inv.epost, eksternt: true }, vedlegg: [...(d.vedlegg || []), ...filer], logg } }).eq('id', a.id);
-    await admin.from('ao_invitasjon').update({ kvittert: t, svar: { navn, firma, komm, filer, samtykke: sam } }).eq('token', inv.token);
+    const tl = renTilstand(body.tilstand);
+    const nyttForslag = await lagTgForslag(await tgMaal(d.komponentId, d.anleggId), tl, av, `Avvik #${a.nr} kvittert ut`, { avvikId: a.id });
+    await admin.from('ao_invitasjon').update({ kvittert: t, svar: { navn, firma, komm, filer, samtykke: sam, tilstand: tl, nyttForslag } }).eq('token', inv.token);
     await logg_(a, av, `Arbeidsordre for avvik #${a.nr} kvittert ut via lenke av ${av} <${inv.epost}> – til kontroll`);
     if (inv.opprettet_av) { const { data: avs } = await admin.from('profiles').select('epost').eq('id', inv.opprettet_av).maybeSingle();
       if (avs?.epost) await sendEpost(avs.epost, `Utført: avvik #${a.nr} ${d.tittel || ''}`, `<p>${esc(av)} har kvittert ut avvik <b>#${a.nr} ${esc(d.tittel)}</b> som utført:</p><p>${esc(komm).replace(/\n/g, '<br>')}</p><p>${filer.length} vedlegg. Avviket står som «Utført – til kontroll» i Eiendomskontroll.</p>`, `${av} har kvittert ut avvik #${a.nr} ${d.tittel || ''} som utført: ${komm}`, undefined, undefined, await hentOppsett((await admin.from('eiendommer').select('eier_org_id').eq('id', a.eiendom_id).maybeSingle()).data?.eier_org_id)); }
@@ -415,7 +444,8 @@ const handler = async (req: Request) => {
       const path = d.aoBilder?.[k]?.path; if (!path || !String(path).startsWith(o.eiendom_id + '/')) continue;
       const { data: su } = await admin.storage.from('filer').createSignedUrl(path, 24 * 3600); if (su?.signedUrl) bilder.push({ tittel, url: su.signedUrl });
     }
-    return json(200, { bilder, tegning: d.aoBilder?.tegning || '', navn: d.navn, type: d.type, kategori: d.kategori, frist: inv.frist || d.nesteFrist, hjemmel: d.hjemmel || '', notat: d.notat || '', eiendom: sn.eiendom, adresse: sn.adresse, system: sn.system, kontakt: sn.kontakt, oppdragsgiver: sn.orgNavn, epost: inv.epost, innsendt: inv.innsendt, utloper: inv.utloper, utdatert: !!(inv.frist && d.nesteFrist && inv.frist !== d.nesteFrist && !inv.innsendt) });
+    const tilstand = tgNaa(await tgMaal(d.komponentId, d.anleggId));
+    return json(200, { bilder, tilstand, tegning: d.aoBilder?.tegning || '', navn: d.navn, type: d.type, kategori: d.kategori, frist: inv.frist || d.nesteFrist, hjemmel: d.hjemmel || '', notat: d.notat || '', eiendom: sn.eiendom, adresse: sn.adresse, system: sn.system, kontakt: sn.kontakt, oppdragsgiver: sn.orgNavn, epost: inv.epost, innsendt: inv.innsendt, utloper: inv.utloper, utdatert: !!(inv.frist && d.nesteFrist && inv.frist !== d.nesteFrist && !inv.innsendt) });
   }
   if (body.action === 'ko_opplasting') {
     const inv = await hentKo(body.token); if (!inv || inv.innsendt) return json(403, { error: 'Lenken er ugyldig eller allerede brukt' });
@@ -438,8 +468,9 @@ const handler = async (req: Request) => {
     const dato = /^\d{4}-\d{2}-\d{2}$/.test(body.dato) ? body.dato : new Date().toISOString().slice(0, 10);
     const res = ['OK – ingen avvik', 'Avvik funnet', 'Ikke utført / utsatt'].includes(body.res) ? body.res : 'OK – ingen avvik';
     const rapport = { token: inv.token, mottatt: new Date().toISOString(), dato, av: String(body.av || '').slice(0, 160), firma: String(body.firma || '').slice(0, 160), epost: inv.epost, res, komm: String(body.komm || '').slice(0, 4000),
-      avvik: (Array.isArray(body.avvik) ? body.avvik : []).map((x: any) => String(x || '').trim().slice(0, 300)).filter(Boolean).slice(0, 30), nesteDato: /^\d{4}-\d{2}-\d{2}$/.test(body.nesteDato || '') ? body.nesteDato : '', filer, samtykke: sam };
+      avvik: (Array.isArray(body.avvik) ? body.avvik : []).map((x: any) => String(x || '').trim().slice(0, 300)).filter(Boolean).slice(0, 30), nesteDato: /^\d{4}-\d{2}-\d{2}$/.test(body.nesteDato || '') ? body.nesteDato : '', filer, samtykke: sam, tilstand: renTilstand(body.tilstand) } as any;
     const fersk = (await hentOppg(o.id))!.data || {};
+    rapport.nyttForslag = await lagTgForslag(await tgMaal(fersk.komponentId, fersk.anleggId), rapport.tilstand, `${rapport.av || inv.epost}${rapport.firma ? ' (' + rapport.firma + ')' : ''}`, `Kontroll «${fersk.navn}»`, { oppgaveId: o.id });
     await admin.from('oppgaver').update({ data: { ...fersk, innrapport: rapport } }).eq('id', o.id);
     await admin.from('ko_invitasjon').update({ innsendt: rapport.mottatt, svar: rapport }).eq('token', inv.token);
     const sn = await koSnapshot(o);

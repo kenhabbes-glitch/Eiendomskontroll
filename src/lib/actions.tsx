@@ -6,6 +6,7 @@ import { levetidRef, midt, spenn } from './ns3451';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore, kanRedigereE, kanDrifteE, mineOrg, oppdaterNiva } from './store';
 import { leieAreal, m2, FELLES_AVTALE } from './utils';
+import { TgKgVelger, tgAvviker, tgTekst } from '../components/TgKg';
 import { alleMaler, finnMal, kopi, kontraktKey, fordeling, pliktKeysFor, OMR, ANS_VALG } from './kontrakt';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst, standardTagger, taggerFor } from './utils';
 import { ikDekning } from './utils';
@@ -31,6 +32,13 @@ const tgFelt = (): Field[] => [
   { k: 'kg', label: 'Konsekvensgrad (KG)', type: 'select', options: [['', '–'], ...KG_DEF.map(k => [k[0], `${k[0]} – ${k[1].toLowerCase()}`] as [string, string])], half: true, show: x => ['TG2', 'TG3', 'TGIU'].includes(x.tg), hint: 'For TG2, TG3 og TGIU: konsekvens for sikkerhet, helse, miljø eller økonomi' },
   { k: 'tgVurdertAv', label: 'Vurdert av', half: true, show: x => !!x.tg, ph: 'Navn / firma' },
   { k: 'tgKomm', label: 'Tilstandsbeskrivelse / begrunnelse', type: 'textarea', show: x => !!x.tg, ph: 'Hva er observert, årsak og anbefalt tiltak' },
+  { k: 'tgForslagInfo', type: 'custom', show: x => !!x.tgForslag?.tg, render: (x, set) => { const f = x.tgForslag;
+    return <div className="note small" style={{ color: 'var(--ink)', borderColor: 'var(--amber)' }}>
+      <b>Forslag til endret tilstand: {tgTekst(f)}</b> <span className="muted">(registrert: {tgTekst(f.fra || { tg: x.tg, kg: x.kg })})</span><br />
+      Fra {f.av || 'utførende'}{f.dato ? ' ' + fd(f.dato) : ''}{f.kilde ? ' · ' + f.kilde : ''}{f.komm && <><br /><i>{f.komm}</i></>}
+      {canEdit() && <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+        <button type="button" className="btn sm pri" onClick={() => set({ tg: f.tg, kg: f.kg || '', tgdato: f.dato || today(), tgVurdertAv: f.av || '', tgKomm: f.komm || x.tgKomm || '', tgForslag: null })}>Godta forslaget</button>
+        <button type="button" className="btn sm" onClick={() => set({ tgForslag: null })}>Avvis</button><span className="muted" style={{ alignSelf: 'center' }}>Trykk Lagre for å bekrefte.</span></div>}</div>; } },
 ];
 
 // ================= EIENDOM =================
@@ -439,9 +447,10 @@ export function editOppgave(id?: string, preset: any = {}) {
       x.ao = { epost: ep, auto: !!x.aoAuto, dager: Math.max(0, Math.min(365, +x.aoDager || 0)), melding: x.aoMelding || '' }; delete x.aoEpost; delete x.aoAuto; delete x.aoDager; delete x.aoMelding; delete x.aoInfo; if (x.anleggId) { const a = byId('anlegg', x.anleggId); if (a) x.eiendomId = a.eiendomId; } const kid = await save('oppgaver', { ...o, ...x }); toast('Kontroll lagret'); if (x.ao?.epost) import('../views/KontrollAo').then(m => m.sikreLokasjonsbilder(kid)); },
   });
 }
-export type UtforPreset = { dato?: string; av?: string; res?: string; komm?: string; avs?: string[]; nyFrist?: string; filer?: any[]; kilde?: string };
+export type UtforPreset = { dato?: string; av?: string; res?: string; komm?: string; avs?: string[]; nyFrist?: string; filer?: any[]; kilde?: string; tilstand?: { tg?: string; kg?: string; komm?: string } | null };
 export function utfor(id: string, pre?: UtforPreset) {
   const o = byId('oppgaver', id); if (!o) return;
+  const tgMaal = o.komponentId ? byId('komponenter', o.komponentId) : o.anleggId ? byId('anlegg', o.anleggId) : null;
   const lt = sortBy(S.leietakere.filter(l => l.eiendomId === o.eiendomId), l => l.navn);
   const nyRad = () => ({ t: '', a: 'Middels', k: '', an: o.ansvar === 'Leietaker' ? 'Leietaker' : 'Eier', l: o.leietakerId || (lt.length === 1 ? lt[0].id : ''), u: o.ansvar === 'Leietaker' ? '' : '' });
   const fields: Field[] = [
@@ -463,6 +472,9 @@ export function utfor(id: string, pre?: UtforPreset) {
           </div></div>)}
           <button type="button" className="btn sm" onClick={() => set({ avs: [...L, nyRad()] })}>+ Legg til avvik</button></>; } },
     { k: 'komm', label: 'Kommentar', type: 'textarea', def: pre?.komm || '' },
+    ...(tgMaal ? [{ k: 'tl', type: 'custom', def: pre?.tilstand || {}, render: (x: any, set: any) => <>
+      <TgKgVelger v={x.tl || {}} set={t => set({ tl: t })} naa={{ tg: tgMaal.tg, kg: tgMaal.kg }} hva={(o.komponentId ? kNavn(o.komponentId) : aNavn(o.anleggId))} intern />
+      {tgAvviker(x.tl, tgMaal) && <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={x.tlBruk !== false} onChange={e => set({ tlBruk: e.target.checked })} style={{ width: 'auto' }} />Oppdater tilstanden på {o.komponentId ? 'komponenten' : 'systemet'} til {tgTekst(x.tl)}</label>}</> } as Field] : []),
     ...(pre?.filer?.length ? [{ k: 'filerInfo', type: 'custom', label: 'Rapport og vedlegg fra servicefirmaet', render: () => <div className="small">{pre.filer!.map((f: any) => <div key={f.path}><FileLink fil={f} /></div>)}<div className="muted">Lagres som dokumenter på kontrollen.</div></div> } as Field] : []),
     { k: 'fil', label: pre?.filer?.length ? 'Ekstra rapport / sjekkliste (valgfritt)' : 'Rapport / sjekkliste', type: 'file' },
   ];
@@ -483,7 +495,15 @@ export function utfor(id: string, pre?: UtforPreset) {
       const upd: Rec = { ...byId('oppgaver', id)!, historikk: h };
       if (pre?.kilde) delete upd.innrapport;
       if (x.res !== 'Ikke utført / utsatt') { upd.sistUtfort = x.dato; upd.nesteFrist = x.nyFrist || addInt(x.dato, o.intervall); } else if (x.nyFrist) upd.nesteFrist = x.nyFrist;
-      await save('oppgaver', upd); toast(avs.length ? `Registrert med ${avs.length} avvik` : 'Registrert – neste frist ' + fd(upd.nesteFrist));
+      await save('oppgaver', upd);
+      // Tilstand: oppdater systemet/komponenten hvis vurderingen avviker og brukeren har valgt det
+      if (tgMaal && x.tl?.tg && tgAvviker(x.tl, tgMaal) && x.tlBruk !== false && kanRedigereE(o.eiendomId)) {
+        const m = byId(o.komponentId ? 'komponenter' : 'anlegg', tgMaal.id)!; const n: Rec = { ...m, tg: x.tl.tg, kg: x.tl.kg || '', tgdato: x.dato, tgVurdertAv: x.av || '', tgKomm: x.tl.komm || m.tgKomm || '' };
+        if (n.tgForslag) delete n.tgForslag; await save(o.komponentId ? 'komponenter' : 'anlegg', n);
+      } else if (tgMaal && x.tl?.tg && !tgAvviker(x.tl, tgMaal) && kanRedigereE(o.eiendomId)) {
+        const m = byId(o.komponentId ? 'komponenter' : 'anlegg', tgMaal.id)!; await save(o.komponentId ? 'komponenter' : 'anlegg', { ...m, tgdato: x.dato, tgVurdertAv: x.av || m.tgVurdertAv || '' });
+      }
+      toast(avs.length ? `Registrert med ${avs.length} avvik` : 'Registrert – neste frist ' + fd(upd.nesteFrist));
     },
   });
 }

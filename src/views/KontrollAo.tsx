@@ -7,6 +7,7 @@ import { plasserteFor } from './Arealer';
 import { Chip, FileLink, openModal, confirmBox } from '../components/ui';
 import { Hjelp } from '../components/Hjelp';
 import { PersonvernBekreft, PERSONVERN_VERSJON } from '../components/Personvern';
+import { TgKgVelger, tgTekst, type Tilstand } from '../components/TgKg';
 import { KoPanelRef, utfor } from '../lib/actions';
 import { save } from '../lib/store';
 
@@ -93,10 +94,11 @@ function KoPanel({ o, close }: { o: Rec; close: () => void }) {
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}><Chip c="blue">Til godkjenning</Chip><b>Rapport fra servicefirma</b><span className="grow" /><span className="small muted">mottatt {fd(r.mottatt)}</span></div>
       <div className="small">Utført <b>{fd(r.dato)}</b> av {r.av || r.epost}{r.firma ? ` (${r.firma})` : ''} · <b>{r.res}</b>{r.nesteDato ? ` · foreslått neste: ${fd(r.nesteDato)}` : ''}</div>
       {r.komm && <div className="small" style={{ whiteSpace: 'pre-wrap', marginTop: 4 }}>{r.komm}</div>}
+      {r.tilstand?.tg && <div className="small" style={{ marginTop: 4 }}><b>Tilstand:</b> {tgTekst(r.tilstand)}{r.nyttForslag ? <span style={{ color: 'var(--amber)' }}> – avviker fra registrert, lagt inn som forslag på systemet</span> : <span className="muted"> – som registrert</span>}{r.tilstand.komm ? <div className="muted">{r.tilstand.komm}</div> : null}</div>}
       {r.avvik?.length > 0 && <div className="small" style={{ marginTop: 4 }}><b>Avvik:</b><ul style={{ margin: '2px 0 0 18px', padding: 0 }}>{r.avvik.map((a: string, i: number) => <li key={i}>{a}</li>)}</ul></div>}
       {r.filer?.length > 0 && <div className="small" style={{ marginTop: 4 }}>{r.filer.map((f: any) => <div key={f.path}><FileLink fil={f} /></div>)}</div>}
       {kan && <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <button className="btn sm pri" onClick={() => { close(); utfor(o.id, { dato: r.dato, av: r.av + (r.firma ? ` (${r.firma})` : ''), res: r.res, komm: r.komm, avs: r.avvik, nyFrist: r.nesteDato, filer: r.filer, kilde: 'servicefirma' }); }}>Godkjenn og registrer utført</button>
+        <button className="btn sm pri" onClick={() => { close(); utfor(o.id, { dato: r.dato, av: r.av + (r.firma ? ` (${r.firma})` : ''), res: r.res, komm: r.komm, avs: r.avvik, nyFrist: r.nesteDato, filer: r.filer, kilde: 'servicefirma', tilstand: r.tilstand }); }}>Godkjenn og registrer utført</button>
         <button className="btn sm" onClick={async () => { if (!await confirmBox('Avvise rapporten? Den fjernes fra kontrollen (filene beholdes). Send gjerne en ny arbeidsordre etterpå.', 'Avvis')) return; const n = { ...byId('oppgaver', o.id)! }; delete n.innrapport; await save('oppgaver', n); toast('Rapporten er avvist'); }}>Avvis</button></div>}
     </div>}
     {kan && <div className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -145,7 +147,7 @@ function SendKo({ id, close }: { id: string; close: () => void }) {
 // ---------- Lenke til servicefirmaet (#/ko/<token>) – ingen innlogging
 export function KoLenke({ token }: { token: string }) {
   const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [ferdig, setFerdig] = useState(false); const [busy, setBusy] = useState(false);
-  const [sam, setSam] = useState(false);
+  const [sam, setSam] = useState(false); const [tl, setTl] = useState<Tilstand>({});
   const [f, setF] = useState<any>({ dato: today(), av: '', firma: '', res: 'OK – ingen avvik', komm: '', avvik: [''], nesteDato: '' }); const [filer, setFiler] = useState<File[]>([]);
   useEffect(() => { aoApi({ action: 'ko_info', token }, false).then(i => { setInfo(i); if (i.innsendt) setFerdig(true); }).catch(e => setErr(e.message)); }, [token]);
   const set = (p: any) => setF((x: any) => ({ ...x, ...p }));
@@ -163,7 +165,7 @@ export function KoLenke({ token }: { token: string }) {
         if (error) throw new Error('Opplasting feilet for ' + fil.name + ': ' + error.message);
         opp.push({ path: u.path, navn: fil.name, type: fil.type, str: fil.size });
       }
-      await aoApi({ action: 'ko_innsend', token, ...f, avvik: f.res === 'Avvik funnet' ? f.avvik : [], filer: opp, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); setFerdig(true);
+      await aoApi({ action: 'ko_innsend', token, ...f, avvik: f.res === 'Avvik funnet' ? f.avvik : [], filer: opp, tilstand: tl.tg ? tl : null, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); setFerdig(true);
     } catch (e: any) { setErr(e.message || String(e)); }
     setBusy(false);
   };
@@ -193,6 +195,7 @@ export function KoLenke({ token }: { token: string }) {
             <div><button type="button" className="btn sm" onClick={() => set({ avvik: [...f.avvik, ''] })}>+ Legg til avvik</button></div></>}
           <label>Kommentar</label><textarea value={f.komm} onChange={e => set({ komm: e.target.value })} style={{ ...inp, minHeight: 70 }} placeholder="Utført arbeid, målinger, byttet filter, anbefalinger …" />
           <label>Anbefalt dato for neste service (valgfritt)</label><input type="date" value={f.nesteDato} onChange={e => set({ nesteDato: e.target.value })} style={inp} />
+          {info.tilstand && <TgKgVelger v={tl} set={setTl} naa={info.tilstand} hva={[info.tilstand.kode, info.tilstand.navn].filter(Boolean).join(' ')} />}
           <label>Servicerapport, sjekkliste og bilder</label><input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.heic,.webp,.doc,.docx,.xls,.xlsx,.txt,.csv" onChange={e => setFiler(Array.from(e.target.files || []))} />
           {filer.length > 0 && <div className="small muted">{filer.length} fil(er) valgt</div>}
           <PersonvernBekreft ok={sam} set={setSam} ansvarlig={info.oppdragsgiver} />
