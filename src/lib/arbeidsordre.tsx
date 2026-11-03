@@ -80,7 +80,7 @@ export async function aoPdf(id: string) {
   D.t('ARBEIDSORDRE', M, D.y - 10, 8.5, RED, true); D.y -= 18;
   D.t(D.fit(`Avvik #${a.nr}: ${a.tittel || ''}`, W - 2 * M, 17, true), M, D.y - 17, 17, INK, true); D.y -= 30;
   const rader: [string, string][] = [['Eiendom', [ao.eiendom, ao.adresse].filter(Boolean).join(', ')], ['System', ao.system], ['Komponent', ao.komponent], ['Plassering', [ao.tegning, ao.plassering].filter(Boolean).join(' – ')],
-    ['Alvorlighet', a.alv || ''], ['Status', a.status || ''], ['Frist', a.frist ? fd(a.frist) : ''], ['Utbedres av', a.ansvar === 'Leverandør/entreprenør' ? a.utbedresAv || 'Leverandør' : a.ansvar === 'Leietaker' ? 'Leietaker' : 'Eier / drift'],
+    ['Alvorlighet', a.alv || ''], ['Status', a.status || ''], ['Frist', a.frist ? fd(a.frist) : ''], ['Utbedres av', a.ansvar === 'Leverandør/entreprenør' ? a.utbedresAv || 'Leverandør' : a.ansvar === 'Leietaker' ? 'Leietaker' : a.ansvar === 'Felles' ? 'Felles (eier og leietaker)' : 'Eier / drift'],
     ['Tildelt', navnPaa(a.tildeltId)], ['Oppdaget', a.oppdaget ? fd(a.oppdaget) : ''], ['Meldt av / kilde', [a.meldtAv, a.kilde].filter(Boolean).join(' · ')]];
   D.tabell([['Detaljer', 1.3], ['', 4]], rader.filter(r => r[1]).map(r => ({ c: [r[0], r[1]] })));
   if (a.beskrivelse) { D.h2('Beskrivelse og tiltak'); D.p(a.beskrivelse, 9.5, INK); }

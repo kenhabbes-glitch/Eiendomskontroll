@@ -7,12 +7,14 @@ import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, 
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore, kanRedigereE, kanDrifteE, mineOrg, oppdaterNiva } from './store';
 import { leieAreal, m2, FELLES_AVTALE } from './utils';
 import { TgKgVelger, tgAvviker, tgTekst } from '../components/TgKg';
+import { PosVelger, BildeVelger, VedleggGalleri } from '../components/PosVelger';
+import { ServiceHistorikk } from '../views/Servicehistorikk';
 import { alleMaler, finnMal, kopi, kontraktKey, fordeling, pliktKeysFor, OMR, ANS_VALG } from './kontrakt';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst, standardTagger, taggerFor } from './utils';
 import { ikDekning } from './utils';
 import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
-import { openPlan } from '../views/Arealer';
+import { openPlan, plasserteFor } from '../views/Arealer';
 import { AoPanel, HendelseListe, aoSnapshot } from './arbeidsordre';
 import { adresseFelter, brregData, enhetStatus, seEiendomUrl, virksomhetFraNaering, rensOrgnr } from './oppslag';
 import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip, DueChip, TaggChips, TaggVelger, Chip, type Field } from '../components/ui';
@@ -22,7 +24,7 @@ const eOpts = () => sortBy(S.eiendommer, e => e.navn).map(e => [e.id, e.navn] as
 // Eiendommer brukeren kan redigere (for skjema som oppretter nye poster)
 const eOptsDrift = () => sortBy(S.eiendommer.filter(e => kanDrifteE(e.id)), e => e.navn).map(e => [e.id, e.navn] as [string, string]);
 const eOptsSkriv = () => sortBy(S.eiendommer.filter(e => kanRedigereE(e.id)), e => e.navn).map(e => [e.id, e.navn] as [string, string]);
-export const UTBEDRER: [string, string][] = [['Eier', 'Eier / drift (felles)'], ['Leietaker', 'Leietaker'], ['Leverandør/entreprenør', 'Serviceselskap / leverandør']];
+export const UTBEDRER: [string, string][] = [['Eier', 'Eier / drift'], ['Leietaker', 'Leietaker'], ['Felles', 'Felles (eier og leietaker)'], ['Leverandør/entreprenør', 'Serviceselskap / leverandør']];
 const TG_OPTS: [string, string][] = [['', 'Ikke vurdert'], ...TG_DEF.map(t => [t[0], `${t[0]} – ${t[1].toLowerCase()}`] as [string, string])];
 // Felles felt for tilstandsvurdering etter NS 3424 (system og komponent)
 const tgFelt = (): Field[] => [
@@ -277,7 +279,8 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'forste', label: 'Første frist for nye kontroller', type: 'date', half: true });
   const closeRef: { c?: () => void } = {};
   closeRef.c = formModal({
-    title: ro ? aNavn(id) : id ? 'Rediger system / bygningsdel' : 'Nytt system / bygningsdel', fields, values: a, readOnly: ro,
+    title: ro ? aNavn(id) : id ? 'Rediger system / bygningsdel' : 'Nytt system / bygningsdel', fields, values: a, readOnly: ro, wide: !!id,
+    bottom: () => id ? <ServiceHistorikk anleggId={id} /> : null,
     onChange: (k, v, prev) => {
       if (k === 'tfmSys') touched.sys = true; if (k === 'tfmLop') touched.lop = true;
       const p: any = { ...m2Patch(k, v) };
@@ -335,7 +338,8 @@ export function editKomponent(id?: string, anleggId?: string) {
     { k: 'notat', label: 'Notater', type: 'textarea' }];
   const closeRefK: { c?: () => void } = {};
   closeRefK.c = formModal({
-    title: ro ? kNavn(id) : id ? 'Rediger komponent' : 'Ny komponent', fields, values: k, readOnly: ro,
+    title: ro ? kNavn(id) : id ? 'Rediger komponent' : 'Ny komponent', fields, values: k, readOnly: ro, wide: !!id,
+    bottom: () => id ? <ServiceHistorikk komponentId={id} /> : null,
     onChange: (key, v) => { if (key === 'levetid') return { levetidKilde: undefined }; const mp = m2Patch(key, v); if (Object.keys(mp).length) return mp; if (key === 'lop') touched.lop = true; if ((key === 'kode' || key === 'anleggId') && !touched.lop && !id) return { lop: nextKompLop(v.anleggId, v.kode) }; },
     extraFoot: close => id && !ro ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette komponenten?')) { await removeDoc('komponenter', id); close(); } }}>Slett</button> : null,
     onSave: async x => {
@@ -550,6 +554,28 @@ export async function autoKvitterIK() {
   } finally { autoKjorer = false; }
 }
 
+/** Rediger eller slett en registrert utførelse i kontrollens historikk */
+export function redigerHistorikk(oid: string, idx: number) {
+  const o = byId('oppgaver', oid); const h = o?.historikk?.[idx]; if (!o || !h) return;
+  formModal({
+    title: 'Rediger utført – ' + o.navn, saveTxt: 'Lagre',
+    fields: [{ k: 'dato', label: 'Utført dato', type: 'date', req: true, half: true }, { k: 'av', label: 'Utført av', half: true },
+      { k: 'res', label: 'Resultat', type: 'select', options: ['OK – ingen avvik', 'Avvik funnet', 'Ikke utført / utsatt'], half: true },
+      ...(idx === 0 ? [{ k: 'nyFrist', label: 'Beregn neste frist på nytt fra denne datoen', type: 'checkbox', half: true } as Field] : []),
+      { k: 'komm', label: 'Kommentar', type: 'textarea' }],
+    values: { dato: h.dato, av: h.av || '', res: h.res || 'OK – ingen avvik', komm: h.komm || '', nyFrist: false },
+    extraFoot: close => <button className="btn danger" onClick={async () => { if (!await confirmBox('Slette denne registreringen fra historikken? Rapporter og avvik beholdes.', 'Slett')) return;
+      const f = byId('oppgaver', oid)!; const L = (f.historikk || []).filter((_: any, j: number) => j !== idx); const sist = L.find((x: any) => x.res !== 'Ikke utført / utsatt');
+      await save('oppgaver', { ...f, historikk: L, sistUtfort: sist?.dato || '' }); toast('Registreringen er slettet'); close(); }}>Slett</button>,
+    onSave: async x => {
+      const f = byId('oppgaver', oid)!; const L = (f.historikk || []).slice(); L[idx] = { ...L[idx], dato: x.dato, av: x.av, res: x.res, komm: x.komm, endret: { t: new Date().toISOString(), av: state.me?.navn || state.me?.epost } };
+      L.sort((a: any, b: any) => String(b.dato).localeCompare(String(a.dato)));
+      const sist = L.find((y: any) => y.res !== 'Ikke utført / utsatt'); const upd: Rec = { ...f, historikk: L, sistUtfort: sist?.dato || '' };
+      if (x.nyFrist && sist) upd.nesteFrist = addInt(sist.dato, f.intervall);
+      await save('oppgaver', upd); toast(x.nyFrist ? 'Lagret – ny frist ' + fd(upd.nesteFrist) : 'Lagret');
+    },
+  });
+}
 export function visOppgave(id: string) {
   const o = byId('oppgaver', id); if (!o) return;
   showModal(o.navn, close => <>
@@ -557,7 +583,7 @@ export function visOppgave(id: string) {
     <KoPanelRef.C o={o} close={close} />
     <IkUnderpunkter o={o} close={close} />
     <h3 style={{ marginTop: 18 }}>Historikk</h3>
-    {(o.historikk || []).length ? <div className="log">{o.historikk.map((h: any, i: number) => { const d = h.dokId && byId('dokumenter', h.dokId); return <div key={i}><span className="lt">{fd(h.dato)}</span> · <b>{h.res}</b>{h.av ? ' · ' + h.av : ''}{h.komm && <><br />{h.komm}</>}{d?.fil && <><br /><FileLink fil={d.fil} /></>}{(() => { const n = Math.max((h.avvik || []).length, S.avvik.filter(a => a.oppgaveId === o.id && a.oppdaget === h.dato).length); return n > 0 ? <><br /><span className="muted small">{n} avvik registrert</span></> : null; })()}{!(h.avvik || []).length && !S.avvik.some(a => a.oppgaveId === o.id && a.oppdaget === h.dato) && h.res === 'Avvik funnet' && <><br /><a href="#" className="small" onClick={e => { e.preventDefault(); close(); editAvvik(undefined, { eiendomId: o.eiendomId, anleggId: o.anleggId || '', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, oppdaget: h.dato, beskrivelse: h.komm || '', ansvar: o.ansvar || 'Eier', leietakerId: o.leietakerId || '' }); }}>Ingen avvik ble opprettet – registrer avvik fra denne kontrollen</a></>}</div>; })}</div> : <p className="muted">Ikke registrert utført ennå.</p>}
+    {(o.historikk || []).length ? <div className="log">{o.historikk.map((h: any, i: number) => { const d = h.dokId && byId('dokumenter', h.dokId); return <div key={i}><span className="lt">{fd(h.dato)}</span> · <b>{h.res}</b>{h.av ? ' · ' + h.av : ''}{kanDrifteE(o.eiendomId) && <> · <a href="#" className="small" onClick={e => { e.preventDefault(); redigerHistorikk(o.id, i); }}>rediger</a></>}{h.komm && <><br />{h.komm}</>}{d?.fil && <><br /><FileLink fil={d.fil} /></>}{(() => { const n = Math.max((h.avvik || []).length, S.avvik.filter(a => a.oppgaveId === o.id && a.oppdaget === h.dato).length); return n > 0 ? <><br /><span className="muted small">{n} avvik registrert</span></> : null; })()}{!(h.avvik || []).length && !S.avvik.some(a => a.oppgaveId === o.id && a.oppdaget === h.dato) && h.res === 'Avvik funnet' && <><br /><a href="#" className="small" onClick={e => { e.preventDefault(); close(); editAvvik(undefined, { eiendomId: o.eiendomId, anleggId: o.anleggId || '', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, oppdaget: h.dato, beskrivelse: h.komm || '', ansvar: o.ansvar || 'Eier', leietakerId: o.leietakerId || '' }); }}>Ingen avvik ble opprettet – registrer avvik fra denne kontrollen</a></>}</div>; })}</div> : <p className="muted">Ikke registrert utført ennå.</p>}
   </>, { foot: close => <>{canEdit() && <button className="btn" onClick={() => { close(); editOppgave(id); }}>Rediger</button>}<span className="grow" /><button className="btn pri" onClick={() => { close(); utfor(id); }}>Registrer utført</button></> });
 }
 
@@ -574,33 +600,44 @@ export function editAvvik(id?: string, preset: any = {}) {
     { k: 'kilde', label: 'Kilde', type: 'select', options: AV_KILDE, half: true }, { k: 'meldtAv', label: 'Meldt av / referanse', half: true, ph: 'Navn, rapportnr., tilsynsref.' },
     { k: 'ansvar', label: 'Ansvarlig for utbedring', type: 'select', options: UTBEDRER, half: true },
     { k: 'utbedresAv', label: 'Serviceselskap / leverandør', half: true, show: x => x.ansvar === 'Leverandør/entreprenør', ph: 'Firma som skal rette avviket' },
-    ...(canEdit() ? [{ k: 'leietakerId', label: 'Leietaker', type: 'select', options: () => S.leietakere.map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true } as Field] : []),
+    ...(canEdit() ? [{ k: 'leietakerId', label: 'Leietaker', type: 'select', options: (v?: any) => S.leietakere.filter(l => !v?.eiendomId || l.eiendomId === v.eiendomId).map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true, show: (x: any) => ['Leietaker', 'Felles'].includes(x.ansvar) || !!x.leietakerId, hint: 'Leietakeren som skal utbedre, eller som deler ansvaret' } as Field] : []),
     { k: 'oppdaget', label: 'Oppdaget dato', type: 'date', half: true }, { k: 'frist', label: 'Frist for utbedring', type: 'date', half: true, hint: id ? '' : 'Tom = foreslått frist ut fra alvorlighet' },
     { k: 'planlagt', label: 'Planlagt utbedret', type: 'date', half: true, show: x => ['Planlagt', 'Under utbedring', 'Utsatt'].includes(x.status) },
     ...(canEdit() ? [{ k: 'kost', label: 'Estimert kostnad (kr)', type: 'number', half: true } as Field] : []),
-    { k: 'beskrivelse', label: 'Beskrivelse og tiltak', type: 'textarea' },
-    { k: 'komm', label: id ? 'Kommentar til denne endringen (legges i loggen)' : 'Kommentar', type: 'textarea', ph: id ? 'F.eks. hvorfor avviket utsettes eller avvises' : '' },
-    { k: 'fil', label: 'Vedlegg (bilde/PDF)', type: 'file' }];
+    { k: 'beskrivelse', label: 'Beskrivelse av avviket og tiltak', type: 'textarea', ph: 'Hva er feil, hvor, omfang og anbefalt tiltak' },
+    { k: 'secPos', label: 'Plassering på etasjeplan', type: 'sec' },
+    { k: 'pos', type: 'custom', render: (v, set) => v.eiendomId ? <PosVelger eiendomId={v.eiendomId} value={v.pos || null} set={p => set({ pos: p })} ro={!staff}
+        merker={(() => { const r = v.komponentId ? byId('komponenter', v.komponentId) : v.anleggId ? byId('anlegg', v.anleggId) : null; return r ? plasserteFor(r).map(x => ({ ...x.pos, t: x.navn || '' })) : []; })()} /> : <div className="small muted">Velg eiendom først.</div> },
+    { k: 'plassering', label: 'Plassering i tekst (valgfritt)', ph: 'F.eks. 2. etg, korridor ved trapp B, i himling' },
+    { k: 'secFoto', label: 'Bilder og vedlegg', type: 'sec' },
+    { k: 'bilder', type: 'custom', def: [], render: (v, set) => <BildeVelger filer={v.bilder || []} set={f => set({ bilder: f })} /> },
+    { k: 'komm', label: id ? 'Kommentar til denne endringen (legges i loggen)' : 'Kommentar', type: 'textarea', ph: id ? 'F.eks. hvorfor avviket utsettes eller avvises' : '' }];
   let touchedFrist = false; const lukkRef: { c?: () => void } = {};
   lukkRef.c = formModal({
-    title: id ? `Avvik #${a.nr || ''}` : 'Nytt avvik', fields, values: { ...a, komm: '', fil: null }, wide: true, readOnly: !staff,
+    title: id ? `Avvik #${a.nr || ''}` : 'Nytt avvik', fields, values: { ...a, komm: '', bilder: [] }, wide: true, readOnly: !staff,
     onChange: (k, v) => { if (k === 'frist') touchedFrist = true; if (k === 'komponentId' && v.komponentId) { const c = byId('komponenter', v.komponentId); if (c) return { anleggId: c.anleggId, eiendomId: c.eiendomId }; } if (!id && !touchedFrist && (k === 'alv' || k === 'oppdaget')) return { frist: addDays(v.oppdaget || today(), AV_FRIST[v.alv]) }; },
     bottom: () => <>
       {id && staff && <AoPanel id={id} lukk={() => lukkRef.c?.()} />}
-      {!id && <p className="small muted" style={{ marginTop: 12 }}>Etter lagring kan avviket plasseres på tegning, tildeles en bruker eller sendes som arbeidsordre på e-post.</p>}
+      {!id && <p className="small muted" style={{ marginTop: 12 }}>Etter lagring kan avviket tildeles en bruker eller sendes som arbeidsordre på e-post.</p>}
       {a.oppgaveId && byId('oppgaver', a.oppgaveId) && <p className="small muted" style={{ marginTop: 12 }}>Registrert fra kontroll: <a href="#" onClick={e => { e.preventDefault(); visOppgave(a.oppgaveId); }}>{byId('oppgaver', a.oppgaveId)!.navn}</a></p>}
-      {(a.vedlegg || []).length > 0 && <><h3 style={{ marginTop: 14 }}>Vedlegg</h3>{a.vedlegg.map((f: any, i: number) => <div key={i}><FileLink fil={f} /></div>)}</>}
+      {((id && byId('avvik', id)) || a).vedlegg?.length > 0 && <><h3 style={{ marginTop: 14 }}>Registrerte bilder og vedlegg</h3><VedleggGalleri filer={((id && byId('avvik', id)) || a).vedlegg} /></>}
       {id && ((byId('avvik', id) || a).logg || []).length > 0 && <><h3 style={{ marginTop: 18 }}>Logg</h3><div className="log">{(byId('avvik', id) || a).logg.slice().reverse().map((l: any, i: number) => <div key={i}><span className="lt">{new Date(l.t).toLocaleString('nb-NO', { dateStyle: 'short', timeStyle: 'short' })}{l.av ? ' · ' + l.av : ''}</span> · <StChip s={l.s} />{l.k && <><br />{l.k}</>}</div>)}</div></>}
       {id && staff && <details style={{ marginTop: 10 }}><summary className="small">Full endringslogg fra databasen</summary><div style={{ marginTop: 8 }}><HendelseListe radId={id} /></div></details>}
     </>,
     extraFoot: close => id && canEdit() ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette avviket permanent? Vanligvis bør avvik heller settes til «Avvist» eller «Lukket» slik at historikken bevares.')) { await removeDoc('avvik', id); close(); } }}>Slett</button> : null,
     onSave: async x => {
-      const komm = x.komm; const fil = x.fil; delete x.komm; delete x.fil;
+      const komm = x.komm; const bilder: File[] = x.bilder || []; delete x.komm; delete x.bilder; delete x.secPos; delete x.secFoto;
+      if (x.ansvar !== 'Leietaker' && x.ansvar !== 'Felles' && !canEdit()) delete x.leietakerId;
       if (x.komponentId) { const kc = byId('komponenter', x.komponentId); if (kc) { x.anleggId = kc.anleggId; x.eiendomId = kc.eiendomId; } }
       const base: Rec = id ? { ...(byId('avvik', id) || a) } : a; // ferske felt (plassering, tildeling, vedlegg, logg) kan være endret mens skjemaet var åpent
       const o: Rec = { ...base, ...x }; if (!o.frist) o.frist = addDays(o.oppdaget || today(), AV_FRIST[o.alv]);
-      if (fil) { const f = await uploadFile(fil, o.eiendomId, o.leietakerId && canEdit() ? o.leietakerId : undefined); if (f) o.vedlegg = [...(base.vedlegg || []), f]; }
+      if (!o.id) o.id = crypto.randomUUID();
+      const nye: any[] = []; for (const f of bilder) { const r = await uploadFile(f, o.eiendomId, undefined, undefined, 'ao/' + (o.id || 'ny')); if (r) nye.push(r); }
+      if (nye.length) o.vedlegg = [...(base.vedlegg || []), ...nye];
+      if (x.pos === '') o.pos = base.pos || null;
       o.logg = (base.logg || []).slice(); const av = state.me?.navn || state.me?.epost;
+      if (nye.length && id) o.logg.push({ t: new Date().toISOString(), s: o.status, k: `La til ${nye.length} bilde${nye.length > 1 ? 'r' : ''}/vedlegg`, av });
+      if (id && JSON.stringify(o.pos || null) !== JSON.stringify(base.pos || null)) o.logg.push({ t: new Date().toISOString(), s: o.status, k: o.pos ? 'Plassert på ' + (byId('tegninger', o.pos.tegningId)?.navn || 'tegning') : 'Plassering fjernet', av });
       if (!id) o.logg.push({ t: new Date().toISOString(), s: o.status, k: komm || 'Registrert', av });
       else if (o.status !== base.status || komm) o.logg.push({ t: new Date().toISOString(), s: o.status, k: (o.status !== base.status ? `Status: ${base.status} → ${o.status}` : '') + (komm ? (o.status !== base.status ? '. ' : '') + komm : ''), av });
       if (AV_LUKKET.includes(o.status) && !AV_LUKKET.includes(base.status)) o.lukket = today();
