@@ -1,3 +1,4 @@
+import { PrLenke } from './views/ProsjektRapport';
 import './views/KomponentRunde';
 import { svaktPassord, PASSORDKRAV } from './lib/utils';
 import { MfaSkjerm } from './components/Tofaktor';
@@ -91,11 +92,12 @@ export default function App() {
   useEffect(() => { if (state.ready && state.me && canEdit()) { const t = setTimeout(() => autoKvitterIK(), 800); return () => clearTimeout(t); } }, [state.version, state.ready]);
   if (!configured) return <Setup />;
   if (!state.ready) return <div className="login"><div className="card"><p>Laster …</p></div></div>;
-  if (state.mfa && !['ao', 'lt', 'ko', 'personvern'].includes(r.v)) return <><MfaSkjerm /><Toast /></>;
+  if (state.mfa && !['ao', 'lt', 'ko', 'pr', 'personvern'].includes(r.v)) return <><MfaSkjerm /><Toast /></>;
   if (state.recovery && state.me) return <SetPassword />;
   if (r.v === 'ao' && r.id) return <><AoLenke token={r.id} /><Toast /></>;
   if (r.v === 'lt' && r.id) return <><LtLenke token={r.id} /><Toast /></>;
   if (r.v === 'ko' && r.id) return <><KoLenke token={r.id} /><Toast /></>;
+  if (r.v === 'pr' && r.id) return <><PrLenke token={r.id} /><ModalHost /><Toast /></>;
   if (r.v === 'personvern') return <div className="login"><div className="card" style={{ maxWidth: 640 }}><PersonvernTekst /><p className="small"><a href="#/">Tilbake</a></p></div></div>;
   if (!state.me) return <Login />;
   if (state.me.rolle === 'ingen' && !state.me.plattform) return <NoAccess />;

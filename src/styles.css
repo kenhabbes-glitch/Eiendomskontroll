@@ -313,3 +313,14 @@ h1 .hjelp-q{position:relative;top:-2px}
 .ns-hode{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:8px 10px 2px;position:sticky;top:0;background:var(--surface)}
 .ns-rad{display:block;width:100%;text-align:left;border:none;background:none;padding:6px 8px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
 .ns-rad:hover{background:var(--acc2)}.ns-rad.on{background:var(--acc2);font-weight:600}
+/* prosjekt: arbeidsflate, beslutningspunkt og rapport */
+.pa-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px 12px;margin-bottom:8px}.pa-grid>*{grid-column:1/-1}.pa-grid>.half{grid-column:span 3}.pa-grid>.third{grid-column:span 2}
+@media(max-width:640px){.pa-grid>.half,.pa-grid>.third{grid-column:1/-1}}
+.pa-felt{display:flex;flex-direction:column;gap:3px;font-size:13px;font-weight:500;color:var(--ink2);margin-bottom:6px}.pa-felt>span{font-size:12px}.pa-felt textarea,.pa-felt input,.pa-felt select{font-weight:400}
+.pa-seksjon{border-top:1px solid var(--line);margin-top:10px;padding-top:10px}.pa-h{font-size:15px;margin:4px 0 8px}
+.pa-tbl td{padding:3px 4px;vertical-align:top}.pa-tbl input,.pa-tbl select,.pa-tbl textarea{width:100%;min-width:60px;padding:5px 6px;font-size:13px}.pa-tbl input.num{text-align:right}
+.pa-mote{border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin-bottom:8px}.pa-mote summary{cursor:pointer;padding:2px 0}
+.pa-forhand{border:1px solid var(--line);border-radius:8px;padding:14px 18px;background:#fff;max-height:60vh;overflow:auto}
+.pf-gate{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:6px 0 2px;border-top:1px dashed var(--line);margin-top:8px}.pf-gate label{display:flex;gap:6px;align-items:center;font-weight:400}
+.pa-svarvalg{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.pa-svar{flex:1;min-width:150px;display:flex;gap:8px;align-items:center;border:2px solid var(--line2);border-radius:8px;padding:10px 12px;cursor:pointer;font-weight:600}
+.pa-svar input{width:auto}.pa-svar.on.green{border-color:var(--green);background:var(--greenbg)}.pa-svar.on.amber{border-color:var(--amber);background:#fff7e6}.pa-svar.on.red{border-color:var(--red);background:#fbefed}

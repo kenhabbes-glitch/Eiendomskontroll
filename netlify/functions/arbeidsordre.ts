@@ -565,5 +565,75 @@ const handler = async (req: Request) => {
     return json(200, { ok: true });
   }
 
+  // ---------- Prosjektrapporter til eier: beslutningsnotat (godkjenning før neste fase) og statusrapport
+  const FASENAVN: Record<string, string> = { ide: 'Behov og idé', plan: 'Planlegging og prosjektering', anbud: 'Anbud og kontrahering', utf: 'Utførelse', over: 'Overlevering og ferdigstillelse', garanti: 'Garantiperiode' };
+  const FASEREKKE = ['ide', 'plan', 'anbud', 'utf', 'over', 'garanti'];
+  const sha = async (t: string) => { const { createHash } = await import('node:crypto'); return createHash('sha256').update(t).digest('hex'); };
+  const krN = (v: any) => new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(Math.round(+v || 0)) + ' kr';
+  const hentPr = async (tok: string) => {
+    if (!/^[0-9a-f]{48}$/i.test(String(tok || ''))) return null; const h = await sha(tok);
+    const { data } = await admin.from('prosjekter').select('*').contains('data', { rapporter: [{ tokenHash: h }] }).limit(1);
+    const p = data?.[0]; if (!p) return null; const r = (p.data?.rapporter || []).find((x: any) => x.tokenHash === h); return r ? { p, r } : null;
+  };
+  if (body.action === 'pr_send') {
+    const u = await hvem(); if (!u) return json(401, { error: 'Ikke innlogget' });
+    const { data: p } = await admin.from('prosjekter').select('*').eq('id', body.prosjekt_id).maybeSingle(); if (!p) return json(404, { error: 'Fant ikke prosjektet' });
+    if (!(await kanRedigere(u, p.eiendom_id))) return json(403, { error: 'Du har ikke skrivetilgang til eiendommen' });
+    const d = p.data || {}; const r = (d.rapporter || []).find((x: any) => x.id === body.rapport_id); if (!r) return json(404, { error: 'Fant ikke rapporten' });
+    const til = String(body.epost || '').trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(til)) return json(400, { error: 'Ugyldig e-postadresse' });
+    const navn = String(body.navn || '').slice(0, 120); const melding = String(body.melding || '').slice(0, 4000);
+    const base = typeof body.lenkeBase === 'string' && /^https?:\/\//.test(body.lenkeBase) ? body.lenkeBase.replace(/\/+$/, '') : (process.env.URL || '');
+    const { randomBytes } = await import('node:crypto'); const tok = randomBytes(24).toString('hex'); const lenke = `${base}/#/pr/${tok}`;
+    const s = r.snap || {}; const fase = r.type === 'fase';
+    const emne = fase ? `Til godkjenning: ${s.prosjekt?.navn} – ${s.fase?.navn}` : `Statusrapport: ${s.prosjekt?.navn}${s.periode?.til ? ' per ' + s.periode.til.split('-').reverse().join('.') : ''}`;
+    const rader: [string, string][] = [['Eiendom', s.prosjekt?.eiendom || ''], ['Prosjekt', s.prosjekt?.navn || ''], ['Fase', s.fase?.navn || ''], ['Budsjett', krN(s.okonomi?.tot?.budsjett)], ['Prognose', krN(s.okonomi?.tot?.prognose)], ['Fremdrift', (s.fremdrift ?? 0) + ' %']];
+    if (fase && s.beslutning) rader.push(['Det bes om', s.beslutning]);
+    const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:620px;color:#1d2521">
+      <h2 style="margin:0 0 6px">${esc(s.tittel || emne)}</h2><p style="color:#6b736d;margin:0 0 14px">${esc(s.prosjekt?.navn)} · ${esc(s.prosjekt?.eiendom)}</p>
+      ${navn ? `<p>Hei ${esc(navn)},</p>` : ''}${melding ? `<p>${esc(melding).replace(/\n/g, '<br>')}</p>` : ''}
+      <table style="border-collapse:collapse;font-size:14px">${rader.filter(x => x[1]).map(x => `<tr><td style="padding:3px 14px 3px 0;color:#6b736d;vertical-align:top">${x[0]}</td><td style="padding:3px 0">${esc(x[1])}</td></tr>`).join('')}</table>
+      <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${fase ? 'Les notatet og gi svar' : 'Åpne rapporten'}</a></p>
+      <p style="font-size:12px;color:#6b736d">Lenken er personlig og gjelder i 90 dager. Du trenger ikke bruker i appen.<br>Sendt av ${esc(u.navn || u.epost)}.</p></div>`;
+    const tekst = `${s.tittel || emne}\n${s.prosjekt?.navn} – ${s.prosjekt?.eiendom}\n\n${melding ? melding + '\n\n' : ''}${rader.map(x => x[0] + ': ' + x[1]).join('\n')}\n\nÅpne: ${lenke}`;
+    const res = await sendEpost(til, emne, html, tekst, undefined, u.epost || undefined, await oppsettFor(p.eiendom_id, await minOrg(u)));
+    const t = new Date().toISOString(); const ny = { ...r, tokenHash: await sha(tok), utloper: new Date(Date.now() + 90 * 864e5).toISOString(), sendtTil: { navn, epost: til }, sendt: t, sendtAv: u.navn || u.epost, sendtAvEpost: u.epost,
+      status: fase ? 'Sendt' : 'Til orientering', svar: null };
+    const logg = [...(d.logg || []), { t, k: `${fase ? 'Beslutningsnotat' : 'Statusrapport'} ${res.sendt ? 'sendt' : 'klargjort'} til ${navn || til}${navn ? ' (' + til + ')' : ''}`, av: u.navn || u.epost }];
+    await admin.from('prosjekter').update({ data: { ...d, rapporter: (d.rapporter || []).map((x: any) => x.id === r.id ? ny : x), eierKontakt: { navn, epost: til }, logg } }).eq('id', p.id);
+    return json(200, { ...res, til, lenke, emne, tekst });
+  }
+  if (body.action === 'pr_info') {
+    const f = await hentPr(body.token); if (!f) return json(404, { error: 'Lenken er ugyldig, eller rapporten er trukket tilbake' });
+    if (f.r.utloper && new Date(f.r.utloper).getTime() < Date.now()) return json(410, { error: 'Lenken er utløpt. Be prosjektlederen sende rapporten på nytt.' });
+    // Merk som lest første gang
+    if (!f.r.lest) { const d = f.p.data; await admin.from('prosjekter').update({ data: { ...d, rapporter: d.rapporter.map((x: any) => x.id === f.r.id ? { ...x, lest: new Date().toISOString() } : x) } }).eq('id', f.p.id); }
+    return json(200, { type: f.r.type, fase: f.r.fase, status: f.r.status, svar: f.r.svar || null, snap: f.r.snap, sendtTil: f.r.sendtTil, sendt: f.r.sendt, sendtAv: f.r.sendtAv, gjeldende: f.p.data?.fase === f.r.fase });
+  }
+  if (body.action === 'pr_svar') {
+    const f = await hentPr(body.token); if (!f) return json(404, { error: 'Lenken er ugyldig' });
+    if (f.r.utloper && new Date(f.r.utloper).getTime() < Date.now()) return json(410, { error: 'Lenken er utløpt' });
+    const B = ['Godkjent', 'Godkjent med merknader', 'Avvist', 'Kommentar'];
+    const beslutning = String(body.beslutning || ''); if (!B.includes(beslutning)) return json(400, { error: 'Ugyldig svar' });
+    if (f.r.type !== 'fase' && beslutning !== 'Kommentar') return json(400, { error: 'Statusrapporter kan bare kommenteres' });
+    if (f.r.type === 'fase' && beslutning !== 'Kommentar' && ['Godkjent', 'Godkjent med merknader', 'Avvist'].includes(f.r.status)) return json(409, { error: `Notatet er allerede besvart (${f.r.status.toLowerCase()})` });
+    const navn = String(body.navn || '').trim().slice(0, 120); if (!navn) return json(400, { error: 'Skriv navnet ditt' });
+    const komm = String(body.komm || '').slice(0, 4000); if (['Avvist', 'Godkjent med merknader', 'Kommentar'].includes(beslutning) && !komm.trim()) return json(400, { error: 'Skriv en kommentar' });
+    const t = new Date().toISOString(); const d = f.p.data || {}; const svar = { navn, komm, t, via: 'lenke', beslutning, epost: f.r.sendtTil?.epost || '' };
+    const kommentarer = beslutning === 'Kommentar' ? [...(f.r.kommentarer || []), svar] : f.r.kommentarer;
+    const status = beslutning === 'Kommentar' ? f.r.status : beslutning;
+    const logg = [...(d.logg || []), { t, k: `${f.r.type === 'fase' ? `Beslutningsnotat «${FASENAVN[f.r.fase] || ''}»` : 'Statusrapport'}: ${beslutning.toLowerCase()} av ${navn}${komm ? ` – «${komm.slice(0, 200)}»` : ''}`, av: navn }];
+    let fase = d.fase; let status2 = d.status;
+    if (f.r.type === 'fase' && ['Godkjent', 'Godkjent med merknader'].includes(beslutning) && d.fase === f.r.fase) {
+      const i = FASEREKKE.indexOf(f.r.fase); if (i >= 0 && i < FASEREKKE.length - 1) { fase = FASEREKKE[i + 1]; if (status2 === 'Idé' || (status2 === 'Planlagt' && i + 1 >= 3)) status2 = i + 1 >= 3 ? 'Pågår' : 'Planlagt';
+        logg.push({ t, k: `Fase: ${FASENAVN[fase]} (etter godkjenning)`, av: navn }); }
+    }
+    await admin.from('prosjekter').update({ data: { ...d, fase, status: status2, logg, rapporter: d.rapporter.map((x: any) => x.id === f.r.id ? { ...x, status, svar: beslutning === 'Kommentar' ? x.svar : svar, kommentarer } : x) } }).eq('id', f.p.id);
+    await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: navn, tabell: 'hendelse', rad_id: f.p.id, eiendom_id: f.p.eiendom_id, handling: 'prosjekt', tekst: logg[logg.length - (fase !== d.fase ? 2 : 1)].k });
+    if (f.r.sendtAvEpost) await sendEpost(f.r.sendtAvEpost, `${beslutning}: ${d.navn}${f.r.type === 'fase' ? ' – ' + (FASENAVN[f.r.fase] || '') : ''}`,
+      `<p><b>${esc(navn)}</b> har svart på ${f.r.type === 'fase' ? 'beslutningsnotatet' : 'statusrapporten'} for <b>${esc(d.navn)}</b>: <b>${esc(beslutning)}</b>.</p>${komm ? `<p>${esc(komm).replace(/\n/g, '<br>')}</p>` : ''}${fase !== d.fase ? `<p>Prosjektet er flyttet til fasen «${esc(FASENAVN[fase])}».</p>` : ''}`,
+      `${navn} har svart: ${beslutning}\n${komm}`, undefined, undefined, await oppsettFor(f.p.eiendom_id, null)).catch(() => null);
+    return json(200, { ok: true, status, nyFase: fase !== d.fase ? FASENAVN[fase] : null });
+  }
+
   return json(400, { error: 'Ukjent handling' });
 };

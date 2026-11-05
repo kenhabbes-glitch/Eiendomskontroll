@@ -10,6 +10,11 @@ import { BETALER, DELER, delFor, delNavn, FAG, FASER, KLASSER, KONTO, PSTATUS, P
 import { lNavn } from '../lib/utils';
 import { NsVelger, nsNavn } from '../components/NsVelger';
 import { Sel, eiendomOpts, useFilter } from './common';
+import { aapneOppgave, nyOppgave } from './ProsjektArbeid';
+import { lagRapport, Rapporter, StatusChip } from './ProsjektRapport';
+import { Gantt, GanttForklaring } from '../components/Gantt';
+import { faseGodkjent, ganttRader, krevGodkjenning, sisteBeslutning } from '../lib/prosjektArbeid';
+import { addDays } from '../lib/utils';
 
 const go = (p: string) => { location.hash = '#/' + p; };
 const kr = (v: number) => nok(Math.round(v));
@@ -81,10 +86,11 @@ export function ProsjektSide({ id }: { id: string }) {
   const p = byId('prosjekter', id); const [fane, setFane] = useState('oversikt');
   if (!p) return <div className="card"><Empty t="Fant ikke prosjektet">Det kan være slettet, eller du mangler tilgang.</Empty></div>;
   const kan = kanP(p); const ferdig = p.status === 'Ferdigstilt'; const o = okonomi(p); const fr = fremdrift(p);
-  const tabs: [string, string][] = [['oversikt', 'Oversikt'], ['oppgaver', `Faser og oppgaver (${(p.oppgaver || []).filter((x: Rec) => x.status !== 'Ferdig').length})`], ['fag', `Fag og entrepriser (${(p.fag || []).length})`], ['okonomi', 'Økonomi'], ['fdv', 'Dokumenter og FDV'], ['system', p.gammeltSystemId ? 'Systembytte og nye systemer' : `Nye systemer (${(p.nyeSystemer || []).length})`], ['logg', 'Logg']];
+  const tabs: [string, string][] = [['oversikt', 'Oversikt'], ['oppgaver', `Faser og oppgaver (${(p.oppgaver || []).filter((x: Rec) => x.status !== 'Ferdig').length})`], ['fag', `Fag og entrepriser (${(p.fag || []).length})`], ['plan', 'Fremdriftsplan'], ['okonomi', 'Økonomi'], ['rapporter', `Rapporter og godkjenning${(p.rapporter || []).filter((r: Rec) => r.status === 'Sendt').length ? ' (' + (p.rapporter || []).filter((r: Rec) => r.status === 'Sendt').length + ' venter)' : ''}`], ['fdv', 'Dokumenter og FDV'], ['system', p.gammeltSystemId ? 'Systembytte og nye systemer' : `Nye systemer (${(p.nyeSystemer || []).length})`], ['logg', 'Logg']];
   return <>
     <div className="head"><div className="grow"><p className="small" style={{ margin: 0 }}><a href="#/prosjekter">← Prosjekter</a> · {eNavn(p.eiendomId)}</p>
       <h1>{p.navn} <Chip c={stFarge(p.status)}>{p.status}</Chip></h1><p className="sub">{p.type}{p.leder ? ` · prosjektleder ${p.leder}` : ''}{p.start ? ` · ${fd(p.start)}–${p.slutt ? fd(p.slutt) : '?'}` : ''}</p></div>
+      {kan && <button className="btn" onClick={() => lagRapport(id, 'status')}>Statusrapport</button>}
       {kan && !ferdig && <button className="btn" onClick={() => redigerProsjekt(id)}>Rediger</button>}
       {kan && !ferdig && p.status !== 'Avbrutt' && <button className="btn pri" onClick={() => ferdigstillDialog(id)}>Ferdigstill prosjekt</button>}</div>
     <div className="tabs">{tabs.map(([k, l]) => <a key={k} className={fane === k ? 'on' : ''} onClick={() => setFane(k)}>{l}</a>)}</div>
@@ -92,6 +98,8 @@ export function ProsjektSide({ id }: { id: string }) {
     {fane === 'oppgaver' && <Oppgaver p={p} kan={kan && !ferdig} />}
     {fane === 'fag' && <Fag p={p} kan={kan} />}
     {fane === 'okonomi' && <Okonomi p={p} kan={kan} />}
+    {fane === 'plan' && <Fremdriftsplan p={p} kan={kan && !ferdig} />}
+    {fane === 'rapporter' && <Rapporter p={p} kan={kan} />}
     {fane === 'fdv' && <Fdv p={p} kan={kan} />}
     {fane === 'system' && <Systembytte p={p} kan={kan} />}
     {fane === 'logg' && <div className="card"><div className="log">{(p.logg || []).slice().reverse().map((l: Rec, i: number) => <div key={i}><span className="lt">{fd(String(l.t).slice(0, 10))}</span> {l.k}{l.av ? <span className="muted"> · {l.av}</span> : null}</div>)}</div></div>}
@@ -121,9 +129,15 @@ function redigerProsjekt(id: string) {
 
 function Kpi({ t, v, s, c }: { t: string; v: string; s?: string; c?: string }) { return <div className="card" style={{ padding: '10px 14px', flex: 1, minWidth: 150 }}><div className="small muted">{t}</div><div style={{ fontSize: 20, fontWeight: 700, color: c }}>{v}</div>{s && <div className="small muted">{s}</div>}</div>; }
 
+async function byttFase(p: Rec, k: string) {
+  const ny = FASER.findIndex(f => f[0] === k), naa = FASER.findIndex(f => f[0] === p.fase);
+  if (ny > naa) { const mangler = FASER.slice(naa, ny).filter(([fk]) => krevGodkjenning(p, fk) && !faseGodkjent(p, fk));
+    if (mangler.length && !(await confirmBox(`${mangler.map(f => `«${f[1]}»`).join(', ')} er ikke godkjent av eier. Lag et beslutningsnotat under fasen, eller gå videre likevel?`, 'Gå videre likevel'))) return; }
+  await oppdater(p.id, { fase: k, status: p.status === 'Planlagt' && ny >= 3 ? 'Pågår' : p.status }, `Fase: ${FASER[ny][1]}`);
+}
+
 function Oversikt({ p, o, fr, kan }: { p: Rec; o: ReturnType<typeof okonomi>; fr: number; kan: boolean }) {
   const fi = FASER.findIndex(f => f[0] === p.fase); const gml = p.gammeltSystemId ? byId('anlegg', p.gammeltSystemId) : null; const ny = p.nyttSystemId ? byId('anlegg', p.nyttSystemId) : null;
-  const F: Rec[] = (p.faser || []).filter((f: Rec) => f.start && f.slutt); const t0 = F.length ? Math.min(...F.map(f => Date.parse(f.start))) : 0, t1 = F.length ? Math.max(...F.map(f => Date.parse(f.slutt))) : 0;
   const forsinket = (p.oppgaver || []).filter((x: Rec) => x.frist && x.frist < today() && !['Ferdig', 'Ikke relevant'].includes(x.status));
   return <>
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -131,16 +145,13 @@ function Oversikt({ p, o, fr, kan }: { p: Rec; o: ReturnType<typeof okonomi>; fr
       <Kpi t="Forpliktet / påløpt" v={kr(o.tot.palopt)} s={`forpliktet ${kr(o.tot.forpliktet)}`} /><Kpi t="Fremdrift" v={fr + ' %'} s={forsinket.length ? `${forsinket.length} oppgaver forsinket` : 'av oppgavene'} c={forsinket.length ? 'var(--amber)' : undefined} />
     </div>
     <div className="card" style={{ marginBottom: 12 }}><b>Faser</b>
-      <div className="pf-faser">{FASER.map(([k, l], i) => <button key={k} disabled={!kan || p.status === 'Ferdigstilt'} className={'pf-fase' + (i < fi ? ' ferdig' : i === fi ? ' naa' : '')} onClick={() => oppdater(p.id, { fase: k, status: p.status === 'Planlagt' && i >= 3 ? 'Pågår' : p.status }, `Fase: ${l}`)}>
+      <div className="pf-faser">{FASER.map(([k, l], i) => <button key={k} disabled={!kan || p.status === 'Ferdigstilt'} className={'pf-fase' + (i < fi ? ' ferdig' : i === fi ? ' naa' : '')} onClick={() => byttFase(p, k)}>
         <span>{i + 1}</span>{l}</button>)}</div>
-      {F.length > 0 && <div style={{ marginTop: 10 }}>{(p.faser || []).filter((f: Rec) => f.start && f.slutt).map((f: Rec) => { const l = (Date.parse(f.start) - t0) / (t1 - t0 || 1) * 100, w = Math.max(2, (Date.parse(f.slutt) - Date.parse(f.start)) / (t1 - t0 || 1) * 100);
-        return <div key={f.k} style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '3px 0' }}><span className="small" style={{ width: 190, flex: 'none' }}>{f.navn}</span>
-          <div style={{ flex: 1, position: 'relative', height: 14, background: 'var(--surface2)', borderRadius: 4 }}><div title={`${fd(f.start)}–${fd(f.slutt)}`} style={{ position: 'absolute', left: l + '%', width: w + '%', top: 0, bottom: 0, borderRadius: 4, background: f.k === p.fase ? 'var(--amber)' : 'var(--acc)', opacity: f.k === p.fase ? 1 : .6 }} /></div>
-          <span className="small muted" style={{ width: 130, flex: 'none' }}>{fd(f.start)}–{fd(f.slutt)}</span></div>; })}
-        {Date.now() >= t0 && Date.now() <= t1 && <p className="small muted" style={{ margin: '2px 0 0' }}>Datoene settes per fase under «Faser og oppgaver».</p>}</div>}
+      <p className="small muted" style={{ margin: '8px 0 0' }}>{FASER.filter(([k]) => krevGodkjenning(p, k)).map(([k, l]) => { const b = sisteBeslutning(p, k); return <span key={k} style={{ marginRight: 14 }}>◆ {l}: {b ? <StatusChip s={b.status} /> : <span>ikke sendt</span>}</span>; })}</p>
+      {ganttRader(p).some(r => r.start) && <div style={{ marginTop: 10 }}><Gantt rader={ganttRader(p).filter(r => r.nivaa === 0 || r.id.startsWith('bp:'))} onKlikk={id => { if (id.startsWith('bp:')) lagRapport(p.id, 'fase', id.slice(3)); }} bredde={760} /></div>}
     </div>
     <div className="grid g2">
-      <div className="card"><b>Om prosjektet</b><p style={{ whiteSpace: 'pre-wrap' }}>{p.beskrivelse || <span className="muted">Ingen beskrivelse.</span>}</p>
+      <div className="card"><b>Om prosjektet</b><p style={{ whiteSpace: 'pre-wrap' }}>{p.beskrivelse || [p.arbeid?.beskrivelse?.bakgrunn, p.arbeid?.beskrivelse?.mal].filter(Boolean).join('\n\n') || <span className="muted">Ingen beskrivelse.</span>}</p>
         <dl className="dl small">{([['Leietaker', p.leietakerId ? lNavn(p.leietakerId) : ''], ['Lokale', p.lokale], ['Fag', (p.fag || []).map((f: Rec) => f.fag).join(', ')], ['Entreprenør', p.entreprenor], ['Kontraktsform', p.kontrakt], ['Ferdigstilt', p.fullfort ? fd(p.fullfort) : ''], ['Garanti til', p.garantiTil ? fd(p.garantiTil) : '']] as [string, string][]).filter(x => x[1]).map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl></div>
       <div className="card"><b>Systemer</b>
         {gml && <p className="small">{gml.arkivert ? 'Erstattet (arkivert): ' : 'Skal skiftes ut: '}<a href="#" onClick={e => { e.preventDefault(); if (!gml.arkivert) editAnlegg(gml.id); else go('arkiv'); }}>{aNavn(gml.id)}</a> {gml.tg && <TgChip t={gml.tg} />}</p>}
@@ -168,12 +179,17 @@ function Oppgaver({ p, kan }: { p: Rec; kan: boolean }) {
     return <div key={k} className="card" style={{ marginBottom: 10, borderLeft: k === p.fase ? '4px solid var(--amber)' : undefined }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><b style={{ flex: 1, minWidth: 200 }}>{i + 1}. {l} <span className="small muted">{ferdig}/{L.length}</span></b>
         <input type="date" disabled={!kan} value={f.start || ''} onChange={e => settFase(k, { start: e.target.value })} title="Start" /><span>–</span><input type="date" disabled={!kan} value={f.slutt || ''} onChange={e => settFase(k, { slutt: e.target.value })} title="Slutt" />
-        {kan && <button className="btn sm" onClick={() => redOppg(undefined, k)}>+ Oppgave</button>}</div>
+        {kan && <button className="btn sm" onClick={() => nyOppgave(p.id, k)}>+ Oppgave</button>}</div>
+      <div className="pf-gate">
+        <label className="small"><input type="checkbox" style={{ width: 'auto' }} disabled={!kan} checked={krevGodkjenning(p, k)} onChange={e => oppdater(p.id, { godkjenning: { ...(p.godkjenning ?? { ide: true, plan: true, anbud: true, utf: false, over: true, garanti: false }), [k]: e.target.checked } })} /> Eier godkjenner før neste fase</label>
+        {(() => { const b = sisteBeslutning(p, k); return b ? <span className="small">Beslutningsnotat: <StatusChip s={b.status} />{b.svar ? ` ${b.svar.navn} ${fd(String(b.svar.t).slice(0, 10))}` : b.sendt ? ` sendt ${fd(String(b.sendt).slice(0, 10))}` : ''}</span> : null; })()}
+        {kan && (krevGodkjenning(p, k) || sisteBeslutning(p, k)) && <button className="btn sm" onClick={() => lagRapport(p.id, 'fase', k)}>{sisteBeslutning(p, k) ? 'Nytt beslutningsnotat' : 'Lag beslutningsnotat'}</button>}
+      </div>
       {L.map(o => { const sen = o.frist && o.frist < today() && !['Ferdig', 'Ikke relevant'].includes(o.status);
         return <div key={o.id} className="rk-rad" style={{ opacity: o.status === 'Ikke relevant' ? .5 : 1 }}>
           <input type="checkbox" style={{ width: 'auto' }} disabled={!kan} checked={o.status === 'Ferdig'} onChange={e => settO(o.id, { status: e.target.checked ? 'Ferdig' : 'Pågår', ferdig: e.target.checked ? today() : '' })} />
-          <span style={{ flex: 1, minWidth: 180, textDecoration: o.status === 'Ferdig' ? 'line-through' : undefined, cursor: kan ? 'pointer' : undefined }} onClick={() => kan && redOppg(o)}>{o.tittel}{o.notat && <span className="small muted"> – {o.notat}</span>}</span>
-          {o.fag && <Chip>{o.fag}</Chip>}<span className="small muted">{o.ansvarlig}</span><span className="small" style={{ color: sen ? 'var(--red)' : 'var(--muted)' }}>{o.frist ? fd(o.frist) : ''}</span>
+          <span style={{ flex: 1, minWidth: 180, textDecoration: o.status === 'Ferdig' ? 'line-through' : undefined, cursor: 'pointer' }} onClick={() => kan ? aapneOppgave(p.id, o.id) : redOppg(o)}>{o.tittel}{o.notat && <span className="small muted"> – {o.notat}</span>}</span>
+          {o.fag && <Chip>{o.fag}</Chip>}{kan && <button className="btn ghost sm" title="Åpne arbeidsflaten" onClick={() => aapneOppgave(p.id, o.id)}>Åpne ›</button>}<span className="small muted">{o.ansvarlig}</span><span className="small" style={{ color: sen ? 'var(--red)' : 'var(--muted)' }}>{o.frist ? fd(o.frist) : ''}</span>
           {o.status === 'Pågår' && <Chip c="amber">Pågår</Chip>}</div>; })}
     </div>; })}</>;
 }
@@ -233,6 +249,43 @@ function Okonomi({ p, kan }: { p: Rec; kan: boolean }) {
           <tr style={{ fontWeight: 700 }}><td>Sum</td>{D.map(d => <td key={d[0]} className="num mono">{kr(sumD(d[0]))}</td>)}<td className="num mono">{kr(o.tot.prognose)}</td></tr>
         </tbody></table></div>; })()}
       <p className="small muted">Beløp er prognose (påløpt under). For aktiverte kostnader (påkostning, nybygg) skal bygg og faste tekniske installasjoner føres på hver sin saldo: bygg i saldogruppe h (4 %) eller i for forretningsbygg (2 %), og tekniske installasjoner (VVS, elektro, kjøling, heis o.l.) i saldogruppe j (10 %). Fordelingen utledes av bygningsdel (NS 3451) og kan overstyres per post. Felles kostnader, som rigg og prosjektledelse, fordeles normalt forholdsmessig. Skillet mellom vedlikehold og påkostning, og grensen mot driftsmidler, avklares med regnskapsfører.</p></div>
+  </>;
+}
+
+function Fremdriftsplan({ p, kan }: { p: Rec; kan: boolean }) {
+  const [skala, setSkala] = useState<'auto' | 'uke' | 'mnd' | 'kvartal'>('auto'); const [kunFaser, setKunFaser] = useState(false);
+  const R = ganttRader(p).filter(r => !kunFaser || r.nivaa === 0 || r.id.startsWith('bp:'));
+  const uten = (p.oppgaver || []).filter((o: Rec) => !o.start && !o.frist && o.status !== 'Ikke relevant' && o.fase !== 'garanti');
+  const endre = async (id: string, start: string, slutt: string) => {
+    const P = byId('prosjekter', p.id)!;
+    if (id.startsWith('fase:')) { const k = id.slice(5); await oppdater(p.id, { faser: FASER.map(([fk, fl]) => { const f = (P.faser || []).find((x: Rec) => x.k === fk) || { k: fk, navn: fl, start: '', slutt: '' }; return fk === k ? { ...f, start, slutt } : f; }) }); }
+    else await oppdater(p.id, { oppgaver: (P.oppgaver || []).map((o: Rec) => o.id === id ? { ...o, start, frist: slutt } : o) });
+  };
+  const fordel = async () => {
+    const P = byId('prosjekter', p.id)!; let faser = FASER.map(([fk, fl]) => (P.faser || []).find((x: Rec) => x.k === fk) || { k: fk, navn: fl, start: '', slutt: '' });
+    const vekt: Record<string, number> = { ide: 1, plan: 3, anbud: 2, utf: 6, over: 1.5 };
+    if (faser.slice(0, 5).some(f => !f.start || !f.slutt)) {
+      if (!P.start || !P.slutt) return toast('Sett planlagt start og ferdig på prosjektet (Rediger), eller datoer på fasene først');
+      const tot = (Date.parse(P.slutt) - Date.parse(P.start)) / 864e5; const sv = Object.values(vekt).reduce((a, b) => a + b, 0); let t = P.start;
+      faser = faser.map(f => { if (!(f.k in vekt)) return f; const len = Math.max(1, Math.round(tot * vekt[f.k] / sv)); const s0 = t; t = addDays(t, len); return f.start && f.slutt ? f : { ...f, start: s0, slutt: addDays(s0, len - 1) }; });
+    }
+    let n0 = 0;
+    const oppgaver = (P.oppgaver || []).map((o: Rec) => o);
+    for (const f of faser) { if (!f.start || !f.slutt) continue; const L = oppgaver.filter((o: Rec) => o.fase === f.k && !o.start && !o.frist && o.status !== 'Ikke relevant'); if (!L.length) continue;
+      const dager = Math.max(1, (Date.parse(f.slutt) - Date.parse(f.start)) / 864e5 + 1); const steg = dager / L.length;
+      L.forEach((o: Rec, i: number) => { const s0 = addDays(f.start, Math.floor(i * steg)); const e0 = addDays(f.start, Math.max(Math.floor(i * steg), Math.floor((i + 1) * steg) - 1)); const j = oppgaver.indexOf(o); oppgaver[j] = { ...o, start: s0, frist: e0 }; n0++; }); }
+    await oppdater(p.id, { faser, oppgaver }, `Fremdriftsplan: datoer fordelt på ${n0} oppgaver`); toast(n0 ? `Datoer satt på ${n0} oppgaver` : 'Fasedatoer satt');
+  };
+  return <>
+    <div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Fremdriftsplan</h2>
+      <label className="small"><input type="checkbox" style={{ width: 'auto' }} checked={kunFaser} onChange={e => setKunFaser(e.target.checked)} /> Bare faser</label>
+      <div className="seg">{([['auto', 'Tilpass'], ['uke', 'Uke'], ['mnd', 'Måned'], ['kvartal', 'Kvartal']] as const).map(([k, l]) => <button key={k} className={'btn sm' + (skala === k ? ' pri' : '')} onClick={() => setSkala(k)}>{l}</button>)}</div>
+      {kan && uten.length > 0 && <button className="btn" onClick={fordel}>Fordel datoer på {uten.length} oppgaver</button>}
+      <button className="btn" onClick={() => lagRapport(p.id, 'status')}>Statusrapport</button></div>
+    <div className="card"><Gantt rader={R} skala={skala} onEndre={kan ? endre : undefined} onKlikk={id => { if (id.startsWith('bp:')) lagRapport(p.id, 'fase', id.slice(3)); else if (!id.startsWith('fase:')) aapneOppgave(p.id, id); }} />
+      <GanttForklaring />
+      <p className="small muted" style={{ marginBottom: 0 }}>{kan ? 'Dra en stolpe for å flytte den, eller dra i endene for å endre start og slutt. Klikk for å åpne oppgaven. ' : ''}Fasestolper uten egne datoer beregnes fra oppgavene (lysere). ◆ = beslutningspunkt der eier godkjenner før neste fase.</p></div>
+    {uten.length > 0 && <p className="small muted">{uten.length} oppgaver mangler datoer og vises ikke{kan ? ' – bruk «Fordel datoer», eller sett start og frist i oppgaven' : ''}.</p>}
   </>;
 }
 

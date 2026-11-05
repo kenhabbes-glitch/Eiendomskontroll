@@ -126,6 +126,8 @@ export async function save(col: Col, obj: any): Promise<string> {
   apply(col, 'upsert', fromRow(col, res.data));
   return o.id;
 }
+/** Hent én rad på nytt fra databasen (f.eks. etter at en serverfunksjon har endret den) */
+export async function refetch(col: Col, id: string) { const { data } = await sb.from(TABLES[col].table).select('*').eq('id', id).maybeSingle(); if (data) apply(col, 'upsert', fromRow(col, data)); }
 export async function removeDoc(col: Col, id: string) {
   const { error } = await sb.from(TABLES[col].table).delete().eq('id', id);
   if (error) { toast('Sletting feilet: ' + feiltekst(error)); throw error; }
