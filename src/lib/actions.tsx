@@ -9,6 +9,9 @@ import { leieAreal, m2, FELLES_AVTALE } from './utils';
 import { TgKgVelger, tgAvviker, tgTekst } from '../components/TgKg';
 import { PosVelger, BildeVelger, VedleggGalleri } from '../components/PosVelger';
 import { ServiceHistorikk } from '../views/Servicehistorikk';
+import { alleSjekkmaler } from '../views/Sjekkmaler';
+import { sysSjekkFor, sysSjekkAvvik } from './komponentsjekk';
+import { SysSjekkVelger, SysSjekkKort } from '../components/SysSjekk';
 import { alleMaler, finnMal, kopi, kontraktKey, fordeling, pliktKeysFor, OMR, ANS_VALG } from './kontrakt';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst, standardTagger, taggerFor } from './utils';
 import { ikDekning } from './utils';
@@ -445,9 +448,9 @@ export function editOppgave(id?: string, preset: any = {}) {
     { k: 'hjemmel', label: 'Hjemmel / krav', hint: 'Lov, forskrift, standard eller avtale som utløser kontrollen' },
     { k: 'aktiv', label: 'Aktiv (vises i kontrollplanen)', type: 'checkbox' },
     { k: 'notat', label: 'Notater / sjekkpunkter', type: 'textarea', hint: 'Tas med i arbeidsordren til servicefirmaet' },
-    { k: 'kompSjekk', label: 'Sjekkliste per komponent', type: 'select', def: 'auto', show: x => !!x.anleggId && !x.komponentId,
-      options: [['auto', 'Automatisk – når komponentene har sjekklistemal (f.eks. branndører, nødlys)'], ['pa', 'På – én sjekkliste for hver komponent i systemet'], ['av', 'Av – én samlet utkvittering']],
-      hint: 'Komponentene kvitteres ut én og én mens man går gjennom bygget. Malene ligger under Dokumenter → Sjekklistemaler.' },
+    { k: 'kompSjekk', label: 'Sjekkliste ved utkvittering', type: 'select', def: 'auto', show: x => !!x.anleggId && !x.komponentId,
+      options: [['auto', 'Automatisk – per komponent (branndører, nødlys) eller for hele systemet (ventilasjon, heis …)'], ['pa', 'Per komponent – én sjekkliste for hver komponent i systemet'], ['av', 'Ingen sjekkliste – vanlig utkvittering']],
+      hint: 'Malene ligger under Dokumenter → Sjekklistemaler og kan redigeres.' },
     { k: 'secAo', label: 'Arbeidsordre til servicefirma', type: 'sec', help: 'ko.arbeidsordre' },
     { k: 'aoEpost', label: 'E-post til servicefirma', type: 'email', half: true, ph: 'service@firma.no' },
     { k: 'aoAuto', label: 'Send automatisk før frist', type: 'checkbox', half: true },
@@ -465,13 +468,15 @@ export function editOppgave(id?: string, preset: any = {}) {
       x.ao = { epost: ep, auto: !!x.aoAuto, dager: Math.max(0, Math.min(365, +x.aoDager || 0)), melding: x.aoMelding || '' }; delete x.aoEpost; delete x.aoAuto; delete x.aoDager; delete x.aoMelding; delete x.aoInfo; if (x.anleggId) { const a = byId('anlegg', x.anleggId); if (a) x.eiendomId = a.eiendomId; } const kid = await save('oppgaver', { ...o, ...x }); toast('Kontroll lagret'); if (x.ao?.epost) import('../views/KontrollAo').then(m => m.sikreLokasjonsbilder(kid)); },
   });
 }
-export type UtforPreset = { fraRunde?: boolean; dato?: string; av?: string; res?: string; komm?: string; avs?: string[]; nyFrist?: string; filer?: any[]; kilde?: string; tilstand?: { tg?: string; kg?: string; komm?: string } | null };
+export type UtforPreset = { sjekk?: any; fraRunde?: boolean; dato?: string; av?: string; res?: string; komm?: string; avs?: string[]; nyFrist?: string; filer?: any[]; kilde?: string; tilstand?: { tg?: string; kg?: string; komm?: string } | null };
 export function utfor(id: string, pre?: UtforPreset) {
   const o = byId('oppgaver', id); if (!o) return;
   // Systemer med flere like komponenter (branndører, nødlys …): kvitteres komponent for komponent
   if (!pre?.fraRunde && !pre?.kilde && RundeRef.start(id)) return;
   const R: any = o.runde?.kp && Object.keys(o.runde.kp).length ? o.runde : null;
   const rAvvik = R ? Object.entries(R.kp).filter(([, s]: any) => (s.avvik || []).length) as [string, any][] : [];
+  // Sjekkliste for hele systemet (ventilasjon, heis, sprinkler …) – fra mal, eller utfylt av servicefirmaet
+  const SJ0 = !R ? (pre?.sjekk || sysSjekkFor(alleSjekkmaler(), o, o.anleggId ? byId('anlegg', o.anleggId)?.type : '')) : null;
   const tgMaal = o.komponentId ? byId('komponenter', o.komponentId) : o.anleggId ? byId('anlegg', o.anleggId) : null;
   const lt = sortBy(S.leietakere.filter(l => l.eiendomId === o.eiendomId), l => l.navn);
   const nyRad = () => ({ t: '', a: 'Middels', k: '', an: o.ansvar === 'Leietaker' ? 'Leietaker' : 'Eier', l: o.leietakerId || (lt.length === 1 ? lt[0].id : ''), u: o.ansvar === 'Leietaker' ? '' : '' });
@@ -479,7 +484,9 @@ export function utfor(id: string, pre?: UtforPreset) {
     { k: 'dato', label: 'Utført dato', type: 'date', def: pre?.dato || today(), req: true, half: true }, { k: 'av', label: 'Utført av', def: pre?.av ?? (o.utfores && state.me?.rolle !== 'tekniker' ? o.utfores : (state.me?.navn || o.utfores || '')), half: true },
     { k: 'res', label: 'Resultat', type: 'select', options: ['OK – ingen avvik', 'Avvik funnet', 'Ikke utført / utsatt'], def: pre?.res || 'OK – ingen avvik', half: true },
     { k: 'nyFrist', label: 'Ny frist (beregnes automatisk)', type: 'date', def: pre?.nyFrist || '', half: true, hint: 'La stå tom for automatisk beregning ut fra intervallet' },
-    { k: 'avs', type: 'custom', label: 'Avvik fra kontrollen – ett avvik per linje', show: x => x.res === 'Avvik funnet', def: pre?.avs?.length ? pre.avs.map(t => ({ ...nyRad(), t, an: 'Eier' })) : [nyRad()], hint: 'Hver linje blir et eget avvik i avvikslisten, med kobling til denne kontrollen. Velg hvem som skal rette avviket. Bruk kommentarfeltet bare til utfyllende informasjon.',
+    ...(SJ0 ? [{ k: 'sjekk', type: 'custom', def: SJ0, show: (x: any) => x.res !== 'Ikke utført / utsatt',
+      render: (x: any, set: any) => <SysSjekkVelger v={x.sjekk} set={sj => set({ sjekk: sj, ...(sysSjekkAvvik(sj).length && x.res === 'OK – ingen avvik' ? { res: 'Avvik funnet', avs: [] } : {}) })} /> } as Field] : []),
+    { k: 'avs', type: 'custom', label: SJ0 ? 'Andre avvik (punkter med avvik i sjekklisten registreres automatisk)' : 'Avvik fra kontrollen – ett avvik per linje', show: x => x.res === 'Avvik funnet', def: pre?.avs?.length ? pre.avs.map(t => ({ ...nyRad(), t, an: 'Eier' })) : [nyRad()], hint: 'Hver linje blir et eget avvik i avvikslisten, med kobling til denne kontrollen. Velg hvem som skal rette avviket. Bruk kommentarfeltet bare til utfyllende informasjon.',
       render: (v, set) => { const L: any[] = v.avs || []; const kc = S.komponenter.filter(k => o.anleggId && k.anleggId === o.anleggId); const upd = (i: number, p: any) => set({ avs: L.map((x, j) => j === i ? { ...x, ...p } : x) });
         const sel = { border: '1px solid var(--line2)', borderRadius: 8, padding: 7 } as React.CSSProperties;
         return <>{L.map((r, i) => <div key={i} className="avrad">
@@ -506,13 +513,18 @@ export function utfor(id: string, pre?: UtforPreset) {
     onSave: async x => {
       const avs = x.res === 'Avvik funnet' ? (x.avs || []).filter((a: any) => a.t.trim()) : [];
       if (avs.some((a: any) => a.an === 'Leietaker' && lt.length > 0 && !a.l)) { toast('Velg hvilken leietaker som skal rette avviket'); return false; }
-      if (x.res === 'Avvik funnet' && !avs.length && !rAvvik.length) { toast('Skriv inn avvikene i feltene under «Avvik fra kontrollen» – én linje per avvik'); return false; }
+      const sj = x.res !== 'Ikke utført / utsatt' && x.sjekk && Object.keys(x.sjekk.svar || {}).length ? x.sjekk : null;
+      if (sj && sj.punkter.some((pt: any) => !sj.svar[pt.id])) { toast('Svar på alle punktene i sjekklisten (OK, Avvik eller I.R.)'); return false; }
+      const sjAv = sysSjekkAvvik(sj);
+      if (sjAv.length && x.res === 'OK – ingen avvik') x.res = 'Avvik funnet';
+      if (x.res === 'Avvik funnet' && !avs.length && !rAvvik.length && !sjAv.length) { toast('Skriv inn avvikene i feltene under «Avvik fra kontrollen» – én linje per avvik'); return false; }
       let dokId = '';
       if (x.fil) { const f = await uploadFile(x.fil, o.eiendomId); if (f) dokId = await save('dokumenter', { eiendomId: o.eiendomId, leietakerId: '', type: o.type === 'Egenkontroll' ? 'Egenkontrollskjema' : 'Servicerapport', tittel: o.navn + ' – ' + fd(x.dato), dato: x.dato, fil: f, oppgaveId: o.id }); }
       const dokIds: string[] = [];
       for (const f of pre?.filer || []) dokIds.push(await save('dokumenter', { eiendomId: o.eiendomId, leietakerId: '', type: o.type === 'Egenkontroll' ? 'Egenkontrollskjema' : 'Servicerapport', tittel: o.navn + ' – ' + fd(x.dato) + (pre!.filer!.length > 1 ? ' – ' + f.navn : ''), dato: x.dato, fil: f, oppgaveId: o.id, anleggIds: o.anleggId ? [o.anleggId] : [] }));
       if (!dokId && dokIds.length) dokId = dokIds[0];
       const ids: string[] = [];
+      for (const t of sjAv) avs.push({ ...nyRad(), t, l: o.ansvar === 'Leietaker' ? (o.leietakerId || nyRad().l) : '' });
       for (const a of avs) ids.push(await save('avvik', { tittel: a.t.trim(), eiendomId: o.eiendomId, anleggId: o.anleggId || '', komponentId: a.k || '', alv: a.a, status: 'Ny', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, ansvar: a.an || 'Eier', leietakerId: a.an === 'Leietaker' ? (a.l || '') : '', utbedresAv: a.an === 'Leverandør/entreprenør' ? (a.u || '') : '', oppdaget: x.dato, frist: addDays(x.dato, AV_FRIST[a.a]), logg: [{ t: new Date().toISOString(), s: 'Ny', k: 'Registrert fra kontroll: ' + o.navn, av: state.me?.navn }] }));
       // Avvik fra komponentsjekklisten: de som er registrert i appen finnes allerede, de fra servicefirmaets lenke opprettes nå
       const kpNy: Record<string, any> = R ? { ...R.kp } : {};
@@ -525,7 +537,7 @@ export function utfor(id: string, pre?: UtforPreset) {
           logg: [{ t: new Date().toISOString(), s: 'Ny', k: `Registrert fra komponentkontroll: ${o.navn}${s.av ? ' (' + s.av + (s.firma ? ', ' + s.firma : '') + ')' : ''}`, av: state.me?.navn }] });
         ids.push(aid); kpNy[kid] = { ...s, avvikIds: [aid] };
       }
-      const h = [{ dato: x.dato, av: x.av, res: x.res, komm: x.komm, dokId, dokIds: dokIds.length ? dokIds : undefined, avvik: ids, regAv: state.me?.id, kilde: pre?.kilde, runde: R ? { ...R, kp: kpNy } : undefined }, ...(o.historikk || [])].slice(0, 80);
+      const h = [{ dato: x.dato, av: x.av, res: x.res, komm: x.komm, dokId, dokIds: dokIds.length ? dokIds : undefined, avvik: ids, regAv: state.me?.id, kilde: pre?.kilde, runde: R ? { ...R, kp: kpNy } : undefined, sjekk: sj || undefined }, ...(o.historikk || [])].slice(0, 80);
       const upd: Rec = { ...byId('oppgaver', id)!, historikk: h };
       if (R) delete upd.runde;
       if (pre?.kilde) delete upd.innrapport;
@@ -616,7 +628,7 @@ export function visOppgave(id: string) {
     <KoPanelRef.C o={o} close={close} />
     <IkUnderpunkter o={o} close={close} />
     <h3 style={{ marginTop: 18 }}>Historikk</h3>
-    {(o.historikk || []).length ? <div className="log">{o.historikk.map((h: any, i: number) => { const d = h.dokId && byId('dokumenter', h.dokId); return <div key={i}><span className="lt">{fd(h.dato)}</span> · <b>{h.res}</b>{h.av ? ' · ' + h.av : ''}{kanDrifteE(o.eiendomId) && <> · <a href="#" className="small" onClick={e => { e.preventDefault(); redigerHistorikk(o.id, i); }}>rediger</a></>}{h.komm && <><br />{h.komm}</>}{h.runde && <div style={{ marginTop: 4 }}><RundeRef.Oppsummering r={h.runde} /></div>}{d?.fil && <><br /><FileLink fil={d.fil} /></>}{(() => { const n = Math.max((h.avvik || []).length, S.avvik.filter(a => a.oppgaveId === o.id && a.oppdaget === h.dato).length); return n > 0 ? <><br /><span className="muted small">{n} avvik registrert</span></> : null; })()}{!(h.avvik || []).length && !S.avvik.some(a => a.oppgaveId === o.id && a.oppdaget === h.dato) && h.res === 'Avvik funnet' && <><br /><a href="#" className="small" onClick={e => { e.preventDefault(); close(); editAvvik(undefined, { eiendomId: o.eiendomId, anleggId: o.anleggId || '', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, oppdaget: h.dato, beskrivelse: h.komm || '', ansvar: o.ansvar || 'Eier', leietakerId: o.leietakerId || '' }); }}>Ingen avvik ble opprettet – registrer avvik fra denne kontrollen</a></>}</div>; })}</div> : <p className="muted">Ikke registrert utført ennå.</p>}
+    {(o.historikk || []).length ? <div className="log">{o.historikk.map((h: any, i: number) => { const d = h.dokId && byId('dokumenter', h.dokId); return <div key={i}><span className="lt">{fd(h.dato)}</span> · <b>{h.res}</b>{h.av ? ' · ' + h.av : ''}{kanDrifteE(o.eiendomId) && <> · <a href="#" className="small" onClick={e => { e.preventDefault(); redigerHistorikk(o.id, i); }}>rediger</a></>}{h.komm && <><br />{h.komm}</>}{h.runde && <div style={{ marginTop: 4 }}><RundeRef.Oppsummering r={h.runde} /></div>}{h.sjekk && <SysSjekkKort s={h.sjekk} />}{d?.fil && <><br /><FileLink fil={d.fil} /></>}{(() => { const n = Math.max((h.avvik || []).length, S.avvik.filter(a => a.oppgaveId === o.id && a.oppdaget === h.dato).length); return n > 0 ? <><br /><span className="muted small">{n} avvik registrert</span></> : null; })()}{!(h.avvik || []).length && !S.avvik.some(a => a.oppgaveId === o.id && a.oppdaget === h.dato) && h.res === 'Avvik funnet' && <><br /><a href="#" className="small" onClick={e => { e.preventDefault(); close(); editAvvik(undefined, { eiendomId: o.eiendomId, anleggId: o.anleggId || '', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, oppdaget: h.dato, beskrivelse: h.komm || '', ansvar: o.ansvar || 'Eier', leietakerId: o.leietakerId || '' }); }}>Ingen avvik ble opprettet – registrer avvik fra denne kontrollen</a></>}</div>; })}</div> : <p className="muted">Ikke registrert utført ennå.</p>}
   </>, { foot: close => <>{canEdit() && <button className="btn" onClick={() => { close(); editOppgave(id); }}>Rediger</button>}<span className="grow" /><button className="btn pri" onClick={() => { close(); utfor(id); }}>Registrer utført</button></> });
 }
 

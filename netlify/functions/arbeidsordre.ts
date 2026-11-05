@@ -5,7 +5,7 @@
 // eller Resend (RESEND_API_KEY). Avsender settes i EPOST_FRA. Svar går til den som sendte (eller EPOST_SVAR).
 // Uten nøkkel returneres teksten, og appen åpner brukerens eget e-postprogram.
 import { createClient } from '@supabase/supabase-js';
-import { kompForKontroll, nyRunde, malIRunde, renKompSvar, sjekkMaler, punkterFor } from '../../src/lib/komponentsjekk';
+import { kompForKontroll, nyRunde, malIRunde, renKompSvar, sjekkMaler, punkterFor, sysSjekkFor, renSysSjekk, sysSjekkAvvik } from '../../src/lib/komponentsjekk';
 import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 
 const svakt = (pw: string) => pw.length < 10 || !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/\d/.test(pw);
@@ -366,14 +366,24 @@ const handler = async (req: Request) => {
   const datoNo = (d?: string) => d ? String(d).split('-').reverse().join('.') : '';
   const koLogg = (p: any, o: any, tekst: string, org?: string | null) => admin.from('hendelseslogg').insert({ bruker_id: p?.id || null, bruker: p ? (p.navn || p.epost) : 'Automatisk', tabell: 'hendelse', rad_id: o.id, eiendom_id: o.eiendom_id, org_id: org || null, handling: 'arbeidsordre', tekst });
   // Komponentvis sjekkliste (branndører, nødlys …): komponentene og runden for kontrollen
+  const malerFor = async (eid: string) => {
+    const { data: e } = await admin.from('eiendommer').select('eier_org_id').eq('id', eid).maybeSingle();
+    const { data: ins } = e?.eier_org_id ? await admin.from('innstillinger').select('data').eq('org_id', e.eier_org_id).eq('nokkel', 'sjekkmaler').limit(1).maybeSingle() : { data: null as any };
+    return sjekkMaler(ins?.data);
+  };
+  // Sjekkliste for hele systemet (når kontrollen ikke kvitteres komponentvis)
+  const koSysSjekk = async (o: any) => {
+    const d = o.data || {}; if (!d.anleggId || d.komponentId) return null;
+    if (await koRunde(o)) return null;
+    const { data: sy } = await admin.from('systemer').select('data').eq('id', d.anleggId).maybeSingle();
+    return sysSjekkFor(await malerFor(o.eiendom_id), d, sy?.data?.type);
+  };
   const koRunde = async (o: any) => {
     const d = o.data || {}; if (d.komponentId || !d.anleggId || d.kompSjekk === 'av') return null;
     const { data: kr } = await admin.from('komponenter').select('id, data').eq('system_id', d.anleggId);
     const K = (kr || []).map((r: any) => ({ ...(r.data || {}), id: r.id, anleggId: d.anleggId }));
     if (!K.length) return null;
-    const { data: e } = await admin.from('eiendommer').select('eier_org_id').eq('id', o.eiendom_id).maybeSingle();
-    const { data: ins } = e?.eier_org_id ? await admin.from('innstillinger').select('data').eq('org_id', e.eier_org_id).eq('nokkel', 'sjekkmaler').limit(1).maybeSingle() : { data: null as any };
-    const maler = sjekkMaler(ins?.data);
+    const maler = await malerFor(o.eiendom_id);
     const KK = kompForKontroll(d, K, maler); if (!KK.length) return null;
     const runde = d.runde?.kp ? { ...d.runde } : nyRunde(KK, maler, new Date().toISOString().slice(0, 10));
     for (const k of KK) if (!runde.malId?.[k.id]) { const nr = nyRunde([k], maler, runde.start); runde.malId = { ...(runde.malId || {}), ...nr.malId }; runde.maler = { ...runde.maler, ...nr.maler }; }
@@ -388,12 +398,12 @@ const handler = async (req: Request) => {
     const { data: org } = e?.eier_org_id ? await admin.from('organisasjoner').select('navn').eq('id', e.eier_org_id).maybeSingle() : { data: null as any };
     const ed = e?.data || {}; const sd = sy?.data || {};
     const sys = sy ? `${ed.tfmBygg ? '+' + ed.tfmBygg : ''}${sd.tfmSys ? '=' + sd.tfmSys + '.' + String(sd.tfmLop || 1).padStart(3, '0') : ''} ${sd.navn || ''}${sd.fabrikat ? ' (' + sd.fabrikat + ')' : ''}`.trim() : '';
-    const kr = await koRunde(o).catch(() => null);
-    return { komp: kr?.K.length || 0, org: e?.eier_org_id || null, orgNavn: org?.navn || '', eiendom: ed.navn || '', adresse: [ed.adresse, [ed.postnr, ed.poststed].filter(Boolean).join(' ')].filter(Boolean).join(', '), system: sys, kontakt: ed.kontaktLeverandor || ed.driftsansvarlig || '' };
+    const kr = await koRunde(o).catch(() => null); const sj = kr ? null : await koSysSjekk(o).catch(() => null);
+    return { sjekkN: sj?.punkter.length || 0, sjekkNavn: sj?.navn || '', komp: kr?.K.length || 0, org: e?.eier_org_id || null, orgNavn: org?.navn || '', eiendom: ed.navn || '', adresse: [ed.adresse, [ed.postnr, ed.poststed].filter(Boolean).join(' ')].filter(Boolean).join(', '), system: sys, kontakt: ed.kontaktLeverandor || ed.driftsansvarlig || '' };
   };
   const koTekst = (o: any, sn: any, lenke: string, melding: string, avsender: string, bilder = false) => {
     const d = o.data || {}; const b = d.aoBilder;
-    const rader: [string, string][] = [['Eiendom', [sn.eiendom, sn.adresse].filter(Boolean).join(', ')], ['System', sn.system], ['Oppdrag', d.navn], ['Sjekkliste', sn.komp ? `${sn.komp} komponenter – kontrolleres og kvitteres ut én og én i lenken` : ''], ['Type', [d.type, d.kategori].filter(Boolean).join(' · ')], ['Planlagt / frist', datoNo(d.nesteFrist)], ['Grunnlag', d.hjemmel || ''], ['Kontakt på stedet', sn.kontakt]];
+    const rader: [string, string][] = [['Eiendom', [sn.eiendom, sn.adresse].filter(Boolean).join(', ')], ['System', sn.system], ['Oppdrag', d.navn], ['Sjekkliste', sn.komp ? `${sn.komp} komponenter – kontrolleres og kvitteres ut én og én i lenken` : sn.sjekkN ? `${sn.sjekkNavn} – ${sn.sjekkN} punkter fylles ut i lenken` : ''], ['Type', [d.type, d.kategori].filter(Boolean).join(' · ')], ['Planlagt / frist', datoNo(d.nesteFrist)], ['Grunnlag', d.hjemmel || ''], ['Kontakt på stedet', sn.kontakt]];
     const tekst = [`Arbeidsordre – ${d.navn}`, '', melding ? melding + '\n' : '', ...rader.filter(r => r[1]).map(r => `${r[0]}: ${r[1]}`), d.notat ? '\nSjekkpunkter / merknader:\n' + d.notat : '', bilder && b ? `\nLokasjon: se vedlagte bilder fra tegningen ${b.tegning}.` : '', '',
       `Når jobben er utført: registrer dato, resultat og last opp servicerapport her (ingen innlogging):\n${lenke}`, '', `Sendt av ${avsender}`].filter(x => x !== '').join('\n');
     const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1d2320">
@@ -477,7 +487,8 @@ const handler = async (req: Request) => {
     const kr = await koRunde(o);
     const komp = kr ? kr.K.map((k: any) => ({ id: k.id, label: kLabel(k), plassering: k.plassering || '' })) : null;
     const runde = kr ? { maler: kr.runde.maler, malId: kr.runde.malId, kp: Object.fromEntries(Object.entries(kr.runde.kp || {}).map(([k, v]: any) => [k, { t: v.t, av: v.av, firma: v.firma, svar: v.svar, komm: v.komm, avvik: v.avvik, laast: !!v.avvikIds?.length }])) } : null;
-    return json(200, { komp, runde, intervall: d.intervall || null, bilder, tilstand, tegning: d.aoBilder?.tegning || '', navn: d.navn, type: d.type, kategori: d.kategori, frist: inv.frist || d.nesteFrist, hjemmel: d.hjemmel || '', notat: d.notat || '', eiendom: sn.eiendom, adresse: sn.adresse, system: sn.system, kontakt: sn.kontakt, oppdragsgiver: sn.orgNavn, epost: inv.epost, innsendt: inv.innsendt, utloper: inv.utloper, utdatert: !!(inv.frist && d.nesteFrist && inv.frist !== d.nesteFrist && !inv.innsendt) });
+    const sjekk = kr ? null : await koSysSjekk(o);
+    return json(200, { sjekk, komp, runde, intervall: d.intervall || null, bilder, tilstand, tegning: d.aoBilder?.tegning || '', navn: d.navn, type: d.type, kategori: d.kategori, frist: inv.frist || d.nesteFrist, hjemmel: d.hjemmel || '', notat: d.notat || '', eiendom: sn.eiendom, adresse: sn.adresse, system: sn.system, kontakt: sn.kontakt, oppdragsgiver: sn.orgNavn, epost: inv.epost, innsendt: inv.innsendt, utloper: inv.utloper, utdatert: !!(inv.frist && d.nesteFrist && inv.frist !== d.nesteFrist && !inv.innsendt) });
   }
   if (body.action === 'ko_opplasting') {
     const inv = await hentKo(body.token); if (!inv || inv.innsendt) return json(403, { error: 'Lenken er ugyldig eller allerede brukt' });
@@ -520,6 +531,8 @@ const handler = async (req: Request) => {
     const rapport = { token: inv.token, mottatt: new Date().toISOString(), dato, av: String(body.av || '').slice(0, 160), firma: String(body.firma || '').slice(0, 160), epost: inv.epost, res, komm: String(body.komm || '').slice(0, 4000),
       avvik: (Array.isArray(body.avvik) ? body.avvik : []).map((x: any) => String(x || '').trim().slice(0, 300)).filter(Boolean).slice(0, 30), nesteDato: /^\d{4}-\d{2}-\d{2}$/.test(body.nesteDato || '') ? body.nesteDato : '', filer, samtykke: sam, tilstand: renTilstand(body.tilstand) } as any;
     const fersk = (await hentOppg(o.id))!.data || {};
+    const sjMal = await koSysSjekk(o);
+    if (sjMal && body.sjekk) { rapport.sjekk = renSysSjekk(body.sjekk, sjMal); if (sysSjekkAvvik(rapport.sjekk).length && rapport.res === 'OK – ingen avvik') rapport.res = 'Avvik funnet'; }
     if (fersk.runde?.kp) { const V = Object.values(fersk.runde.kp) as any[]; const nAv = V.filter(v => (v.avvik || []).length).length;
       rapport.runde = { kontrollert: V.length, avvik: nAv }; if (nAv && rapport.res === 'OK – ingen avvik') rapport.res = 'Avvik funnet'; }
     rapport.nyttForslag = await lagTgForslag(await tgMaal(fersk.komponentId, fersk.anleggId), rapport.tilstand, `${rapport.av || inv.epost}${rapport.firma ? ' (' + rapport.firma + ')' : ''}`, `Kontroll «${fersk.navn}»`, { oppgaveId: o.id });

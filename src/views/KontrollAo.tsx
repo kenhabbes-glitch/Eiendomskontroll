@@ -7,6 +7,8 @@ import { plasserteFor } from './Arealer';
 import { Chip, FileLink, openModal, confirmBox } from '../components/ui';
 import { Hjelp } from '../components/Hjelp';
 import { BildeVelger } from '../components/PosVelger';
+import { SysSjekkVelger } from '../components/SysSjekk';
+import { sysSjekkAvvik, type SysSjekk } from '../lib/komponentsjekk';
 import { PersonvernBekreft, PERSONVERN_VERSJON } from '../components/Personvern';
 import { TgKgVelger, tgTekst, type Tilstand } from '../components/TgKg';
 import { KoPanelRef, utfor } from '../lib/actions';
@@ -99,7 +101,7 @@ function KoPanel({ o, close }: { o: Rec; close: () => void }) {
       {r.avvik?.length > 0 && <div className="small" style={{ marginTop: 4 }}><b>Avvik:</b><ul style={{ margin: '2px 0 0 18px', padding: 0 }}>{r.avvik.map((a: string, i: number) => <li key={i}>{a}</li>)}</ul></div>}
       {r.filer?.length > 0 && <div className="small" style={{ marginTop: 4 }}>{r.filer.map((f: any) => <div key={f.path}><FileLink fil={f} /></div>)}</div>}
       {kan && <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <button className="btn sm pri" onClick={() => { close(); utfor(o.id, { dato: r.dato, av: r.av + (r.firma ? ` (${r.firma})` : ''), res: r.res, komm: r.komm, avs: r.avvik, nyFrist: r.nesteDato, filer: r.filer, kilde: 'servicefirma', tilstand: r.tilstand }); }}>Godkjenn og registrer utført</button>
+        <button className="btn sm pri" onClick={() => { close(); utfor(o.id, { dato: r.dato, av: r.av + (r.firma ? ` (${r.firma})` : ''), res: r.res, komm: r.komm, avs: r.avvik, nyFrist: r.nesteDato, filer: r.filer, kilde: 'servicefirma', tilstand: r.tilstand, sjekk: r.sjekk }); }}>Godkjenn og registrer utført</button>
         <button className="btn sm" onClick={async () => { if (!await confirmBox('Avvise rapporten? Den fjernes fra kontrollen (filene beholdes). Send gjerne en ny arbeidsordre etterpå.', 'Avvis')) return; const n = { ...byId('oppgaver', o.id)! }; delete n.innrapport; await save('oppgaver', n); toast('Rapporten er avvist'); }}>Avvis</button></div>}
     </div>}
     {kan && <div className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -153,7 +155,7 @@ function EksternRunde({ info, token, av, firma, setF, sam, setSam, setInfo }: { 
   const [aapen, setAapen] = useState(''); const [svar, setSvar] = useState<Record<string, string>>({}); const [tekst, setTekst] = useState<Record<string, string>>({});
   const [komm, setKomm] = useState(''); const [bilder, setBilder] = useState<File[]>([]); const [busy, setBusy] = useState(false); const [feil, setFeil] = useState(''); const [visAlle, setVisAlle] = useState(false);
   const malFor = (kid: string) => R.maler[R.malId?.[kid]] || Object.values(R.maler)[0] as any;
-  const aarlig = (() => { const iv = info.intervall || { n: 1, enhet: 'år' }; const e = String(iv.enhet || 'år'); return e.startsWith('år') || (e.startsWith('mnd') && +iv.n >= 12); })();
+  const aarlig = (() => { const iv = info.intervall || { n: 1, enhet: 'år' }; const e = String(iv.enhet || 'år'); return e.startsWith('år') || (e.startsWith('mnd') && +iv.n >= 6); })();
   const punkter = (kid: string) => (malFor(kid)?.punkter || []).filter((p: any) => !p.aar || aarlig);
   const harAv = (s: any) => !!s && ((s.avvik || []).length > 0);
   const gjort = K.filter(k => kp[k.id]).length; const nAv = K.filter(k => harAv(kp[k.id])).length;
@@ -221,11 +223,14 @@ export function KoLenke({ token }: { token: string }) {
   const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [ferdig, setFerdig] = useState(false); const [busy, setBusy] = useState(false);
   const [sam, setSam] = useState(false); const [tl, setTl] = useState<Tilstand>({});
   const [f, setF] = useState<any>({ dato: today(), av: '', firma: '', res: 'OK – ingen avvik', komm: '', avvik: [''], nesteDato: '' }); const [filer, setFiler] = useState<File[]>([]);
-  useEffect(() => { aoApi({ action: 'ko_info', token }, false).then(i => { setInfo(i); if (i.innsendt) setFerdig(true); }).catch(e => setErr(e.message)); }, [token]);
+  const [sj, setSj] = useState<SysSjekk | null>(null);
+  useEffect(() => { aoApi({ action: 'ko_info', token }, false).then(i => { setInfo(i); if (i.sjekk) setSj(i.sjekk); if (i.innsendt) setFerdig(true); }).catch(e => setErr(e.message)); }, [token]);
   const set = (p: any) => setF((x: any) => ({ ...x, ...p }));
   const sendInn = async (e: React.FormEvent) => {
     e.preventDefault(); if (!f.av.trim()) return setErr('Skriv hvem som utførte jobben');
-    if (f.res === 'Avvik funnet' && !f.avvik.some((a: string) => a.trim())) return setErr('Beskriv avvikene – ett per linje');
+    const sjBrukt = sj && f.res !== 'Ikke utført / utsatt' && Object.keys(sj.svar || {}).length ? sj : null;
+    if (sjBrukt && sjBrukt.punkter.some(p => !sjBrukt.svar[p.id])) return setErr('Svar på alle punktene i sjekklisten (OK, Avvik eller I.R.)');
+    if (f.res === 'Avvik funnet' && !f.avvik.some((a: string) => a.trim()) && !sysSjekkAvvik(sjBrukt).length) return setErr('Beskriv avvikene – ett per linje');
     if (filer.some(x => x.size > 50e6)) return setErr('Hver fil kan være maks 50 MB');
     if (!sam) return setErr('Du må godta personvernerklæringen før du sender inn');
     if (info.komp?.length && info.runde) { const n = info.komp.filter((k: any) => !info.runde.kp?.[k.id]).length;
@@ -239,7 +244,7 @@ export function KoLenke({ token }: { token: string }) {
         if (error) throw new Error('Opplasting feilet for ' + fil.name + ': ' + error.message);
         opp.push({ path: u.path, navn: fil.name, type: fil.type, str: fil.size });
       }
-      await aoApi({ action: 'ko_innsend', token, ...f, avvik: f.res === 'Avvik funnet' ? f.avvik : [], filer: opp, tilstand: tl.tg ? tl : null, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); setFerdig(true);
+      await aoApi({ action: 'ko_innsend', token, ...f, sjekk: sjBrukt, avvik: f.res === 'Avvik funnet' ? f.avvik : [], filer: opp, tilstand: tl.tg ? tl : null, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); setFerdig(true);
     } catch (e: any) { setErr(e.message || String(e)); }
     setBusy(false);
   };
@@ -260,13 +265,14 @@ export function KoLenke({ token }: { token: string }) {
           {info.utdatert && <p className="small" style={{ color: 'var(--amber)' }}>Merk: Fristen er endret siden arbeidsordren ble sendt. Rapporten kan likevel sendes inn.</p>}
           {info.komp?.length > 0 && info.runde && <EksternRunde info={info} token={token} av={f.av} firma={f.firma} setF={set} sam={sam} setSam={setSam} setInfo={setInfo} />}
           <h3 style={{ margin: '14px 0 6px' }}>{info.komp?.length ? 'Send inn rapport' : 'Registrer utført'}</h3>
+          {sj && <div style={{ margin: '6px 0 10px' }}><SysSjekkVelger v={sj} set={x => { setSj(x); if (sysSjekkAvvik(x).length && f.res === 'OK – ingen avvik') set({ res: 'Avvik funnet', avvik: [''] }); }} /></div>}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
             <div><label>Utført dato</label><input type="date" value={f.dato} max={today()} onChange={e => set({ dato: e.target.value })} required style={inp} /></div>
             <div><label>Resultat</label><select value={f.res} onChange={e => set({ res: e.target.value })} style={{ ...inp, border: '1px solid var(--line2)', borderRadius: 8, padding: '9px 10px', background: '#fff', marginTop: 0 }}>{['OK – ingen avvik', 'Avvik funnet', 'Ikke utført / utsatt'].map(x => <option key={x}>{x}</option>)}</select></div>
             <div><label>Utført av (navn)</label><input value={f.av} onChange={e => set({ av: e.target.value })} required style={inp} /></div>
             <div><label>Firma</label><input value={f.firma} onChange={e => set({ firma: e.target.value })} style={inp} /></div>
           </div>
-          {f.res === 'Avvik funnet' && <><label>Avvik – ett per linje</label>{f.avvik.map((a: string, i: number) => <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 4 }}><input value={a} onChange={e => set({ avvik: f.avvik.map((x: string, j: number) => j === i ? e.target.value : x) })} placeholder={`Avvik ${i + 1}`} style={inp} />{f.avvik.length > 1 && <button type="button" className="btn ghost sm" onClick={() => set({ avvik: f.avvik.filter((_: any, j: number) => j !== i) })}>✕</button>}</div>)}
+          {f.res === 'Avvik funnet' && <><label>{sj ? 'Andre avvik (punkter med avvik i sjekklisten tas med automatisk)' : 'Avvik – ett per linje'}</label>{f.avvik.map((a: string, i: number) => <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 4 }}><input value={a} onChange={e => set({ avvik: f.avvik.map((x: string, j: number) => j === i ? e.target.value : x) })} placeholder={`Avvik ${i + 1}`} style={inp} />{f.avvik.length > 1 && <button type="button" className="btn ghost sm" onClick={() => set({ avvik: f.avvik.filter((_: any, j: number) => j !== i) })}>✕</button>}</div>)}
             <div><button type="button" className="btn sm" onClick={() => set({ avvik: [...f.avvik, ''] })}>+ Legg til avvik</button></div></>}
           <label>Kommentar</label><textarea value={f.komm} onChange={e => set({ komm: e.target.value })} style={{ ...inp, minHeight: 70 }} placeholder="Utført arbeid, målinger, byttet filter, anbefalinger …" />
           <label>Anbefalt dato for neste service (valgfritt)</label><input type="date" value={f.nesteDato} onChange={e => set({ nesteDato: e.target.value })} style={inp} />
