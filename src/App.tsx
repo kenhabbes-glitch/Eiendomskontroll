@@ -1,3 +1,4 @@
+import './views/KomponentRunde';
 import { svaktPassord, PASSORDKRAV } from './lib/utils';
 import { MfaSkjerm } from './components/Tofaktor';
 import React, { useEffect, useState } from 'react';

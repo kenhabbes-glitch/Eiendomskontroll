@@ -6,6 +6,7 @@ import { dUntil, sortBy } from '../lib/utils';
 import { editDok } from '../lib/actions';
 import { CoverageTable, DokTable, ServiceavtaleTable } from '../components/tables';
 import { Search, Sel, eiendomOpts, useFilter } from './common';
+import { Sjekkmaler } from './Sjekkmaler';
 
 export function Dokumenter() {
   useStore();
@@ -22,5 +23,6 @@ export function Dokumenter() {
     <div className="sec"><div className="toolbar"><Search value={f.q} onChange={q => setF({ q })} /><Sel value={f.e} onChange={e => setF({ e })} opts={eiendomOpts()} empty="Alle eiendommer" />
       <Sel value={f.t} onChange={t => setF({ t })} opts={DOK_TYPER} empty="Alle typer" /><Sel value={f.g} onChange={g => setF({ g })} opts={[['exp', 'Utløpt / utløper ≤ 90 d']]} empty="Alle" /><span className="muted small">{L.length} dokumenter</span></div>
       <DokTable list={L} /></div>
+    <Sjekkmaler />
   </>;
 }

@@ -435,6 +435,9 @@ export function editOppgave(id?: string, preset: any = {}) {
     { k: 'hjemmel', label: 'Hjemmel / krav', hint: 'Lov, forskrift, standard eller avtale som utløser kontrollen' },
     { k: 'aktiv', label: 'Aktiv (vises i kontrollplanen)', type: 'checkbox' },
     { k: 'notat', label: 'Notater / sjekkpunkter', type: 'textarea', hint: 'Tas med i arbeidsordren til servicefirmaet' },
+    { k: 'kompSjekk', label: 'Sjekkliste per komponent', type: 'select', def: 'auto', show: x => !!x.anleggId && !x.komponentId,
+      options: [['auto', 'Automatisk – når komponentene har sjekklistemal (f.eks. branndører, nødlys)'], ['pa', 'På – én sjekkliste for hver komponent i systemet'], ['av', 'Av – én samlet utkvittering']],
+      hint: 'Komponentene kvitteres ut én og én mens man går gjennom bygget. Malene ligger under Dokumenter → Sjekklistemaler.' },
     { k: 'secAo', label: 'Arbeidsordre til servicefirma', type: 'sec', help: 'ko.arbeidsordre' },
     { k: 'aoEpost', label: 'E-post til servicefirma', type: 'email', half: true, ph: 'service@firma.no' },
     { k: 'aoAuto', label: 'Send automatisk før frist', type: 'checkbox', half: true },
@@ -452,9 +455,13 @@ export function editOppgave(id?: string, preset: any = {}) {
       x.ao = { epost: ep, auto: !!x.aoAuto, dager: Math.max(0, Math.min(365, +x.aoDager || 0)), melding: x.aoMelding || '' }; delete x.aoEpost; delete x.aoAuto; delete x.aoDager; delete x.aoMelding; delete x.aoInfo; if (x.anleggId) { const a = byId('anlegg', x.anleggId); if (a) x.eiendomId = a.eiendomId; } const kid = await save('oppgaver', { ...o, ...x }); toast('Kontroll lagret'); if (x.ao?.epost) import('../views/KontrollAo').then(m => m.sikreLokasjonsbilder(kid)); },
   });
 }
-export type UtforPreset = { dato?: string; av?: string; res?: string; komm?: string; avs?: string[]; nyFrist?: string; filer?: any[]; kilde?: string; tilstand?: { tg?: string; kg?: string; komm?: string } | null };
+export type UtforPreset = { fraRunde?: boolean; dato?: string; av?: string; res?: string; komm?: string; avs?: string[]; nyFrist?: string; filer?: any[]; kilde?: string; tilstand?: { tg?: string; kg?: string; komm?: string } | null };
 export function utfor(id: string, pre?: UtforPreset) {
   const o = byId('oppgaver', id); if (!o) return;
+  // Systemer med flere like komponenter (branndører, nødlys …): kvitteres komponent for komponent
+  if (!pre?.fraRunde && !pre?.kilde && RundeRef.start(id)) return;
+  const R: any = o.runde?.kp && Object.keys(o.runde.kp).length ? o.runde : null;
+  const rAvvik = R ? Object.entries(R.kp).filter(([, s]: any) => (s.avvik || []).length) as [string, any][] : [];
   const tgMaal = o.komponentId ? byId('komponenter', o.komponentId) : o.anleggId ? byId('anlegg', o.anleggId) : null;
   const lt = sortBy(S.leietakere.filter(l => l.eiendomId === o.eiendomId), l => l.navn);
   const nyRad = () => ({ t: '', a: 'Middels', k: '', an: o.ansvar === 'Leietaker' ? 'Leietaker' : 'Eier', l: o.leietakerId || (lt.length === 1 ? lt[0].id : ''), u: o.ansvar === 'Leietaker' ? '' : '' });
@@ -476,6 +483,7 @@ export function utfor(id: string, pre?: UtforPreset) {
             {kc.length > 0 && <select value={r.k} onChange={e => upd(i, { k: e.target.value })} title="Komponent"><option value="">Komponent –</option>{kc.map(k => <option key={k.id} value={k.id}>{'-' + k.kode + pad(k.lop)} {k.navn}</option>)}</select>}
           </div></div>)}
           <button type="button" className="btn sm" onClick={() => set({ avs: [...L, nyRad()] })}>+ Legg til avvik</button></>; } },
+    ...(R ? [{ k: 'rundeInfo', type: 'custom', label: 'Sjekkliste per komponent', render: () => <RundeRef.Oppsummering r={R} /> } as Field] : []),
     { k: 'komm', label: 'Kommentar', type: 'textarea', def: pre?.komm || '' },
     ...(tgMaal ? [{ k: 'tl', type: 'custom', def: pre?.tilstand || {}, render: (x: any, set: any) => <>
       <TgKgVelger v={x.tl || {}} set={t => set({ tl: t })} naa={{ tg: tgMaal.tg, kg: tgMaal.kg }} hva={(o.komponentId ? kNavn(o.komponentId) : aNavn(o.anleggId))} intern />
@@ -488,7 +496,7 @@ export function utfor(id: string, pre?: UtforPreset) {
     onSave: async x => {
       const avs = x.res === 'Avvik funnet' ? (x.avs || []).filter((a: any) => a.t.trim()) : [];
       if (avs.some((a: any) => a.an === 'Leietaker' && lt.length > 0 && !a.l)) { toast('Velg hvilken leietaker som skal rette avviket'); return false; }
-      if (x.res === 'Avvik funnet' && !avs.length) { toast('Skriv inn avvikene i feltene under «Avvik fra kontrollen» – én linje per avvik'); return false; }
+      if (x.res === 'Avvik funnet' && !avs.length && !rAvvik.length) { toast('Skriv inn avvikene i feltene under «Avvik fra kontrollen» – én linje per avvik'); return false; }
       let dokId = '';
       if (x.fil) { const f = await uploadFile(x.fil, o.eiendomId); if (f) dokId = await save('dokumenter', { eiendomId: o.eiendomId, leietakerId: '', type: o.type === 'Egenkontroll' ? 'Egenkontrollskjema' : 'Servicerapport', tittel: o.navn + ' – ' + fd(x.dato), dato: x.dato, fil: f, oppgaveId: o.id }); }
       const dokIds: string[] = [];
@@ -496,8 +504,20 @@ export function utfor(id: string, pre?: UtforPreset) {
       if (!dokId && dokIds.length) dokId = dokIds[0];
       const ids: string[] = [];
       for (const a of avs) ids.push(await save('avvik', { tittel: a.t.trim(), eiendomId: o.eiendomId, anleggId: o.anleggId || '', komponentId: a.k || '', alv: a.a, status: 'Ny', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, ansvar: a.an || 'Eier', leietakerId: a.an === 'Leietaker' ? (a.l || '') : '', utbedresAv: a.an === 'Leverandør/entreprenør' ? (a.u || '') : '', oppdaget: x.dato, frist: addDays(x.dato, AV_FRIST[a.a]), logg: [{ t: new Date().toISOString(), s: 'Ny', k: 'Registrert fra kontroll: ' + o.navn, av: state.me?.navn }] }));
-      const h = [{ dato: x.dato, av: x.av, res: x.res, komm: x.komm, dokId, dokIds: dokIds.length ? dokIds : undefined, avvik: ids, regAv: state.me?.id, kilde: pre?.kilde }, ...(o.historikk || [])].slice(0, 80);
+      // Avvik fra komponentsjekklisten: de som er registrert i appen finnes allerede, de fra servicefirmaets lenke opprettes nå
+      const kpNy: Record<string, any> = R ? { ...R.kp } : {};
+      for (const [kid, s] of rAvvik) {
+        if (s.avvikIds?.length) { ids.push(...s.avvikIds); continue; }
+        const k = byId('komponenter', kid); const kl = k ? kNavn(kid) : 'Komponent';
+        const aid = await save('avvik', { tittel: `${kl}: ${s.avvik.join('; ')}`.slice(0, 200), eiendomId: o.eiendomId, anleggId: o.anleggId || '', komponentId: k ? kid : '', alv: 'Middels', status: 'Ny', kilde: 'Servicerapport', oppgaveId: o.id,
+          ansvar: o.ansvar === 'Leietaker' ? 'Leietaker' : 'Eier', leietakerId: o.ansvar === 'Leietaker' ? (o.leietakerId || '') : '', beskrivelse: s.avvik.map((t: string) => '• ' + t).join('\n') + (s.komm ? '\n\n' + s.komm : ''),
+          plassering: k?.plassering || '', pos: k?.pos?.tegningId ? k.pos : null, vedlegg: s.filer || [], oppdaget: x.dato, frist: addDays(x.dato, AV_FRIST.Middels),
+          logg: [{ t: new Date().toISOString(), s: 'Ny', k: `Registrert fra komponentkontroll: ${o.navn}${s.av ? ' (' + s.av + (s.firma ? ', ' + s.firma : '') + ')' : ''}`, av: state.me?.navn }] });
+        ids.push(aid); kpNy[kid] = { ...s, avvikIds: [aid] };
+      }
+      const h = [{ dato: x.dato, av: x.av, res: x.res, komm: x.komm, dokId, dokIds: dokIds.length ? dokIds : undefined, avvik: ids, regAv: state.me?.id, kilde: pre?.kilde, runde: R ? { ...R, kp: kpNy } : undefined }, ...(o.historikk || [])].slice(0, 80);
       const upd: Rec = { ...byId('oppgaver', id)!, historikk: h };
+      if (R) delete upd.runde;
       if (pre?.kilde) delete upd.innrapport;
       if (x.res !== 'Ikke utført / utsatt') { upd.sistUtfort = x.dato; upd.nesteFrist = x.nyFrist || addInt(x.dato, o.intervall); } else if (x.nyFrist) upd.nesteFrist = x.nyFrist;
       await save('oppgaver', upd);
@@ -512,6 +532,8 @@ export function utfor(id: string, pre?: UtforPreset) {
     },
   });
 }
+// Settes av views/KomponentRunde (unngår sirkulær import)
+export const RundeRef: { start: (id: string) => boolean; Oppsummering: (p: { r: any }) => any } = { start: () => false, Oppsummering: () => null };
 // Settes av views/KontrollAo for å unngå sirkulær import
 export const KoPanelRef: { C: (p: { o: Rec; close: () => void }) => any } = { C: () => null };
 // Settes av views/Sjekkliste for å unngå sirkulær import
@@ -584,7 +606,7 @@ export function visOppgave(id: string) {
     <KoPanelRef.C o={o} close={close} />
     <IkUnderpunkter o={o} close={close} />
     <h3 style={{ marginTop: 18 }}>Historikk</h3>
-    {(o.historikk || []).length ? <div className="log">{o.historikk.map((h: any, i: number) => { const d = h.dokId && byId('dokumenter', h.dokId); return <div key={i}><span className="lt">{fd(h.dato)}</span> · <b>{h.res}</b>{h.av ? ' · ' + h.av : ''}{kanDrifteE(o.eiendomId) && <> · <a href="#" className="small" onClick={e => { e.preventDefault(); redigerHistorikk(o.id, i); }}>rediger</a></>}{h.komm && <><br />{h.komm}</>}{d?.fil && <><br /><FileLink fil={d.fil} /></>}{(() => { const n = Math.max((h.avvik || []).length, S.avvik.filter(a => a.oppgaveId === o.id && a.oppdaget === h.dato).length); return n > 0 ? <><br /><span className="muted small">{n} avvik registrert</span></> : null; })()}{!(h.avvik || []).length && !S.avvik.some(a => a.oppgaveId === o.id && a.oppdaget === h.dato) && h.res === 'Avvik funnet' && <><br /><a href="#" className="small" onClick={e => { e.preventDefault(); close(); editAvvik(undefined, { eiendomId: o.eiendomId, anleggId: o.anleggId || '', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, oppdaget: h.dato, beskrivelse: h.komm || '', ansvar: o.ansvar || 'Eier', leietakerId: o.leietakerId || '' }); }}>Ingen avvik ble opprettet – registrer avvik fra denne kontrollen</a></>}</div>; })}</div> : <p className="muted">Ikke registrert utført ennå.</p>}
+    {(o.historikk || []).length ? <div className="log">{o.historikk.map((h: any, i: number) => { const d = h.dokId && byId('dokumenter', h.dokId); return <div key={i}><span className="lt">{fd(h.dato)}</span> · <b>{h.res}</b>{h.av ? ' · ' + h.av : ''}{kanDrifteE(o.eiendomId) && <> · <a href="#" className="small" onClick={e => { e.preventDefault(); redigerHistorikk(o.id, i); }}>rediger</a></>}{h.komm && <><br />{h.komm}</>}{h.runde && <div style={{ marginTop: 4 }}><RundeRef.Oppsummering r={h.runde} /></div>}{d?.fil && <><br /><FileLink fil={d.fil} /></>}{(() => { const n = Math.max((h.avvik || []).length, S.avvik.filter(a => a.oppgaveId === o.id && a.oppdaget === h.dato).length); return n > 0 ? <><br /><span className="muted small">{n} avvik registrert</span></> : null; })()}{!(h.avvik || []).length && !S.avvik.some(a => a.oppgaveId === o.id && a.oppdaget === h.dato) && h.res === 'Avvik funnet' && <><br /><a href="#" className="small" onClick={e => { e.preventDefault(); close(); editAvvik(undefined, { eiendomId: o.eiendomId, anleggId: o.anleggId || '', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, oppdaget: h.dato, beskrivelse: h.komm || '', ansvar: o.ansvar || 'Eier', leietakerId: o.leietakerId || '' }); }}>Ingen avvik ble opprettet – registrer avvik fra denne kontrollen</a></>}</div>; })}</div> : <p className="muted">Ikke registrert utført ennå.</p>}
   </>, { foot: close => <>{canEdit() && <button className="btn" onClick={() => { close(); editOppgave(id); }}>Rediger</button>}<span className="grow" /><button className="btn pri" onClick={() => { close(); utfor(id); }}>Registrer utført</button></> });
 }
 

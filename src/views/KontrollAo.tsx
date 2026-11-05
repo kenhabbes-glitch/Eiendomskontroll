@@ -6,6 +6,7 @@ import { addDays, byId, fd, today, tfmSys, tfmKomp, type Rec } from '../lib/util
 import { plasserteFor } from './Arealer';
 import { Chip, FileLink, openModal, confirmBox } from '../components/ui';
 import { Hjelp } from '../components/Hjelp';
+import { BildeVelger } from '../components/PosVelger';
 import { PersonvernBekreft, PERSONVERN_VERSJON } from '../components/Personvern';
 import { TgKgVelger, tgTekst, type Tilstand } from '../components/TgKg';
 import { KoPanelRef, utfor } from '../lib/actions';
@@ -145,6 +146,77 @@ function SendKo({ id, close }: { id: string; close: () => void }) {
 }
 
 // ---------- Lenke til servicefirmaet (#/ko/<token>) – ingen innlogging
+// Komponentvis sjekkliste i lenken til servicefirmaet: kvitter ut én komponent om gangen (lagres med en gang)
+function EksternRunde({ info, token, av, firma, setF, sam, setSam, setInfo }: { info: any; token: string; av: string; firma: string; setF: (p: any) => void; sam: boolean; setSam: (b: boolean) => void; setInfo: (i: any) => void }) {
+  const K: any[] = [...info.komp].sort((a: any, b: any) => ((a.plassering || '~') + a.label).localeCompare((b.plassering || '~') + b.label, 'nb'));
+  const R = info.runde; const kp = R.kp || {};
+  const [aapen, setAapen] = useState(''); const [svar, setSvar] = useState<Record<string, string>>({}); const [tekst, setTekst] = useState<Record<string, string>>({});
+  const [komm, setKomm] = useState(''); const [bilder, setBilder] = useState<File[]>([]); const [busy, setBusy] = useState(false); const [feil, setFeil] = useState(''); const [visAlle, setVisAlle] = useState(false);
+  const malFor = (kid: string) => R.maler[R.malId?.[kid]] || Object.values(R.maler)[0] as any;
+  const aarlig = (() => { const iv = info.intervall || { n: 1, enhet: 'år' }; const e = String(iv.enhet || 'år'); return e.startsWith('år') || (e.startsWith('mnd') && +iv.n >= 12); })();
+  const punkter = (kid: string) => (malFor(kid)?.punkter || []).filter((p: any) => !p.aar || aarlig);
+  const harAv = (s: any) => !!s && ((s.avvik || []).length > 0);
+  const gjort = K.filter(k => kp[k.id]).length; const nAv = K.filter(k => harAv(kp[k.id])).length;
+  const aapne = (kid: string) => { setAapen(kid); setSvar(kp[kid]?.svar || {}); setTekst({}); setKomm(kp[kid]?.komm || ''); setBilder([]); setFeil(''); };
+  const lagre = async (videre: boolean) => {
+    const P = punkter(aapen);
+    if (!av.trim()) return setFeil('Skriv navnet ditt øverst i sjekklisten først');
+    if (!sam) return setFeil('Kryss av for personvernerklæringen først');
+    if (!P.every((p: any) => svar[p.id])) return setFeil('Svar på alle sjekkpunktene');
+    setBusy(true); setFeil('');
+    try {
+      const opp: any[] = [];
+      for (const fil of bilder) {
+        const u = await aoApi({ action: 'ko_opplasting', token, navn: fil.name }, false);
+        const { error } = await sb.storage.from('filer').uploadToSignedUrl(u.path, u.token, fil, { contentType: fil.type || 'application/octet-stream' });
+        if (error) throw new Error('Opplasting feilet: ' + error.message); opp.push({ path: u.path, navn: fil.name, type: fil.type, str: fil.size });
+      }
+      const avvik = P.filter((p: any) => svar[p.id] === 'avvik').map((p: any) => (tekst[p.id] ?? p.t).trim()).filter(Boolean);
+      await aoApi({ action: 'ko_komp', token, komponentId: aapen, svar: { svar, komm, av, firma, avvik }, filer: opp, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false);
+      const nkp = { ...kp, [aapen]: { t: new Date().toISOString(), av, firma, svar, komm, avvik } };
+      setInfo({ ...info, runde: { ...R, kp: nkp } });
+      const i = K.findIndex(k => k.id === aapen); const n = videre ? [...K.slice(i + 1), ...K.slice(0, i)].find(k => !nkp[k.id]) : null;
+      if (n) aapne(n.id); else setAapen('');
+    } catch (e: any) { setFeil(e.message || String(e)); }
+    setBusy(false);
+  };
+  const vis = visAlle ? K : K.filter(k => !kp[k.id] || k.id === aapen);
+  return <div style={{ marginTop: 14 }}>
+    <h3 style={{ margin: '4px 0 2px' }}>Sjekkliste per komponent</h3>
+    <p className="small muted" style={{ marginTop: 0 }}>Kvitter ut hver komponent etter hvert som du går gjennom bygget. Hver komponent lagres med en gang, så du kan lukke siden og fortsette senere med samme lenke. Send inn rapporten nederst når du er ferdig.</p>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '6px 0 10px' }}>
+      <div style={{ flex: 1, height: 9, background: '#eef0ec', borderRadius: 5, overflow: 'hidden' }}><div style={{ width: (K.length ? gjort / K.length * 100 : 0) + '%', height: '100%', background: nAv ? 'var(--amber)' : 'var(--acc)' }} /></div>
+      <b className="small">{gjort} av {K.length}</b>{nAv > 0 && <span className="small" style={{ color: 'var(--amber)' }}>{nAv} avvik</span>}
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+      <div><label className="small">Ditt navn</label><input value={av} onChange={e => setF({ av: e.target.value })} style={{ width: '100%' }} placeholder="Utført av" /></div>
+      <div><label className="small">Firma</label><input value={firma} onChange={e => setF({ firma: e.target.value })} style={{ width: '100%' }} /></div></div>
+    {!sam && <PersonvernBekreft ok={sam} set={setSam} ansvarlig={info.oppdragsgiver} />}
+    <div className="kr-liste" style={{ maxHeight: 'none' }}>{vis.map(k => { const s = kp[k.id]; const av_ = harAv(s); const laast = s?.laast;
+      return <div key={k.id}>
+        <button type="button" className={'kr-rad' + (s ? (av_ ? ' avvik' : ' ok') : '')} onClick={() => !laast && (aapen === k.id ? setAapen('') : aapne(k.id))}>
+          <span className="kr-ikon">{s ? (av_ ? '!' : '✓') : ''}</span>
+          <span style={{ flex: 1, textAlign: 'left' }}><b>{k.label}</b><span className="small muted" style={{ display: 'block' }}>{k.plassering || 'Plassering ikke registrert'}</span></span>
+          <span className="small muted">{laast ? 'Behandlet av oppdragsgiver' : s ? (s.av || 'Kontrollert') : 'Kontroller'}</span></button>
+        {aapen === k.id && <div className="card" style={{ margin: '4px 0 8px', padding: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span className="small muted">{malFor(k.id)?.navn}</span>
+            <button type="button" className="btn sm" onClick={() => setSvar(Object.fromEntries(punkter(k.id).map((p: any) => [p.id, svar[p.id] === 'ia' ? 'ia' : 'ok'])))}>✓ Alt OK</button></div>
+          <div className="kr-punkter">{punkter(k.id).map((p: any, i: number) => <div key={p.id} className="kr-punkt">
+            <div style={{ flex: 1 }}><span className="muted small">{i + 1}.</span> {p.t}
+              {svar[p.id] === 'avvik' && <input className="kr-avtekst" value={tekst[p.id] ?? p.t} onChange={e => setTekst({ ...tekst, [p.id]: e.target.value })} />}</div>
+            <div className="kr-valg">{([['ok', 'OK'], ['avvik', 'Avvik'], ['ia', 'I.R.']] as const).map(([v, l]) =>
+              <button key={v} type="button" className={'kr-v ' + v + (svar[p.id] === v ? ' on' : '')} onClick={() => setSvar({ ...svar, [p.id]: v })}>{l}</button>)}</div></div>)}</div>
+          {Object.values(svar).includes('avvik') && <div style={{ marginTop: 8 }}><label className="small">Bilder av avviket (valgfritt)</label><BildeVelger filer={bilder} set={setBilder} /></div>}
+          <label className="small">Kommentar (valgfritt)</label><input value={komm} onChange={e => setKomm(e.target.value)} style={{ width: '100%' }} />
+          {feil && <p className="small" style={{ color: 'var(--red)' }}>{feil}</p>}
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}><button type="button" className="btn" disabled={busy} onClick={() => lagre(false)}>Kvitter ut</button>
+            <button type="button" className="btn pri" style={{ flex: 1 }} disabled={busy} onClick={() => lagre(true)}>{busy ? 'Lagrer …' : 'Kvitter ut og neste →'}</button></div>
+        </div>}</div>; })}</div>
+    {!vis.length && <p className="small muted">Alle komponentene er kontrollert. Send inn rapporten nedenfor.</p>}
+    {gjort > 0 && <p className="small"><a href="#" onClick={e => { e.preventDefault(); setVisAlle(!visAlle); }}>{visAlle ? 'Skjul kontrollerte' : `Vis kontrollerte (${gjort})`}</a></p>}
+  </div>;
+}
+
 export function KoLenke({ token }: { token: string }) {
   const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [ferdig, setFerdig] = useState(false); const [busy, setBusy] = useState(false);
   const [sam, setSam] = useState(false); const [tl, setTl] = useState<Tilstand>({});
@@ -156,6 +228,8 @@ export function KoLenke({ token }: { token: string }) {
     if (f.res === 'Avvik funnet' && !f.avvik.some((a: string) => a.trim())) return setErr('Beskriv avvikene – ett per linje');
     if (filer.some(x => x.size > 50e6)) return setErr('Hver fil kan være maks 50 MB');
     if (!sam) return setErr('Du må godta personvernerklæringen før du sender inn');
+    if (info.komp?.length && info.runde) { const n = info.komp.filter((k: any) => !info.runde.kp?.[k.id]).length;
+      if (n && !window.confirm(`${n} av ${info.komp.length} komponenter er ikke kvittert ut. Sende inn rapporten likevel?`)) return; }
     setBusy(true); setErr('');
     try {
       const opp: any[] = [];
@@ -171,7 +245,7 @@ export function KoLenke({ token }: { token: string }) {
   };
   const inp = { width: '100%' } as any;
   return <div className="login"><div className="card" style={{ maxWidth: 560 }}>
-    <p className="small" style={{ color: 'var(--accent, #1f6f5c)', fontWeight: 700, margin: 0 }}>ARBEIDSORDRE{info?.type ? ' – ' + String(info.type).toUpperCase() : ''}</p>
+    <p className="small" style={{ color: 'var(--acc)', fontWeight: 700, margin: 0 }}>ARBEIDSORDRE{info?.type ? ' – ' + String(info.type).toUpperCase() : ''}</p>
     {err && !info ? <><h1>Lenken virker ikke</h1><p>{err}</p></>
       : !info ? <p>Henter arbeidsordren …</p>
       : <>
@@ -184,7 +258,8 @@ export function KoLenke({ token }: { token: string }) {
         {ferdig ? <div className="note" style={{ marginTop: 14 }}><b>Takk – rapporten er sendt inn.</b><br /><span className="small">Oppdragsgiver går gjennom den og registrerer kontrollen som utført. Lenken kan ikke brukes på nytt; ta kontakt med oppdragsgiver ved behov for endringer.</span></div>
         : <form onSubmit={sendInn} style={{ marginTop: 14 }}>
           {info.utdatert && <p className="small" style={{ color: 'var(--amber)' }}>Merk: Fristen er endret siden arbeidsordren ble sendt. Rapporten kan likevel sendes inn.</p>}
-          <h3 style={{ margin: '4px 0 6px' }}>Registrer utført</h3>
+          {info.komp?.length > 0 && info.runde && <EksternRunde info={info} token={token} av={f.av} firma={f.firma} setF={set} sam={sam} setSam={setSam} setInfo={setInfo} />}
+          <h3 style={{ margin: '14px 0 6px' }}>{info.komp?.length ? 'Send inn rapport' : 'Registrer utført'}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
             <div><label>Utført dato</label><input type="date" value={f.dato} max={today()} onChange={e => set({ dato: e.target.value })} required style={inp} /></div>
             <div><label>Resultat</label><select value={f.res} onChange={e => set({ res: e.target.value })} style={{ ...inp, border: '1px solid var(--line2)', borderRadius: 8, padding: '9px 10px', background: '#fff', marginTop: 0 }}>{['OK – ingen avvik', 'Avvik funnet', 'Ikke utført / utsatt'].map(x => <option key={x}>{x}</option>)}</select></div>

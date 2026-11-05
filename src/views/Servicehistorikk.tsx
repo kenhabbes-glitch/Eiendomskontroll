@@ -16,7 +16,8 @@ export function ServiceHistorikk({ anleggId, komponentId }: { anleggId?: string;
   const eid = (sys || komp)?.eiendomId; if (!eid) return null;
   const kompIds = sys ? S.komponenter.filter(k => k.anleggId === sys.id).map(k => k.id) : [];
   const gjelder = (x: Rec) => komp ? x.komponentId === komp.id : (x.anleggId === sys!.id || kompIds.includes(x.komponentId));
-  const K = S.oppgaver.filter(o => gjelder(o)); const A = S.avvik.filter(a => gjelder(a));
+  // For en komponent: også systemets kontroller der komponenten ble kvittert ut i en komponentvis sjekkliste
+  const K = S.oppgaver.filter(o => gjelder(o) || (komp && o.anleggId === komp.anleggId && (o.historikk || []).some((h: any) => h.runde?.kp?.[komp.id]))); const A = S.avvik.filter(a => gjelder(a));
   const kan = kanDrifteE(eid);
   const apne = A.filter(a => !AV_LUKKET.includes(a.status));
   const nyStatus = async (a: Rec, s: string) => {
@@ -26,7 +27,12 @@ export function ServiceHistorikk({ anleggId, komponentId }: { anleggId?: string;
     await save('avvik', n); toast(`Avvik #${f.nr}: ${s}`);
   };
   const rader: Rad[] = [];
-  for (const o of K) for (const [i, h] of (o.historikk || []).entries()) {
+  for (const o of K) for (const [i, h0] of (o.historikk || []).entries()) {
+    let h = h0;
+    if (komp && !gjelder(o)) { // bare komponentens egen linje fra sjekklisten
+      const s = h0.runde?.kp?.[komp.id]; if (!s) continue; const av = (s.avvik || []).length > 0;
+      h = { ...h0, res: av ? 'Avvik funnet' : 'OK – ingen avvik', av: s.av ? s.av + (s.firma ? ' (' + s.firma + ')' : '') : h0.av, komm: 'Sjekkliste: ' + (av ? s.avvik.join('; ') : 'alle punkter OK') + (s.komm ? ' – ' + s.komm : ''), avvik: s.avvikIds || [], dokId: h0.dokId };
+    }
     const dk = h.dokId && byId('dokumenter', h.dokId);
     rader.push({ d: h.dato || '', type: 'service', key: o.id + i, el: <tr key={o.id + ':' + i} className="click" onClick={() => visOppgave(o.id)}>
       <td className="small" style={{ whiteSpace: 'nowrap' }}>{fd(h.dato)}</td>

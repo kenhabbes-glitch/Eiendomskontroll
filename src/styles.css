@@ -254,3 +254,18 @@ h1 .hjelp-q{position:relative;top:-2px}
 .pn p,.pn li{line-height:1.55}.pn ul,.pn ol{padding-left:20px}
 .pn-t{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0 10px}.pn-t th,.pn-t td{border:1px solid var(--line);padding:5px 7px;text-align:left;vertical-align:top}.pn-t th{background:var(--surface2)}
 .flagg{background:#fff4d6;border-left:3px solid #c08a00;padding:6px 10px;margin:8px 0;border-radius:0 6px 6px 0;font-size:13px}
+
+/* Komponentvis sjekkliste */
+.kr-liste{display:flex;flex-direction:column;gap:6px;max-height:58vh;overflow:auto}
+.kr-rad{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer;font:inherit;color:inherit;width:100%}
+.kr-rad:hover{border-color:var(--acc)}.kr-rad.ok{background:#f1f8f4}.kr-rad.avvik{background:#fff7e6}
+.kr-ikon{width:26px;height:26px;border-radius:50%;border:2px solid var(--line2);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+.kr-rad.ok .kr-ikon{background:var(--acc);border-color:var(--acc);color:#fff}.kr-rad.avvik .kr-ikon{background:var(--amber);border-color:var(--amber);color:#fff}
+.kr-punkter{display:flex;flex-direction:column}
+.kr-punkt{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}
+.kr-valg{display:flex;gap:4px;flex:none}
+.kr-v{border:1px solid var(--line2);background:var(--surface);border-radius:8px;padding:8px 10px;min-width:48px;font:inherit;font-size:13px;cursor:pointer}
+.kr-v.ok.on{background:var(--acc);border-color:var(--acc);color:#fff}.kr-v.avvik.on{background:var(--amber);border-color:var(--amber);color:#fff}.kr-v.ia.on{background:#6b736d;border-color:#6b736d;color:#fff}
+.kr-avtekst{display:block;width:100%;margin-top:6px;border:1px solid var(--amber);border-radius:8px;padding:6px 8px;font:inherit}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+@media (max-width:600px){.kr-punkt{flex-direction:column}.kr-valg{width:100%}.kr-v{flex:1;padding:11px 0}}
