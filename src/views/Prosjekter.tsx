@@ -6,7 +6,7 @@ import { byId, fd, today, sortBy, eNavn, aNavn, nok, toCsv, type Rec } from '../
 import { Chip, Empty, confirmBox, formModal, openModal, ModalFrame, FileLink, TgChip } from '../components/ui';
 import { editAnlegg } from '../lib/actions';
 import { KOMP } from '../lib/catalog';
-import { BETALER, FAG, FASER, KLASSER, KONTO, PSTATUS, PTYPER, ferdigstill, fremdrift, nyttProsjektData, okonomi, uid } from '../lib/prosjekt';
+import { BETALER, DELER, delFor, delNavn, FAG, FASER, KLASSER, KONTO, PSTATUS, PTYPER, ferdigstill, fremdrift, nyttProsjektData, okonomi, uid } from '../lib/prosjekt';
 import { lNavn } from '../lib/utils';
 import { NsVelger, nsNavn } from '../components/NsVelger';
 import { Sel, eiendomOpts, useFilter } from './common';
@@ -183,6 +183,8 @@ function Okonomi({ p, kan }: { p: Rec; kan: boolean }) {
   const redPost = (b?: Rec) => formModal({ title: b ? 'Rediger budsjettpost' : 'Ny budsjettpost', values: b || { klasse: p.type === 'Vedlikehold' ? 'vedl' : 'pak', konto: p.type === 'Vedlikehold' ? '6600' : '1100' }, fields: [
     { k: 'post', label: 'Post', req: true, ph: 'F.eks. Rive gammelt aggregat' }, { k: 'fag', label: 'Fag', type: 'select', options: fagValg(p), empty: '– felles –', half: true },
     { k: 'bygningsdel', label: 'Bygningsdel (NS 3451)', type: 'custom', render: (v, set) => <NsVelger value={v.bygningsdel} set={k => set({ bygningsdel: k })} fag={v.fag} /> },
+    { k: 'del', label: 'Bygg / teknisk (avskrivning)', type: 'select', half: true, def: 'auto', options: [['auto', 'Automatisk fra bygningsdel'], ...DELER.map(d => [d[0], `${d[1]} – ${d[2]}`] as [string, string])],
+      hint: 'Utledes av NS 3451: 2 = bygg, 3–6 = tekniske installasjoner, 7 = utendørs' },
     { k: 'betaler', label: 'Betales av', type: 'select', options: BETALER, half: true, def: 'eier' }, { k: 'andelLt', label: 'Leietakers andel (%)', type: 'number', half: true, show: x => x.betaler === 'delt' },
     { k: 'klasse', label: 'Regnskapsklassifisering', type: 'select', options: KLASSER, half: true }, { k: 'konto', label: 'Konto', half: true, dl: KONTO },
     { k: 'belop', label: 'Budsjett (kr eks. mva)', type: 'number', half: true }, { k: 'prognose', label: 'Prognose (tom = beregnes)', type: 'number', half: true }],
@@ -200,13 +202,13 @@ function Okonomi({ p, kan }: { p: Rec; kan: boolean }) {
     onSave: async x => { const L: Rec[] = byId('prosjekter', p.id)!.kostnader || []; await oppdater(p.id, { kostnader: k ? L.map(y => y.id === k.id ? { ...y, ...x } : y) : [...L, { id: uid(), ...x }] }, k ? undefined : `Kostnad: ${x.leverandor || x.beskrivelse || ''} ${kr(+x.belop || 0)}`); } });
   const post = (id: string) => (p.budsjett || []).find((b: Rec) => b.id === id);
   const klasseFor = (k: Rec) => k.klasse || post(k.post)?.klasse || 'annet'; const kontoFor = (k: Rec) => k.konto || post(k.post)?.konto || '';
-  const eksport = () => { const rader: (string | number)[][] = [['Dato', 'Prosjekt', 'Eiendom', 'Leverandør', 'Faktura/ordre', 'Beskrivelse', 'Budsjettpost', 'Fag', 'Bygningsdel', 'Klassifisering', 'Konto', 'Betales av', 'Leietakers andel %', 'Status', 'Beløp eks. mva']];
-    for (const k of p.kostnader || []) { const b = post(k.post); rader.push([k.dato, p.navn, eNavn(p.eiendomId), k.leverandor || '', k.faktura || '', k.beskrivelse || '', b?.post || '', o.fagF(k), b?.bygningsdel ? `${b.bygningsdel} ${nsNavn(b.bygningsdel)}` : '', klasseNavn(klasseFor(k)), kontoFor(k), BETALER.find(x => x[0] === (b?.betaler || 'eier'))?.[1] || 'Eier', b?.betaler === 'leietaker' ? 100 : b?.betaler === 'delt' ? +b.andelLt || 0 : 0, k.status, +k.belop || 0]); }
+  const eksport = () => { const rader: (string | number)[][] = [['Dato', 'Prosjekt', 'Eiendom', 'Leverandør', 'Faktura/ordre', 'Beskrivelse', 'Budsjettpost', 'Fag', 'Bygningsdel', 'Klassifisering', 'Bygg/teknisk', 'Konto', 'Betales av', 'Leietakers andel %', 'Status', 'Beløp eks. mva']];
+    for (const k of p.kostnader || []) { const b = post(k.post); rader.push([k.dato, p.navn, eNavn(p.eiendomId), k.leverandor || '', k.faktura || '', k.beskrivelse || '', b?.post || '', o.fagF(k), b?.bygningsdel ? `${b.bygningsdel} ${nsNavn(b.bygningsdel)}` : '', klasseNavn(klasseFor(k)), delNavn(b ? delFor(b) : 'felles'), kontoFor(k), BETALER.find(x => x[0] === (b?.betaler || 'eier'))?.[1] || 'Eier', b?.betaler === 'leietaker' ? 100 : b?.betaler === 'delt' ? +b.andelLt || 0 : 0, k.status, +k.belop || 0]); }
     const b = new Blob(['﻿' + toCsv(rader)], { type: 'text/csv;charset=utf-8' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `kostnader-${p.navn}.csv`.replace(/[^\wæøåÆØÅ.\- ]/g, ''); a.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); };
   return <>
     <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Budsjett og prognose</h2>{kan && <button className="btn" onClick={() => redPost()}>+ Budsjettpost</button>}</div>
       <div className="tbl-wrap"><table><thead><tr><th>Post</th><th>Fag</th><th>Klassifisering</th><th className="num">Budsjett</th><th className="num">Forpliktet</th><th className="num">Påløpt</th><th className="num">Prognose</th><th className="num">Avvik</th></tr></thead><tbody>
-        {o.poster.map(x => <tr key={x.b.id} className={kan ? 'click' : ''} onClick={() => kan && redPost(x.b)}><td>{x.b.post}{x.b.bygningsdel && <span className="small muted"> · <span className="mono">{x.b.bygningsdel}</span> {nsNavn(x.b.bygningsdel)}</span>}{x.b.betaler && x.b.betaler !== 'eier' && <div className="small" style={{ color: 'var(--blue)' }}>{x.b.betaler === 'delt' ? `Delt – leietaker ${x.b.andelLt || 0} %` : 'Betales av leietaker'}</div>}</td><td className="small">{x.b.fag || '–'}</td><td className="small">{klasseNavn(x.b.klasse)}{x.b.konto ? ` · ${x.b.konto}` : ''}</td>
+        {o.poster.map(x => <tr key={x.b.id} className={kan ? 'click' : ''} onClick={() => kan && redPost(x.b)}><td>{x.b.post}{x.b.bygningsdel && <span className="small muted"> · <span className="mono">{x.b.bygningsdel}</span> {nsNavn(x.b.bygningsdel)}</span>}{x.b.betaler && x.b.betaler !== 'eier' && <div className="small" style={{ color: 'var(--blue)' }}>{x.b.betaler === 'delt' ? `Delt – leietaker ${x.b.andelLt || 0} %` : 'Betales av leietaker'}</div>}</td><td className="small">{x.b.fag || '–'}</td><td className="small">{klasseNavn(x.b.klasse)}{x.b.konto ? ` · ${x.b.konto}` : ''}<div className="muted">{delNavn(delFor(x.b))}</div></td>
           <td className="num mono">{kr(x.budsjett)}</td><td className="num mono">{kr(x.forpliktet)}</td><td className="num mono">{kr(x.palopt)}</td><td className="num mono">{kr(x.prognose)}</td><td className="num mono" style={{ color: x.prognose > x.budsjett ? 'var(--red)' : undefined }}>{kr(x.prognose - x.budsjett)}</td></tr>)}
         {o.uten.length > 0 && <tr><td className="muted">Uten budsjettpost</td><td /><td /><td className="num mono">–</td><td className="num mono">{kr(o.uten.reduce((s, x) => s + (+x.belop || 0), 0))}</td><td /><td /><td /></tr>}
         <tr style={{ fontWeight: 700 }}><td>Sum</td><td /><td /><td className="num mono">{kr(o.tot.budsjett)}</td><td className="num mono">{kr(o.tot.forpliktet)}</td><td className="num mono">{kr(o.tot.palopt)}</td><td className="num mono">{kr(o.tot.prognose)}</td><td className="num mono" style={{ color: o.avvik > 0 ? 'var(--red)' : undefined }}>{kr(o.avvik)}</td></tr>
@@ -222,9 +224,15 @@ function Okonomi({ p, kan }: { p: Rec; kan: boolean }) {
     {(erLt(p.type) || o.fordeling.leietaker > 0) && <div className="sec"><h2>Fordeling eier / leietaker</h2>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}><Kpi t="Eier" v={kr(o.fordeling.eier)} s="av prognosen" /><Kpi t={'Leietaker' + (p.leietakerId ? ' – ' + lNavn(p.leietakerId) : '')} v={kr(o.fordeling.leietaker)} s="grunnlag for viderefakturering" /></div>
       <p className="small muted">Fordelingen settes per budsjettpost med «Betales av» (eier, leietaker eller delt med prosentandel). Kontroller mot leieavtalen og avtalt tilpasningsbidrag.</p></div>}
-    <div className="sec"><h2>Per regnskapsklassifisering</h2><div className="tbl-wrap"><table><thead><tr><th>Klassifisering</th><th className="num">Budsjett</th><th className="num">Påløpt</th></tr></thead><tbody>
-      {Object.entries(o.perKlasse).map(([k, v]) => <tr key={k}><td>{klasseNavn(k)}</td><td className="num mono">{kr(v.budsjett)}</td><td className="num mono">{kr(v.palopt)}</td></tr>)}</tbody></table></div>
-      <p className="small muted">Skillet mellom vedlikehold (kostnadsføres) og påkostning (aktiveres) har skattemessig betydning. Kontroller klassifiseringen med regnskapsfører. Kontoene følger NS 4102 og kan endres per post.</p></div>
+    <div className="sec"><h2>Per regnskapsklassifisering – bygg og tekniske installasjoner</h2>
+      {(() => { const D = DELER.filter(d => Object.values(o.matrise).some(r => r[d[0]])); const kl = Object.keys(o.matrise);
+        const sumD = (d: string) => kl.reduce((s0, k) => s0 + (o.matrise[k][d]?.prognose || 0), 0);
+        return <div className="tbl-wrap"><table><thead><tr><th>Klassifisering</th>{D.map(d => <th key={d[0]} className="num" title={d[2]}>{d[1]}<div className="muted" style={{ fontWeight: 400, textTransform: 'none' }}>{d[2]}</div></th>)}<th className="num">Sum</th></tr></thead><tbody>
+          {kl.map(k => { const r = o.matrise[k]; const sum = Object.values(r).reduce((s0, v) => s0 + v.prognose, 0);
+            return <tr key={k}><td>{klasseNavn(k)}</td>{D.map(d => <td key={d[0]} className="num mono">{r[d[0]] ? <>{kr(r[d[0]].prognose)}{r[d[0]].palopt ? <div className="small muted">påløpt {kr(r[d[0]].palopt)}</div> : null}</> : '–'}</td>)}<td className="num mono"><b>{kr(sum)}</b></td></tr>; })}
+          <tr style={{ fontWeight: 700 }}><td>Sum</td>{D.map(d => <td key={d[0]} className="num mono">{kr(sumD(d[0]))}</td>)}<td className="num mono">{kr(o.tot.prognose)}</td></tr>
+        </tbody></table></div>; })()}
+      <p className="small muted">Beløp er prognose (påløpt under). For aktiverte kostnader (påkostning, nybygg) skal bygg og faste tekniske installasjoner føres på hver sin saldo: bygg i saldogruppe h (4 %) eller i for forretningsbygg (2 %), og tekniske installasjoner (VVS, elektro, kjøling, heis o.l.) i saldogruppe j (10 %). Fordelingen utledes av bygningsdel (NS 3451) og kan overstyres per post. Felles kostnader, som rigg og prosjektledelse, fordeles normalt forholdsmessig. Skillet mellom vedlikehold og påkostning, og grensen mot driftsmidler, avklares med regnskapsfører.</p></div>
   </>;
 }
 

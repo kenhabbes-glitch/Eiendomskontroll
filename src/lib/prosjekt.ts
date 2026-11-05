@@ -23,6 +23,14 @@ export const KLASSER: [string, string][] = [
   ['vedl', 'Vedlikehold – kostnadsføres (6600)'], ['pak', 'Påkostning – aktiveres (11xx)'], ['nybygg', 'Nybygg / tilbygg – aktiveres (11xx)'],
   ['rad', 'Rådgivning / prosjektering (6700)'], ['lt', 'Leietakertilpasning (avtales: aktiveres eller viderefaktureres)'], ['annet', 'Annet / avklares'],
 ];
+/** Fordeling for avskrivning: bygg (saldogruppe h/i) og faste tekniske installasjoner (saldogruppe j, 10 %). Utledes av NS 3451. */
+export const DELER: [string, string, string][] = [['bygg', 'Bygg', 'saldogruppe h/i (4 % / 2 %)'], ['teknisk', 'Tekniske installasjoner', 'saldogruppe j (10 %)'], ['ute', 'Utendørs / anlegg', 'saldogruppe h'], ['felles', 'Felles / ikke fordelt', 'fordeles forholdsmessig']];
+export function delFor(b?: Rec | null): string {
+  if (b?.del && b.del !== 'auto') return b.del;
+  const k = String(b?.bygningsdel || '')[0];
+  return k === '2' ? 'bygg' : ['3', '4', '5', '6'].includes(k) ? 'teknisk' : k === '7' ? 'ute' : 'felles';
+}
+export const delNavn = (d: string) => DELER.find(x => x[0] === d)?.[1] || 'Felles / ikke fordelt';
 export const KONTO: [string, string][] = [['1100', 'Bygninger'], ['1120', 'Tekniske installasjoner i bygg'], ['1130', 'Anlegg under utførelse'], ['6600', 'Reparasjon og vedlikehold bygninger'], ['6620', 'Reparasjon og vedlikehold utstyr'], ['6700', 'Fremmedtjenester (rådgivning)'], ['6790', 'Annen fremmed tjeneste']];
 /** Fag / entrepriser som kan inngå i et prosjekt */
 export const FAG = ['Prosjektledelse / byggherre', 'Rådgiver / arkitekt', 'Bygningsarbeider / tømrer', 'Riving', 'Murer / betong', 'Maler / overflater', 'Gulv', 'Himling', 'Glass / dører / lås', 'Elektro', 'Rør / sanitær', 'Ventilasjon', 'Kjøling', 'Brann (alarm, sprinkler, branntetting)', 'Tele / data / adgangskontroll', 'Heis', 'Storkjøkken', 'Skilt og profilering', 'Rengjøring / byggvask', 'Annet'];
@@ -67,7 +75,12 @@ export function okonomi(p: Rec) {
   const fordeling = { eier: 0, leietaker: 0 };
   for (const x of poster) { const b = x.b; const a = b.betaler === 'leietaker' ? 1 : b.betaler === 'delt' ? Math.min(100, Math.max(0, n(b.andelLt))) / 100 : 0; fordeling.leietaker += x.prognose * a; fordeling.eier += x.prognose * (1 - a); }
   fordeling.eier += utenSum;
-  return { poster, uten, tot, perKlasse, perFag, fordeling, avvik: tot.prognose - tot.budsjett, fagF };
+  // Klassifisering × bygg/teknisk (prognose og påløpt)
+  const matrise: Record<string, Record<string, { prognose: number; palopt: number }>> = {};
+  const legg = (kl: string, d: string, pr: number, pa: number) => { ((matrise[kl] ||= {})[d] ||= { prognose: 0, palopt: 0 }); matrise[kl][d].prognose += pr; matrise[kl][d].palopt += pa; };
+  for (const x of poster) legg(x.b.klasse || 'annet', delFor(x.b), x.prognose, x.palopt);
+  for (const x of uten) legg(x.klasse || 'annet', 'felles', n(x.belop), x.status !== 'Bestilt' ? n(x.belop) : 0);
+  return { poster, uten, tot, perKlasse, perFag, fordeling, matrise, avvik: tot.prognose - tot.budsjett, fagF };
 }
 export function fremdrift(p: Rec) { const O: Rec[] = p.oppgaver || []; if (!O.length) return 0; return Math.round(O.filter(o => o.status === 'Ferdig').length / O.filter(o => o.status !== 'Ikke relevant').length * 100) || 0; }
 
