@@ -6,6 +6,7 @@ import { S, adminApi, isPlattform, mineOrg, reloadAdmin, sb, state, toast, useSt
 import { eNavn, fd, sortBy, today, aNavn } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, type Field } from '../components/ui';
 import { KOMP } from '../lib/catalog';
+import { PersonvernNotat } from './PersonvernNotat';
 
 export const ORG_ROLLER: [string, string, string][] = [
   ['admin', 'Administrator', 'Styrer organisasjonen: brukere, tildeling av bygg, porteføljer og oppdrag. Ser alle bygg organisasjonen har.'],
@@ -183,7 +184,7 @@ export function Organisasjon() {
   const admin = mineOrg(['admin']); const eierRoller = mineOrg(['admin', 'forvalter']).filter(o => o.type === 'eier' || S.eiendommer.some(e => e.eierOrgId === o.id) || S.portefoljer.some(p => p.eier_org_id === o.id));
   const fane0 = admin.length ? 'medlemmer' : eierRoller.length ? 'portefoljer' : isPlattform() ? 'kunder' : 'medlemmer';
   const [fane, setFane] = useState(fane0); const [orgV, setOrgV] = useState(admin[0]?.id || '');
-  const tabs: [string, string][] = [...(admin.length ? [['medlemmer', 'Brukere og tildeling']] as [string, string][] : []), ...(eierRoller.length ? [['portefoljer', 'Porteføljer'], ['oppdrag', 'Oppdrag']] as [string, string][] : []), ...(isPlattform() ? [['kunder', 'Kunder (plattform)']] as [string, string][] : [])];
+  const tabs: [string, string][] = [...(admin.length ? [['medlemmer', 'Brukere og tildeling']] as [string, string][] : []), ...(eierRoller.length ? [['portefoljer', 'Porteføljer'], ['oppdrag', 'Oppdrag']] as [string, string][] : []), ...(admin.length ? [['personvern', 'Personvern']] as [string, string][] : []), ...(isPlattform() ? [['kunder', 'Kunder (plattform)']] as [string, string][] : [])];
   const org = admin.find(o => o.id === orgV) ? orgV : admin[0]?.id || '';
   const eierOrg = eierRoller.find(o => o.id === orgV)?.id || eierRoller[0]?.id || '';
   const orgVelger = (L: any[], v: string) => L.length > 1 ? <select value={v} onChange={e => setOrgV(e.target.value)} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '6px 8px' }}>{L.map(o => <option key={o.id} value={o.id}>{o.navn}</option>)}</select> : <b>{L[0]?.navn}</b>;
@@ -235,6 +236,10 @@ export function Organisasjon() {
       {gitt.length ? <div className="tbl-wrap"><table><thead><tr><th>Firma</th><th>Gjelder</th><th>Rolle</th><th>Periode</th><th>Status</th></tr></thead><tbody>{sortBy(gitt, o => orgNavn(o.org_id)).map(o => rad(o, true))}</tbody></table></div>
         : <div className="card"><Empty t="Ingen oppdrag gitt">Gi et forvalterselskap, en byggdrifter eller et servicefirma tilgang til bygg eller porteføljer. Firmaet ser bare det dere gir dem, og tilgangen opphører når oppdraget avsluttes.</Empty></div>}
       {fatt.length > 0 && <div className="sec"><h2>Oppdrag dere har fått</h2><div className="tbl-wrap"><table><thead><tr><th>Oppdragsgiver</th><th>Gjelder</th><th>Rolle</th><th>Periode</th><th>Status</th></tr></thead><tbody>{fatt.map(o => rad(o, false))}</tbody></table></div><p className="small muted">Fordel byggene på deres ansatte under «Brukere og tildeling».</p></div>}</>;
+  }
+  if (fane === 'personvern' && org) {
+    c = <><div className="toolbar">{orgVelger(admin, org)}<span className="muted small">Notat til advokat om hvordan appen behandler personopplysninger. Skriv ut eller lagre som PDF og send til advokaten; noter tilbakemeldingen her.</span></div>
+      <PersonvernNotat key={org} org={org} /></>;
   }
   if (fane === 'kunder' && isPlattform()) {
     const O = sortBy(S.orgs, o => o.navn);
