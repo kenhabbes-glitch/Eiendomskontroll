@@ -88,7 +88,7 @@ function EpostKort() {
     {feil && <div className="banner">{feil}</div>}
     {aktiv && <p className="small">{aktiv.metode ? <>Aktiv nå: <b>{aktiv.metode === 'smtp' ? 'SMTP' : 'Resend'}</b> fra <b>{aktiv.fra}</b> {aktiv.kilde === 'netlify' && <span className="muted">(fra miljøvariabler i Netlify – det du lagrer her overstyrer dem)</span>}</> : <span style={{ color: 'var(--amber)' }}>Ingen e-posttjeneste er satt opp. Arbeidsordre åpnes i brukerens eget e-postprogram.</span>}</p>}
     <div className="form" style={{ maxWidth: 640 }}>
-      <div className="fld half"><label>Avsendernavn</label><input style={inp} value={d.fraNavn || ''} onChange={e => set({ fraNavn: e.target.value })} placeholder="F.eks. Havnespeilet Eiendom AS" /></div>
+      <div className="fld half"><label>Standard avsendernavn</label><input style={inp} value={d.fraNavn || ''} onChange={e => set({ fraNavn: e.target.value })} placeholder="F.eks. organisasjonens navn" /><div className="hint">Brukes når eiendommen ikke har eget avsendernavn eller eier registrert. Ellers vises eiendommens avsendernavn, eller eieren (hjemmelshaver).</div></div>
       <div className="fld half"><label>Svar går til (valgfritt)</label><input style={inp} value={d.svarTil || ''} onChange={e => set({ svarTil: e.target.value })} placeholder="Tom = den som sendte arbeidsordren" /></div>
       <div className="fld half"><label>Sendemetode</label><select style={inp} value={d.metode || ''} onChange={e => set({ metode: e.target.value })}><option value="smtp">SMTP (egen e-postkonto)</option><option value="resend">Resend (eget domene)</option><option value="">Av – bruk eget e-postprogram</option></select></div>
       {d.metode === 'smtp' && <>
@@ -104,7 +104,7 @@ function EpostKort() {
         <div className="fld half"><label>Resend API-nøkkel</label><input style={inp} type="password" value={hem} onChange={e => setHem(e.target.value)} placeholder={har ? '•••••••• (lagret – fyll ut for å bytte)' : 're_…'} autoComplete="new-password" /></div>
       </>}
     </div>
-    <p className="small muted">Mottakeren ser: <b>{d.fraNavn || 'Eiendomskontroll'}</b> &lt;{d.fraEpost || d.smtpUser || '…'}&gt;</p>
+    <p className="small muted">Mottakeren ser: <b>«eiendommens avsendernavn eller eier»</b> &lt;{d.fraEpost || d.smtpUser || '…'}&gt; – eller <b>{d.fraNavn || 'Eiendomskontroll'}</b> hvis eiendommen mangler begge.</p>
     <div style={{ display: 'flex', gap: 8 }}><button className="btn pri" disabled={!!busy} onClick={lagre}>{busy || 'Lagre e-postoppsett'}</button><button className="btn" disabled={!!busy} onClick={test}>Send test til meg</button></div>
   </div>;
 }

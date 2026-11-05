@@ -79,6 +79,13 @@ const handler = async (req: Request) => {
     if (env('RESEND_API_KEY')) return { metode: 'resend', fraNavn: d.fraNavn || n || 'Eiendomskontroll', fraEpost: e || 'onboarding@resend.dev', svarTil: d.svarTil || env('EPOST_SVAR'), smtpHost: '', smtpPort: 0, smtpUser: '', passord: env('RESEND_API_KEY'), kilde: 'netlify' };
     return { metode: '', fraNavn: d.fraNavn || '', fraEpost: '', svarTil: d.svarTil || '', smtpHost: '', smtpPort: 0, smtpUser: '', passord: '', kilde: '' };
   };
+  // Avsendernavn følger eiendommen: eget avsendernavn på eiendommen → eier/hjemmelshaver → organisasjonens oppsett
+  const oppsettFor = async (eid: string | null | undefined, org?: string | null): Promise<Oppsett> => {
+    const { data: e } = eid ? await admin.from('eiendommer').select('eier_org_id, data').eq('id', eid).maybeSingle() : { data: null as any };
+    const o = await hentOppsett(org || e?.eier_org_id || null);
+    const navn = String(e?.data?.avsenderNavn || e?.data?.eierNavn || '').trim();
+    return navn ? { ...o, fraNavn: navn.slice(0, 120) } : o;
+  };
   type Vedlegg = { navn: string; base64: string; type?: string; cid?: string };
   const sendEpost = async (til: string, emne: string, html: string, tekst: string, vedlegg0?: Vedlegg | Vedlegg[], svarTil?: string, o0?: Oppsett) => {
     const vedlegg = vedlegg0 ? (Array.isArray(vedlegg0) ? vedlegg0 : [vedlegg0]) : [];
@@ -174,7 +181,7 @@ const handler = async (req: Request) => {
     }
     const m = aoTekst(a, lenke, String(body.melding || ''), p.navn || p.epost);
     const vedlegg = typeof body.pdf === 'string' && body.pdf.length < 8_000_000 ? { navn: `Arbeidsordre avvik ${a.nr}.pdf`, base64: body.pdf } : undefined;
-    const r = await sendEpost(til, m.emne, m.html, m.tekst, vedlegg, p.epost || undefined, await hentOppsett(await minOrg(p)));
+    const r = await sendEpost(til, m.emne, m.html, m.tekst, vedlegg, p.epost || undefined, await oppsettFor(a.eiendom_id, await minOrg(p)));
     const hva = body.action === 'inviter' ? `Arbeidsordre ${r.sendt ? 'sendt' : 'klargjort'} på e-post til ${til}` : `Varsel om tildeling ${r.sendt ? 'sendt' : 'klargjort'} på e-post til ${til}`;
     await logg(p, a, hva); if (r.sendt) await leggTilAvvikLogg(a, hva, p.navn || p.epost);
     return json(200, { ...r, til, lenke, emne: m.emne, tekst: m.tekst });
@@ -264,7 +271,7 @@ const handler = async (req: Request) => {
     await admin.from('ao_invitasjon').update({ kvittert: t, svar: { navn, firma, komm, filer, samtykke: sam, tilstand: tl, nyttForslag } }).eq('token', inv.token);
     await logg_(a, av, `Arbeidsordre for avvik #${a.nr} kvittert ut via lenke av ${av} <${inv.epost}> – til kontroll`);
     if (inv.opprettet_av) { const { data: avs } = await admin.from('profiles').select('epost').eq('id', inv.opprettet_av).maybeSingle();
-      if (avs?.epost) await sendEpost(avs.epost, `Utført: avvik #${a.nr} ${d.tittel || ''}`, `<p>${esc(av)} har kvittert ut avvik <b>#${a.nr} ${esc(d.tittel)}</b> som utført:</p><p>${esc(komm).replace(/\n/g, '<br>')}</p><p>${filer.length} vedlegg. Avviket står som «Utført – til kontroll» i Eiendomskontroll.</p>`, `${av} har kvittert ut avvik #${a.nr} ${d.tittel || ''} som utført: ${komm}`, undefined, undefined, await hentOppsett((await admin.from('eiendommer').select('eier_org_id').eq('id', a.eiendom_id).maybeSingle()).data?.eier_org_id)); }
+      if (avs?.epost) await sendEpost(avs.epost, `Utført: avvik #${a.nr} ${d.tittel || ''}`, `<p>${esc(av)} har kvittert ut avvik <b>#${a.nr} ${esc(d.tittel)}</b> som utført:</p><p>${esc(komm).replace(/\n/g, '<br>')}</p><p>${filer.length} vedlegg. Avviket står som «Utført – til kontroll» i Eiendomskontroll.</p>`, `${av} har kvittert ut avvik #${a.nr} ${d.tittel || ''} som utført: ${komm}`, undefined, undefined, await oppsettFor(a.eiendom_id)); }
     return json(200, { ok: true });
   }
 
@@ -302,7 +309,7 @@ const handler = async (req: Request) => {
       ${lenke ? `<p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${maate === 'begge' ? 'Eller fyll ut på nett' : 'Åpne sjekklisten'}</a></p>
       <p style="font-size:12px;color:#6b736d">Via lenken oppretter du bruker (eller logger inn), krysser av for dokumentasjonen og laster opp filer. Utleier går gjennom og godkjenner.</p>` : ''}<p style="font-size:12px;color:#6b736d">Sendt av ${esc(avs)}.</p></div>`;
     const vedlegg = maate !== 'lenke' && body.vedlegg && typeof body.vedlegg.base64 === 'string' && body.vedlegg.base64.length < 4_000_000 ? { navn: String(body.vedlegg.navn || 'Sjekkliste.zip').slice(0, 120), base64: body.vedlegg.base64, type: 'application/zip' } : undefined;
-    const r = await sendEpost(til, emne, html, tekst, vedlegg, p.epost || undefined, await hentOppsett(await minOrg(p)));
+    const r = await sendEpost(til, emne, html, tekst, vedlegg, p.epost || undefined, await oppsettFor(l.eiendom_id, await minOrg(p)));
     await ltLogg(p, l, `Sjekkliste (${maate === 'fil' ? 'Excel-pakke' : maate === 'begge' ? 'lenke og Excel-pakke' : 'lenke'}) ${r.sendt ? 'sendt' : 'klargjort'} til ${til} (${d.navn || ''})`);
     await admin.from('leietakere').update({ data: { ...d, sjekklisteSendt: { tid: new Date().toISOString(), til, av: avs, frist: body.frist || '' } } }).eq('id', l.id);
     return json(200, { ...r, til, lenke, emne, tekst });
@@ -395,7 +402,7 @@ const handler = async (req: Request) => {
       const { data: bl } = await admin.storage.from('filer').download(path); if (bl) vedl.push({ navn, base64: Buffer.from(await bl.arrayBuffer()).toString('base64'), type: 'image/jpeg', cid });
     }
     const m = koTekst(o, sn, lenke, melding, avsender, vedl.length === 2);
-    const r = await sendEpost(til, m.emne, m.html, m.tekst, vedl, p?.epost || undefined, await hentOppsett(sn.org || (p ? await minOrg(p) : null)));
+    const r = await sendEpost(til, m.emne, m.html, m.tekst, vedl, p?.epost || undefined, await oppsettFor(o.eiendom_id, sn.org || (p ? await minOrg(p) : null)));
     const fersk = (await hentOppg(o.id))?.data || d;
     if (r.sendt) await admin.from('oppgaver').update({ data: { ...fersk, aoSendt: { frist: d.nesteFrist || '', dato: new Date().toISOString(), til, auto: !p, av: p ? (p.navn || p.epost) : 'Automatisk' } } }).eq('id', o.id);
     await koLogg(p, o, `Arbeidsordre «${d.navn}» ${r.sendt ? 'sendt' : 'klargjort'}${!p ? ' automatisk' : ''} til ${til}${d.nesteFrist ? ' (frist ' + datoNo(d.nesteFrist) + ')' : ''}${r.sendt ? '' : ' – ' + (r as any).grunn}`, sn.org);
@@ -477,7 +484,7 @@ const handler = async (req: Request) => {
     await koLogg({ id: null, navn: `${rapport.av || inv.epost}${rapport.firma ? ' (' + rapport.firma + ')' : ''}` }, o, `Servicerapport mottatt for «${fersk.navn}»: ${res}${rapport.avvik.length ? `, ${rapport.avvik.length} avvik` : ''}, ${filer.length} vedlegg – venter på godkjenning`, sn.org);
     // Varsle den som sendte arbeidsordren (eller ingen, hvis automatisk og uten mottaker)
     if (inv.opprettet_av) { const { data: av } = await admin.from('profiles').select('epost').eq('id', inv.opprettet_av).maybeSingle();
-      if (av?.epost) await sendEpost(av.epost, `Rapport mottatt: ${fersk.navn} – ${sn.eiendom}`, `<p>${esc(rapport.av || inv.epost)}${rapport.firma ? ' (' + esc(rapport.firma) + ')' : ''} har registrert <b>${esc(fersk.navn)}</b> på ${esc(sn.eiendom)} som utført ${esc(datoNo(dato))}: ${esc(res)}.</p><p>Gå til kontrollen i Eiendomskontroll for å godkjenne.</p>`, `${rapport.av || inv.epost} har registrert ${fersk.navn} på ${sn.eiendom} som utført ${datoNo(dato)}: ${res}. Gå til kontrollen i Eiendomskontroll for å godkjenne.`, undefined, undefined, await hentOppsett(sn.org)); }
+      if (av?.epost) await sendEpost(av.epost, `Rapport mottatt: ${fersk.navn} – ${sn.eiendom}`, `<p>${esc(rapport.av || inv.epost)}${rapport.firma ? ' (' + esc(rapport.firma) + ')' : ''} har registrert <b>${esc(fersk.navn)}</b> på ${esc(sn.eiendom)} som utført ${esc(datoNo(dato))}: ${esc(res)}.</p><p>Gå til kontrollen i Eiendomskontroll for å godkjenne.</p>`, `${rapport.av || inv.epost} har registrert ${fersk.navn} på ${sn.eiendom} som utført ${datoNo(dato)}: ${res}. Gå til kontrollen i Eiendomskontroll for å godkjenne.`, undefined, undefined, await oppsettFor(o.eiendom_id, sn.org)); }
     return json(200, { ok: true });
   }
 
