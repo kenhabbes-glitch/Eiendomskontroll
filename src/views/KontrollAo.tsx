@@ -101,7 +101,7 @@ function KoPanel({ o, close }: { o: Rec; close: () => void }) {
       {r.avvik?.length > 0 && <div className="small" style={{ marginTop: 4 }}><b>Avvik:</b><ul style={{ margin: '2px 0 0 18px', padding: 0 }}>{r.avvik.map((a: string, i: number) => <li key={i}>{a}</li>)}</ul></div>}
       {r.filer?.length > 0 && <div className="small" style={{ marginTop: 4 }}>{r.filer.map((f: any) => <div key={f.path}><FileLink fil={f} /></div>)}</div>}
       {kan && <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <button className="btn sm pri" onClick={() => { close(); utfor(o.id, { dato: r.dato, av: r.av + (r.firma ? ` (${r.firma})` : ''), res: r.res, komm: r.komm, avs: r.avvik, nyFrist: r.nesteDato, filer: r.filer, kilde: 'servicefirma', tilstand: r.tilstand, sjekk: r.sjekk }); }}>Godkjenn og registrer utført</button>
+        <button className="btn sm pri" onClick={() => { close(); utfor(o.id, { dato: r.dato, av: r.av + (r.firma ? ` (${r.firma})` : ''), res: r.res, komm: r.komm, avs: r.avvik, nyFrist: r.nesteDato, filer: r.filer, kilde: 'servicefirma', tilstand: r.tilstand, sjekk: r.sjekk, avl: r.avl }); }}>Godkjenn og registrer utført</button>
         <button className="btn sm" onClick={async () => { if (!await confirmBox('Avvise rapporten? Den fjernes fra kontrollen (filene beholdes). Send gjerne en ny arbeidsordre etterpå.', 'Avvis')) return; const n = { ...byId('oppgaver', o.id)! }; delete n.innrapport; await save('oppgaver', n); toast('Rapporten er avvist'); }}>Avvis</button></div>}
     </div>}
     {kan && <div className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -223,7 +223,7 @@ export function KoLenke({ token }: { token: string }) {
   const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [ferdig, setFerdig] = useState(false); const [busy, setBusy] = useState(false);
   const [sam, setSam] = useState(false); const [tl, setTl] = useState<Tilstand>({});
   const [f, setF] = useState<any>({ dato: today(), av: '', firma: '', res: 'OK – ingen avvik', komm: '', avvik: [''], nesteDato: '' }); const [filer, setFiler] = useState<File[]>([]);
-  const [sj, setSj] = useState<SysSjekk | null>(null);
+  const [sj, setSj] = useState<SysSjekk | null>(null); const [avl, setAvl] = useState<Record<string, string>>({});
   useEffect(() => { aoApi({ action: 'ko_info', token }, false).then(i => { setInfo(i); if (i.sjekk) setSj(i.sjekk); if (i.innsendt) setFerdig(true); }).catch(e => setErr(e.message)); }, [token]);
   const set = (p: any) => setF((x: any) => ({ ...x, ...p }));
   const sendInn = async (e: React.FormEvent) => {
@@ -244,7 +244,7 @@ export function KoLenke({ token }: { token: string }) {
         if (error) throw new Error('Opplasting feilet for ' + fil.name + ': ' + error.message);
         opp.push({ path: u.path, navn: fil.name, type: fil.type, str: fil.size });
       }
-      await aoApi({ action: 'ko_innsend', token, ...f, sjekk: sjBrukt, avvik: f.res === 'Avvik funnet' ? f.avvik : [], filer: opp, tilstand: tl.tg ? tl : null, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); setFerdig(true);
+      await aoApi({ action: 'ko_innsend', token, ...f, avl, sjekk: sjBrukt, avvik: f.res === 'Avvik funnet' ? f.avvik : [], filer: opp, tilstand: tl.tg ? tl : null, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); setFerdig(true);
     } catch (e: any) { setErr(e.message || String(e)); }
     setBusy(false);
   };
@@ -266,6 +266,12 @@ export function KoLenke({ token }: { token: string }) {
           {info.komp?.length > 0 && info.runde && <EksternRunde info={info} token={token} av={f.av} firma={f.firma} setF={set} sam={sam} setSam={setSam} setInfo={setInfo} />}
           <h3 style={{ margin: '14px 0 6px' }}>{info.komp?.length ? 'Send inn rapport' : 'Registrer utført'}</h3>
           {sj && <div style={{ margin: '6px 0 10px' }}><SysSjekkVelger v={sj} set={x => { setSj(x); if (sysSjekkAvvik(x).length && f.res === 'OK – ingen avvik') set({ res: 'Avvik funnet', avvik: [''] }); }} /></div>}
+          {info.maalere?.length > 0 && <div className="note" style={{ color: 'var(--ink)', background: 'var(--surface)', margin: '6px 0 10px' }}><b>Måleravlesninger</b>
+            {info.maalere.map((m: any) => { const v = parseFloat(String(avl[m.id] || '').replace(',', '.')); const ut = isFinite(v) && m.type === 'tilstand' && ((m.min != null && v < +m.min) || (m.max != null && v > +m.max));
+              return <div key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+                <span className="small" style={{ flex: 1, minWidth: 160 }}><b>{m.label}</b>{m.nr ? ` · nr. ${m.nr}` : ''}<span className="muted" style={{ display: 'block' }}>{m.plassering}{m.forrige ? ` · forrige ${String(m.forrige.verdi).replace('.', ',')} ${m.enhet} (${fd(m.forrige.dato)})` : ''}{m.min != null || m.max != null ? ` · grense ${m.min ?? ''}–${m.max ?? ''} ${m.enhet}` : ''}</span></span>
+                <input inputMode="decimal" value={avl[m.id] || ''} onChange={e => setAvl({ ...avl, [m.id]: e.target.value })} placeholder={m.enhet} style={{ width: 110, borderColor: ut ? 'var(--red)' : undefined }} />
+                {ut && <span className="small" style={{ color: 'var(--red)', width: '100%' }}>⚠ Utenfor grensen</span>}</div>; })}</div>}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
             <div><label>Utført dato</label><input type="date" value={f.dato} max={today()} onChange={e => set({ dato: e.target.value })} required style={inp} /></div>
             <div><label>Resultat</label><select value={f.res} onChange={e => set({ res: e.target.value })} style={{ ...inp, border: '1px solid var(--line2)', borderRadius: 8, padding: '9px 10px', background: '#fff', marginTop: 0 }}>{['OK – ingen avvik', 'Avvik funnet', 'Ikke utført / utsatt'].map(x => <option key={x}>{x}</option>)}</select></div>

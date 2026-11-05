@@ -11,6 +11,7 @@ import { PosVelger, BildeVelger, VedleggGalleri } from '../components/PosVelger'
 import { ServiceHistorikk } from '../views/Servicehistorikk';
 import { alleSjekkmaler } from '../views/Sjekkmaler';
 import { sysSjekkFor, sysSjekkAvvik } from './komponentsjekk';
+import { MEDIER, MAALER_KODER, sisteAvl, enhet as mEnhet, grenseTekst, tall as mTall, fmt as mFmt } from './maaler';
 import { SysSjekkVelger, SysSjekkKort } from '../components/SysSjekk';
 import { alleMaler, finnMal, kopi, kontraktKey, fordeling, pliktKeysFor, OMR, ANS_VALG } from './kontrakt';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst, standardTagger, taggerFor } from './utils';
@@ -324,10 +325,13 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     },
   });
 }
-export function editKomponent(id?: string, anleggId?: string) {
+// Settes av views/Maalere (unngår sirkulær import)
+export const MaalerRef: { Kort: (p: { kid: string }) => any } = { Kort: () => null };
+export function editKomponent(id?: string, anleggId?: string, preset?: Rec) {
   const k: Rec = id ? byId('komponenter', id)! : { anleggId } as any;
   const sys = byId('anlegg', k.anleggId) || ({} as Rec); const ro = !kanRedigereE(sys.eiendomId);
-  if (!id) { k.kode = TFM_DEF[sys.type]?.[1] || ''; k.lop = nextKompLop(k.anleggId, k.kode); k.eiendomId = sys.eiendomId; }
+  if (!id) { k.kode = TFM_DEF[sys.type]?.[1] || ''; Object.assign(k, preset || {}); k.lop = nextKompLop(k.anleggId, k.kode); k.eiendomId = sys.eiendomId;
+    if (!k.mType && MAALER_KODER[k.kode]) { k.mType = MAALER_KODER[k.kode].type; k.mMedium = MAALER_KODER[k.kode].medium; } }
   const touched: Record<string, boolean> = {};
   const fields: Field[] = [
     { k: 'anleggId', label: 'System', type: 'select', options: () => sortBy(S.anlegg.filter(a => a.eiendomId === sys.eiendomId), a => aNavn(a.id)).map(a => [a.id, aNavn(a.id)] as [string, string]), req: true },
@@ -348,16 +352,30 @@ export function editKomponent(id?: string, anleggId?: string) {
     { k: 'kostFlagg', type: 'custom', render: v => <KostFlagg v={v} /> },
     { k: 'levSok', type: 'custom', render: (v, set) => <LeverandorSok v={v} set={set} kind="k" sysKode={byId('anlegg', v.anleggId)?.tfmSys} /> },
     { k: 'beregn', type: 'custom', render: v => <UtskiftNote v={v} kompAv={v.anleggId} /> },
+    { k: 'secM', label: 'Måler', type: 'sec' },
+    { k: 'mType', label: 'Er komponenten en måler?', type: 'select', options: [['', 'Nei'], ['forbruk', 'Ja – forbruksmåler (telleverk: vann, el, fjernvarme, fjernkjøling …)'], ['tilstand', 'Ja – tilstandsmåler (trykk, temperatur …)']] },
+    { k: 'mMedium', label: 'Måler hva', type: 'select', options: MEDIER.map(([k, n]) => [k, n] as [string, string]), half: true, show: x => !!x.mType },
+    { k: 'mEnhet', label: 'Enhet', half: true, show: x => !!x.mType, hint: 'Tom = standard (m³, kWh, bar …)' },
+    { k: 'mNr', label: 'Målernummer', half: true, mono: true, show: x => !!x.mType },
+    { k: 'mFaktor', label: 'Omregningsfaktor', type: 'number', half: true, show: x => x.mType === 'forbruk', hint: 'Differansen ganges med faktoren. Tom = 1' },
+    { k: 'mFrekN', label: 'Leses av hver', type: 'number', half: true, def: 1, show: x => !!x.mType }, { k: 'mFrekE', label: 'Periode', type: 'select', options: [['uke', 'uke'], ['mnd', 'måned'], ['år', 'år']], def: 'mnd', half: true, show: x => !!x.mType },
+    { k: 'mMin', label: 'Nedre grense', type: 'number', half: true, show: x => x.mType === 'tilstand', hint: 'F.eks. minste tillatte trykk' }, { k: 'mMax', label: 'Øvre grense', type: 'number', half: true, show: x => x.mType === 'tilstand' },
+    { k: 'mHoved', label: 'Undermåler av', type: 'select', half: true, empty: '– ingen (hovedmåler) –', show: x => x.mType === 'forbruk',
+      options: (v: any) => sortBy(S.komponenter.filter(z => z.id !== id && z.mType === 'forbruk' && z.eiendomId === (byId('anlegg', v?.anleggId)?.eiendomId || k.eiendomId) && (!v?.mMedium || !z.mMedium || z.mMedium === v.mMedium)), z => kNavn(z.id)).map(z => [z.id, kNavn(z.id) + (z.mNr ? ' (' + z.mNr + ')' : '')] as [string, string]),
+      hint: 'Seriemålere kobles til hovedmåleren de måler en del av' },
+    { k: 'mLeietaker', label: 'Leietaker (for fordeling)', type: 'select', half: true, empty: '– felles / eier –', show: x => x.mType === 'forbruk',
+      options: (v: any) => sortBy(S.leietakere.filter(l => l.eiendomId === (byId('anlegg', v?.anleggId)?.eiendomId || k.eiendomId)), l => l.navn).map(l => [l.id, l.navn] as [string, string]) },
     { k: 'secTg', label: 'Tilstand', type: 'sec' }, ...tgFelt(),
     { k: 'notat', label: 'Notater', type: 'textarea' }];
   const closeRefK: { c?: () => void } = {};
   closeRefK.c = formModal({
     title: ro ? kNavn(id) : id ? 'Rediger komponent' : 'Ny komponent', fields, values: k, readOnly: ro, wide: !!id,
-    bottom: () => id ? <ServiceHistorikk komponentId={id} /> : null,
-    onChange: (key, v) => { if (key === 'levetid') return { levetidKilde: undefined }; const mp = m2Patch(key, v); if (Object.keys(mp).length) return mp; if (key === 'lop') touched.lop = true; if ((key === 'kode' || key === 'anleggId') && !touched.lop && !id) return { lop: nextKompLop(v.anleggId, v.kode) }; },
+    bottom: () => id ? <>{byId('komponenter', id)?.mType && <MaalerRef.Kort kid={id} />}<ServiceHistorikk komponentId={id} /></> : null,
+    onChange: (key, v) => { if (key === 'kode' && !id && !v.mType && MAALER_KODER[String(v.kode || '').toUpperCase()]) { const m = MAALER_KODER[String(v.kode).toUpperCase()]; return { mType: m.type, mMedium: m.medium, lop: touched.lop ? v.lop : nextKompLop(v.anleggId, v.kode) }; }
+      if (key === 'levetid') return { levetidKilde: undefined }; const mp = m2Patch(key, v); if (Object.keys(mp).length) return mp; if (key === 'lop') touched.lop = true; if ((key === 'kode' || key === 'anleggId') && !touched.lop && !id) return { lop: nextKompLop(v.anleggId, v.kode) }; },
     extraFoot: close => id && !ro ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette komponenten?')) { await removeDoc('komponenter', id); close(); } }}>Slett</button> : null,
     onSave: async x => {
-      delete x.prev; delete x.beregn; if (x.kost && !x.kostAar) x.kostAar = YEAR; x.kode = String(x.kode || '').toUpperCase().replace(/[^A-ZÆØÅ]/g, ''); x.lop = pad(String(x.lop || '1').replace(/\D/g, '') || 1);
+      delete x.prev; delete x.beregn; delete x.secM; if (!x.mType) for (const f of ['mType', 'mMedium', 'mEnhet', 'mNr', 'mFaktor', 'mFrekN', 'mFrekE', 'mMin', 'mMax', 'mHoved', 'mLeietaker']) x[f] = undefined; if (x.kost && !x.kostAar) x.kostAar = YEAR; x.kode = String(x.kode || '').toUpperCase().replace(/[^A-ZÆØÅ]/g, ''); x.lop = pad(String(x.lop || '1').replace(/\D/g, '') || 1);
       if (!x.navn) x.navn = TFM_KODER.find(c => c[0] === x.kode)?.[1] || '';
       const dup = S.komponenter.find(z => z.id !== id && z.anleggId === x.anleggId && String(z.kode || '').toUpperCase() === x.kode && pad(z.lop) === x.lop);
       if (dup) { toast('Komponentkoden er allerede brukt i dette systemet'); return false; }
@@ -468,7 +486,7 @@ export function editOppgave(id?: string, preset: any = {}) {
       x.ao = { epost: ep, auto: !!x.aoAuto, dager: Math.max(0, Math.min(365, +x.aoDager || 0)), melding: x.aoMelding || '' }; delete x.aoEpost; delete x.aoAuto; delete x.aoDager; delete x.aoMelding; delete x.aoInfo; if (x.anleggId) { const a = byId('anlegg', x.anleggId); if (a) x.eiendomId = a.eiendomId; } const kid = await save('oppgaver', { ...o, ...x }); toast('Kontroll lagret'); if (x.ao?.epost) import('../views/KontrollAo').then(m => m.sikreLokasjonsbilder(kid)); },
   });
 }
-export type UtforPreset = { sjekk?: any; fraRunde?: boolean; dato?: string; av?: string; res?: string; komm?: string; avs?: string[]; nyFrist?: string; filer?: any[]; kilde?: string; tilstand?: { tg?: string; kg?: string; komm?: string } | null };
+export type UtforPreset = { avl?: Record<string, any>; sjekk?: any; fraRunde?: boolean; dato?: string; av?: string; res?: string; komm?: string; avs?: string[]; nyFrist?: string; filer?: any[]; kilde?: string; tilstand?: { tg?: string; kg?: string; komm?: string } | null };
 export function utfor(id: string, pre?: UtforPreset) {
   const o = byId('oppgaver', id); if (!o) return;
   // Systemer med flere like komponenter (branndører, nødlys …): kvitteres komponent for komponent
@@ -476,6 +494,8 @@ export function utfor(id: string, pre?: UtforPreset) {
   const R: any = o.runde?.kp && Object.keys(o.runde.kp).length ? o.runde : null;
   const rAvvik = R ? Object.entries(R.kp).filter(([, s]: any) => (s.avvik || []).length) as [string, any][] : [];
   // Sjekkliste for hele systemet (ventilasjon, heis, sprinkler …) – fra mal, eller utfylt av servicefirmaet
+  // Målere på systemet (eller komponenten) kan leses av i samme utkvittering
+  const MK = (o.komponentId ? [byId('komponenter', o.komponentId)] : o.anleggId ? S.komponenter.filter(k => k.anleggId === o.anleggId) : []).filter(k => k?.mType) as Rec[];
   const SJ0 = !R ? (pre?.sjekk || sysSjekkFor(alleSjekkmaler(), o, o.anleggId ? byId('anlegg', o.anleggId)?.type : '')) : null;
   const tgMaal = o.komponentId ? byId('komponenter', o.komponentId) : o.anleggId ? byId('anlegg', o.anleggId) : null;
   const lt = sortBy(S.leietakere.filter(l => l.eiendomId === o.eiendomId), l => l.navn);
@@ -486,6 +506,11 @@ export function utfor(id: string, pre?: UtforPreset) {
     { k: 'nyFrist', label: 'Ny frist (beregnes automatisk)', type: 'date', def: pre?.nyFrist || '', half: true, hint: 'La stå tom for automatisk beregning ut fra intervallet' },
     ...(SJ0 ? [{ k: 'sjekk', type: 'custom', def: SJ0, show: (x: any) => x.res !== 'Ikke utført / utsatt',
       render: (x: any, set: any) => <SysSjekkVelger v={x.sjekk} set={sj => set({ sjekk: sj, ...(sysSjekkAvvik(sj).length && x.res === 'OK – ingen avvik' ? { res: 'Avvik funnet', avs: [] } : {}) })} /> } as Field] : []),
+    ...(MK.length ? [{ k: 'avl', type: 'custom', label: 'Måleravlesninger', def: Object.fromEntries(Object.entries(pre?.avl || {}).map(([k, v]) => [k, String(v).replace('.', ',')])),
+      render: (x: any, set: any) => <div style={{ display: 'grid', gap: 6 }}>{MK.map(k => { const s0 = sisteAvl(k.id); const v = mTall(x.avl?.[k.id]); const min = mTall(k.mMin), max = mTall(k.mMax); const ut = v != null && k.mType === 'tilstand' && ((min != null && v < min) || (max != null && v > max));
+        return <div key={k.id} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><span style={{ flex: 1, minWidth: 180 }} className="small"><b>{kNavn(k.id)}</b><span className="muted"> · forrige {s0 ? `${mFmt(mTall(s0.verdi))} ${mEnhet(k)} (${fd(s0.dato)})` : '–'}{grenseTekst(k) ? ` · grense ${grenseTekst(k)}` : ''}</span></span>
+          <input inputMode="decimal" value={x.avl?.[k.id] || ''} onChange={e => set({ avl: { ...(x.avl || {}), [k.id]: e.target.value } })} placeholder={mEnhet(k)} style={{ width: 110, fontFamily: 'ui-monospace, monospace', borderColor: ut ? 'var(--red)' : undefined }} />
+          {ut && <span className="small" style={{ color: 'var(--red)', width: '100%' }}>⚠ Utenfor grensen – blir registrert som avvik</span>}</div>; })}</div> } as Field] : []),
     { k: 'avs', type: 'custom', label: SJ0 ? 'Andre avvik (punkter med avvik i sjekklisten registreres automatisk)' : 'Avvik fra kontrollen – ett avvik per linje', show: x => x.res === 'Avvik funnet', def: pre?.avs?.length ? pre.avs.map(t => ({ ...nyRad(), t, an: 'Eier' })) : [nyRad()], hint: 'Hver linje blir et eget avvik i avvikslisten, med kobling til denne kontrollen. Velg hvem som skal rette avviket. Bruk kommentarfeltet bare til utfyllende informasjon.',
       render: (v, set) => { const L: any[] = v.avs || []; const kc = S.komponenter.filter(k => o.anleggId && k.anleggId === o.anleggId); const upd = (i: number, p: any) => set({ avs: L.map((x, j) => j === i ? { ...x, ...p } : x) });
         const sel = { border: '1px solid var(--line2)', borderRadius: 8, padding: 7 } as React.CSSProperties;
@@ -516,6 +541,9 @@ export function utfor(id: string, pre?: UtforPreset) {
       const sj = x.res !== 'Ikke utført / utsatt' && x.sjekk && Object.keys(x.sjekk.svar || {}).length ? x.sjekk : null;
       if (sj && sj.punkter.some((pt: any) => !sj.svar[pt.id])) { toast('Svar på alle punktene i sjekklisten (OK, Avvik eller I.R.)'); return false; }
       const sjAv = sysSjekkAvvik(sj);
+      // Avlesninger utenfor grense blir avvik
+      const avlV = MK.map(k => ({ k, v: mTall(x.avl?.[k.id]) })).filter(r => r.v != null) as { k: Rec; v: number }[];
+      for (const { k, v } of avlV) { const min = mTall(k.mMin), max = mTall(k.mMax); if (k.mType === 'tilstand' && ((min != null && v < min) || (max != null && v > max))) sjAv.push(`${kNavn(k.id)}: ${mFmt(v)} ${mEnhet(k)} – utenfor grense (${grenseTekst(k)})`); }
       if (sjAv.length && x.res === 'OK – ingen avvik') x.res = 'Avvik funnet';
       if (x.res === 'Avvik funnet' && !avs.length && !rAvvik.length && !sjAv.length) { toast('Skriv inn avvikene i feltene under «Avvik fra kontrollen» – én linje per avvik'); return false; }
       let dokId = '';
@@ -537,7 +565,8 @@ export function utfor(id: string, pre?: UtforPreset) {
           logg: [{ t: new Date().toISOString(), s: 'Ny', k: `Registrert fra komponentkontroll: ${o.navn}${s.av ? ' (' + s.av + (s.firma ? ', ' + s.firma : '') + ')' : ''}`, av: state.me?.navn }] });
         ids.push(aid); kpNy[kid] = { ...s, avvikIds: [aid] };
       }
-      const h = [{ dato: x.dato, av: x.av, res: x.res, komm: x.komm, dokId, dokIds: dokIds.length ? dokIds : undefined, avvik: ids, regAv: state.me?.id, kilde: pre?.kilde, runde: R ? { ...R, kp: kpNy } : undefined, sjekk: sj || undefined }, ...(o.historikk || [])].slice(0, 80);
+      for (const { k, v } of avlV) await save('avlesninger', { eiendomId: k.eiendomId, komponentId: k.id, dato: x.dato, verdi: v, t: new Date().toISOString(), av: x.av || state.me?.navn || '', kilde: pre?.kilde ? 'servicefirma' : 'kontroll', oppgaveId: o.id, komm: o.navn });
+      const h = [{ dato: x.dato, av: x.av, res: x.res, avl: avlV.length ? Object.fromEntries(avlV.map(r => [r.k.id, r.v])) : undefined, komm: x.komm, dokId, dokIds: dokIds.length ? dokIds : undefined, avvik: ids, regAv: state.me?.id, kilde: pre?.kilde, runde: R ? { ...R, kp: kpNy } : undefined, sjekk: sj || undefined }, ...(o.historikk || [])].slice(0, 80);
       const upd: Rec = { ...byId('oppgaver', id)!, historikk: h };
       if (R) delete upd.runde;
       if (pre?.kilde) delete upd.innrapport;

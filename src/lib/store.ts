@@ -34,13 +34,14 @@ export const TABLES = {
   avvik: { table: 'avvik', cols: { eiendomId: 'eiendom_id', leietakerId: 'leietaker_id', tildeltId: 'tildelt_id' } as ColMap },
   dokumenter: { table: 'dokumenter', cols: { eiendomId: 'eiendom_id', leietakerId: 'leietaker_id' } as ColMap },
   tegninger: { table: 'tegninger', cols: { eiendomId: 'eiendom_id' } as ColMap },
+  avlesninger: { table: 'avlesninger', cols: { eiendomId: 'eiendom_id', komponentId: 'komponent_id' } as ColMap },
 };
 export type Col = keyof typeof TABLES;
 export const COLS = Object.keys(TABLES) as Col[];
 
 export type Niva = 'skriv' | 'drift' | 'les' | 'service';
 export const S: Record<Col, any[]> & { profiles: any[]; tilganger: any[]; innst: Record<string, any>; innstMangler: boolean; orgs: any[]; medlemmer: any[]; portefoljer: any[]; oppdrag: any[]; niva: Record<string, Niva>; primarOrg: string } = {
-  eiendommer: [], leietakere: [], anlegg: [], komponenter: [], oppgaver: [], avvik: [], dokumenter: [], tegninger: [], profiles: [], tilganger: [], innst: {}, innstMangler: false,
+  eiendommer: [], leietakere: [], anlegg: [], komponenter: [], oppgaver: [], avvik: [], dokumenter: [], tegninger: [], avlesninger: [], profiles: [], tilganger: [], innst: {}, innstMangler: false,
   orgs: [], medlemmer: [], portefoljer: [], oppdrag: [], niva: {}, primarOrg: '',
 };
 
@@ -149,7 +150,8 @@ export async function saveInnst(nokkel: string, data: any) {
 export async function loadData() {
   state.loading = true; state.error = ''; bump();
   try {
-    await Promise.all(COLS.map(async c => { S[c] = (await loadAll(TABLES[c].table)).map(r => fromRow(c, r)); }));
+    // avlesninger er nyere enn de andre tabellene – mangler den (før migrering), lastes resten likevel
+    await Promise.all(COLS.map(async c => { try { S[c] = (await loadAll(TABLES[c].table)).map(r => fromRow(c, r)); } catch (e) { if (c === 'avlesninger') S[c] = []; else throw e; } }));
     if (state.me && ['admin', 'forvalter', 'tekniker'].includes(state.me.rolle)) {
       await loadInnst();
       S.profiles = await loadAll('profiles');

@@ -389,6 +389,21 @@ const handler = async (req: Request) => {
     for (const k of KK) if (!runde.malId?.[k.id]) { const nr = nyRunde([k], maler, runde.start); runde.malId = { ...(runde.malId || {}), ...nr.malId }; runde.maler = { ...runde.maler, ...nr.maler }; }
     return { K: KK, runde, d };
   };
+  // Målere på systemet/komponenten – servicefirmaet kan registrere avlesninger i lenken (lagres når oppdragsgiver godkjenner)
+  const koMaalere = async (o: any) => {
+    const d = o.data || {};
+    const q = d.komponentId ? admin.from('komponenter').select('id, data').eq('id', d.komponentId) : d.anleggId ? admin.from('komponenter').select('id, data').eq('system_id', d.anleggId) : null;
+    if (!q) return [];
+    const { data: kr } = await q; const M = (kr || []).filter((r: any) => r.data?.mType);
+    const ut: any[] = [];
+    for (const r of M) {
+      const { data: av } = await admin.from('avlesninger').select('data').eq('komponent_id', r.id).order('created_at', { ascending: false }).limit(20);
+      const siste = (av || []).map((a: any) => a.data).filter((x: any) => x?.dato).sort((a: any, b: any) => String(b.dato).localeCompare(String(a.dato)))[0];
+      const k = r.data; const enh = k.mEnhet || ({ vann: 'm³', el: 'kWh', fjernvarme: 'kWh', fjernkjoling: 'kWh', varme: 'kWh', kjoling: 'kWh', gass: 'm³', olje: 'l', trykk: 'bar', temperatur: '°C', timer: 't' } as any)[k.mMedium] || '';
+      ut.push({ id: r.id, label: kLabel(k), plassering: k.plassering || '', type: k.mType, enhet: enh, nr: k.mNr || '', min: k.mMin ?? null, max: k.mMax ?? null, forrige: siste ? { verdi: siste.verdi, dato: siste.dato } : null });
+    }
+    return ut;
+  };
   const kLabel = (k: any) => `-${String(k.kode || '').toUpperCase()}${String(k.lop || 1).padStart(3, '0')} ${k.navn || ''}`.trim();
 
   const koSnapshot = async (o: any) => {
@@ -487,8 +502,8 @@ const handler = async (req: Request) => {
     const kr = await koRunde(o);
     const komp = kr ? kr.K.map((k: any) => ({ id: k.id, label: kLabel(k), plassering: k.plassering || '' })) : null;
     const runde = kr ? { maler: kr.runde.maler, malId: kr.runde.malId, kp: Object.fromEntries(Object.entries(kr.runde.kp || {}).map(([k, v]: any) => [k, { t: v.t, av: v.av, firma: v.firma, svar: v.svar, komm: v.komm, avvik: v.avvik, laast: !!v.avvikIds?.length }])) } : null;
-    const sjekk = kr ? null : await koSysSjekk(o);
-    return json(200, { sjekk, komp, runde, intervall: d.intervall || null, bilder, tilstand, tegning: d.aoBilder?.tegning || '', navn: d.navn, type: d.type, kategori: d.kategori, frist: inv.frist || d.nesteFrist, hjemmel: d.hjemmel || '', notat: d.notat || '', eiendom: sn.eiendom, adresse: sn.adresse, system: sn.system, kontakt: sn.kontakt, oppdragsgiver: sn.orgNavn, epost: inv.epost, innsendt: inv.innsendt, utloper: inv.utloper, utdatert: !!(inv.frist && d.nesteFrist && inv.frist !== d.nesteFrist && !inv.innsendt) });
+    const sjekk = kr ? null : await koSysSjekk(o); const maalere = await koMaalere(o).catch(() => []);
+    return json(200, { maalere, sjekk, komp, runde, intervall: d.intervall || null, bilder, tilstand, tegning: d.aoBilder?.tegning || '', navn: d.navn, type: d.type, kategori: d.kategori, frist: inv.frist || d.nesteFrist, hjemmel: d.hjemmel || '', notat: d.notat || '', eiendom: sn.eiendom, adresse: sn.adresse, system: sn.system, kontakt: sn.kontakt, oppdragsgiver: sn.orgNavn, epost: inv.epost, innsendt: inv.innsendt, utloper: inv.utloper, utdatert: !!(inv.frist && d.nesteFrist && inv.frist !== d.nesteFrist && !inv.innsendt) });
   }
   if (body.action === 'ko_opplasting') {
     const inv = await hentKo(body.token); if (!inv || inv.innsendt) return json(403, { error: 'Lenken er ugyldig eller allerede brukt' });
@@ -531,6 +546,10 @@ const handler = async (req: Request) => {
     const rapport = { token: inv.token, mottatt: new Date().toISOString(), dato, av: String(body.av || '').slice(0, 160), firma: String(body.firma || '').slice(0, 160), epost: inv.epost, res, komm: String(body.komm || '').slice(0, 4000),
       avvik: (Array.isArray(body.avvik) ? body.avvik : []).map((x: any) => String(x || '').trim().slice(0, 300)).filter(Boolean).slice(0, 30), nesteDato: /^\d{4}-\d{2}-\d{2}$/.test(body.nesteDato || '') ? body.nesteDato : '', filer, samtykke: sam, tilstand: renTilstand(body.tilstand) } as any;
     const fersk = (await hentOppg(o.id))!.data || {};
+    const MM = await koMaalere(o).catch(() => [] as any[]);
+    if (body.avl && typeof body.avl === 'object') { const avl: Record<string, number> = {};
+      for (const m of MM) { const v = body.avl[m.id]; const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/\s/g, '').replace(',', '.')); if (isFinite(n)) avl[m.id] = n; }
+      if (Object.keys(avl).length) rapport.avl = avl; }
     const sjMal = await koSysSjekk(o);
     if (sjMal && body.sjekk) { rapport.sjekk = renSysSjekk(body.sjekk, sjMal); if (sysSjekkAvvik(rapport.sjekk).length && rapport.res === 'OK – ingen avvik') rapport.res = 'Avvik funnet'; }
     if (fersk.runde?.kp) { const V = Object.values(fersk.runde.kp) as any[]; const nAv = V.filter(v => (v.avvik || []).length).length;

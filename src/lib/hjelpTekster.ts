@@ -48,6 +48,15 @@ Klikk på en rad for å gå rett til saken.` },
 - DWG leses automatisk med målestokk. Lag i tegningen kan slås av og på.
 - Plasser systemer, komponenter og avvik på tegningen. Filtrer på tagg eller tilstandsgrad.
 - Arealrapporten (PDF) viser leieareal, fordelt fellesareal og over- eller underdekning mot kontrakt.` },
+  'side.maalere': { gruppe: 'Sider', tittel: 'Målere', tekst: `Avlesning av målere: trykk på sprinkleranlegg, vannmåler, fjernvarme, fjernkjøling, energimålere og seriemålere.
+
+En måler er en komponent i systemet den hører til (f.eks. trykkmåler under sprinkleranlegget). Kryss av for «Er komponenten en måler?» i komponenten, eller bruk «+ Ny måler».
+
+• Forbruksmålere teller oppover. Appen regner ut forbruket mellom avlesningene og per måned. Ved målerbytte: kryss av «Måleren er byttet» og oppgi sluttstand på gammel måler og startverdi på ny.
+• Tilstandsmålere (trykk, temperatur) har grenseverdier. Avlesninger utenfor grensen markeres rødt, og du får spørsmål om å registrere avvik.
+• Avlesningsrunde: alle målere på eiendommen som skal leses av, i én liste sortert etter plassering – skriv inn verdien og trykk Enter.
+• Fordeling per leietaker: koble seriemålere til leietaker og hovedmåler. Da vises forbruket per leietaker for valgfri periode, og hva som ikke fanges opp av seriemålerne. Kan eksporteres til Excel.
+• Målere på et system kan også leses av når kontrollen av systemet kvitteres ut, og servicefirmaet kan registrere avlesninger i lenken.` },
   'side.dokumenter': { gruppe: 'Sider', tittel: 'Dokumenter', tekst: `Påkrevd og relevant dokumentasjon per eiendom: FDV, brannkonsept, el-kontroll, serviceavtaler med mer.
 
 - Dekningsmatrisen viser hva som finnes, mangler eller er utløpt.
