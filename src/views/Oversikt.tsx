@@ -1,3 +1,4 @@
+import { importerSystemer } from './SystemImport';
 import { tgTekst } from '../components/TgKg';
 import { koTilGodkjenning } from './KontrollAo';
 import React from 'react';
@@ -24,7 +25,7 @@ export function Oversikt() {
       <li><b>Legg inn leietakerne</b> med avtaleperiode, vedlikeholdsansvar og internkontrollplikter.</li>
       <li><b>Inviter brukere</b> under «Brukere og roller» og gi dem tilgang til riktige eiendommer.</li>
       <li>Har du data fra prototypen, kan du hente dem inn under «Import og eksport».</li></ol>
-      <button className="btn pri" onClick={() => editEiendom()}>+ Registrer første eiendom</button></div>
+      <button className="btn pri" onClick={() => editEiendom()}>+ Registrer første eiendom</button> <button className="btn" onClick={() => importerSystemer()}>Importer fra datainnsamlingsfil (Excel)</button></div>
       : <div className="card"><p style={{ margin: 0 }}>Du har ikke fått tilgang til noen eiendommer ennå. Kontakt administratoren.</p></div>}</div>;
 
   const T = activeTasks(); const forf = T.filter(o => (dUntil(o.nesteFrist) as number) < 0); const d30 = T.filter(o => { const d = dUntil(o.nesteFrist); return d !== null && d >= 0 && d <= 30; });

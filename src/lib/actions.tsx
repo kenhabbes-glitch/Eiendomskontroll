@@ -48,9 +48,9 @@ const tgFelt = (): Field[] => [
 ];
 
 // ================= EIENDOM =================
-export function editEiendom(id?: string) {
+export function editEiendom(id?: string, etter?: (nid: string) => void, preset?: Rec) {
   const eierOrg = mineOrg(['admin', 'forvalter']);
-  const e = id ? byId('eiendommer', id)! : { eierOrgId: (eierOrg.find(o => o.id === S.primarOrg) || eierOrg.find(o => o.type === 'eier') || eierOrg[0])?.id } as Rec;
+  const e = id ? byId('eiendommer', id)! : { eierOrgId: (eierOrg.find(o => o.id === S.primarOrg) || eierOrg.find(o => o.type === 'eier') || eierOrg[0])?.id, ...(preset || {}) } as Rec;
   if (!id && !eierOrg.length) { toast('Du må være administrator eller forvalter i en organisasjon for å opprette eiendommer'); return; }
   const kanEie = id ? mineOrg(['admin']).some(o => o.id === e.eierOrgId) : true;
   const fields: Field[] = [
@@ -89,7 +89,7 @@ export function editEiendom(id?: string) {
       const m = String(v.gnrbnr || '').match(/^\s*(\d+)\s*\/\s*(\d+)(?:\s*\/\s*(\d+))?(?:\s*\/\s*(\d+))?/);
       if (m) Object.assign(v, { gnr: +m[1], bnr: +m[2], fnr: m[3] ? +m[3] : '', snr: m[4] ? +m[4] : '' });
       if (v.eierOrgnr && rensOrgnr(v.eierOrgnr).length === 9 && v.eierBrreg?.orgnr !== rensOrgnr(v.eierOrgnr)) { const b = await brregData(v.eierOrgnr).catch(() => null); if (b) { v.eierBrreg = b; if (!v.eierNavn) v.eierNavn = b.navn; } }
-      const nid = await save('eiendommer', { ...e, ...v }); toast('Eiendom lagret'); if (!id) { await oppdaterNiva(); go('eiendom/' + nid); setTimeout(() => generatePlan(nid, true), 300); } },
+      const nid = await save('eiendommer', { ...e, ...v }); toast('Eiendom lagret'); if (!id) { await oppdaterNiva(); if (etter) etter(nid); else { go('eiendom/' + nid); setTimeout(() => generatePlan(nid, true), 300); } } },
   });
 }
 

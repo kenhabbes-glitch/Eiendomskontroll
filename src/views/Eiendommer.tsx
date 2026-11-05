@@ -1,7 +1,8 @@
+import { importerSystemer } from './SystemImport';
 import React, { useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { AV_LUKKET, DOK_PAAKREVD } from '../lib/catalog';
-import { S, canEdit, isAdmin, useStore } from '../lib/store';
+import { S, canEdit, isAdmin, useStore, mineOrg } from '../lib/store';
 import { activeTasks, byId, dUntil, openAvvik, sortBy } from '../lib/utils';
 import { autoTfm, editAnlegg, editAvvik, editDok, editEiendom, editKomponent, editLeietaker, editOppgave, generatePlan, importTfm, visOppgave } from '../lib/actions';
 import { AvvikTable, CoverageTable, DokTable, LeieTable, ServiceavtaleTable, TaskTable, TfmTree } from '../components/tables';
@@ -14,7 +15,7 @@ const go = (p: string) => { location.hash = '#/' + p; };
 export function Eiendommer() {
   useStore();
   return <>
-    <div className="head"><div className="grow"><h1>Eiendommer<Hjelp id="side.eiendommer" /></h1><p className="sub">{S.eiendommer.length} eiendommer</p></div>{isAdmin() && <button className="btn pri" onClick={() => editEiendom()}>+ Ny eiendom</button>}</div>
+    <div className="head"><div className="grow"><h1>Eiendommer<Hjelp id="side.eiendommer" /></h1><p className="sub">{S.eiendommer.length} eiendommer</p></div>{(isAdmin() || mineOrg(['admin', 'forvalter']).length > 0) && <button className="btn" onClick={() => importerSystemer()}>Importer systemer fra Excel</button>}{isAdmin() && <button className="btn pri" onClick={() => editEiendom()}>+ Ny eiendom</button>}</div>
     {S.eiendommer.length ? <div className="props">{sortBy(S.eiendommer, e => e.navn).map(e => {
       const f = activeTasks().filter(o => o.eiendomId === e.id && (dUntil(o.nesteFrist) as number) < 0).length; const a = openAvvik().filter(x => x.eiendomId === e.id); const kh = a.filter(x => x.alv === 'Kritisk' || x.alv === 'Høy').length;
       return <div key={e.id} className="card prop" onClick={() => go('eiendom/' + e.id)}>
@@ -52,7 +53,7 @@ export function Eiendom({ id }: { id: string }) {
       {ed && <div className="sec"><h2>Dokumentdekning</h2><CoverageTable es={[e]} /></div>}</>;
   }
   if (cur === 'anlegg') c = <>
-    <div className="toolbar">{ed && <><button className="btn pri" onClick={() => editAnlegg(undefined, id)}>+ System / bygningsdel</button><button className="btn" onClick={() => importTfm(id)}>Importer TFM-liste</button>
+    <div className="toolbar">{ed && <><button className="btn pri" onClick={() => editAnlegg(undefined, id)}>+ System / bygningsdel</button><button className="btn" onClick={() => importerSystemer(id)}>Importer fra Excel</button><button className="btn" onClick={() => importTfm(id)}>Importer TFM-liste</button>
       {AN.some(a => !a.tfmSys) && <button className="btn" onClick={() => autoTfm(id)}>Tildel TFM-koder automatisk ({AN.filter(a => !a.tfmSys).length})</button>}</>}
       <input type="search" placeholder="Søk kode, navn, fabrikat …" value={q} onChange={ev => setQ(ev.target.value)} style={{ marginLeft: 'auto' }} /></div>
     <p className="small muted" style={{ margin: '-4px 0 10px' }}>{e.tfmBygg ? <>Byggnummer <span className="mono">+{e.tfmBygg}</span> · </> : ed ? 'Ingen TFM byggnummer satt (rediger eiendommen) · ' : ''}{AN.length} systemer · {S.komponenter.filter(k => k.eiendomId === id).length} komponenter · levetider er veiledende<Hjelp id="side.eiendom.tfm" /></p>
