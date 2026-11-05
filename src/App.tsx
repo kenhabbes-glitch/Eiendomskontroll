@@ -14,6 +14,7 @@ import { AvvikView } from './views/Avvik';
 import { Leietakere, LeietakerView } from './views/Leietakere';
 import { Dokumenter } from './views/Dokumenter';
 import { Maalere } from './views/Maalere';
+import { Kontrollrunde } from './views/Kontrollrunde';
 import { Vedlikehold } from './views/Vedlikehold';
 import { TfmRegister } from './views/Tfm';
 import { Arealer } from './views/Arealer';
@@ -41,6 +42,7 @@ const I: Record<string, string> = {
   eiendommer: 'M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6',
   kontroller: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2zM9 16l2 2 4-4',
   maalere: 'M12 14l4-5M4.9 19a9 9 0 1114.2 0M12 14a1 1 0 100 .01',
+  runde: 'M5 20a2 2 0 100-4 2 2 0 000 4zM19 8a2 2 0 100-4 2 2 0 000 4zM7 18h6a3 3 0 000-6h-2a3 3 0 010-6h6',
   avvik: 'M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z',
   leietakere: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8',
   tfm: 'M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L2 12V2h10l8.6 8.6a2 2 0 010 2.8zM7 7h.01',
@@ -61,7 +63,7 @@ const I: Record<string, string> = {
 function navFor(): [string, string][] {
   if (isTenant()) return [['portal', 'Mitt leieforhold'], ['regelverk', 'Plikter og regelverk'], ['hjelp', 'Hjelp']];
   if (isUtforer()) return [['arbeidsordre', 'Mine arbeidsordre'], ['hjelp', 'Hjelp']];
-  const n: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['kontroller', 'Kontrollplan'], ['avvik', 'Avvik'], ['arbeidsordre', 'Mine arbeidsordre']];
+  const n: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['kontroller', 'Kontrollplan'], ['runde', 'Kontrollrunde'], ['avvik', 'Avvik'], ['arbeidsordre', 'Mine arbeidsordre']];
   if (canEdit()) n.push(['leietakere', 'Leietakere']);
   n.push(['maalere', 'Målere'], ['tfm', 'TFM-register'], ['arealer', 'Tegninger og arealer'], ['dokumenter', 'Dokumenter']);
   if (canEdit()) n.push(['vedlikehold', 'Vedlikeholdsplan']);
@@ -119,6 +121,7 @@ export default function App() {
     case 'arealer': body = <Arealer />; break;
     case 'dokumenter': body = <Dokumenter />; break;
     case 'maalere': body = <Maalere />; break;
+    case 'runde': body = <Kontrollrunde />; break;
     case 'vedlikehold': body = <Vedlikehold />; break;
     case 'regelverk': body = <Regelverk />; break;
     case 'hjelp': body = <HjelpSide id={r.id} />; break;

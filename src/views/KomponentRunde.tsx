@@ -138,6 +138,14 @@ function SjekkKomp({ oid, kid, close, neste }: { oid: string; kid: string; close
   </ModalFrame>;
 }
 
+/** Fra kontrollrunden: åpne sjekklisten for én komponent */
+export async function sjekkEnKomp(oid: string, kid: string) { await sikreRunde(oid); sjekkKomp(oid, kid, () => undefined); }
+/** Fra kontrollrunden: kvitter ut én komponent med alle punkter OK */
+export async function kompOk(oid: string, kid: string) {
+  const r = await sikreRunde(oid); const fersk = byId('oppgaver', oid)!; const mal = malIRunde(r, kid);
+  const s: KompSvar = { t: new Date().toISOString(), av: state.me?.navn || '', svar: Object.fromEntries(punkterFor(mal, fersk.intervall).map(p => [p.id, 'ok'])) as Record<string, Svar>, komm: '', avvik: [], kilde: 'kontrollrunde' };
+  await save('oppgaver', { ...fersk, runde: { ...(fersk.runde?.kp ? fersk.runde : r), kp: { ...(fersk.runde?.kp || {}), [kid]: s } } });
+}
 /** Kort oppsummering av runden for utkvitteringsskjemaet og historikken. */
 export function RundeOppsummering({ r, K }: { r: Runde; K?: Rec[] }) {
   const ids = Object.keys(r.kp || {}); const KK = K || ids.map(i => byId('komponenter', i)).filter(Boolean) as Rec[];

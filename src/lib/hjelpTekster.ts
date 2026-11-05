@@ -48,6 +48,14 @@ Klikk på en rad for å gå rett til saken.` },
 - DWG leses automatisk med målestokk. Lag i tegningen kan slås av og på.
 - Plasser systemer, komponenter og avvik på tegningen. Filtrer på tagg eller tilstandsgrad.
 - Arealrapporten (PDF) viser leieareal, fordelt fellesareal og over- eller underdekning mot kontrakt.` },
+  'side.runde': { gruppe: 'Sider', tittel: 'Kontrollrunde', tekst: `Én runde i bygget for alt som skal gjøres: egenkontroller, branndører og nødlys, måleravlesninger og avvik du er tildelt.
+
+• Punktene er gruppert etter sted – arealet på tegningen der systemet eller komponenten står (eller nærhet hvis arealer ikke er tegnet) – og sortert etasje for etasje i en foreslått gangrekkefølge.
+• «Kan tas nå»: kontroller i samme område som forfaller innen valgt antall dager tas med, så du slipper en ekstra tur. Velg 7, 14 eller 30 dager øverst.
+• «✓ Alt OK her» kvitterer ut alle kontroller på stedet uten avvik (sjekklister settes til OK). Måleravlesninger skrives inn hver for seg.
+• «Utfør …» / «Sjekkliste …» åpner full utkvittering hvis noe er galt.
+• Tegning: ett nummer per sted. Trykk for å se hva som skal gjøres der. Én finger flytter, to fingre zoomer.
+• Plasser systemer, komponenter og målere på tegningen (Tegninger og arealer) – da blir rundeforslaget bedre. Tegn gjerne inn rom/arealer, så får stedene riktige navn.` },
   'side.maalere': { gruppe: 'Sider', tittel: 'Målere', tekst: `Avlesning av målere: trykk på sprinkleranlegg, vannmåler, fjernvarme, fjernkjøling, energimålere og seriemålere.
 
 En måler er en komponent i systemet den hører til (f.eks. trykkmåler under sprinkleranlegget). Kryss av for «Er komponenten en måler?» i komponenten, eller bruk «+ Ny måler».

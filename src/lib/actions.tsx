@@ -587,6 +587,14 @@ export function utfor(id: string, pre?: UtforPreset) {
     },
   });
 }
+/** Hurtigkvittering fra kontrollrunden: registrer kontrollen som utført i dag uten avvik (sjekklisten settes til OK) */
+export async function registrerOk(id: string, komm = 'Kvittert i kontrollrunde') {
+  const o = byId('oppgaver', id); if (!o) return;
+  const d = today(); const sjMal = sysSjekkFor(alleSjekkmaler(), o, o.anleggId ? byId('anlegg', o.anleggId)?.type : '');
+  const sjekk = sjMal ? { ...sjMal, svar: Object.fromEntries(sjMal.punkter.map(pt => [pt.id, 'ok'])) } : undefined;
+  const h = [{ dato: d, av: state.me?.navn || state.me?.epost || '', res: 'OK – ingen avvik', komm, avvik: [], regAv: state.me?.id, sjekk }, ...(o.historikk || [])].slice(0, 80);
+  await save('oppgaver', { ...o, historikk: h, sistUtfort: d, nesteFrist: addInt(d, o.intervall) });
+}
 // Settes av views/KomponentRunde (unngår sirkulær import)
 export const RundeRef: { start: (id: string) => boolean; Oppsummering: (p: { r: any }) => any } = { start: () => false, Oppsummering: () => null };
 // Settes av views/KontrollAo for å unngå sirkulær import

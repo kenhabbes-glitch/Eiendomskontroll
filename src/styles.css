@@ -269,3 +269,30 @@ h1 .hjelp-q{position:relative;top:-2px}
 .kr-avtekst{display:block;width:100%;margin-top:6px;border:1px solid var(--amber);border-radius:8px;padding:6px 8px;font:inherit}
 .seg{display:flex;gap:4px;flex-wrap:wrap}
 @media (max-width:600px){.kr-punkt{flex-direction:column}.kr-valg{width:100%}.kr-v{flex:1;padding:11px 0}}
+
+/* Kontrollrunde */
+.rk-verktoy select{border:1px solid var(--line2);border-radius:8px;padding:7px 8px;background:#fff;max-width:100%}
+.rk-fremdrift{height:8px;background:var(--surface2);border:1px solid var(--line);border-radius:5px;overflow:hidden;margin:0 0 12px}.rk-fremdrift div{height:100%;background:var(--green)}
+.rk-etasje{margin:16px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.rk-sted{margin-bottom:10px;padding:12px 14px}.rk-sted.aktiv{outline:2px solid var(--acc)}
+.rk-hode{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.rk-nr{width:30px;height:30px;border-radius:50%;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.rk-handling{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.rk-rad{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}.rk-rad.gjort{opacity:.6}
+.rk-tekst{flex:1;min-width:200px;display:flex;flex-direction:column;gap:2px;align-items:flex-start}
+.rk-knapper{display:flex;gap:6px}
+.rk-maal{width:100%;display:flex;flex-direction:column;gap:4px}.rk-maal input{width:130px;border:1px solid var(--line2);border-radius:8px;padding:8px 9px;font-family:ui-monospace,monospace;font-size:16px}
+.rk-kart{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;height:62vh;min-height:320px}
+.rk-kart svg{width:100%;height:100%;display:block;user-select:none;-webkit-user-select:none}
+.rk-kartknapper{position:absolute;top:8px;right:8px}
+.rk-ark{position:relative;margin-top:10px}.rk-lukk{position:absolute;right:8px;top:8px;z-index:1}
+@media (max-width:700px){
+  .rk-verktoy{flex-wrap:wrap}.rk-verktoy select{width:100%}
+  .rk-kart{height:58vh}
+  .rk-ark{position:fixed;left:0;right:0;bottom:0;max-height:55vh;overflow:auto;z-index:50;margin:0;box-shadow:0 -6px 24px rgba(0,0,0,.18);border-radius:14px 14px 0 0;background:var(--surface)}
+  .rk-ark .rk-sted{margin:0;border-radius:14px 14px 0 0;border:none}
+  .rk-knapper{width:100%}.rk-knapper .btn{flex:1;justify-content:center;padding:10px 0}
+  .rk-handling .btn{flex:1;justify-content:center;padding:10px 0}
+}
+.rk-innst{flex:1;min-width:220px}.rk-innst summary{cursor:pointer;color:var(--ink2);padding:6px 0}.rk-innst[open]{padding-bottom:6px}
+@media (max-width:700px){.rk-innst{flex-basis:100%}}
