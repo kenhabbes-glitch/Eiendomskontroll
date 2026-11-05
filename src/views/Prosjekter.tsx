@@ -8,6 +8,7 @@ import { editAnlegg } from '../lib/actions';
 import { KOMP } from '../lib/catalog';
 import { BETALER, FAG, FASER, KLASSER, KONTO, PSTATUS, PTYPER, ferdigstill, fremdrift, nyttProsjektData, okonomi, uid } from '../lib/prosjekt';
 import { lNavn } from '../lib/utils';
+import { NsVelger, nsNavn } from '../components/NsVelger';
 import { Sel, eiendomOpts, useFilter } from './common';
 
 const go = (p: string) => { location.hash = '#/' + p; };
@@ -181,7 +182,7 @@ function Okonomi({ p, kan }: { p: Rec; kan: boolean }) {
   const o = okonomi(p);
   const redPost = (b?: Rec) => formModal({ title: b ? 'Rediger budsjettpost' : 'Ny budsjettpost', values: b || { klasse: p.type === 'Vedlikehold' ? 'vedl' : 'pak', konto: p.type === 'Vedlikehold' ? '6600' : '1100' }, fields: [
     { k: 'post', label: 'Post', req: true, ph: 'F.eks. Rive gammelt aggregat' }, { k: 'fag', label: 'Fag', type: 'select', options: fagValg(p), empty: '– felles –', half: true },
-    { k: 'bygningsdel', label: 'Bygningsdel (NS 3451)', half: true, mono: true, ph: '360' },
+    { k: 'bygningsdel', label: 'Bygningsdel (NS 3451)', type: 'custom', render: (v, set) => <NsVelger value={v.bygningsdel} set={k => set({ bygningsdel: k })} fag={v.fag} /> },
     { k: 'betaler', label: 'Betales av', type: 'select', options: BETALER, half: true, def: 'eier' }, { k: 'andelLt', label: 'Leietakers andel (%)', type: 'number', half: true, show: x => x.betaler === 'delt' },
     { k: 'klasse', label: 'Regnskapsklassifisering', type: 'select', options: KLASSER, half: true }, { k: 'konto', label: 'Konto', half: true, dl: KONTO },
     { k: 'belop', label: 'Budsjett (kr eks. mva)', type: 'number', half: true }, { k: 'prognose', label: 'Prognose (tom = beregnes)', type: 'number', half: true }],
@@ -200,12 +201,12 @@ function Okonomi({ p, kan }: { p: Rec; kan: boolean }) {
   const post = (id: string) => (p.budsjett || []).find((b: Rec) => b.id === id);
   const klasseFor = (k: Rec) => k.klasse || post(k.post)?.klasse || 'annet'; const kontoFor = (k: Rec) => k.konto || post(k.post)?.konto || '';
   const eksport = () => { const rader: (string | number)[][] = [['Dato', 'Prosjekt', 'Eiendom', 'Leverandør', 'Faktura/ordre', 'Beskrivelse', 'Budsjettpost', 'Fag', 'Bygningsdel', 'Klassifisering', 'Konto', 'Betales av', 'Leietakers andel %', 'Status', 'Beløp eks. mva']];
-    for (const k of p.kostnader || []) { const b = post(k.post); rader.push([k.dato, p.navn, eNavn(p.eiendomId), k.leverandor || '', k.faktura || '', k.beskrivelse || '', b?.post || '', o.fagF(k), b?.bygningsdel || '', klasseNavn(klasseFor(k)), kontoFor(k), BETALER.find(x => x[0] === (b?.betaler || 'eier'))?.[1] || 'Eier', b?.betaler === 'leietaker' ? 100 : b?.betaler === 'delt' ? +b.andelLt || 0 : 0, k.status, +k.belop || 0]); }
+    for (const k of p.kostnader || []) { const b = post(k.post); rader.push([k.dato, p.navn, eNavn(p.eiendomId), k.leverandor || '', k.faktura || '', k.beskrivelse || '', b?.post || '', o.fagF(k), b?.bygningsdel ? `${b.bygningsdel} ${nsNavn(b.bygningsdel)}` : '', klasseNavn(klasseFor(k)), kontoFor(k), BETALER.find(x => x[0] === (b?.betaler || 'eier'))?.[1] || 'Eier', b?.betaler === 'leietaker' ? 100 : b?.betaler === 'delt' ? +b.andelLt || 0 : 0, k.status, +k.belop || 0]); }
     const b = new Blob(['﻿' + toCsv(rader)], { type: 'text/csv;charset=utf-8' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `kostnader-${p.navn}.csv`.replace(/[^\wæøåÆØÅ.\- ]/g, ''); a.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); };
   return <>
     <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Budsjett og prognose</h2>{kan && <button className="btn" onClick={() => redPost()}>+ Budsjettpost</button>}</div>
       <div className="tbl-wrap"><table><thead><tr><th>Post</th><th>Fag</th><th>Klassifisering</th><th className="num">Budsjett</th><th className="num">Forpliktet</th><th className="num">Påløpt</th><th className="num">Prognose</th><th className="num">Avvik</th></tr></thead><tbody>
-        {o.poster.map(x => <tr key={x.b.id} className={kan ? 'click' : ''} onClick={() => kan && redPost(x.b)}><td>{x.b.post}{x.b.bygningsdel && <span className="small muted mono"> · {x.b.bygningsdel}</span>}{x.b.betaler && x.b.betaler !== 'eier' && <div className="small" style={{ color: 'var(--blue)' }}>{x.b.betaler === 'delt' ? `Delt – leietaker ${x.b.andelLt || 0} %` : 'Betales av leietaker'}</div>}</td><td className="small">{x.b.fag || '–'}</td><td className="small">{klasseNavn(x.b.klasse)}{x.b.konto ? ` · ${x.b.konto}` : ''}</td>
+        {o.poster.map(x => <tr key={x.b.id} className={kan ? 'click' : ''} onClick={() => kan && redPost(x.b)}><td>{x.b.post}{x.b.bygningsdel && <span className="small muted"> · <span className="mono">{x.b.bygningsdel}</span> {nsNavn(x.b.bygningsdel)}</span>}{x.b.betaler && x.b.betaler !== 'eier' && <div className="small" style={{ color: 'var(--blue)' }}>{x.b.betaler === 'delt' ? `Delt – leietaker ${x.b.andelLt || 0} %` : 'Betales av leietaker'}</div>}</td><td className="small">{x.b.fag || '–'}</td><td className="small">{klasseNavn(x.b.klasse)}{x.b.konto ? ` · ${x.b.konto}` : ''}</td>
           <td className="num mono">{kr(x.budsjett)}</td><td className="num mono">{kr(x.forpliktet)}</td><td className="num mono">{kr(x.palopt)}</td><td className="num mono">{kr(x.prognose)}</td><td className="num mono" style={{ color: x.prognose > x.budsjett ? 'var(--red)' : undefined }}>{kr(x.prognose - x.budsjett)}</td></tr>)}
         {o.uten.length > 0 && <tr><td className="muted">Uten budsjettpost</td><td /><td /><td className="num mono">–</td><td className="num mono">{kr(o.uten.reduce((s, x) => s + (+x.belop || 0), 0))}</td><td /><td /><td /></tr>}
         <tr style={{ fontWeight: 700 }}><td>Sum</td><td /><td /><td className="num mono">{kr(o.tot.budsjett)}</td><td className="num mono">{kr(o.tot.forpliktet)}</td><td className="num mono">{kr(o.tot.palopt)}</td><td className="num mono">{kr(o.tot.prognose)}</td><td className="num mono" style={{ color: o.avvik > 0 ? 'var(--red)' : undefined }}>{kr(o.avvik)}</td></tr>

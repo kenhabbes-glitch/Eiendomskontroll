@@ -306,3 +306,10 @@ h1 .hjelp-q{position:relative;top:-2px}
 .pf-fase.ferdig{background:var(--greenbg);border-color:transparent;color:var(--green)}.pf-fase.ferdig span{background:var(--green);color:#fff;border-color:var(--green)}
 .pf-fase.naa{border:2px solid var(--amber);color:var(--ink);font-weight:600}.pf-fase.naa span{background:var(--amber);color:#fff;border-color:var(--amber)}
 .pf-fase:disabled{cursor:default}
+
+/* NS 3451-velger */
+.ns-velger{position:relative}
+.ns-liste{position:absolute;left:0;right:0;top:100%;z-index:30;margin-top:4px;background:var(--surface);border:1px solid var(--line2);border-radius:10px;box-shadow:var(--shadow);max-height:300px;overflow:auto}
+.ns-hode{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:8px 10px 2px;position:sticky;top:0;background:var(--surface)}
+.ns-rad{display:block;width:100%;text-align:left;border:none;background:none;padding:6px 8px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
+.ns-rad:hover{background:var(--acc2)}.ns-rad.on{background:var(--acc2);font-weight:600}
