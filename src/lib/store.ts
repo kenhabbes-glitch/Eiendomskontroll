@@ -35,13 +35,18 @@ export const TABLES = {
   dokumenter: { table: 'dokumenter', cols: { eiendomId: 'eiendom_id', leietakerId: 'leietaker_id' } as ColMap },
   tegninger: { table: 'tegninger', cols: { eiendomId: 'eiendom_id' } as ColMap },
   avlesninger: { table: 'avlesninger', cols: { eiendomId: 'eiendom_id', komponentId: 'komponent_id' } as ColMap },
+  prosjekter: { table: 'prosjekter', cols: { eiendomId: 'eiendom_id' } as ColMap },
 };
+/** Arkiverte rader (data.arkivert) holdes utenfor de vanlige listene, men finnes for oppslag og arkivsøk */
+export const ARKIV: Record<'anlegg' | 'komponenter' | 'oppgaver', any[]> = { anlegg: [], komponenter: [], oppgaver: [] };
+const ARK_COLS = ['anlegg', 'komponenter', 'oppgaver'] as const;
+const VALGFRIE = ['avlesninger', 'prosjekter'];
 export type Col = keyof typeof TABLES;
 export const COLS = Object.keys(TABLES) as Col[];
 
 export type Niva = 'skriv' | 'drift' | 'les' | 'service';
 export const S: Record<Col, any[]> & { profiles: any[]; tilganger: any[]; innst: Record<string, any>; innstMangler: boolean; orgs: any[]; medlemmer: any[]; portefoljer: any[]; oppdrag: any[]; niva: Record<string, Niva>; primarOrg: string } = {
-  eiendommer: [], leietakere: [], anlegg: [], komponenter: [], oppgaver: [], avvik: [], dokumenter: [], tegninger: [], avlesninger: [], profiles: [], tilganger: [], innst: {}, innstMangler: false,
+  eiendommer: [], leietakere: [], anlegg: [], komponenter: [], oppgaver: [], avvik: [], dokumenter: [], tegninger: [], avlesninger: [], prosjekter: [], profiles: [], tilganger: [], innst: {}, innstMangler: false,
   orgs: [], medlemmer: [], portefoljer: [], oppdrag: [], niva: {}, primarOrg: '',
 };
 
@@ -69,6 +74,10 @@ function toRow(col: Col, o: any) {
   return row;
 }
 function apply(col: Col | 'profiles' | 'tilganger', type: 'upsert' | 'delete', o: any) {
+  if ((ARK_COLS as readonly string[]).includes(col)) { // arkiverte flyttes mellom vanlig liste og arkiv
+    const c = col as typeof ARK_COLS[number]; S[c] = S[c].filter(x => x.id !== o.id); ARKIV[c] = ARKIV[c].filter(x => x.id !== o.id);
+    if (type === 'upsert') (o.arkivert ? ARKIV[c] : S[c]).push(o); bump(); return;
+  }
   const arr = S[col] as any[]; const key = col === 'tilganger' ? (x: any) => x.user_id + '|' + x.eiendom_id : (x: any) => x.id;
   const i = arr.findIndex(x => key(x) === key(o));
   if (type === 'delete') { if (i >= 0) arr.splice(i, 1); }
@@ -104,7 +113,7 @@ export function toast(m: string) { toasts.msg = m; toasts.t = Date.now(); bump()
 
 // ---- lagring
 export async function save(col: Col, obj: any): Promise<string> {
-  const o = { ...obj }; const exists = !!o.id && (S[col] as any[]).some(x => x.id === o.id);
+  const o = { ...obj }; const exists = !!o.id && ((S[col] as any[]).some(x => x.id === o.id) || ((ARK_COLS as readonly string[]).includes(col) && ARKIV[col as typeof ARK_COLS[number]].some(x => x.id === o.id)));
   if (!o.id) o.id = crypto.randomUUID();
   const row = toRow(col, o); const t = TABLES[col].table;
   const res = exists
@@ -151,7 +160,8 @@ export async function loadData() {
   state.loading = true; state.error = ''; bump();
   try {
     // avlesninger er nyere enn de andre tabellene – mangler den (før migrering), lastes resten likevel
-    await Promise.all(COLS.map(async c => { try { S[c] = (await loadAll(TABLES[c].table)).map(r => fromRow(c, r)); } catch (e) { if (c === 'avlesninger') S[c] = []; else throw e; } }));
+    await Promise.all(COLS.map(async c => { try { S[c] = (await loadAll(TABLES[c].table)).map(r => fromRow(c, r)); } catch (e) { if (VALGFRIE.includes(c)) S[c] = []; else throw e; } }));
+    for (const c of ARK_COLS) { const alle = S[c]; S[c] = alle.filter(x => !x.arkivert); ARKIV[c] = alle.filter(x => x.arkivert); }
     if (state.me && ['admin', 'forvalter', 'tekniker'].includes(state.me.rolle)) {
       await loadInnst();
       S.profiles = await loadAll('profiles');

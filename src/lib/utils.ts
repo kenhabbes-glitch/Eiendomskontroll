@@ -1,5 +1,5 @@
 import { KOMP, TFM_KODER, AV_LUKKET, TYPE_TAGGER, NS_TAGG } from './catalog';
-import { S } from './store';
+import { S, ARKIV } from './store';
 
 export type Rec = { id: string; [k: string]: any };
 
@@ -31,7 +31,7 @@ export const sortBy = <T,>(arr: T[], f: (x: T) => any) => arr.slice().sort((a, b
 export const m2 = (v: any) => v == null || isNaN(v) ? '–' : (+v).toLocaleString('nb-NO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' m²';
 
 // ---- oppslag
-export const byId = (col: keyof typeof S, id?: string): Rec | undefined => id ? (S[col] as Rec[]).find(x => x.id === id) : undefined;
+export const byId = (col: keyof typeof S, id?: string): Rec | undefined => id ? ((S[col] as Rec[]).find(x => x.id === id) || ((ARKIV as any)[col] as Rec[] | undefined)?.find(x => x.id === id)) : undefined;
 export const eNavn = (id?: string) => byId('eiendommer', id)?.navn || '–';
 export const lNavn = (id?: string) => byId('leietakere', id)?.navn || '';
 export function tfmSys(a?: Rec, full?: boolean) {

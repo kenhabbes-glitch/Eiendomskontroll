@@ -48,6 +48,13 @@ Klikk på en rad for å gå rett til saken.` },
 - DWG leses automatisk med målestokk. Lag i tegningen kan slås av og på.
 - Plasser systemer, komponenter og avvik på tegningen. Filtrer på tagg eller tilstandsgrad.
 - Arealrapporten (PDF) viser leieareal, fordelt fellesareal og over- eller underdekning mot kontrakt.` },
+  'side.prosjekter': { gruppe: 'Sider', tittel: 'Prosjekter', tekst: `Prosjekter fra små vedlikeholdsjobber til store rehabiliteringer.
+
+• Faser: behov og idé → planlegging og prosjektering → anbud og kontrahering → utførelse → overlevering og ferdigstillelse → garantiperiode. Hver fase har standardoppgaver som kan endres, og datoer for en enkel fremdriftsplan.
+• Økonomi: budsjettposter med NS 3451-bygningsdel, regnskapsklassifisering (vedlikehold, påkostning, nybygg, rådgivning, leietakertilpasning) og konto (NS 4102). Kostnader registreres som bestilt (forpliktet) eller fakturert/betalt (påløpt). Prognose og avvik mot budsjett beregnes. Eksport til regnskap som CSV.
+• Dokumenter og FDV: sjekkliste for sluttdokumentasjon med opplasting.
+• Utskiftingsprosjekt: trykk «Opprett utskiftingsprosjekt» på et system (eller i vedlikeholdsplanen). Systemet merkes, og prosjektet åpnes. Når prosjektet ferdigstilles, opprettes nytt system med samme TFM-merking, det gamle arkiveres med komponenter og kontroller, og kontrollene opprettes på nytt for det nye systemet.` },
+  'side.arkiv': { gruppe: 'Sider', tittel: 'Arkiv', tekst: `Systemer, komponenter og kontroller som er erstattet, med all historikk (utførte kontroller, rapporter, avvik), og avsluttede prosjekter. Søk på navn, TFM-kode, fabrikat eller tekst i kommentarer. Arkiverte data vises ikke i kontrollplan, vedlikeholdsplan eller TFM-register.` },
   'side.runde': { gruppe: 'Sider', tittel: 'Kontrollrunde', tekst: `Én runde i bygget for alt som skal gjøres: egenkontroller, branndører og nødlys, måleravlesninger og avvik du er tildelt.
 
 • Punktene er gruppert etter sted – arealet på tegningen der systemet eller komponenten står (eller nærhet hvis arealer ikke er tegnet) – og sortert etasje for etasje i en foreslått gangrekkefølge.

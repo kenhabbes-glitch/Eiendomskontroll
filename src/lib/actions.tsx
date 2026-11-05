@@ -11,6 +11,7 @@ import { PosVelger, BildeVelger, VedleggGalleri } from '../components/PosVelger'
 import { ServiceHistorikk } from '../views/Servicehistorikk';
 import { alleSjekkmaler } from '../views/Sjekkmaler';
 import { sysSjekkFor, sysSjekkAvvik } from './komponentsjekk';
+import { aktivtProsjektFor, opprettUtskifting } from './prosjekt';
 import { MEDIER, MAALER_KODER, sisteAvl, enhet as mEnhet, grenseTekst, tall as mTall, fmt as mFmt } from './maaler';
 import { SysSjekkVelger, SysSjekkKort } from '../components/SysSjekk';
 import { alleMaler, finnMal, kopi, kontraktKey, fordeling, pliktKeysFor, OMR, ANS_VALG } from './kontrakt';
@@ -252,6 +253,8 @@ export function editAnlegg(id?: string, eiendomId?: string) {
   if (!id) { a.tfmSys = TFM_DEF[a.type][0]; a.tfmLop = nextSysLop(a.eiendomId, a.tfmSys); a.mk = KOMP[a.type]?.m || []; a.forste = addDays(today(), 30); }
   const touched: Record<string, boolean> = {};
   const fields: Field[] = [
+    ...(id ? [{ k: 'utskInfo', type: 'custom', show: () => !!aktivtProsjektFor(id), render: () => { const pr = aktivtProsjektFor(id)!; return <div className="note" style={{ color: 'var(--ink)', display: 'flex', gap: 8, alignItems: 'center' }}>
+      <Chip c="amber">Utskiftingsprosjekt opprettet</Chip><span style={{ flex: 1 }} className="small">{pr.navn} · {pr.status}</span><button type="button" className="btn sm" onClick={() => { closeRef.c?.(); go('prosjekt/' + pr.id); }}>Åpne prosjektet</button></div>; } } as Field] : []),
     { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOptsSkriv, req: true },
     { k: 'type', label: 'Type system / bygningsdel', type: 'select', groups: kompGroups },
     { k: 'tagger', type: 'custom', label: 'Tagger (fag)', render: (v, set) => <div><TaggVelger value={Array.isArray(v.tagger) ? v.tagger : standardTagger(v)} onChange={t => set({ tagger: t })} disabled={!canEdit()} />
@@ -314,7 +317,8 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     extraFoot: close => id && !ro ? <><button className="btn danger" onClick={async () => {
       const kc = S.komponenter.filter(k => k.anleggId === id);
       if (await confirmBox(`Slette systemet${kc.length ? ` og ${kc.length} komponenter` : ''}? Tilknyttede kontroller beholdes, men mister koblingen.`)) { await removeDoc('anlegg', id); close(); }
-    }}>Slett</button><button className="btn" title="Klikk rundt på en tegning og marker f.eks. hver branndør" onClick={() => kompFraTegning(id, close)}>+ Komponenter fra tegning</button></> : null,
+    }}>Slett</button><button className="btn" title="Klikk rundt på en tegning og marker f.eks. hver branndør" onClick={() => kompFraTegning(id, close)}>+ Komponenter fra tegning</button>
+      {!aktivtProsjektFor(id) && <button className="btn" title="Systemet merkes, og et prosjekt åpnes i prosjektmodulen. Når prosjektet ferdigstilles, erstatter nytt system det gamle." onClick={async () => { const pid = await opprettUtskifting(id); if (pid) { close(); toast('Utskiftingsprosjekt opprettet'); go('prosjekt/' + pid); } }}>Opprett utskiftingsprosjekt</button>}</> : null,
     onSave: async v => {
       const mk: string[] = [...(v.mk || []), ...(v.mkNy || [])]; const forste = v.forste || addDays(today(), 30); const levMk: any[] = v.levMk || []; delete v.mk; delete v.mkNy; delete v.levMk; delete v.forste; delete v.prev; delete v.beregn;
       if (v.kost && !v.kostAar) v.kostAar = YEAR;

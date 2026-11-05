@@ -15,6 +15,8 @@ import { Leietakere, LeietakerView } from './views/Leietakere';
 import { Dokumenter } from './views/Dokumenter';
 import { Maalere } from './views/Maalere';
 import { Kontrollrunde } from './views/Kontrollrunde';
+import { Prosjekter, ProsjektSide } from './views/Prosjekter';
+import { Arkiv } from './views/Arkiv';
 import { Vedlikehold } from './views/Vedlikehold';
 import { TfmRegister } from './views/Tfm';
 import { Arealer } from './views/Arealer';
@@ -43,6 +45,8 @@ const I: Record<string, string> = {
   kontroller: 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2zM9 16l2 2 4-4',
   maalere: 'M12 14l4-5M4.9 19a9 9 0 1114.2 0M12 14a1 1 0 100 .01',
   runde: 'M5 20a2 2 0 100-4 2 2 0 000 4zM19 8a2 2 0 100-4 2 2 0 000 4zM7 18h6a3 3 0 000-6h-2a3 3 0 010-6h6',
+  prosjekter: 'M3 7h18v13H3zM8 7V4h8v3M3 12h18',
+  arkiv: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
   avvik: 'M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z',
   leietakere: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8',
   tfm: 'M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L2 12V2h10l8.6 8.6a2 2 0 010 2.8zM7 7h.01',
@@ -66,17 +70,17 @@ function navFor(): [string, string][] {
   const n: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['kontroller', 'Kontrollplan'], ['runde', 'Kontrollrunde'], ['avvik', 'Avvik'], ['arbeidsordre', 'Mine arbeidsordre']];
   if (canEdit()) n.push(['leietakere', 'Leietakere']);
   n.push(['maalere', 'Målere'], ['tfm', 'TFM-register'], ['arealer', 'Tegninger og arealer'], ['dokumenter', 'Dokumenter']);
-  if (canEdit()) n.push(['vedlikehold', 'Vedlikeholdsplan']);
+  if (canEdit()) n.push(['vedlikehold', 'Vedlikeholdsplan'], ['prosjekter', 'Prosjekter']);
   n.push(['regelverk', 'Regelverk og plikter']);
   if (canEdit()) n.push(['innstillinger', 'Innstillinger']);
-  if (canEdit()) n.push(['logg', 'Hendelseslogg']);
+  if (canEdit()) n.push(['logg', 'Hendelseslogg'], ['arkiv', 'Arkiv']);
   if (isAdmin() || mineOrg(['admin', 'forvalter']).length) n.push(['brukere', 'Organisasjon og tilgang']);
   if (isAdmin()) n.push(['data', 'Import og eksport']);
   n.push(['hjelp', 'Hjelp']);
   return n;
 }
 
-const ADMIN_NAV = ['innstillinger', 'logg', 'brukere', 'data'];
+const ADMIN_NAV = ['innstillinger', 'logg', 'arkiv', 'brukere', 'data'];
 export default function App() {
   useEffect(() => { initAuth(); }, []);
   const [admApen, setAdmApen] = useState(() => { try { return localStorage.getItem('navAdmin') === '1'; } catch { return false; } });
@@ -99,10 +103,11 @@ export default function App() {
   const nav = navFor();
   const def = isTenant() ? 'portal' : isUtforer() ? 'arbeidsordre' : 'oversikt';
   let v = r.v || def;
-  if (!nav.some(n => n[0] === v) && !['eiendom', 'leietaker', 'profil'].includes(v)) v = def;
+  if (!nav.some(n => n[0] === v) && !['eiendom', 'leietaker', 'profil', 'prosjekt'].includes(v)) v = def;
+  if (v === 'prosjekt' && !canEdit()) v = def;
   if (v === 'leietaker' && !canEdit()) v = def;
   if (v === 'eiendom' && !isStaff()) v = def;
-  const cur = v === 'eiendom' ? 'eiendommer' : v === 'leietaker' ? 'leietakere' : v;
+  const cur = v === 'eiendom' ? 'eiendommer' : v === 'leietaker' ? 'leietakere' : v === 'prosjekt' ? 'prosjekter' : v;
   const forf = isStaff() ? activeTasks().filter(o => (dUntil(o.nesteFrist) as number) < 0).length : 0;
   const avv = isStaff() ? openAvvik().filter(a => (a.frist && (dUntil(a.frist) as number) < 0) || a.alv === 'Kritisk').length : 0;
   const me = state.me;
@@ -122,6 +127,9 @@ export default function App() {
     case 'dokumenter': body = <Dokumenter />; break;
     case 'maalere': body = <Maalere />; break;
     case 'runde': body = <Kontrollrunde />; break;
+    case 'prosjekter': body = <Prosjekter />; break;
+    case 'prosjekt': body = <ProsjektSide id={r.id!} />; break;
+    case 'arkiv': body = <Arkiv />; break;
     case 'vedlikehold': body = <Vedlikehold />; break;
     case 'regelverk': body = <Regelverk />; break;
     case 'hjelp': body = <HjelpSide id={r.id} />; break;
