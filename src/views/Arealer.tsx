@@ -155,7 +155,7 @@ async function lesDwgPaaNytt(id: string) {
 
 // ---------- tegneverktøy
 const HELP: Record<string, string> = {
-  nykomp: 'Velg system og komponenttype til høyre. Hvert klikk på tegningen lager en ny komponent med neste løpenummer, plassert der du klikket. Plasseringen fylles ut med tegningens navn og arealet du klikket i.',
+  nykomp: 'Velg system og komponenttype til høyre. Hvert klikk på tegningen lager en ny komponent med neste løpenummer, plassert der du klikket. For systemer som måles i m² (gulv, overflater, fasade) tegner du flaten i stedet – arealet lagres på komponenten og summeres på systemet.',
   plasser: 'Velg system eller komponent i listen til høyre, og klikk der det skal stå på tegningen. Markører kan dras til ny plassering.',
   velg: 'Klikk på et areal for å velge det. Dra i hjørnepunktene for å justere. Dra i bakgrunnen for å flytte tegningen, scroll for å zoome.',
   skala: 'Klikk på to punkter med kjent avstand, f.eks. endene av en målsatt vegg. Skriv inn lengden i meter til høyre. Zoom inn for presisjon.',
@@ -220,7 +220,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   const setTool = (t: string) => { st.tool = t; if (t === 'nykomp' && !st.nkSys) { const a1 = S.anlegg.filter(a => a.eiendomId === T.eiendomId); if (a1.length === 1) st.nkSys = a1[0].id; } if (t !== 'plasser') st.placeId = ''; if (t === 'tegn' || t === 'skala') st.lagA = true; if (t !== 'velg') st.selM = null; st.draft = []; if (t !== 'skala') st.scale = []; if (t !== 'maal') st.meas = []; if (t !== 'velg') st.sel = null; rr(); };
   if (maalMode && !st.maalInit) { st.maalInit = true; st.tool = T.skala ? 'flate' : 'skala'; st.lagM = false; st.lagV = false; }
   const flateM2 = (f: number[][]) => { const r = mpp(T); return r ? polyArea(f) * r * r : 0; };
-  const closePoly = () => { if (st.draft.length < 3) return; if (st.tool === 'flate') { st.flater.push(st.draft.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10])); st.draft = []; rr(); return; } const z = { id: crypto.randomUUID(), navn: 'Areal ' + (T.soner.length + 1), kat: 'leie', leietakerId: '', pts: st.draft.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]) }; T.soner.push(z); st.draft = []; st.sel = z.id; st.tool = 'velg'; change(); setTimeout(() => { const n = document.getElementById('zN') as HTMLInputElement; n?.focus(); n?.select(); }, 30); };
+  const closePoly = () => { if (st.draft.length < 3) return; if (st.tool === 'nykomp') { const f = st.draft.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]); st.draft = []; rr(); nyKompHer(centroid(f), f); return; } if (st.tool === 'flate') { st.flater.push(st.draft.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10])); st.draft = []; rr(); return; } const z = { id: crypto.randomUUID(), navn: 'Areal ' + (T.soner.length + 1), kat: 'leie', leietakerId: '', pts: st.draft.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]) }; T.soner.push(z); st.draft = []; st.sel = z.id; st.tool = 'velg'; change(); setTimeout(() => { const n = document.getElementById('zN') as HTMLInputElement; n?.focus(); n?.select(); }, 30); };
   const done = async () => { await flush(); close(); };
 
   useEffect(() => { const s = svgRef.current!; const wheel = (e: WheelEvent) => { e.preventDefault(); const p = pt(e); const f = e.deltaY > 0 ? 1.15 : 1 / 1.15; setVb(v => { const nw = v.w * f; if (nw < (T.w || 1000) / 80 || nw > (T.w || 1000) * 4) return v; return { x: p[0] - (p[0] - v.x) * f, y: p[1] - (p[1] - v.y) * f, w: nw, h: v.h * f }; }); }; s.addEventListener('wheel', wheel, { passive: false }); return () => s.removeEventListener('wheel', wheel); });
@@ -232,8 +232,8 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
       if (e.type !== 'keydown') return;
       if (e.key === 'Escape') { if (st.draft.length || st.scale.length || st.meas.length) { st.draft = []; st.scale = []; st.meas = []; rr(); } else if (st.sel || st.selM || st.placeId) { st.sel = null; st.selM = null; st.placeId = ''; rr(); } else done(); return; }
       if (inField || ro) return;
-      if (e.key === 'Enter' && (st.tool === 'tegn' || st.tool === 'flate')) closePoly();
-      if (e.key === 'Backspace' && (st.tool === 'tegn' || st.tool === 'flate') && st.draft.length) { st.draft.pop(); rr(); e.preventDefault(); }
+      if (e.key === 'Enter' && (st.tool === 'tegn' || st.tool === 'flate' || st.tool === 'nykomp')) closePoly();
+      if (e.key === 'Backspace' && (st.tool === 'tegn' || st.tool === 'flate' || st.tool === 'nykomp') && st.draft.length) { st.draft.pop(); rr(); e.preventDefault(); }
       if ((e.key === 'Delete' || e.key === 'Backspace') && st.tool === 'velg' && st.sel) { T.soner = T.soner.filter((q: Rec) => q.id !== st.sel); st.sel = null; change(); e.preventDefault(); }
       const map: Record<string, string> = maalMode ? { v: 'velg', t: 'flate', m: 'maal', s: 'skala' } : { v: 'velg', t: 'tegn', m: 'maal', s: 'skala', p: 'plasser', k: 'nykomp' }; if (map[e.key]) setTool(map[e.key]);
     };
@@ -246,6 +246,9 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
     st.shift = e.shiftKey; const p = pt(e); const tg = e.target as Element; const hdl = tg.getAttribute('data-h'); const zid = tg.getAttribute('data-z');
     const mid = (tg.closest && tg.closest('[data-m]')?.getAttribute('data-m')) || null;
     if (mid && e.button === 0 && (st.tool === 'velg' || st.tool === 'plasser' || st.tool === 'nykomp')) { st.selM = mid; st.sel = null; if (!ro) { st.drag = { t: 'm', id: mid, cx: e.clientX, cy: e.clientY, moved: false }; svgRef.current!.setPointerCapture(e.pointerId); } rr(); return; }
+    if (st.tool === 'nykomp' && e.button === 0 && !ro && !st.space && nkM2() && st.nkSys) {
+      if (!mpp(T)) { toast('Sett målestokk på tegningen først («Sett målestokk»), så arealet blir riktig'); return; }
+      const q = snap(p, st.draft[st.draft.length - 1]); if (st.draft.length >= 3 && Math.hypot(q[0] - st.draft[0][0], q[1] - st.draft[0][1]) < 12 * k()) { closePoly(); return; } st.draft.push(q); rr(); return; }
     if (st.tool === 'nykomp' && e.button === 0 && !ro && !st.space) { nyKompHer(p); return; }
     if (st.tool === 'plasser' && e.button === 0 && !ro) { const it = findItem(st.placeId); if (!it) { toast('Velg først hva som skal plasseres i listen til høyre'); return; }
       if (it.o.pos && st.flyttOk !== it.o.id) { const fra = byId('tegninger', it.o.pos.tegningId)?.navn || 'en annen tegning'; const pos = [p[0], p[1]];
@@ -261,15 +264,17 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
     if (st.tool === 'maal') { const q = snap(p, st.meas[0]); if (st.meas.length >= 2) st.meas = []; st.meas.push(q); rr(); }
   };
   // Legg til komponent der det klikkes (f.eks. hver branndør), med neste løpenummer og plassering fra arealet
+  const nkM2 = () => KOMP[byId('anlegg', st.nkSys)?.type || '']?.enh === 'm2';
   const nkKode = () => (st.nkKode || TFM_DEF[byId('anlegg', st.nkSys)?.type || '']?.[1] || '').toUpperCase();
   const inniAreal = (q: number[]) => T.soner.find((z: Rec) => { let inn = false; const P = z.pts; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > q[1]) !== (yj > q[1]) && q[0] < (xj - xi) * (q[1] - yi) / (yj - yi) + xi) inn = !inn; } return inn; });
-  const nyKompHer = async (q: number[]) => {
+  const nyKompHer = async (q: number[], flate?: number[][]) => {
     const sys = byId('anlegg', st.nkSys); if (!sys) { toast('Velg først hvilket system komponentene hører til'); return; }
     if (!kanRedigereE(sys.eiendomId)) { toast('Du har ikke tilgang til å legge til komponenter på dette bygget'); return; }
     const kode = nkKode(); if (!kode) { toast('Velg komponenttype (TFM-kode) til høyre'); return; }
     const z = inniAreal(q); const lop = nextKompLop(sys.id, kode);
     const ny: Rec = { anleggId: sys.id, eiendomId: sys.eiendomId, kode, lop, navn: st.nkNavn.trim(), plassering: [T.navn, z?.navn].filter(Boolean).join(' – '), pos: { tegningId: T.id, x: Math.round(q[0] * 10) / 10, y: Math.round(q[1] * 10) / 10 } } as any;
-    try { const id = await save('komponenter', ny); st.nkLagt = [...st.nkLagt, id]; st.selM = id; rr(); toast(`-${kode}${pad(lop)} lagt til${z?.navn ? ' i ' + z.navn : ''}`); }
+    if (flate) { const r = mpp(T)!; const a2 = Math.round(polyArea(flate) * r * r * 10) / 10; ny.mengde = a2; ny.arealMaaling = { tegningId: T.id, flater: [flate], m2: a2 }; if (sys.kostMetode === 'm2' && sys.m2pris) { ny.kostMetode = 'm2'; ny.m2pris = sys.m2pris; } }
+    try { const id = await save('komponenter', ny); st.nkLagt = [...st.nkLagt, id]; st.selM = id; rr(); toast(`-${kode}${pad(lop)} lagt til${flate ? ' – ' + m2(ny.mengde) : ''}${z?.navn ? ' i ' + z.navn : ''}`); }
     catch (e: any) { toast(e?.message || 'Kunne ikke lagre komponenten'); }
   };
   const onMove = (e: React.PointerEvent) => {
@@ -309,7 +314,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
         <hr /><button onClick={() => setVb({ x: 0, y: 0, w: T.w, h: T.h })}>Tilpass til vindu</button><div className="phelp">{HELP[st.tool]}</div>
       </div>
       <div className="pcanvas"><svg ref={svgRef} className={st.tool === 'velg' ? 'pan' : ''} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
-        onDoubleClick={() => { if (st.tool === 'tegn' || st.tool === 'flate') { if (st.draft.length > 3) st.draft.pop(); closePoly(); } }} onPointerLeave={() => { st.hover = null; if (st.tool !== 'velg') rr(); }} fontFamily="IBM Plex Sans,sans-serif">
+        onDoubleClick={() => { if (st.tool === 'tegn' || st.tool === 'flate' || (st.tool === 'nykomp' && st.draft.length)) { if (st.draft.length > 3) st.draft.pop(); closePoly(); } }} onPointerLeave={() => { st.hover = null; if (st.tool !== 'velg') rr(); }} fontFamily="IBM Plex Sans,sans-serif">
         {src && <image href={src} x={0} y={0} width={T.w} height={T.h} />}
         {st.lagA && T.soner.map((z: Rec) => { const c = zoneColor(T, z); const on = z.id === st.sel; return <polygon key={z.id} points={z.pts.map((p: number[]) => p.join(',')).join(' ')} fill={c} fillOpacity={on ? .38 : .24} stroke={c} strokeWidth={on ? 3 : 1.6} vectorEffect="non-scaling-stroke" data-z={z.id} style={{ cursor: 'pointer' }} />; })}
         {st.lagA && T.soner.map((z: Rec) => { const c = centroid(z.pts); const a = zoneArea(T, z); let lt = z.kat === 'leie' && z.leietakerId ? lNavn(z.leietakerId) : ''; if (lt === z.navn) lt = '';
@@ -317,6 +322,10 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
             <text x={c[0]} y={c[1] + fs * 1.25} textAnchor="middle" fontSize={fs * .9} fill="#1d2320" stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{(lt ? lt + ' · ' : '') + (a != null ? m2(a) : 'mangler målestokk')}</text></g>; })}
         {maalMode && st.flater.map((f: number[][], fi: number) => { const c = centroid(f); return <g key={'fl' + fi} pointerEvents="none"><polygon points={f.map(p => p.join(',')).join(' ')} fill="#b54708" fillOpacity={.28} stroke="#b54708" strokeWidth={2.5} vectorEffect="non-scaling-stroke" />
           <text x={c[0]} y={c[1]} textAnchor="middle" fontSize={fs} fontWeight={700} fill="#7a2e00" stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{'Flate ' + (fi + 1) + ': ' + m2(flateM2(f))}</text></g>; })}
+        {st.lagM && !maalMode && items.filter(i => i.o.arealMaaling?.tegningId === T.id && (!st.fag || itemFag(i) === st.fag)).map(i => { const col = fagFarge(itemFag(i)); const F: number[][][] = i.o.arealMaaling.flater || [];
+          const big = F.slice().sort((x, y) => polyArea(y) - polyArea(x))[0]; const c = big ? centroid(big) : null;
+          return <g key={'am' + i.o.id} pointerEvents="none">{F.map((f, fi) => <polygon key={fi} points={f.map(p => p.join(',')).join(' ')} fill={col} fillOpacity={st.selM === i.o.id ? .28 : .13} stroke={col} strokeWidth={1.5} strokeDasharray="5 3" vectorEffect="non-scaling-stroke" />)}
+            {c && <text x={c[0]} y={c[1] + fs * 1.9} textAnchor="middle" fontSize={fs * .9} fontWeight={700} fill={col} stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{m2(i.o.arealMaaling.m2)}</text>}</g>; })}
         {st.lagM && markers.map(i => { const isDrag = st.drag?.t === 'm' && st.drag.id === i.o.id && st.mpos; const x = isDrag ? st.mpos![0] : i.o.pos.x, y = isDrag ? st.mpos![1] : i.o.pos.y; const col = fagFarge(itemFag(i)); const on = st.selM === i.o.id || st.fokus.has(i.o.id);
           const av = openAvvik().filter(a => i.kind === 'a' ? a.anleggId === i.o.id && !a.komponentId : a.komponentId === i.o.id).length; const R0 = (i.kind === 'a' ? 8 : 6) * kk;
           return <g key={'m' + i.o.id} data-m={i.o.id} style={{ cursor: ro ? 'pointer' : 'move' }} onPointerEnter={tipOn(i)} onPointerMove={tipMove} onPointerLeave={tipOff}>
@@ -369,9 +378,9 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
               <select style={sel} value={kode} onChange={e => { st.nkKode = e.target.value; rr(); }}><option value="">– velg –</option>{TFM_KODER.map(([c, n]) => <option key={c} value={c}>{c} – {n}</option>)}</select>
               <label className="small">Betegnelse (valgfritt)</label>
               <input style={sel} value={st.nkNavn} onChange={e => { st.nkNavn = e.target.value; rr(); }} placeholder={TFM_KODER.find(c => c[0] === kode)?.[1] || 'F.eks. Branndør EI60'} />
-              <p className="small muted" style={{ margin: '2px 0 8px' }}>{st.nkSys && kode ? <>Klikk på tegningen der hver komponent står. Neste blir <b className="mono">-{kode}{nextKompLop(st.nkSys, kode)}</b>.</> : 'Velg system og type, og klikk så på tegningen.'}</p>
-              {lagt.length > 0 && <div className="note small" style={{ color: 'var(--ink)' }}><b>Lagt til nå: {lagt.length}</b>
-                <div style={{ maxHeight: 160, overflow: 'auto', margin: '4px 0' }}>{lagt.slice().reverse().map(k => <div key={k.id}><a href="#" onClick={e => { e.preventDefault(); editKomponent(k.id); }} className="mono">-{k.kode}{pad(k.lop)}</a> <span className="muted">{k.plassering}</span></div>)}</div>
+              <p className="small muted" style={{ margin: '2px 0 8px' }}>{st.nkSys && kode ? <>{nkM2() ? <>Systemet måles i m²: <b>tegn flaten</b> for hver komponent – klikk hjørnene og avslutt på første punkt (eller Enter). Arealet lagres på komponenten.{!mpp(T) && <span style={{ color: 'var(--amber)' }}> Tegningen mangler målestokk.</span>}</> : 'Klikk på tegningen der hver komponent står.'} Neste blir <b className="mono">-{kode}{nextKompLop(st.nkSys, kode)}</b>.</> : 'Velg system og type, og klikk så på tegningen.'}</p>
+              {lagt.length > 0 && <div className="note small" style={{ color: 'var(--ink)' }}><b>Lagt til nå: {lagt.length}{lagt.some(k => +k.mengde > 0) ? ` · ${m2(lagt.reduce((s0, k) => s0 + (+k.mengde || 0), 0))}` : ''}</b>
+                <div style={{ maxHeight: 160, overflow: 'auto', margin: '4px 0' }}>{lagt.slice().reverse().map(k => <div key={k.id}><a href="#" onClick={e => { e.preventDefault(); editKomponent(k.id); }} className="mono">-{k.kode}{pad(k.lop)}</a> <span className="muted">{+k.mengde > 0 ? m2(k.mengde) + ' · ' : ''}{k.plassering}</span></div>)}</div>
                 <button className="btn sm" onClick={async () => { const id = st.nkLagt[st.nkLagt.length - 1]; if (!id) return; await removeDoc('komponenter', id); st.nkLagt = st.nkLagt.slice(0, -1); if (st.selM === id) st.selM = null; rr(); toast('Siste komponent fjernet'); }}>Angre siste</button></div>}
               <p className="small muted">Klikk på en markør for å se eller flytte den. Fabrikat, brannklasse og annet kan fylles ut senere i komponenten.</p></>}
             <hr style={{ margin: '14px 0', border: 0, borderTop: '1px solid var(--line)' }} /></>; })()}

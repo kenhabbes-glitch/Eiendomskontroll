@@ -17,8 +17,9 @@ export function TfmRegister() {
   const [f, setF] = useFilter('tfm', { e: '', k: '', q: '', t: '', tg: '' });
   let rows: any[] = [];
   S.anlegg.forEach(a => {
-    rows.push({ kind: 's', o: a, e: a.eiendomId, code: tfmSys(a, true), navn: a.navn || KOMP[a.type]?.n, fab: a.fabrikat || '', aar: a.aar || '', sort: (a.tfmSys || '999') + '.' + pad(a.tfmLop) });
-    S.komponenter.filter(k => k.anleggId === a.id).forEach(k => rows.push({ kind: 'k', o: k, e: a.eiendomId, code: tfmKomp(k, true), navn: k.navn || '', fab: k.fabrikat || '', aar: k.aar || '', plass: k.plassering || '', sort: (a.tfmSys || '999') + '.' + pad(a.tfmLop) + '-' + (k.kode || '') + pad(k.lop) }));
+    const m2K = S.komponenter.filter(k => k.anleggId === a.id && +k.mengde > 0).reduce((s0, k) => s0 + +String(k.mengde).replace(',', '.'), 0);
+    rows.push({ kind: 's', o: a, e: a.eiendomId, code: tfmSys(a, true), navn: (a.navn || KOMP[a.type]?.n) + (m2K > 0 ? ` · Σ ${m2K.toLocaleString('nb-NO', { maximumFractionDigits: 1 })} m²` : ''), fab: a.fabrikat || '', aar: a.aar || '', sort: (a.tfmSys || '999') + '.' + pad(a.tfmLop) });
+    S.komponenter.filter(k => k.anleggId === a.id).forEach(k => rows.push({ kind: 'k', o: k, e: a.eiendomId, code: tfmKomp(k, true), navn: (k.navn || '') + (+k.mengde > 0 ? ` · ${String(k.mengde).replace('.', ',')} m²` : ''), fab: k.fabrikat || '', aar: k.aar || '', plass: k.plassering || '', sort: (a.tfmSys || '999') + '.' + pad(a.tfmLop) + '-' + (k.kode || '') + pad(k.lop) }));
   });
   if (f.e) rows = rows.filter(r => r.e === f.e); if (f.k === 's') rows = rows.filter(r => r.kind === 's'); if (f.k === 'k') rows = rows.filter(r => r.kind === 'k'); if (f.k === 'mangler') rows = rows.filter(r => r.kind === 's' && !r.o.tfmSys); if (f.k === 'uplassert') rows = rows.filter(r => !r.o.pos); if (f.t) rows = rows.filter(r => taggerFor(r.o, r.kind === 's' ? 'a' : 'k').includes(f.t)); if (f.tg) rows = rows.filter(r => f.tg === 'TG23' ? ['TG2', 'TG3'].includes(r.o.tg) : f.tg === 'ingen' ? !r.o.tg : r.o.tg === f.tg);
   if (f.q) { const q = f.q.toLowerCase(); rows = rows.filter(r => (r.code + ' ' + r.navn + ' ' + r.fab + ' ' + (r.plass || '')).toLowerCase().includes(q)); }

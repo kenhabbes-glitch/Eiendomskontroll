@@ -101,14 +101,14 @@ function m2Patch(k: string, v: any) {
   if (!['mengde', 'm2pris', 'faktor', 'kostMetode'].includes(k) || v.kostMetode !== 'm2') return {};
   const kost = m2Kost(v); return kost != null ? { kost, kostKilde: undefined, kostAar: v.kostAar || YEAR } : {};
 }
-function m2Felter(eid: (v: any) => string | undefined, navn: (v: any) => string): Field[] {
-  const vis = (x: any) => x.kostMetode === 'm2';
+function m2Felter(eid: (v: any) => string | undefined, navn: (v: any) => string, alltid?: (v: any) => boolean): Field[] {
+  const vis = (x: any) => x.kostMetode === 'm2'; const visA = (x: any) => vis(x) || !!alltid?.(x);
   return [
     { k: 'kostMetode', label: 'Hvordan beregnes kostnaden?', type: 'select', options: [['fast', 'Fast beløp'], ['m2', 'Areal × pris per m² (areal kan måles på tegning)']], help: 'kost.m2' },
-    { k: 'mengde', label: 'Areal (m²)', type: 'number', half: true, show: vis },
+    { k: 'mengde', label: 'Areal (m²)', type: 'number', half: true, show: visA, hint: alltid ? 'Mål på tegningen eller skriv inn' : undefined },
     { k: 'm2pris', label: 'Pris per m² (kr)', type: 'number', half: true, show: vis, hint: 'Utskifting inkl. riving, materialer og montasje' },
     { k: 'faktor', label: 'Faktor / påslag', type: 'number', half: true, show: vis, ph: '1', hint: 'F.eks. 1,15 for takvinkel, svinn eller rigg. Tomt = 1' },
-    { k: 'maalKnapp', type: 'custom', show: vis, render: (v, set) => {
+    { k: 'maalKnapp', type: 'custom', show: visA, render: (v, set) => {
       const e = eid(v); const T = sortBy(S.tegninger.filter(t => t.eiendomId === e), t => +t.etasje || 0); const am = v.arealMaaling; const valgt = v._maalT || am?.tegningId || T[0]?.id || '';
       const kost = m2Kost(v);
       return <div className="note small" style={{ color: 'var(--ink)' }}>
@@ -263,6 +263,10 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'aar', label: 'Installert/utskiftet år', type: 'number', half: true }, { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Tomt = veiledende levetid for typen' },
     { k: 'levHjelp', type: 'custom', render: (v, set) => <LevetidHjelp v={v} set={set} sysKode={v.tfmSys} typeLev={KOMP[v.type]?.l} /> },
     { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true, hint: 'La stå tom for å bruke beregnet år' },
+    ...(id ? [{ k: 'kompSum', type: 'custom', show: () => S.komponenter.some(k => k.anleggId === id), render: () => { const K = S.komponenter.filter(k => k.anleggId === id); const mK = K.filter(k => +k.mengde > 0);
+      const m2sum = mK.reduce((s0, k) => s0 + +String(k.mengde).replace(',', '.'), 0); const kSum = K.reduce((s0, k) => s0 + (+k.kost || 0), 0); const erM2 = KOMP[a.type]?.enh === 'm2' || mK.length > 0;
+      return <div className="note small" style={{ color: 'var(--ink)' }}><b>Komponenter: {K.length}</b>{erM2 && <> · areal <b>{m2(m2sum)}</b>{mK.length < K.length ? <span className="muted"> ({K.length - mK.length} uten areal)</span> : null}</>}{kSum > 0 && <> · utskiftingskostnad <b>{nok(kSum)}</b></>}
+        {erM2 && <div className="muted" style={{ marginTop: 2 }}>Summen av komponentene. Mål hver komponent på tegningen i komponentskjemaet{kompFraTegning ? ', eller legg til komponenter fra tegning' : ''}.</div>}</div>; } } as Field] : []),
     ...(isStaff() && canEdit() ? m2Felter(v => v.eiendomId, v => v.navn || KOMP[v.type]?.n || 'systemet') : []),
     ...(isStaff() && canEdit() ? [{ k: 'kost', label: 'Sentralkost på systemnivå (kr)', type: 'number', half: true, hint: 'F.eks. sentral, styring, kabling. Komponentene summeres i tillegg.' } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR, hint: 'Året beløpet er anslått i' } as Field] : []),
     { k: 'kostFlagg', type: 'custom', render: v => <KostFlagg v={v} /> },
@@ -347,7 +351,7 @@ export function editKomponent(id?: string, anleggId?: string, preset?: Rec) {
     { k: 'levetid', label: 'Forventet levetid (år)', type: 'number', half: true, hint: 'Tomt = skiftes sammen med systemet' }, { k: 'planAar', label: 'Overstyr utskiftingsår (valgfritt)', type: 'number', half: true },
     { k: 'levHjelp', type: 'custom', render: (v, set) => <LevetidHjelp v={v} set={set} sysKode={byId('anlegg', v.anleggId)?.tfmSys} /> },
     { k: 'plass', type: 'custom', label: 'Plassering på tegning', render: v => <PlasseringFelt kind="k" id={id} eiendomId={byId('anlegg', v.anleggId)?.eiendomId || k.eiendomId} close={() => closeRefK.c?.()} /> },
-    ...(canEdit() ? m2Felter(v => byId('anlegg', v.anleggId)?.eiendomId, v => v.navn || 'komponenten') : []),
+    ...(canEdit() ? m2Felter(v => byId('anlegg', v.anleggId)?.eiendomId, v => v.navn || 'komponenten', v => KOMP[byId('anlegg', v.anleggId)?.type]?.enh === 'm2') : []),
     ...(canEdit() ? [{ k: 'kost', label: 'Utskiftingskostnad (kr)', type: 'number', half: true } as Field, { k: 'kostAar', label: 'Kostnad vurdert (prisnivå år)', type: 'number', half: true, def: YEAR } as Field] : []),
     { k: 'kostFlagg', type: 'custom', render: v => <KostFlagg v={v} /> },
     { k: 'levSok', type: 'custom', render: (v, set) => <LeverandorSok v={v} set={set} kind="k" sysKode={byId('anlegg', v.anleggId)?.tfmSys} /> },
