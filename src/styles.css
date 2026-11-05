@@ -284,7 +284,9 @@ h1 .hjelp-q{position:relative;top:-2px}
 .rk-maal{width:100%;display:flex;flex-direction:column;gap:4px}.rk-maal input{width:130px;border:1px solid var(--line2);border-radius:8px;padding:8px 9px;font-family:ui-monospace,monospace;font-size:16px}
 .rk-kart{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;height:62vh;min-height:320px}
 .rk-kart svg{width:100%;height:100%;display:block;user-select:none;-webkit-user-select:none}
-.rk-kartknapper{position:absolute;top:8px;right:8px}
+.rk-kartknapper{position:absolute;top:8px;right:8px;display:flex;gap:6px}
+.rk-modus{position:absolute;left:50%;top:8px;transform:translateX(-50%);background:#b42318;color:#fff;font-size:13px;font-weight:600;padding:6px 12px;border-radius:20px;pointer-events:none;white-space:nowrap}
+@media (max-width:700px){.rk-modus{top:auto;bottom:10px}}
 .rk-ark{position:relative;margin-top:10px}.rk-lukk{position:absolute;right:8px;top:8px;z-index:1}
 @media (max-width:700px){
   .rk-verktoy{flex-wrap:wrap}.rk-verktoy select{width:100%}

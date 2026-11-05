@@ -41,7 +41,7 @@ export function rundePunkter(eid: string, horisont: number): RItem[] {
   return ut;
 }
 
-function iPoly(q: number[], P: number[][]) { let inn = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > q[1]) !== (yj > q[1]) && q[0] < (xj - xi) * (q[1] - yi) / (yj - yi) + xi) inn = !inn; } return inn; }
+export function iPoly(q: number[], P: number[][]) { let inn = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > q[1]) !== (yj > q[1]) && q[0] < (xj - xi) * (q[1] - yi) / (yj - yi) + xi) inn = !inn; } return inn; }
 
 /** Grupper punktene i steder (areal på tegningen, eller nærhet) og sorter etasje for etasje i gangrekkefølge. */
 export function lagSteder(items: RItem[], visAlle: boolean): { steder: Sted[]; uten: Sted[] } {

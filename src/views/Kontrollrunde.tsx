@@ -5,7 +5,8 @@ import { S, save, state, toast, useStore, kanDrifteE } from '../lib/store';
 import { byId, fd, today, sortBy, eNavn, kNavn, type Rec } from '../lib/utils';
 import { Chip, Empty, confirmBox, useFileUrl } from '../components/ui';
 import { editAvvik, registrerOk, utfor } from '../lib/actions';
-import { lagSteder, rundePunkter, type RItem, type Sted } from '../lib/runde';
+import { lagSteder, rundePunkter, iPoly, type RItem, type Sted } from '../lib/runde';
+import { AV_LUKKET } from '../lib/catalog';
 import { kompOk, sjekkEnKomp, rundeKomp } from './KomponentRunde';
 import { enhet, fmt, grenseTekst, maalerStatus, tall, vurderVerdi } from '../lib/maaler';
 import { useFilter } from './common';
@@ -75,7 +76,7 @@ function StedKort({ s, aktiv }: { s: Sted; aktiv?: boolean }) {
 }
 
 /** Tegning med ett nummerert punkt per sted. Én finger flytter, to fingre zoomer, trykk åpner stedet. */
-function RundeKart({ T, steder, valgt, velg }: { T: Rec; steder: Sted[]; valgt: string; velg: (k: string) => void }) {
+function RundeKart({ T, steder, valgt, velg, avvik, modus, setModus, onPunkt }: { T: Rec; steder: Sted[]; valgt: string; velg: (k: string) => void; avvik: Rec[]; modus: boolean; setModus: (b: boolean) => void; onPunkt: (x: number, y: number) => void }) {
   const src = useFileUrl(T.fil?.path); const svg = useRef<SVGSVGElement>(null);
   const init = () => { const L = steder; if (!L.length) return { x: 0, y: 0, w: T.w || 1000, h: T.h || 800 };
     const xs = L.map(s => s.x), ys = L.map(s => s.y); const pad = 0.12 * Math.max(T.w || 1000, T.h || 800);
@@ -88,7 +89,7 @@ function RundeKart({ T, steder, valgt, velg }: { T: Rec; steder: Sted[]; valgt: 
   const ned = (e: React.PointerEvent) => {
     svg.current!.setPointerCapture(e.pointerId); P.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const L = [...P.current.values()];
-    if (L.length === 1) G.current = { t: 'pan', s: L[0], vb0: vb, moved: false, sted: (e.target as Element).closest?.('[data-sted]')?.getAttribute('data-sted') || '' };
+    if (L.length === 1) G.current = { t: 'pan', s: L[0], vb0: vb, moved: false, sted: (e.target as Element).closest?.('[data-sted]')?.getAttribute('data-sted') || '', av: (e.target as Element).closest?.('[data-avvik]')?.getAttribute('data-avvik') || '' };
     else if (L.length === 2) { const c = { x: (L[0].x + L[1].x) / 2, y: (L[0].y + L[1].y) / 2 }; G.current = { t: 'pinch', d0: Math.hypot(L[0].x - L[1].x, L[0].y - L[1].y), vb0: vb, c0: tilSvg(c.x, c.y), cs: c, moved: true }; }
   };
   const flytt = (e: React.PointerEvent) => {
@@ -101,20 +102,26 @@ function RundeKart({ T, steder, valgt, velg }: { T: Rec; steder: Sted[]; valgt: 
       const kk = Math.max(w / r.width, g.vb0.h * ff / r.height);
       setVb({ w, h: g.vb0.h * ff, x: g.c0.x - (g.c0.x - g.vb0.x) * ff - (c.x - g.cs.x) * kk, y: g.c0.y - (g.c0.y - g.vb0.y) * ff - (c.y - g.cs.y) * kk }); }
   };
-  const opp = (e: React.PointerEvent) => { const g = G.current; P.current.delete(e.pointerId); if (g?.t === 'pan' && !g.moved && g.sted) velg(g.sted); if (!P.current.size) G.current = null; else if (g?.t === 'pinch') G.current = null; };
+  const opp = (e: React.PointerEvent) => { const g = G.current; P.current.delete(e.pointerId);
+    if (g?.t === 'pan' && !g.moved) { if (modus) { const q = tilSvg(e.clientX, e.clientY); onPunkt(q.x, q.y); } else if (g.av) editAvvik(g.av); else if (g.sted) velg(g.sted); } if (!P.current.size) G.current = null; else if (g?.t === 'pinch') G.current = null; };
   useEffect(() => { const s = svg.current!; const h = (e: WheelEvent) => { e.preventDefault(); const p = tilSvg(e.clientX, e.clientY); const f = e.deltaY > 0 ? 1.15 : 1 / 1.15;
     setVb(v => { const w = v.w * f; if (w < (T.w || 1000) / 40 || w > (T.w || 1000) * 2) return v; return { x: p.x - (p.x - v.x) * f, y: p.y - (p.y - v.y) * f, w, h: v.h * f }; }); };
     s.addEventListener('wheel', h, { passive: false }); return () => s.removeEventListener('wheel', h); }, [T.id]);
   const kk = k(); const R = 15 * kk;
   return <div className="rk-kart">
-    <svg ref={svg} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} onPointerDown={ned} onPointerMove={flytt} onPointerUp={opp} onPointerCancel={opp} style={{ touchAction: 'none' }}>
+    <svg ref={svg} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} onPointerDown={ned} onPointerMove={flytt} onPointerUp={opp} onPointerCancel={opp} style={{ touchAction: 'none', cursor: modus ? 'crosshair' : undefined }}>
       {src && <image href={src} x={0} y={0} width={T.w} height={T.h} />}
+      {avvik.map(a => { const x = a.pos.x, y = a.pos.y, r = 11 * kk; return <g key={a.id} data-avvik={a.id} style={{ cursor: 'pointer' }}>
+        <circle cx={x} cy={y} r={r * 1.8} fill="transparent" />
+        <path d={`M${x},${y - r * 1.15} L${x + r},${y + r * .75} L${x - r},${y + r * .75} Z`} fill="#b42318" stroke="#fff" strokeWidth={2.5 * kk} strokeLinejoin="round" />
+        <text x={x} y={y + r * .55} textAnchor="middle" fontSize={r * 1.1} fontWeight={700} fill="#fff" pointerEvents="none">!</text></g>; })}
       {steder.map(s => { const c = FARGE[stedStatus(s)]; const on = s.key === valgt; return <g key={s.key} data-sted={s.key} style={{ cursor: 'pointer' }}>
         <circle cx={s.x} cy={s.y} r={R * 1.9} fill="transparent" />
         <circle cx={s.x} cy={s.y} r={on ? R * 1.25 : R} fill={c} stroke="#fff" strokeWidth={3 * kk} />
         <text x={s.x} y={s.y + R * .36} textAnchor="middle" fontSize={R * 1.05} fontWeight={700} fill="#fff" pointerEvents="none">{s.nr}</text></g>; })}
     </svg>
-    <div className="rk-kartknapper"><button className="btn sm" onClick={() => setVb(init())}>Tilpass</button></div>
+    <div className="rk-kartknapper"><button className={'btn sm' + (modus ? ' danger' : '')} onClick={() => setModus(!modus)}>{modus ? 'Avbryt' : '⚠ Marker avvik'}</button><button className="btn sm" onClick={() => setVb(init())}>Tilpass</button></div>
+    {modus && <div className="rk-modus">Trykk på tegningen der avviket er</div>}
   </div>;
 }
 
@@ -123,7 +130,7 @@ export function Kontrollrunde() {
   const ES = sortBy(S.eiendommer.filter(e => kanDrifteE(e.id)), e => e.navn || '');
   const [f, setF] = useFilter('runde', { e: '', h: '14', vis: 'liste', alle: '', t: '' });
   const eid = ES.find(e => e.id === f.e)?.id || ES[0]?.id || '';
-  const [valgt, setValgt] = useState('');
+  const [valgt, setValgt] = useState(''); const [modus, setModus] = useState(false);
   if (!eid && (state.loading || !state.ready)) return <p className="muted">Laster …</p>;
   if (!eid) return <><div className="head"><div className="grow"><h1>Kontrollrunde</h1></div></div><div className="card"><Empty t="Ingen eiendommer">Du har ikke tilgang til å utføre kontroller på noen eiendom.</Empty></div></>;
   const punkter = rundePunkter(eid, +f.h || 14);
@@ -136,6 +143,16 @@ export function Kontrollrunde() {
   const tid = TT.find(t => t.id === f.t)?.id || TT[0]?.id || '';
   const velg = (k: string) => { setValgt(k); setTimeout(() => document.getElementById('sted-' + k)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 60); };
   const valgtSted = alle.find(s => s.key === valgt);
+  const nyttAvvik = (T: Rec, x: number, y: number) => {
+    setModus(false);
+    const z = (T.soner || []).find((z: Rec) => z.pts?.length > 2 && iPoly([x, y], z.pts));
+    // Nærmeste plasserte komponent eller system (innenfor en liten radius) foreslås som kobling
+    const R = 0.05 * Math.max(T.w || 1000, T.h || 800); const kand = [...S.komponenter, ...S.anlegg].filter(o => o.pos?.tegningId === T.id).map(o => ({ o, d: Math.hypot(o.pos.x - x, o.pos.y - y) })).filter(c => c.d < R).sort((a, b) => a.d - b.d)[0]?.o;
+    const erK = kand && !!kand.anleggId && S.komponenter.includes(kand);
+    editAvvik(undefined, { eiendomId: T.eiendomId, kilde: 'Egenkontroll', pos: { tegningId: T.id, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }, plassering: [T.navn, z?.navn].filter(Boolean).join(' – '),
+      ...(kand ? (erK ? { komponentId: kand.id, anleggId: kand.anleggId } : { anleggId: kand.id }) : {}) });
+  };
+  const avvikPaaT = (tid2: string) => S.avvik.filter(a => a.eiendomId === eid && a.pos?.tegningId === tid2 && !AV_LUKKET.includes(a.status));
   return <>
     <div className="head"><div className="grow"><h1>Kontrollrunde<Hjelp id="side.runde" /></h1>
       <p className="sub">{alle.length ? <>{alle.length} steder · {it.length} punkter{nForfalt ? <> · <span style={{ color: 'var(--red)' }}>{nForfalt} forfalt</span></> : null} · {nGjort} gjort i dag</> : 'Ingenting å gjøre akkurat nå'}</p></div></div>
@@ -153,9 +170,9 @@ export function Kontrollrunde() {
     {!alle.length ? <div className="card"><Empty t="Alt er gjort">Ingen kontroller, avlesninger eller tildelte avvik forfaller{+f.h ? ` de neste ${f.h} dagene` : ''} på {eNavn(eid)}.</Empty></div>
       : f.vis === 'kart' && tid ? <>
         {TT.length > 1 && <div className="tabs">{TT.map(t => <a key={t.id} className={t.id === tid ? 'on' : ''} onClick={() => { setF({ t: t.id }); setValgt(''); }}>{t.navn} ({steder.filter(s => s.tegningId === t.id).length})</a>)}</div>}
-        <RundeKart T={byId('tegninger', tid)!} steder={steder.filter(s => s.tegningId === tid)} valgt={valgt} velg={velg} />
+        <RundeKart T={byId('tegninger', tid)!} steder={steder.filter(s => s.tegningId === tid)} valgt={valgt} velg={velg} avvik={avvikPaaT(tid)} modus={modus} setModus={setModus} onPunkt={(x, y) => nyttAvvik(byId('tegninger', tid)!, x, y)} />
         {valgtSted ? <div className="rk-ark"><button className="btn ghost sm rk-lukk" onClick={() => setValgt('')} aria-label="Lukk">✕</button><StedKort s={valgtSted} aktiv /></div>
-          : <p className="small muted" style={{ textAlign: 'center' }}>Trykk på et nummer for å se hva som skal gjøres der. Én finger flytter tegningen, to fingre zoomer.</p>}
+          : <p className="small muted" style={{ textAlign: 'center' }}>Trykk på et nummer for å se hva som skal gjøres der, eller på en rød trekant for å åpne et avvik. «⚠ Marker avvik» registrerer et nytt avvik der du trykker. Én finger flytter tegningen, to fingre zoomer.</p>}
         {uten.length > 0 && <p className="small muted">{uten.reduce((s, x) => s + x.items.length, 0)} punkter er ikke plassert på tegning – se listen.</p>}
       </>
       : <>{alle.map((s, i) => <React.Fragment key={s.key}>
