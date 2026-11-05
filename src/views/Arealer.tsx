@@ -17,9 +17,10 @@ export async function syncArealer(eid: string) {
 import { AREAL_KAT, KAT_FARGE, arealCalc, byId, centroid, clone, eNavn, lNavn, ltColor, m2, mpp, polyArea, sortBy, toCsv, today, zoneArea, zoneColor, type Rec } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, openModal, textModal, useFileUrl } from '../components/ui';
 import { Sel, eiendomOpts, useFilter } from './common';
-import { KOMP, TFM_KODER, AV_LUKKET } from '../lib/catalog';
-import { pad, tfmSys, tfmKomp, openAvvik } from '../lib/utils';
+import { KOMP, TFM_KODER, TFM_DEF, AV_LUKKET } from '../lib/catalog';
+import { pad, tfmSys, tfmKomp, openAvvik, nextKompLop, aNavn } from '../lib/utils';
 import { editAnlegg, editAvvik, editKomponent } from '../lib/actions';
+import { kanRedigereE } from '../lib/store';
 import { state, isUtforer } from '../lib/store';
 import { AlvChip, FileLink, StChip, TaggChips, taggFarge } from '../components/ui';
 import { arealRapport } from '../lib/arealRapport';
@@ -154,6 +155,7 @@ async function lesDwgPaaNytt(id: string) {
 
 // ---------- tegneverktøy
 const HELP: Record<string, string> = {
+  nykomp: 'Velg system og komponenttype til høyre. Hvert klikk på tegningen lager en ny komponent med neste løpenummer, plassert der du klikket. Plasseringen fylles ut med tegningens navn og arealet du klikket i.',
   plasser: 'Velg system eller komponent i listen til høyre, og klikk der det skal stå på tegningen. Markører kan dras til ny plassering.',
   velg: 'Klikk på et areal for å velge det. Dra i hjørnepunktene for å justere. Dra i bakgrunnen for å flytte tegningen, scroll for å zoome.',
   skala: 'Klikk på to punkter med kjent avstand, f.eks. endene av en målsatt vegg. Skriv inn lengden i meter til høyre. Zoom inn for presisjon.',
@@ -169,7 +171,7 @@ export function visPaaTegning(o: Rec) {
   openPlan(tid, { mode: 'tfm', focus: o.pos?.tegningId === tid ? o.id : undefined, fokus: L.filter(x => x.pos.tegningId === tid).map(x => x.id) });
 }
 export type MaalResultat = { tegningId: string; flater: number[][][]; m2: number };
-export type PlanOpts = { mode?: 'tfm'; placeId?: string; focus?: string; fokus?: string[]; tagg?: string; maal?: { tittel: string; flater?: number[][][]; onFerdig: (r: MaalResultat) => void } };
+export type PlanOpts = { nyKomp?: string; mode?: 'tfm'; placeId?: string; focus?: string; fokus?: string[]; tagg?: string; maal?: { tittel: string; flater?: number[][][]; onFerdig: (r: MaalResultat) => void } };
 export function openPlan(tid: string, opts: PlanOpts = {}) { openModal({ noFrame: true, render: close => <PlanEditor tid={tid} close={close} opts={opts} /> }); }
 
 function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void; opts?: PlanOpts }) {
@@ -181,7 +183,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   const tipMove = (e: React.PointerEvent) => { if (tip && !st.drag) setTip({ ...tip, x: e.clientX, y: e.clientY }); else if (tip) setTip(null); };
   const tipOff = () => setTip(null);
   const tfmMode = opts.mode === 'tfm'; const maalMode = !!opts.maal;
-  const st = useRef({ flater: (opts.maal?.flater ? clone(opts.maal.flater) : []) as number[][][], tgF: '', tagg: (opts.tagg || '') as string, fokus: new Set<string>(opts.fokus || (opts.focus ? [opts.focus] : [])), visPlassert: false, flyttOk: (opts.placeId || '') as string, lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, tool: opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '' }).current;
+  const st = useRef({ flater: (opts.maal?.flater ? clone(opts.maal.flater) : []) as number[][][], tgF: '', tagg: (opts.tagg || '') as string, fokus: new Set<string>(opts.fokus || (opts.focus ? [opts.focus] : [])), visPlassert: false, flyttOk: (opts.placeId || '') as string, lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, nkSys: (opts.nyKomp || '') as string, nkKode: '', nkNavn: '', nkLagt: [] as string[], tool: opts.nyKomp && !ro ? 'nykomp' : opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '' }).current;
   const [vb, setVb] = useState({ x: 0, y: 0, w: T.w || 1000, h: T.h || 800 });
   const svgRef = useRef<SVGSVGElement>(null);
   const src = useFileUrl(T.fil?.path);
@@ -215,7 +217,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   };
   const flush = async () => { clearTimeout(st.saveT); if (!st.dirty) return; st.dirty = false; st.status = 'Lagrer …'; rr(); try { await save('tegninger', clone(T)); await syncArealer(T.eiendomId); st.status = 'Lagret'; } catch { st.dirty = true; st.status = 'Lagring feilet'; } rr(); };
   const change = () => { if (ro) return; st.dirty = true; st.status = 'Ikke lagret …'; clearTimeout(st.saveT); st.saveT = setTimeout(flush, 900); rr(); };
-  const setTool = (t: string) => { st.tool = t; if (t !== 'plasser') st.placeId = ''; if (t === 'tegn' || t === 'skala') st.lagA = true; if (t !== 'velg') st.selM = null; st.draft = []; if (t !== 'skala') st.scale = []; if (t !== 'maal') st.meas = []; if (t !== 'velg') st.sel = null; rr(); };
+  const setTool = (t: string) => { st.tool = t; if (t === 'nykomp' && !st.nkSys) { const a1 = S.anlegg.filter(a => a.eiendomId === T.eiendomId); if (a1.length === 1) st.nkSys = a1[0].id; } if (t !== 'plasser') st.placeId = ''; if (t === 'tegn' || t === 'skala') st.lagA = true; if (t !== 'velg') st.selM = null; st.draft = []; if (t !== 'skala') st.scale = []; if (t !== 'maal') st.meas = []; if (t !== 'velg') st.sel = null; rr(); };
   if (maalMode && !st.maalInit) { st.maalInit = true; st.tool = T.skala ? 'flate' : 'skala'; st.lagM = false; st.lagV = false; }
   const flateM2 = (f: number[][]) => { const r = mpp(T); return r ? polyArea(f) * r * r : 0; };
   const closePoly = () => { if (st.draft.length < 3) return; if (st.tool === 'flate') { st.flater.push(st.draft.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10])); st.draft = []; rr(); return; } const z = { id: crypto.randomUUID(), navn: 'Areal ' + (T.soner.length + 1), kat: 'leie', leietakerId: '', pts: st.draft.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]) }; T.soner.push(z); st.draft = []; st.sel = z.id; st.tool = 'velg'; change(); setTimeout(() => { const n = document.getElementById('zN') as HTMLInputElement; n?.focus(); n?.select(); }, 30); };
@@ -233,7 +235,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
       if (e.key === 'Enter' && (st.tool === 'tegn' || st.tool === 'flate')) closePoly();
       if (e.key === 'Backspace' && (st.tool === 'tegn' || st.tool === 'flate') && st.draft.length) { st.draft.pop(); rr(); e.preventDefault(); }
       if ((e.key === 'Delete' || e.key === 'Backspace') && st.tool === 'velg' && st.sel) { T.soner = T.soner.filter((q: Rec) => q.id !== st.sel); st.sel = null; change(); e.preventDefault(); }
-      const map: Record<string, string> = maalMode ? { v: 'velg', t: 'flate', m: 'maal', s: 'skala' } : { v: 'velg', t: 'tegn', m: 'maal', s: 'skala', p: 'plasser' }; if (map[e.key]) setTool(map[e.key]);
+      const map: Record<string, string> = maalMode ? { v: 'velg', t: 'flate', m: 'maal', s: 'skala' } : { v: 'velg', t: 'tegn', m: 'maal', s: 'skala', p: 'plasser', k: 'nykomp' }; if (map[e.key]) setTool(map[e.key]);
     };
     document.addEventListener('keydown', keys); document.addEventListener('keyup', keys);
     return () => { document.removeEventListener('keydown', keys); document.removeEventListener('keyup', keys); };
@@ -243,7 +245,8 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   const onDown = (e: React.PointerEvent) => {
     st.shift = e.shiftKey; const p = pt(e); const tg = e.target as Element; const hdl = tg.getAttribute('data-h'); const zid = tg.getAttribute('data-z');
     const mid = (tg.closest && tg.closest('[data-m]')?.getAttribute('data-m')) || null;
-    if (mid && e.button === 0 && (st.tool === 'velg' || st.tool === 'plasser')) { st.selM = mid; st.sel = null; if (!ro) { st.drag = { t: 'm', id: mid, cx: e.clientX, cy: e.clientY, moved: false }; svgRef.current!.setPointerCapture(e.pointerId); } rr(); return; }
+    if (mid && e.button === 0 && (st.tool === 'velg' || st.tool === 'plasser' || st.tool === 'nykomp')) { st.selM = mid; st.sel = null; if (!ro) { st.drag = { t: 'm', id: mid, cx: e.clientX, cy: e.clientY, moved: false }; svgRef.current!.setPointerCapture(e.pointerId); } rr(); return; }
+    if (st.tool === 'nykomp' && e.button === 0 && !ro && !st.space) { nyKompHer(p); return; }
     if (st.tool === 'plasser' && e.button === 0 && !ro) { const it = findItem(st.placeId); if (!it) { toast('Velg først hva som skal plasseres i listen til høyre'); return; }
       if (it.o.pos && st.flyttOk !== it.o.id) { const fra = byId('tegninger', it.o.pos.tegningId)?.navn || 'en annen tegning'; const pos = [p[0], p[1]];
         confirmBox(`${itemKode(it)} ${itemNavn(it)} er allerede plassert ${it.o.pos.tegningId === T.id ? 'på denne tegningen' : 'på ' + fra}. Vil du flytte den hit? Den forrige plasseringen fjernes.`, 'Flytt hit').then(ok => { if (!ok) return; st.flyttOk = it.o.id;
@@ -256,6 +259,18 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
     if (st.tool === 'tegn' || st.tool === 'flate') { const q = snap(p, st.draft[st.draft.length - 1]); if (st.draft.length >= 3 && Math.hypot(q[0] - st.draft[0][0], q[1] - st.draft[0][1]) < 12 * k()) { closePoly(); return; } st.draft.push(q); rr(); return; }
     if (st.tool === 'skala') { const q = snap(p, st.scale[0]); if (st.scale.length >= 2) st.scale = []; st.scale.push(q); if (st.scale.length === 2) setTimeout(() => (document.getElementById('scM') as HTMLInputElement)?.focus(), 30); rr(); return; }
     if (st.tool === 'maal') { const q = snap(p, st.meas[0]); if (st.meas.length >= 2) st.meas = []; st.meas.push(q); rr(); }
+  };
+  // Legg til komponent der det klikkes (f.eks. hver branndør), med neste løpenummer og plassering fra arealet
+  const nkKode = () => (st.nkKode || TFM_DEF[byId('anlegg', st.nkSys)?.type || '']?.[1] || '').toUpperCase();
+  const inniAreal = (q: number[]) => T.soner.find((z: Rec) => { let inn = false; const P = z.pts; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > q[1]) !== (yj > q[1]) && q[0] < (xj - xi) * (q[1] - yi) / (yj - yi) + xi) inn = !inn; } return inn; });
+  const nyKompHer = async (q: number[]) => {
+    const sys = byId('anlegg', st.nkSys); if (!sys) { toast('Velg først hvilket system komponentene hører til'); return; }
+    if (!kanRedigereE(sys.eiendomId)) { toast('Du har ikke tilgang til å legge til komponenter på dette bygget'); return; }
+    const kode = nkKode(); if (!kode) { toast('Velg komponenttype (TFM-kode) til høyre'); return; }
+    const z = inniAreal(q); const lop = nextKompLop(sys.id, kode);
+    const ny: Rec = { anleggId: sys.id, eiendomId: sys.eiendomId, kode, lop, navn: st.nkNavn.trim(), plassering: [T.navn, z?.navn].filter(Boolean).join(' – '), pos: { tegningId: T.id, x: Math.round(q[0] * 10) / 10, y: Math.round(q[1] * 10) / 10 } } as any;
+    try { const id = await save('komponenter', ny); st.nkLagt = [...st.nkLagt, id]; st.selM = id; rr(); toast(`-${kode}${pad(lop)} lagt til${z?.navn ? ' i ' + z.navn : ''}`); }
+    catch (e: any) { toast(e?.message || 'Kunne ikke lagre komponenten'); }
   };
   const onMove = (e: React.PointerEvent) => {
     st.shift = e.shiftKey; const p = pt(e);
@@ -282,7 +297,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
     <div className="mh"><h2>{eNavn(T.eiendomId)} · {T.navn}</h2><span className="small muted">{ro ? 'Lesetilgang' : st.status}</span><button className="btn sm" onClick={done}>Ferdig</button></div>
     <div className="pbody">
       <div className="ptools">
-        {(maalMode ? ['velg', 'skala', 'flate', 'maal'] as const : ['velg', 'skala', 'tegn', 'maal', 'plasser'] as const).filter(t => !ro || t === 'velg' || t === 'maal').map(t => <button key={t} className={st.tool === t ? 'on' : ''} onClick={() => setTool(t)}>{({ velg: 'Velg / panorer', skala: 'Sett målestokk', tegn: 'Tegn areal', flate: 'Tegn flate som skal måles', maal: 'Mål avstand', plasser: 'Plasser system/komponent' } as any)[t]}</button>)}
+        {(maalMode ? ['velg', 'skala', 'flate', 'maal'] as const : ['velg', 'skala', 'tegn', 'maal', 'plasser', 'nykomp'] as const).filter(t => !ro || t === 'velg' || t === 'maal').map(t => <button key={t} className={st.tool === t ? 'on' : ''} onClick={() => setTool(t)}>{({ velg: 'Velg / panorer', skala: 'Sett målestokk', tegn: 'Tegn areal', flate: 'Tegn flate som skal måles', maal: 'Mål avstand', plasser: 'Plasser system/komponent', nykomp: 'Legg til komponenter' } as any)[t]}</button>)}
         <hr /><div className="small" style={{ fontWeight: 600 }}>Vis på tegningen</div>
         <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={st.lagA} onChange={e => { st.lagA = e.target.checked; rr(); }} />Arealer</label>
         <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={st.lagM} onChange={e => { st.lagM = e.target.checked; rr(); }} />Systemer og komponenter</label>
@@ -315,7 +330,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
             <path d={`M${x} ${y - R0 * 1.25} L${x + R0 * 1.15} ${y + R0 * .75} L${x - R0 * 1.15} ${y + R0 * .75} Z`} fill={col} stroke="#fff" strokeWidth={2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
             <text x={x} y={y + R0 * .5} textAnchor="middle" fontSize={R0 * 1.25} fontWeight={700} fill="#fff" fontFamily="IBM Plex Sans,sans-serif">!</text>
             <text x={x} y={y - R0 * 1.25 - 4 * kk} textAnchor="middle" fontSize={fs * .85} fontWeight={700} fill={col} stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">#{i.o.nr}</text></g>; })}
-        {st.tool === 'plasser' && st.hover && st.placeId && <g pointerEvents="none"><line x1={st.hover[0] - 12 * kk} y1={st.hover[1]} x2={st.hover[0] + 12 * kk} y2={st.hover[1]} stroke="#1d2320" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /><line x1={st.hover[0]} y1={st.hover[1] - 12 * kk} x2={st.hover[0]} y2={st.hover[1] + 12 * kk} stroke="#1d2320" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /><text x={st.hover[0] + 10 * kk} y={st.hover[1] - 8 * kk} fontSize={fs * .85} fontFamily="IBM Plex Mono,monospace" fill="#1d2320" stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{findItem(st.placeId) ? itemKode(findItem(st.placeId)!) : ''}</text></g>}
+        {((st.tool === 'plasser' && st.placeId) || (st.tool === 'nykomp' && st.nkSys)) && st.hover && <g pointerEvents="none"><line x1={st.hover[0] - 12 * kk} y1={st.hover[1]} x2={st.hover[0] + 12 * kk} y2={st.hover[1]} stroke="#1d2320" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /><line x1={st.hover[0]} y1={st.hover[1] - 12 * kk} x2={st.hover[0]} y2={st.hover[1] + 12 * kk} stroke="#1d2320" strokeWidth={1.5} vectorEffect="non-scaling-stroke" /><text x={st.hover[0] + 10 * kk} y={st.hover[1] - 8 * kk} fontSize={fs * .85} fontFamily="IBM Plex Mono,monospace" fill="#1d2320" stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{findItem(st.placeId) ? itemKode(findItem(st.placeId)!) : ''}</text></g>}
         {selZ && st.tool === 'velg' && !ro && selZ.pts.map((p: number[], i: number) => <circle key={'h' + i} cx={p[0]} cy={p[1]} r={r * 1.2} fill="#fff" stroke={zoneColor(T, selZ)} strokeWidth={2} vectorEffect="non-scaling-stroke" data-h={i} style={{ cursor: 'move' }} />)}
         {T.skala && (st.tool === 'skala' || !st.sel) && !st.scale.length && line(T.skala.a, T.skala.b, '#b42318', true, 'Målestokk ' + fmtM(T.skala.m), 'sk')}
         {st.scale.length > 0 && (st.scale[1] || st.hover) && line(st.scale[0], st.scale[1] || st.hover!, '#b42318', true, '', 'sc')}
@@ -344,6 +359,22 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
           <p style={{ margin: '8px 0' }}>Sum: <b className="mono" style={{ fontSize: 16 }}>{m2(sum)}</b></p>
           <button className="btn pri" disabled={!sum} style={{ width: '100%' }} onClick={() => { opts.maal!.onFerdig({ tegningId: T.id, flater: clone(st.flater), m2: Math.round(sum * 10) / 10 }); flush(); close(); }}>Bruk {m2(sum)}</button>
           <hr style={{ margin: '14px 0', border: 0, borderTop: '1px solid var(--line)' }} /></>; })()}
+        {st.tool === 'nykomp' && (() => { const SY = sortBy(S.anlegg.filter(a => a.eiendomId === T.eiendomId), a => aNavn(a.id)); const kode = nkKode(); const sel = { width: '100%', marginBottom: 6 } as React.CSSProperties;
+          const lagt = st.nkLagt.map(id => byId('komponenter', id)).filter(Boolean) as Rec[];
+          return <><h3>Legg til komponenter</h3>
+            {!SY.length ? <p className="small muted">Eiendommen har ingen systemer ennå. <a href="#" onClick={e => { e.preventDefault(); editAnlegg(undefined, T.eiendomId); }}>Registrer et system</a> først, f.eks. «Branndører/brannskiller».</p> : <>
+              <label className="small">System</label>
+              <select style={sel} value={st.nkSys} onChange={e => { st.nkSys = e.target.value; st.nkKode = ''; rr(); }}><option value="">– velg system –</option>{SY.map(a => <option key={a.id} value={a.id}>{aNavn(a.id)}</option>)}</select>
+              <label className="small">Komponenttype (TFM-kode)</label>
+              <select style={sel} value={kode} onChange={e => { st.nkKode = e.target.value; rr(); }}><option value="">– velg –</option>{TFM_KODER.map(([c, n]) => <option key={c} value={c}>{c} – {n}</option>)}</select>
+              <label className="small">Betegnelse (valgfritt)</label>
+              <input style={sel} value={st.nkNavn} onChange={e => { st.nkNavn = e.target.value; rr(); }} placeholder={TFM_KODER.find(c => c[0] === kode)?.[1] || 'F.eks. Branndør EI60'} />
+              <p className="small muted" style={{ margin: '2px 0 8px' }}>{st.nkSys && kode ? <>Klikk på tegningen der hver komponent står. Neste blir <b className="mono">-{kode}{nextKompLop(st.nkSys, kode)}</b>.</> : 'Velg system og type, og klikk så på tegningen.'}</p>
+              {lagt.length > 0 && <div className="note small" style={{ color: 'var(--ink)' }}><b>Lagt til nå: {lagt.length}</b>
+                <div style={{ maxHeight: 160, overflow: 'auto', margin: '4px 0' }}>{lagt.slice().reverse().map(k => <div key={k.id}><a href="#" onClick={e => { e.preventDefault(); editKomponent(k.id); }} className="mono">-{k.kode}{pad(k.lop)}</a> <span className="muted">{k.plassering}</span></div>)}</div>
+                <button className="btn sm" onClick={async () => { const id = st.nkLagt[st.nkLagt.length - 1]; if (!id) return; await removeDoc('komponenter', id); st.nkLagt = st.nkLagt.slice(0, -1); if (st.selM === id) st.selM = null; rr(); toast('Siste komponent fjernet'); }}>Angre siste</button></div>}
+              <p className="small muted">Klikk på en markør for å se eller flytte den. Fabrikat, brannklasse og annet kan fylles ut senere i komponenten.</p></>}
+            <hr style={{ margin: '14px 0', border: 0, borderTop: '1px solid var(--line)' }} /></>; })()}
         {st.tool === 'plasser' && <><h3>Plasser på tegningen</h3>
           {items.length + avItems.length ? <><select value={st.placeId} onChange={e => { st.placeId = e.target.value; st.flyttOk = ''; rr(); }}><option value="">– velg system, komponent eller avvik –</option>
             {(() => { const vis = (i: MItem) => st.visPlassert || !i.o.pos || i.o.id === st.placeId; const lab = (i: MItem) => i.o.pos ? (i.o.pos.tegningId === T.id ? ' – plassert her (flyttes)' : ` – plassert på ${byId('tegninger', i.o.pos.tegningId)?.navn || 'annen tegning'} (flyttes)`) : ''; const A = avItems.filter(vis), I = items.filter(vis);

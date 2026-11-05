@@ -232,6 +232,16 @@ function UtskiftNote({ v, typeLevetid, sysId, kompAv }: { v: any; typeLevetid?: 
 }
 
 const kompGroups = () => { const g: Record<string, [string, string][]> = {}; Object.entries(KOMP).forEach(([k, v]) => { (g[v.g] = g[v.g] || []).push([k, v.n]); }); return Object.entries(g) as [string, [string, string][]][]; };
+/** Åpne en tegning i modusen «Legg til komponenter» for systemet */
+export function kompFraTegning(aid: string, lukk?: () => void) {
+  const a = byId('anlegg', aid); if (!a) return;
+  const T = sortBy(S.tegninger.filter(t => t.eiendomId === a.eiendomId), t => t.navn || '');
+  if (!T.length) { toast('Eiendommen har ingen tegninger ennå – last opp under Tegninger og arealer'); return; }
+  const aapne = (tid: string) => { lukk?.(); openPlan(tid, { mode: 'tfm', nyKomp: aid, fokus: S.komponenter.filter(k => k.anleggId === aid && k.pos?.tegningId === tid).map(k => k.id) }); };
+  if (T.length === 1) return aapne(T[0].id);
+  showModal('Velg tegning', close => <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{T.map(t => { const n = S.komponenter.filter(k => k.anleggId === aid && k.pos?.tegningId === t.id).length;
+    return <button key={t.id} className="btn" style={{ justifyContent: 'space-between' }} onClick={() => { close(); aapne(t.id); }}><span>{t.navn}</span><span className="small muted">{n ? n + ' komponenter her' : ''}</span></button>; })}</div>);
+}
 export function editAnlegg(id?: string, eiendomId?: string) {
   const a: Rec = id ? byId('anlegg', id)! : { eiendomId: eiendomId || S.eiendommer.find(e => kanRedigereE(e.id))?.id, type: 'ventilasjon', ansvar: 'Eier' } as any;
   const ro = !kanRedigereE(a.eiendomId);
@@ -293,10 +303,10 @@ export function editAnlegg(id?: string, eiendomId?: string) {
       if ((k === 'type' || k === 'tfmSys' || k === 'eiendomId') && !touched.lop && !id) p.tfmLop = nextSysLop(v.eiendomId, p.tfmSys ?? v.tfmSys);
       return p;
     },
-    extraFoot: close => id && !ro ? <button className="btn danger" onClick={async () => {
+    extraFoot: close => id && !ro ? <><button className="btn danger" onClick={async () => {
       const kc = S.komponenter.filter(k => k.anleggId === id);
       if (await confirmBox(`Slette systemet${kc.length ? ` og ${kc.length} komponenter` : ''}? Tilknyttede kontroller beholdes, men mister koblingen.`)) { await removeDoc('anlegg', id); close(); }
-    }}>Slett</button> : null,
+    }}>Slett</button><button className="btn" title="Klikk rundt på en tegning og marker f.eks. hver branndør" onClick={() => kompFraTegning(id, close)}>+ Komponenter fra tegning</button></> : null,
     onSave: async v => {
       const mk: string[] = [...(v.mk || []), ...(v.mkNy || [])]; const forste = v.forste || addDays(today(), 30); const levMk: any[] = v.levMk || []; delete v.mk; delete v.mkNy; delete v.levMk; delete v.forste; delete v.prev; delete v.beregn;
       if (v.kost && !v.kostAar) v.kostAar = YEAR;
