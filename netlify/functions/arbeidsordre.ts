@@ -7,6 +7,8 @@
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 
+const svakt = (pw: string) => pw.length < 10 || !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/\d/.test(pw);
+const aalFra = (t: string) => { try { return JSON.parse(Buffer.from(t.split('.')[1] || '', 'base64url').toString()).aal || ''; } catch { return ''; } };
 const json = (status: number, body: any) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const esc = (s: any) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
 
@@ -26,6 +28,8 @@ const handler = async (req: Request) => {
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
   const hvem = async () => {
     if (!token) return null; const { data } = await admin.auth.getUser(token); if (!data?.user) return null;
+    // Tofaktor: samme regel som i databasen (token er verifisert av getUser, så aal-feltet er til å stole på)
+    const { data: mok } = await admin.rpc('mfa_ok_for', { p_uid: data.user.id, p_aal: aalFra(token) }); if (mok === false) return null;
     const { data: p } = await admin.from('profiles').select('*').eq('id', data.user.id).single(); return p ? { ...p, epost: (p.epost || data.user.email || '').toLowerCase() } : null;
   };
   // Tilgang avgjøres av databasens tilgangsfunksjon (organisasjon, oppdrag og tildeling)
@@ -204,7 +208,7 @@ const handler = async (req: Request) => {
     if (!inv) return json(404, { error: 'Lenken er ugyldig' });
     if (utlopt(inv)) return json(410, { error: UTLOPT });
     const sam = samtykke(body); if (!sam) return json(400, { error: SAMTYKKE_MANGLER });
-    const passord = String(body.passord || ''); if (passord.length < 8) return json(400, { error: 'Passordet må ha minst 8 tegn' });
+    const passord = String(body.passord || ''); if (svakt(passord)) return json(400, { error: 'Passordet må ha minst 10 tegn, med store og små bokstaver og tall' });
     const { data: fins } = await admin.from('profiles').select('id').eq('epost', inv.epost).maybeSingle();
     if (fins) return json(409, { error: 'Det finnes allerede en bruker med denne e-posten. Logg inn i stedet.' });
     const { data: u, error } = await admin.auth.admin.createUser({ email: inv.epost, password: passord, email_confirm: true, user_metadata: { navn: body.navn || '' } });
@@ -330,7 +334,7 @@ const handler = async (req: Request) => {
     if (!inv) return json(404, { error: 'Lenken er ugyldig' });
     if (utlopt(inv)) return json(410, { error: 'Lenken er utløpt. Be utleier sende sjekklisten på nytt.' });
     const sam = samtykke(body); if (!sam) return json(400, { error: SAMTYKKE_MANGLER });
-    const passord = String(body.passord || ''); if (passord.length < 8) return json(400, { error: 'Passordet må ha minst 8 tegn' });
+    const passord = String(body.passord || ''); if (svakt(passord)) return json(400, { error: 'Passordet må ha minst 10 tegn, med store og små bokstaver og tall' });
     const { data: fins } = await admin.from('profiles').select('id').eq('epost', inv.epost).maybeSingle();
     if (fins) return json(409, { error: 'Det finnes allerede en bruker med denne e-posten. Logg inn i stedet.' });
     const { data: u, error } = await admin.auth.admin.createUser({ email: inv.epost, password: passord, email_confirm: true, user_metadata: { navn: body.navn || '' } });

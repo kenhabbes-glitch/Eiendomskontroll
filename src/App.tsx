@@ -1,3 +1,5 @@
+import { svaktPassord, PASSORDKRAV } from './lib/utils';
+import { MfaSkjerm } from './components/Tofaktor';
 import React, { useEffect, useState } from 'react';
 import { mineOrg } from './lib/store';
 import { autoKvitterIK } from './lib/actions';
@@ -80,6 +82,7 @@ export default function App() {
   useEffect(() => { if (state.ready && state.me && canEdit()) { const t = setTimeout(() => autoKvitterIK(), 800); return () => clearTimeout(t); } }, [state.version, state.ready]);
   if (!configured) return <Setup />;
   if (!state.ready) return <div className="login"><div className="card"><p>Laster …</p></div></div>;
+  if (state.mfa && !['ao', 'lt', 'ko', 'personvern'].includes(r.v)) return <><MfaSkjerm /><Toast /></>;
   if (state.recovery && state.me) return <SetPassword />;
   if (r.v === 'ao' && r.id) return <><AoLenke token={r.id} /><Toast /></>;
   if (r.v === 'lt' && r.id) return <><LtLenke token={r.id} /><Toast /></>;
@@ -180,7 +183,7 @@ function Login() {
 function SetPassword() {
   const [pw, setPw] = useState(''); const [pw2, setPw2] = useState(''); const [err, setErr] = useState('');
   const submit = async (e: React.FormEvent) => {
-    e.preventDefault(); if (pw.length < 8) return setErr('Passordet må ha minst 8 tegn'); if (pw !== pw2) return setErr('Passordene er ikke like');
+    e.preventDefault(); if (svaktPassord(pw)) return setErr(PASSORDKRAV); if (pw !== pw2) return setErr('Passordene er ikke like');
     const { error } = await sb.auth.updateUser({ password: pw });
     if (error) return setErr(error.message);
     state.recovery = false; history.replaceState(null, '', location.pathname); toast('Passordet er lagret'); location.hash = '';

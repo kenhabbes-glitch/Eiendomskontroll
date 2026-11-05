@@ -1,6 +1,6 @@
 // Organisasjon og tilgang: medlemmer og tildeling, porteføljer, oppdrag og (for plattformadmin) kunder.
 // Appen viser bare det brukeren har lov til å endre – databasen håndhever reglene uansett.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { S, adminApi, isPlattform, mineOrg, reloadAdmin, sb, state, toast, useStore, feiltekst, orgNavn, save, bump } from '../lib/store';
 import { eNavn, fd, sortBy, today, aNavn } from '../lib/utils';
@@ -64,7 +64,7 @@ export function leggTilMedlem(org: string) {
     { k: 'info', type: 'custom', render: v => <p className="small muted" style={{ margin: 0 }}>{ORG_ROLLER.find(r => r[0] === v.rolle)?.[2]}</p> },
     { k: 'alle_bygg', label: 'Tilgang til alle organisasjonens bygg (også nye)', type: 'checkbox', show: v => v.rolle !== 'admin' },
     { k: 'tild', type: 'custom', label: 'Tildel bygg / porteføljer', def: { e: [], p: [] }, show: v => v.rolle !== 'admin' && !v.alle_bygg, render: (v, set) => <TildelVelger org={org} val={v.tild} set={x => set({ tild: x })} /> },
-    ...(isPlattform() ? [{ k: 'passord', label: 'Testbruker: sett passord i stedet for å sende invitasjon (valgfritt)', type: 'text', ph: 'Minst 8 tegn' } as Field] : []),
+    ...(isPlattform() ? [{ k: 'passord', label: 'Testbruker: sett passord i stedet for å sende invitasjon (valgfritt)', type: 'text', ph: 'Minst 10 tegn, store/små bokstaver og tall' } as Field] : []),
   ];
   formModal({
     title: 'Legg til bruker i ' + orgNavn(org), fields, saveTxt: 'Legg til',
@@ -78,6 +78,10 @@ export function leggTilMedlem(org: string) {
   });
 }
 
+// Hvem i organisasjonen har tofaktor (bare synlig for administrator)
+const MFA: Record<string, Record<string, boolean>> = {};
+async function lastMfa(org: string) { const { data, error } = await sb.rpc('mfa_oversikt', { p_org: org }); if (!error) { MFA[org] = Object.fromEntries((data || []).map((r: any) => [r.user_id, !!r.har_mfa])); bump(); } }
+
 function redigerMedlem(m: any) {
   const p = profil(m.user_id); const T = S.tilganger.filter(t => t.user_id === m.user_id && t.org_id === m.org_id);
   formModal({
@@ -90,11 +94,14 @@ function redigerMedlem(m: any) {
       { k: 'tild', type: 'custom', label: 'Tildelte bygg / porteføljer', show: v => v.rolle !== 'admin' && !v.alle_bygg, render: (v, set) => <TildelVelger org={m.org_id} val={v.tild} set={x => set({ tild: x })} /> },
       { k: 'aktiv', label: 'Aktiv i organisasjonen', type: 'checkbox' },
     ],
-    extraFoot: close => <button className="btn danger" onClick={async () => {
+    extraFoot: close => <>{MFA[m.org_id]?.[m.user_id] && <button className="btn" onClick={async () => {
+      if (!(await confirmBox(`Nullstille tofaktor for ${p.navn || p.epost}? Bruk dette hvis brukeren har mistet eller byttet telefon. Brukeren må sette opp tofaktor på nytt ved neste innlogging${S.orgs.find(o => o.id === m.org_id)?.krev_mfa !== false && ['admin', 'forvalter'].includes(m.rolle) ? '' : ' (hvis hen ønsker det)'}.`, 'Nullstill'))) return;
+      try { await adminApi({ action: 'mfa_nullstill', user_id: m.user_id, org_id: m.org_id }); toast('Tofaktor er nullstilt'); await lastMfa(m.org_id); close(); } catch (e: any) { toast(e.message); }
+    }}>Nullstill tofaktor</button>}<button className="btn danger" onClick={async () => {
       if (!(await confirmBox(`Fjerne ${p.navn || p.epost} fra ${orgNavn(m.org_id)}? Brukeren mister all tilgang via denne organisasjonen.`, 'Fjern'))) return;
       const { error } = await sb.from('org_medlem').delete().eq('org_id', m.org_id).eq('user_id', m.user_id); if (error) { toast(feiltekst(error)); return; }
       await sb.from('eiendom_tilgang').delete().eq('org_id', m.org_id).eq('user_id', m.user_id); close(); await reloadAdmin(); toast('Fjernet fra organisasjonen');
-    }}>Fjern fra organisasjonen</button>,
+    }}>Fjern fra organisasjonen</button></>,
     onSave: async v => {
       const { error } = await sb.from('org_medlem').update({ rolle: v.rolle, alle_bygg: v.rolle === 'admin' || !!v.alle_bygg, aktiv: !!v.aktiv }).eq('org_id', m.org_id).eq('user_id', m.user_id);
       if (error) { toast(feiltekst(error)); return false; }
@@ -166,7 +173,7 @@ function nyOrg() {
     fields: [{ k: 'navn', label: 'Navn', req: true, half: true }, { k: 'orgnr', label: 'Org.nr.', half: true, mono: true },
       { k: 'type', label: 'Type', type: 'select', options: ORG_TYPER, def: 'eier', half: true }, { k: 's', label: 'Første administrator', type: 'sec' },
       { k: 'admin_navn', label: 'Navn', req: true, half: true }, { k: 'admin_epost', label: 'E-post', type: 'email', req: true, half: true },
-      { k: 'passord', label: 'Testkunde: sett passord i stedet for invitasjon (valgfritt)', ph: 'Minst 8 tegn' }],
+      { k: 'passord', label: 'Testkunde: sett passord i stedet for invitasjon (valgfritt)', ph: 'Minst 10 tegn, store/små bokstaver og tall' }],
     onSave: async v => { try { await adminApi({ action: 'ny_org', ...v, redirectTo: location.origin }); toast('Organisasjon opprettet'); await reloadAdmin(); } catch (e: any) { toast(e.message); return false; } },
   });
 }
@@ -180,14 +187,27 @@ export function Organisasjon() {
   const org = admin.find(o => o.id === orgV) ? orgV : admin[0]?.id || '';
   const eierOrg = eierRoller.find(o => o.id === orgV)?.id || eierRoller[0]?.id || '';
   const orgVelger = (L: any[], v: string) => L.length > 1 ? <select value={v} onChange={e => setOrgV(e.target.value)} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '6px 8px' }}>{L.map(o => <option key={o.id} value={o.id}>{o.navn}</option>)}</select> : <b>{L[0]?.navn}</b>;
+  useEffect(() => { if (org && fane === 'medlemmer') lastMfa(org); }, [org, fane]);
   let c: React.ReactNode = null;
   if (fane === 'medlemmer' && org) {
     const M = sortBy(S.medlemmer.filter(m => m.org_id === org), m => (profil(m.user_id).navn || profil(m.user_id).epost || '').toLowerCase());
+    const O = S.orgs.find(o => o.id === org); const krev = O?.krev_mfa !== false; const mf = MFA[org] || {};
+    const settKrev = async (b: boolean) => {
+      if (!b && !(await confirmBox('Slå av kravet om tofaktor for administratorer og forvaltere? Kontoene blir da beskyttet bare av passord. De som allerede har slått på tofaktor, beholder den.', 'Slå av kravet'))) return;
+      const { error } = await sb.from('organisasjoner').update({ krev_mfa: b }).eq('id', org); if (error) return toast(feiltekst(error));
+      if (O) O.krev_mfa = b; bump(); toast(b ? 'Tofaktor kreves nå for administratorer og forvaltere' : 'Kravet om tofaktor er slått av');
+    };
+    const mangler = M.filter(m => m.aktiv && ['admin', 'forvalter'].includes(m.rolle) && mf[m.user_id] === false);
     c = <><div className="toolbar">{orgVelger(admin, org)}<span className="muted small">{M.length} brukere · {typeNavn(S.orgs.find(o => o.id === org)?.type)}</span><button className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => leggTilMedlem(org)}>+ Legg til bruker</button></div>
-      <div className="tbl-wrap"><table><thead><tr><th>Navn</th><th>E-post</th><th>Rolle</th><th>Tilgang til bygg</th><th>Status</th></tr></thead><tbody>
+      <div className="card" style={{ marginBottom: 12, padding: '10px 14px' }}>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 500 }}><input type="checkbox" checked={krev} onChange={e => settKrev(e.target.checked)} /> Krev tofaktorinnlogging for administratorer og forvaltere</label>
+        <p className="small muted" style={{ margin: '4px 0 0 24px' }}>{krev ? <>Administratorer og forvaltere må logge inn med passord og kode fra en autentiseringsapp. Uten tofaktor får de ikke tilgang til data – reglen håndheves i databasen.{mangler.length > 0 && <> <span style={{ color: 'var(--amber)' }}>{mangler.length} må sette det opp ved neste innlogging.</span></>}</> : 'Anbefalt å ha på. Andre brukere kan likevel slå på tofaktor selv under «Min profil».'}</p>
+      </div>
+      <div className="tbl-wrap"><table><thead><tr><th>Navn</th><th>E-post</th><th>Rolle</th><th>Tilgang til bygg</th><th>Tofaktor</th><th>Status</th></tr></thead><tbody>
         {M.map(m => { const p = profil(m.user_id); return <tr key={m.user_id} className="click" onClick={() => redigerMedlem(m)}><td><b style={{ fontWeight: 500 }}>{p.navn || '–'}</b>{m.user_id === state.me?.id && <span className="muted small"> (deg)</span>}</td><td className="small">{p.epost}</td>
           <td><Chip c={m.rolle === 'admin' ? 'blue' : m.rolle === 'leser' ? '' : 'green'}>{rolleNavn(m.rolle)}</Chip></td>
           <td className="small">{m.rolle === 'admin' || m.alle_bygg ? 'Alle organisasjonens bygg' : tildelingTekst(m.user_id, org) || <span style={{ color: 'var(--amber)' }}>Ingen bygg tildelt</span>}</td>
+          <td>{mf[m.user_id] === undefined ? <span className="muted small">–</span> : mf[m.user_id] ? <Chip c="green">På</Chip> : krev && ['admin', 'forvalter'].includes(m.rolle) ? <Chip c="amber">Må settes opp</Chip> : <Chip>Av</Chip>}</td>
           <td>{m.aktiv ? <Chip c="green">Aktiv</Chip> : <Chip>Deaktivert</Chip>}</td></tr>; })}
       </tbody></table></div>
       <div className="sec"><h2>Roller i organisasjonen</h2><div className="tbl-wrap"><table><tbody>{ORG_ROLLER.map(r => <tr key={r[0]}><td style={{ width: 160 }}><b style={{ fontWeight: 600 }}>{r[1]}</b></td><td className="small">{r[2]}</td></tr>)}</tbody></table></div>

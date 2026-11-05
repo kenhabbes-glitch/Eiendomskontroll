@@ -45,7 +45,7 @@ export const S: Record<Col, any[]> & { profiles: any[]; tilganger: any[]; innst:
 };
 
 export type Me = { id: string; epost: string; navn: string; rolle: Rolle; leietakerId?: string | null; aktiv: boolean; plattform?: boolean };
-export const state = { me: null as Me | null, ready: false, loading: false, error: '', recovery: false, version: 0 };
+export const state = { me: null as Me | null, ready: false, loading: false, error: '', recovery: false, version: 0, mfa: '' as '' | 'verifiser' | 'oppsett', mfaEpost: '' };
 if (FRA_LENKE) state.recovery = true;
 
 // ---- enkel global butikk med abonnement
@@ -193,9 +193,23 @@ function setMe(p: any) {
   bump(); if (prevRolle && prevRolle !== state.me.rolle) loadData();
 }
 let loadedFor = '';
+async function mfaSjekk(): Promise<'' | 'verifiser' | 'oppsett'> {
+  try {
+    const { data: a } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (a && a.nextLevel === 'aal2' && a.currentLevel !== 'aal2') return 'verifiser';
+    if (a?.currentLevel === 'aal2') return '';
+    const { data: s, error } = await sb.rpc('mfa_status');
+    if (!error && s?.kreves) return 'oppsett';
+  } catch { /* eldre klient eller midlertidig feil – databasen håndhever */ }
+  return '';
+}
 export async function loadMe() {
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) { state.me = null; state.ready = true; bump(); return; }
+  if (!session) { state.me = null; state.mfa = ''; state.ready = true; bump(); return; }
+  // Tofaktor: kode ved innlogging, eller påkrevd oppsett for administratorer/forvaltere. Databasen stenger data uansett.
+  const mfa = await mfaSjekk();
+  if (mfa) { state.mfa = mfa; state.mfaEpost = session.user.email || ''; state.me = null; state.ready = true; bump(); return; }
+  state.mfa = '';
   const { data, error } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
   if (error || !data) { state.me = { id: session.user.id, epost: session.user.email || '', navn: '', rolle: 'ingen', aktiv: false }; }
   else setMe(data);
@@ -210,7 +224,7 @@ export function initAuth() {
   });
   loadMe();
 }
-export async function signOut() { if (channel) sb.removeChannel(channel); await sb.auth.signOut(); COLS.forEach(c => S[c] = []); S.profiles = []; S.tilganger = []; S.orgs = []; S.medlemmer = []; S.portefoljer = []; S.oppdrag = []; S.niva = {}; S.primarOrg = ''; state.me = null; loadedFor = ''; bump(); location.hash = ''; }
+export async function signOut() { if (channel) sb.removeChannel(channel); await sb.auth.signOut(); COLS.forEach(c => S[c] = []); S.profiles = []; S.tilganger = []; S.orgs = []; S.medlemmer = []; S.portefoljer = []; S.oppdrag = []; S.niva = {}; S.primarOrg = ''; state.me = null; state.mfa = ''; loadedFor = ''; bump(); location.hash = ''; }
 
 // ---- roller (styrer hva som vises; databasen håndhever tilgangen)
 export const role = () => state.me?.rolle || 'ingen';

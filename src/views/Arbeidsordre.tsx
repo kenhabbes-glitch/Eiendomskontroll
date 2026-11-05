@@ -1,3 +1,4 @@
+import { svaktPassord, PASSORDKRAV } from '../lib/utils';
 import React, { useEffect, useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { AV_LUKKET } from '../lib/catalog';
@@ -131,7 +132,7 @@ export function AoLenke({ token }: { token: string }) {
     } catch (e: any) { setErr(e.message); } setBusy(false);
   };
   const registrer = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!sam) return setErr('Du må godta personvernerklæringen'); if (pw.length < 8) return setErr('Passordet må ha minst 8 tegn'); if (pw !== pw2) return setErr('Passordene er ikke like');
+    e.preventDefault(); if (!sam) return setErr('Du må godta personvernerklæringen'); if (svaktPassord(pw)) return setErr(PASSORDKRAV); if (pw !== pw2) return setErr('Passordene er ikke like');
     setBusy(true); setErr('');
     try { await aoApi({ action: 'registrer', token, navn, firma, passord: pw, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); const { error } = await sb.auth.signInWithPassword({ email: info.epost, password: pw }); if (error) throw error; }
     catch (e: any) { setErr(e.message); } setBusy(false);

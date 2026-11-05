@@ -208,3 +208,7 @@ export function pliktVis(p: Rec): { c: string; t: string } {
   if (p.status === 'avvist') return { c: 'red', t: 'Sendt tilbake' };
   const s = pliktStatus(p); return { c: s.c, t: s.t };
 }
+
+// Samme krav som Supabase Auth: minst 10 tegn, små og store bokstaver og tall
+export const svaktPassord = (pw: string) => pw.length < 10 || !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/\d/.test(pw);
+export const PASSORDKRAV = 'Passordet må ha minst 10 tegn, med store og små bokstaver og tall';

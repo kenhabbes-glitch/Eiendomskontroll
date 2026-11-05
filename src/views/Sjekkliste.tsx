@@ -1,3 +1,4 @@
+import { svaktPassord, PASSORDKRAV } from '../lib/utils';
 import { PersonvernBekreft, PERSONVERN_VERSJON } from '../components/Personvern';
 // Sjekkliste til leietaker: eier sender lenke, leietaker fyller ut i portalen, eier godkjenner.
 import React, { useEffect, useState } from 'react';
@@ -114,7 +115,7 @@ export function LtLenke({ token }: { token: string }) {
     } catch (e: any) { setErr(e.message); }
   })(); }, [inne]);
   const registrer = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!sam) return setErr('Du må godta personvernerklæringen'); if (pw.length < 8) return setErr('Passordet må ha minst 8 tegn'); if (pw !== pw2) return setErr('Passordene er ikke like');
+    e.preventDefault(); if (!sam) return setErr('Du må godta personvernerklæringen'); if (svaktPassord(pw)) return setErr(PASSORDKRAV); if (pw !== pw2) return setErr('Passordene er ikke like');
     setBusy(true); setErr('');
     try { await aoApi({ action: 'lt_registrer', token, navn, passord: pw, samtykke: true, personvernVersjon: PERSONVERN_VERSJON }, false); const { error } = await sb.auth.signInWithPassword({ email: info.epost, password: pw }); if (error) throw error; }
     catch (e: any) { setErr(e.message); } setBusy(false);

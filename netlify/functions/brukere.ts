@@ -4,6 +4,8 @@
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 
+const svakt = (pw: string) => pw.length < 10 || !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/\d/.test(pw);
+const aalFra = (t: string) => { try { return JSON.parse(Buffer.from(t.split('.')[1] || '', 'base64url').toString()).aal || ''; } catch { return ''; } };
 const json = (status: number, body: any) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const ORG_ROLLER = ['admin', 'forvalter', 'tekniker', 'leser'];
 const ORG_TYPER = ['eier', 'forvalter', 'drift', 'service', 'annet'];
@@ -24,6 +26,8 @@ const handler = async (req: Request) => {
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
   const { data: u, error: ue } = await admin.auth.getUser(token);
   if (ue || !u?.user) return json(401, { error: 'Ikke innlogget' });
+  const { data: mok } = await admin.rpc('mfa_ok_for', { p_uid: u.user.id, p_aal: aalFra(token) });
+  if (mok === false) return json(403, { error: 'Tofaktorinnlogging kreves. Logg ut og inn igjen med kode.' });
   const { data: me } = await admin.from('profiles').select('id, rolle, aktiv, plattform_admin, navn, epost').eq('id', u.user.id).single();
   if (!me || !me.aktiv) return json(403, { error: 'Brukeren er ikke aktiv' });
   const plattform = !!me.plattform_admin;
@@ -83,7 +87,7 @@ const handler = async (req: Request) => {
     const epost = String(body.epost || '').trim().toLowerCase(); const navn = String(body.navn || '');
     if (!/^\S+@\S+\.\S+$/.test(epost)) return json(400, { error: 'Ugyldig e-postadresse' });
     const passord = body.action === 'testbruker' ? String(body.passord || '') : undefined;
-    if (passord !== undefined && passord.length < 8) return json(400, { error: 'Passordet må ha minst 8 tegn' });
+    if (passord !== undefined && svakt(passord)) return json(400, { error: 'Passordet må ha minst 10 tegn, med store og små bokstaver og tall' });
 
     if (body.rolle === 'leietaker') {
       const { data: lt } = await admin.from('leietakere').select('id, eiendom_id').eq('id', body.leietaker_id).maybeSingle();
@@ -107,6 +111,23 @@ const handler = async (req: Request) => {
       await logg(org, `${b.ny ? 'Ny bruker' : 'Eksisterende bruker'} ${epost} lagt til som ${rolle}${body.alle_bygg ? ' (alle bygg)' : ''}`);
       return json(200, { ok: true, id: b.id, ny: b.ny });
     } catch (e: any) { return json(400, { error: e.message }); }
+  }
+
+  // ---------- Nullstill tofaktor (mistet telefon): org-admin for medlemmer i egen organisasjon, eller plattformadministrator
+  if (body.action === 'mfa_nullstill') {
+    const uid = String(body.user_id || ''); const org = String(body.org_id || '');
+    if (!uid) return json(400, { error: 'Mangler bruker' });
+    if (!plattform) {
+      if (!(await erOrgAdmin(org))) return json(403, { error: 'Bare administrator i organisasjonen kan nullstille tofaktor' });
+      const { data: m } = await admin.from('org_medlem').select('user_id').eq('org_id', org).eq('user_id', uid).maybeSingle();
+      if (!m) return json(403, { error: 'Brukeren er ikke medlem i organisasjonen' });
+    }
+    const { data: l, error: le } = await admin.auth.admin.mfa.listFactors({ userId: uid });
+    if (le) return json(400, { error: le.message });
+    let n = 0; for (const f of l?.factors || []) { const { error } = await admin.auth.admin.mfa.deleteFactor({ id: f.id, userId: uid }); if (!error) n++; }
+    const { data: pr } = await admin.from('profiles').select('epost').eq('id', uid).maybeSingle();
+    await logg(org || null, `Tofaktor nullstilt for ${pr?.epost || uid} (${n} faktor${n === 1 ? '' : 'er'} fjernet)`);
+    return json(200, { ok: true, fjernet: n });
   }
 
   // ---------- Slett bruker helt (bare plattformadministrator). Organisasjoner fjerner medlemmer i appen.
