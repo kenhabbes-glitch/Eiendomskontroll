@@ -469,7 +469,9 @@ const handler = async (req: Request) => {
   if (body.action === 'regelverk_varsel') {
     const forv = (process.env.REGELVERK_TOKEN || '').trim(); const fikk = (req.headers.get('x-regelverk-token') || '').trim();
     const { timingSafeEqual } = await import('node:crypto');
-    if (forv.length < 24 || fikk.length !== forv.length || !timingSafeEqual(Buffer.from(fikk), Buffer.from(forv))) return json(403, { error: 'Ikke tillatt' });
+    if (!forv) return json(503, { error: 'REGELVERK_TOKEN er ikke satt i Netlify (eller siden er ikke deployet på nytt etter at variabelen ble lagt inn)' });
+    if (forv.length < 24) return json(503, { error: 'REGELVERK_TOKEN i Netlify er for kort – bruk minst 24 tegn' });
+    if (fikk.length !== forv.length || !timingSafeEqual(Buffer.from(fikk), Buffer.from(forv))) return json(403, { error: 'Ikke tillatt' });
     const v = body.varsel || {}; const E: any[] = Array.isArray(v.endringer) ? v.endringer.slice(0, 50) : []; const PR: string[] = Array.isArray(v.problemer) ? v.problemer.slice(0, 50).map(String) : [];
     const type = ['startet', 'endringer', 'godkjent'].includes(v.type) ? v.type : 'endringer';
     const kort = type === 'godkjent' ? 'Regelverk: appen er kontrollert og oppdatert mot gjeldende lover og forskrifter (Lovdata).'

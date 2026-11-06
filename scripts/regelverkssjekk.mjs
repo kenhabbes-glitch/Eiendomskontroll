@@ -79,6 +79,13 @@ for (const k of kilder) {
   let fil = filer.find(f => idTilFil(k.id)?.test(basename(f)));
   let d = fil ? tolk(readFileSync(fil, 'utf8')) : null;
   if (!d && k.tittel) { const t = k.tittel.toLowerCase(); fil = filer.find(f => { const s = readFileSync(f, 'utf8').slice(0, 4000).toLowerCase(); return s.includes(t); }); d = fil ? tolk(readFileSync(fil, 'utf8')) : null; }
+  if (!d && k.sok) { // nøkkelord i tittelen, f.eks. «trykkpåkjent» + «håndtering»
+    const ord = k.sok.map(x => x.toLowerCase()); const kand = filer.map(f => [f, (readFileSync(f, 'utf8').match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '').toLowerCase()]).filter(([, t]) => ord.every(o => t.includes(o)));
+    if (kand.length) { fil = kand[0][0]; d = tolk(readFileSync(fil, 'utf8')); if (kand.length > 1) problemer.push(`${k.navn}: flere treff på søkeordene (${kand.slice(0, 4).map(([f, t]) => basename(f) + ' «' + t.slice(0, 80) + '»').join('; ')}) – brukte ${basename(fil)}. Sett riktig id i kilder.json.`); }
+    else { const delvis = filer.map(f => [f, (readFileSync(f, 'utf8').match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || '')]).filter(([, t]) => t.toLowerCase().includes(ord[0])).slice(0, 5);
+      if (delvis.length) problemer.push(`${k.navn}: mulige treff – ${delvis.map(([f, t]) => basename(f) + ' «' + tekst(t).slice(0, 90) + '»').join('; ')}`); }
+  }
+  if (d && !k.id && fil) problemer.push(`${k.navn}: funnet som ${basename(fil)} («${d.tittel.slice(0, 90)}») – sett id i kilder.json for sikker identifisering`);
   if (!d) { naaData[k.key] = { finnes: false }; problemer.push(`${k.navn}: fant ikke dokumentet blant gjeldende lover/forskrifter (opphevet, nytt navn eller feil ID)`); continue; }
   const valgt = Object.fromEntries(Object.entries(d.par).filter(([p]) => (k.paragrafer || []).includes(p) || (k.prefiks || []).some(x => p.startsWith(x))));
   for (const p of k.paragrafer || []) if (!d.par[p]) problemer.push(`${k.navn}: fant ikke ${p} i gjeldende tekst${d.metode ? '' : ' (paragrafene kunne ikke tolkes – bare hele dokumentet sammenlignes)'}`);

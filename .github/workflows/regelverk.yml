@@ -49,6 +49,8 @@ jobs:
           else URL=$(gh issue create --title "Regelverk: endringer som kan kreve oppdatering av appen ($(date +%d.%m.%Y))" --label regelverk --body-file regelverk/rapport.md); fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
       - name: Varsle appen (e-post til utvikler og hendelseslogg)
+        id: varsle
+        continue-on-error: true
         if: hashFiles('regelverk/varsel.json') != '' && env.HAR_TOKEN == 'true'
         env:
           REGELVERK_TOKEN: ${{ secrets.REGELVERK_TOKEN }}
@@ -57,10 +59,14 @@ jobs:
         run: |
           node -e "
             const v=require('./regelverk/varsel.json'); const k=require('./regelverk/kilder.json');
-            fetch((process.env.APP_URL||'https://eiendomskontroll.netlify.app').replace(/\/+$/,'')+'/.netlify/functions/arbeidsordre',{method:'POST',headers:{'Content-Type':'application/json','x-regelverk-token':process.env.REGELVERK_TOKEN},
-              body:JSON.stringify({action:'regelverk_varsel',varsel:v,issue:process.env.ISSUE||'',antall:k.kilder.length})}).then(async r=>{const t=await r.text();console.log(r.status,t);if(!r.ok)process.exit(1)});"
+            const ctl=new AbortController(); setTimeout(()=>ctl.abort(),60000);
+            fetch((process.env.APP_URL||'https://eiendomskontroll.netlify.app').replace(/\/+$/,'')+'/.netlify/functions/arbeidsordre',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json','x-regelverk-token':process.env.REGELVERK_TOKEN},
+              body:JSON.stringify({action:'regelverk_varsel',varsel:v,issue:process.env.ISSUE||'',antall:k.kilder.length})}).then(async r=>{const t=await r.text();console.log(r.status,t);if(!r.ok){console.log('::warning::Varsel til appen feilet ('+r.status+'). Sjekk at REGELVERK_TOKEN er lik i GitHub og Netlify, og at Netlify er deployet etter at variabelen ble satt.');process.exit(1)}}).catch(e=>{console.log('::warning::'+e.message);process.exit(1)});"
       - name: Lagre status og grunnlinje
+        if: always()
         run: |
+          # Feilet varslingen, beholdes ikke fingeravtrykket – da prøves varselet igjen neste uke
+          if [ "${{ steps.varsle.outcome }}" = "failure" ]; then git checkout -- regelverk/varslet.json 2>/dev/null || rm -f regelverk/varslet.json; fi
           rm -f regelverk/varsel.json
           git config user.name "regelverkssjekk"; git config user.email "actions@users.noreply.github.com"
           git add regelverk public/regelverk-status.json
