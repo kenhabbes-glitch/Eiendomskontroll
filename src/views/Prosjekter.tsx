@@ -1,18 +1,19 @@
 // Prosjektmodul: liste og prosjektside (oversikt, faser og oppgaver, økonomi, FDV, systembytte, logg).
 import React, { useState } from 'react';
-import { Hjelp } from '../components/LovHjelp';
+import { Hjelp } from '../components/Hjelp';
+import { Hjelp as LovHjelp } from '../components/LovHjelp';
 import { S, save, removeDoc, toast, useStore, kanRedigereE, uploadFile, state } from '../lib/store';
 import { byId, fd, today, sortBy, eNavn, aNavn, nok, toCsv, type Rec } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, openModal, ModalFrame, FileLink, TgChip } from '../components/ui';
-import { editAnlegg } from '../lib/actions';
+import { editAnlegg, editDok } from '../lib/actions';
 import { KOMP } from '../lib/catalog';
 import { BETALER, DELER, delFor, delNavn, FAG, FASER, KLASSER, KONTO, PSTATUS, PTYPER, ferdigstill, fremdrift, nyttProsjektData, okonomi, uid } from '../lib/prosjekt';
 import { lNavn } from '../lib/utils';
 import { NsVelger, nsNavn } from '../components/NsVelger';
 import { Sel, eiendomOpts, useFilter } from './common';
 import { aapneOppgave, nyOppgave } from './ProsjektArbeid';
-import { Hjelp } from '../components/LovHjelp';
 import { hjelpFor } from '../lib/lovhjelp';
+import { ARKIVKLASSER, STD_REGLER, kontrollFerdigstill, lagProsjektarkiv, normRef, stdSystem, sysNavn, systemValg } from '../lib/prosjektArkiv';
 import { lagRapport, Rapporter, StatusChip } from './ProsjektRapport';
 import { Gantt, GanttForklaring } from '../components/Gantt';
 import { faseGodkjent, ganttRader, krevGodkjenning, sisteBeslutning } from '../lib/prosjektArbeid';
@@ -190,7 +191,7 @@ function Oppgaver({ p, kan }: { p: Rec; kan: boolean }) {
       {L.map(o => { const sen = o.frist && o.frist < today() && !['Ferdig', 'Ikke relevant'].includes(o.status);
         return <div key={o.id} className="rk-rad" style={{ opacity: o.status === 'Ikke relevant' ? .5 : 1 }}>
           <input type="checkbox" style={{ width: 'auto' }} disabled={!kan} checked={o.status === 'Ferdig'} onChange={e => settO(o.id, { status: e.target.checked ? 'Ferdig' : 'Pågår', ferdig: e.target.checked ? today() : '' })} />
-          <span style={{ flex: 1, minWidth: 180, textDecoration: o.status === 'Ferdig' ? 'line-through' : undefined, cursor: 'pointer' }} onClick={() => kan ? aapneOppgave(p.id, o.id) : redOppg(o)}>{o.tittel}{o.notat && <span className="small muted"> – {o.notat}</span>}</span><Hjelp k={hjelpFor(o.tittel || '')} />
+          <span style={{ flex: 1, minWidth: 180, textDecoration: o.status === 'Ferdig' ? 'line-through' : undefined, cursor: 'pointer' }} onClick={() => kan || p.status === 'Ferdigstilt' ? aapneOppgave(p.id, o.id) : redOppg(o)}>{o.tittel}{o.notat && <span className="small muted"> – {o.notat}</span>}</span><LovHjelp k={hjelpFor(o.tittel || '')} />
           {o.fag && <Chip>{o.fag}</Chip>}{kan && <button className="btn ghost sm" title="Åpne arbeidsflaten" onClick={() => aapneOppgave(p.id, o.id)}>Åpne ›</button>}<span className="small muted">{o.ansvarlig}</span><span className="small" style={{ color: sen ? 'var(--red)' : 'var(--muted)' }}>{o.frist ? fd(o.frist) : ''}</span>
           {o.status === 'Pågår' && <Chip c="amber">Pågår</Chip>}</div>; })}
     </div>; })}</>;
@@ -318,24 +319,48 @@ function Fag({ p, kan }: { p: Rec; kan: boolean }) {
 }
 
 function Fdv({ p, kan }: { p: Rec; kan: boolean }) {
-  const D = S.dokumenter.filter(d => d.prosjektId === p.id);
-  const lastOpp = async (f: File, krav?: Rec) => {
-    const fil = await uploadFile(f, p.eiendomId); if (!fil) return;
-    const did = await save('dokumenter', { eiendomId: p.eiendomId, leietakerId: '', prosjektId: p.id, anleggId: p.nyttSystemId || '', type: krav ? (/samsvar/i.test(krav.tittel) ? 'Samsvarserklæring el-anlegg' : /serviceavtale/i.test(krav.tittel) ? 'Serviceavtale' : 'FDV-dokumentasjon') : 'Annet', tittel: (krav?.tittel || f.name) + ' – ' + p.navn, dato: today(), fil });
-    if (krav) await oppdater(p.id, { fdv: (byId('prosjekter', p.id)!.fdv || []).map((x: Rec) => x.id === krav.id ? { ...x, mottatt: true, dokId: did } : x) }, `FDV mottatt: ${krav.tittel}`);
+  const D = S.dokumenter.filter(d => d.prosjektId === p.id); const SV = systemValg(p); const laast = p.status === 'Ferdigstilt';
+  const sysFelt = (ref?: string) => ref ? (ref.startsWith('ny:') ? { anleggId: '', nySysRef: ref } : { anleggId: ref, nySysRef: '' }) : { anleggId: '', nySysRef: '' };
+  const lastOpp = async (f: File, krav?: Rec, sys?: string) => {
+    const fil = await uploadFile(f, p.eiendomId); if (!fil) return; const ref = krav ? krav.system : sys;
+    const did = await save('dokumenter', { eiendomId: p.eiendomId, leietakerId: '', prosjektId: p.id, ...sysFelt(ref), type: krav ? (/samsvar/i.test(krav.tittel) ? 'Samsvarserklæring el-anlegg' : /serviceavtale/i.test(krav.tittel) ? 'Serviceavtale' : 'FDV-dokumentasjon') : 'Annet', tittel: (krav?.tittel || f.name) + (ref ? ' – ' + sysNavn(p, ref).replace(/ \(registreres.*\)$/, '').replace(/^Nytt: /, '').replace(/^Nytt: /, '') : ' – ' + p.navn), dato: today(), fil });
+    if (krav) await oppdater(p.id, { fdv: (byId('prosjekter', p.id)!.fdv || []).map((x: Rec) => x.id === krav.id ? { ...x, mottatt: true, dokId: did } : x) }, `FDV mottatt: ${krav.tittel}${ref ? ' (' + sysNavn(p, ref) + ')' : ''}`);
     toast('Dokument lastet opp');
   };
-  const F: Rec[] = p.fdv || [];
+  const settSystem = async (x: Rec, ref: string) => { const P = byId('prosjekter', p.id)!; await oppdater(p.id, { fdv: (P.fdv || []).map((y: Rec) => y.id === x.id ? { ...y, system: ref } : y) });
+    const d = x.dokId ? byId('dokumenter', x.dokId) : null; if (d) await save('dokumenter', { ...d, ...sysFelt(ref) }); };
+  const F: Rec[] = (p.fdv || []).map((x: Rec) => x.system === undefined && stdSystem(p) ? { ...x, system: stdSystem(p) } : { ...x, system: normRef(p, x.system) });
+  const kravForSystemer = async () => {
+    const P = byId('prosjekter', p.id)!; const eks: Rec[] = P.fdv || []; const sys = SV.filter(([k]) => k.startsWith('ny:') || (P.nyeSystemer || []).some((x: Rec) => x.opprettetId === k) || k === P.nyttSystemId).map(([k]) => k);
+    if (!sys.length) return toast('Ingen nye systemer i prosjektet. Velg system per krav i stedet.');
+    const STD = ['FDV-dokumentasjon', 'Samsvarserklæring / dokumentasjon av produkter', 'Tegninger «som bygget»', 'Brukerveiledning / driftsinstruks'];
+    const nye = sys.flatMap(ref => STD.filter(t => !eks.some(e => e.tittel === t && e.system === ref)).map(t => ({ id: uid(), tittel: t, mottatt: false, dokId: '', system: ref })));
+    // Generelle krav uten system som nå dekkes per system, fjernes hvis de ikke er mottatt
+    const behold = eks.filter(e => e.mottatt || e.system || !STD.includes(e.tittel));
+    await oppdater(p.id, { fdv: [...behold, ...nye] }, `FDV-krav lagt til for ${sys.length} system(er)`); toast(`${nye.length} FDV-krav lagt til`);
+  };
+  const grupper = [...new Set(F.map(x => x.system || ''))];
   return <>
-    <div className="card" style={{ marginBottom: 12 }}><b>FDV og sluttdokumentasjon</b> <span className="small muted">{F.filter(x => x.mottatt).length} av {F.length} mottatt</span>
-      {F.map(x => { const d = x.dokId ? byId('dokumenter', x.dokId) : null; return <div key={x.id} className="rk-rad">
-        <input type="checkbox" style={{ width: 'auto' }} disabled={!kan} checked={!!x.mottatt} onChange={e => oppdater(p.id, { fdv: F.map(y => y.id === x.id ? { ...y, mottatt: e.target.checked } : y) })} />
-        <span style={{ flex: 1 }}>{x.tittel}{d?.fil && <span className="small"> · <FileLink fil={d.fil} /></span>}</span>
-        {kan && <label className="btn sm">Last opp<input type="file" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) lastOpp(f, x); e.target.value = ''; }} /></label>}</div>; })}
-      {kan && <p style={{ marginBottom: 0 }}><button className="btn sm" onClick={() => formModal({ title: 'Nytt FDV-krav', fields: [{ k: 't', label: 'Dokument', req: true }], onSave: async v => oppdater(p.id, { fdv: [...F, { id: uid(), tittel: v.t, mottatt: false }] }) })}>+ Krav</button></p>}
-      <p className="small muted">Dokumentene lagres under Dokumenter på eiendommen{p.nyttSystemId ? ' og er koblet til det nye systemet' : ''}. Ved ferdigstilling kobles de til det nye systemet.</p></div>
-    <div className="card"><div style={{ display: 'flex', alignItems: 'center' }}><b style={{ flex: 1 }}>Alle dokumenter i prosjektet</b>{kan && <label className="btn sm">+ Last opp<input type="file" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) lastOpp(f); e.target.value = ''; }} /></label>}</div>
-      {D.length ? D.map(d => <div key={d.id} className="small" style={{ padding: '4px 0' }}><FileLink fil={d.fil}>{d.tittel}</FileLink> <span className="muted">· {d.type} · {fd(d.dato)}</span></div>) : <p className="small muted">Ingen dokumenter ennå (tilbud, kontrakt, tegninger, møtereferater …).</p>}</div>
+    <div className="card" style={{ marginBottom: 12 }}><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><b style={{ flex: 1 }}>FDV og sluttdokumentasjon <span className="small muted" style={{ fontWeight: 400 }}>{F.filter(x => x.mottatt).length} av {F.length} mottatt</span></b>
+      {kan && !laast && <button className="btn sm" onClick={kravForSystemer}>FDV-krav per nytt system</button>}</div>
+      {grupper.map(g => <div key={g} style={{ marginTop: 8 }}>{grupper.length > 1 && <div className="small" style={{ fontWeight: 600, color: 'var(--ink2)' }}>{g ? sysNavn(p, g) : 'Ikke koblet til system'}</div>}
+        {F.filter(x => (x.system || '') === g).map(x => { const d = x.dokId ? byId('dokumenter', x.dokId) : null; return <div key={x.id} className="rk-rad">
+          <input type="checkbox" style={{ width: 'auto' }} disabled={!kan || laast} checked={!!x.mottatt} onChange={e => oppdater(p.id, { fdv: F.map(y => y.id === x.id ? { ...y, mottatt: e.target.checked } : y) })} />
+          <span style={{ flex: 1 }}>{x.tittel}<LovHjelp k={hjelpFor(x.tittel)} />{d?.fil && <span className="small"> · <FileLink fil={d.fil} /></span>}</span>
+          {kan && SV.length > 0 && <select className="small" style={{ width: 'auto', maxWidth: 260 }} value={x.system || ''} onChange={e => settSystem(x, e.target.value)} title="System dokumentet gjelder"><option value="">– velg system –</option>{SV.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>}
+          {kan && <label className="btn sm">Last opp<input type="file" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) lastOpp(f, x); e.target.value = ''; }} /></label>}</div>; })}</div>)}
+      {kan && !laast && <p style={{ marginBottom: 0 }}><button className="btn sm" onClick={() => formModal({ title: 'Nytt FDV-krav', values: { sys: stdSystem(p) }, fields: [{ k: 't', label: 'Dokument', req: true }, ...(SV.length ? [{ k: 'sys', label: 'Gjelder system', type: 'select', options: SV, empty: '– ikke koblet –' } as any] : [])], onSave: async v => oppdater(p.id, { fdv: [...(byId('prosjekter', p.id)!.fdv || []), { id: uid(), tittel: v.t, mottatt: false, system: v.sys || '' }] }) })}>+ Krav</button></p>}
+      <p className="small muted">FDV-dokumentene lagres under Dokumenter og kobles til systemet de gjelder. Nye systemer får koblingen når de registreres ved ferdigstilling. Dokumentene finner du også i systemkortet.</p></div>
+    {laast && !p.arkivInfo && kan && <div className="note" style={{ marginBottom: 12, display: 'flex', gap: 10, alignItems: 'center' }}><span style={{ flex: 1 }} className="small">Prosjektet er ferdigstilt uten prosjektarkiv. Lag låste PDF-er av arbeidsdokumentene og sett oppbevaringstid.</span>
+      <button className="btn sm pri" onClick={() => formModal({ title: 'Lag prosjektarkiv', values: { ...STD_REGLER, ...(p.arkivRegler || {}), erf: '' }, fields: [{ k: 'erf', label: 'Erfaringer og læringspunkter (sluttrapport)', type: 'textarea' },
+        { k: 'reklamasjonAar', label: 'Kontrakt, endringer, overtakelse (år)', type: 'number', half: true }, { k: 'regnskapAar', label: 'Regnskapsbilag (år)', type: 'number', half: true }, { k: 'shaMnd', label: 'SHA-plan (mnd)', type: 'number', half: true }, { k: 'personMnd', label: 'Personopplysninger (mnd)', type: 'number', half: true }],
+        onSave: async x => { const regler = { reklamasjonAar: +x.reklamasjonAar || 6, regnskapAar: +x.regnskapAar || 5, shaMnd: +x.shaMnd || 6, personMnd: +x.personMnd || 6 };
+          const ids = await lagProsjektarkiv(p.id, { regler, erfaringer: x.erf || '', dato: p.fullfort || today() }, t => toast(t));
+          await oppdater(p.id, { arkivRegler: regler, arkivInfo: { laget: new Date().toISOString(), dokIds: ids, av: state.me?.navn || state.me?.epost } }, `Prosjektarkiv laget: ${ids.length} låste PDF-er`); toast(`Prosjektarkiv laget – ${ids.length} dokumenter`); } })}>Lag prosjektarkiv</button></div>}
+    {p.arkivInfo && <div className="card" style={{ marginBottom: 12 }}><b>Prosjektarkiv</b> <span className="small muted">laget {fd(String(p.arkivInfo.laget).slice(0, 10))} · låste PDF-er</span>
+      {S.dokumenter.filter(d => d.prosjektId === p.id && d.laast).map(d => <div key={d.id} className="small" style={{ padding: '3px 0' }}><FileLink fil={d.fil}>{d.tittel}</FileLink> <span className="muted">· {ARKIVKLASSER[d.arkiv?.klasse]?.navn}{d.arkiv?.minstTil ? ` · oppbevares minst til ${fd(d.arkiv.minstTil)}` : ''}</span></div>)}</div>}
+    <div className="card"><div style={{ display: 'flex', alignItems: 'center' }}><b style={{ flex: 1 }}>Alle dokumenter i prosjektet</b>{kan && <label className="btn sm">+ Last opp<input type="file" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) lastOpp(f, undefined, stdSystem(p)); e.target.value = ''; }} /></label>}</div>
+      {D.length ? D.map(d => <div key={d.id} className="small" style={{ padding: '4px 0', cursor: 'pointer' }} onClick={() => editDok(d.id)}><FileLink fil={d.fil}>{d.tittel}</FileLink> <span className="muted">· {d.type} · {fd(d.dato)}{d.anleggId ? ' · ' + aNavn(d.anleggId) : d.nySysRef ? ' · ' + sysNavn(p, d.nySysRef) : ''}{d.arkiv?.minstTil ? ` · oppbevares til ${fd(d.arkiv.minstTil)}` : d.arkiv ? ' · byggets levetid' : ''}</span></div>) : <p className="small muted">Ingen dokumenter ennå (tilbud, kontrakt, tegninger, møtereferater …).</p>}</div>
   </>;
 }
 
@@ -389,18 +414,35 @@ function SystembytteGml({ p, kan }: { p: Rec; kan: boolean }) {
 
 export function ferdigstillDialog(pid: string) {
   const p = byId('prosjekter', pid)!; const gml = p.gammeltSystemId ? byId('anlegg', p.gammeltSystemId) : null;
-  const apneO = (p.oppgaver || []).filter((o: Rec) => !['Ferdig', 'Ikke relevant'].includes(o.status)).length;
   const nAv = gml ? S.avvik.filter(a => a.anleggId === gml.id && !['Lukket', 'Utført'].includes(a.status)).length : 0;
-  formModal({ title: 'Ferdigstill prosjekt', saveTxt: gml ? 'Ferdigstill og bytt system' : 'Ferdigstill', values: { dato: today(), lukk: true }, fields: [
+  const K = kontrollFerdigstill(p); const R = { ...STD_REGLER, ...(p.arkivRegler || {}) };
+  formModal({ title: 'Ferdigstill prosjekt', wide: true, saveTxt: gml ? 'Ferdigstill og bytt system' : 'Ferdigstill', values: { dato: today(), lukk: true, arkiv: true, erf: '', ...R }, fields: [
+    { k: 'kontroll', type: 'custom', render: () => K.length ? <div className="note small" style={{ color: 'var(--ink)' }}><b>Sjekk før ferdigstilling</b>
+      <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>{K.map((m, i) => <li key={i} style={{ color: m.niva === 'rod' ? 'var(--red)' : 'var(--amber)' }}>{m.t}</li>)}</ul>
+      <p className="muted" style={{ margin: '6px 0 0' }}>Du kan ferdigstille likevel – det som mangler kan legges til i garantiperioden.</p></div> : <div className="note small" style={{ color: 'var(--green)' }}>✓ FDV er mottatt, og det er ingen åpne mangler, endringer eller beslutninger.</div> },
     { k: 'info', type: 'custom', render: () => <div className="note small" style={{ color: 'var(--ink)' }}>
-      {apneO > 0 && <p style={{ marginTop: 0, color: 'var(--amber)' }}>⚠ {apneO} oppgaver er ikke ferdige.</p>}
       {gml ? <>Dette skjer når du ferdigstiller:<ul style={{ margin: '4px 0', paddingLeft: 18 }}>
         <li>Nytt system opprettes med samme TFM-merking ({aNavn(gml.id).split(' ')[0]}), plassering og ansvar.</li>
         <li>Det gamle systemet, komponentene og {S.oppgaver.filter(o => o.anleggId === gml.id).length} kontroller arkiveres. De finnes under <b>Arkiv</b>.</li>
         <li>Kontrollene opprettes på nytt for det nye systemet, med første frist ut fra datoen under.</li>
-        <li>Prosjektets dokumenter kobles til det nye systemet. Status settes til «Ferdigstilt», og garantitiden (5 år) startes.</li></ul></> : 'Status settes til «Ferdigstilt», og garantitiden (5 år) startes.'}
-      {(p.nyeSystemer || []).filter((x: Rec) => !x.opprettetId).length > 0 && <p style={{ marginBottom: 0 }}>{(p.nyeSystemer || []).filter((x: Rec) => !x.opprettetId).length} nye systemer registreres i TFM-registeret med kontroller fra katalogen.</p>}</div> },
+        <li>FDV og prosjektdokumenter kobles til det nye systemet. Status settes til «Ferdigstilt», og garantitiden (5 år) startes.</li></ul></> : 'Status settes til «Ferdigstilt», og garantitiden (5 år) startes.'}
+      {(p.nyeSystemer || []).filter((x: Rec) => !x.opprettetId).length > 0 && <p style={{ marginBottom: 0 }}>{(p.nyeSystemer || []).filter((x: Rec) => !x.opprettetId).length} nye systemer registreres i TFM-registeret med kontroller fra katalogen, og FDV-dokumentene deres kobles til dem.</p>}</div> },
     { k: 'dato', label: 'Ferdigstilt dato (overtakelse)', type: 'date', req: true, half: true },
-    ...(gml && nAv ? [{ k: 'lukk', label: `Lukk ${nAv} åpne avvik på det gamle systemet`, type: 'checkbox', half: true } as any] : [])],
-    onSave: async x => { await ferdigstill(pid, { lukkAvvik: !!x.lukk, dato: x.dato }); } });
+    ...(gml && nAv ? [{ k: 'lukk', label: `Lukk ${nAv} åpne avvik på det gamle systemet`, type: 'checkbox', half: true } as any] : []),
+    { k: 'arkiv', label: 'Lag prosjektarkiv: låste PDF-er av sluttrapport, SHA-plan, tilbud og kontrakt, referater, endringer, overtakelse og beslutninger', type: 'checkbox' },
+    { k: 'erf', label: 'Erfaringer og læringspunkter (tas med i sluttrapporten)', type: 'textarea', show: (v: Rec) => !!v.arkiv },
+    { k: 'regHdr', type: 'custom', show: (v: Rec) => !!v.arkiv, render: () => <b className="small">Oppbevaringstid <span className="muted" style={{ fontWeight: 400 }}>– FDV og dokumentasjon for fremtidig arbeid beholdes i byggets levetid</span></b> },
+    { k: 'reklamasjonAar', label: 'Kontrakt, endringer, overtakelse, referater (år)', type: 'number', half: true, show: (v: Rec) => !!v.arkiv, hint: 'Reklamasjonsfrist etter NS 8405/8406/8407 er normalt 5 år – standard 6 år gir margin' },
+    { k: 'regnskapAar', label: 'Regnskapsbilag (år etter regnskapsåret)', type: 'number', half: true, show: (v: Rec) => !!v.arkiv, hint: 'Avklar med regnskapsfører' },
+    { k: 'shaMnd', label: 'SHA-plan, minst (måneder)', type: 'number', half: true, show: (v: Rec) => !!v.arkiv, hint: 'Byggherreforskriften § 7: minst 6 måneder' },
+    { k: 'personMnd', label: 'Lister med personopplysninger slettes etter (måneder)', type: 'number', half: true, show: (v: Rec) => !!v.arkiv, hint: 'Oversiktslister etter § 15 – 6 måneder' }],
+    onSave: async x => {
+      await ferdigstill(pid, { lukkAvvik: !!x.lukk, dato: x.dato });
+      if (!x.arkiv) return;
+      const regler = { reklamasjonAar: +x.reklamasjonAar || 6, regnskapAar: +x.regnskapAar || 5, shaMnd: +x.shaMnd || 6, personMnd: +x.personMnd || 6 };
+      try { const ids = await lagProsjektarkiv(pid, { regler, erfaringer: x.erf || '', dato: x.dato }, s => toast(s));
+        await oppdater(pid, { arkivRegler: regler, arkivInfo: { laget: new Date().toISOString(), dokIds: ids, av: state.me?.navn || state.me?.epost } }, `Prosjektarkiv laget: ${ids.length} låste PDF-er`);
+        toast(`Prosjektarkiv laget – ${ids.length} dokumenter under Dokumenter`); }
+      catch (e: any) { toast('Prosjektet er ferdigstilt, men arkivet feilet: ' + (e?.message || e) + '. Prøv «Lag prosjektarkiv» under Dokumenter og FDV.'); }
+    } });
 }

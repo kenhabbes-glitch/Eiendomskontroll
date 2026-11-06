@@ -288,6 +288,12 @@ export function editAnlegg(id?: string, eiendomId?: string) {
         {!st.d && id && canEdit() && <> <button type="button" className="btn sm" onClick={() => { closeRef.c?.(); editDok(undefined, { eiendomId: v.eiendomId, type: 'Serviceavtale', anleggId: id, tittel: 'Serviceavtale – ' + (v.navn || KOMP[v.type]?.n) + (v.leverandor ? ' (' + v.leverandor + ')' : '') }); }}>Registrer avtale</button></>}
         {!id && <span className="muted"> Lagre systemet først, deretter kan avtalen registreres her eller under Dokumenter.</span>}</div>; } },
     { k: 'plass', type: 'custom', label: 'Plassering på tegning', render: v => <PlasseringFelt kind="a" id={id} eiendomId={v.eiendomId} close={() => closeRef.c?.()} /> },
+    ...(id ? [{ k: 'doks', type: 'custom', label: 'Dokumentasjon (FDV, samsvar, avtaler, rapporter)', render: (v: Rec) => { const D = sortBy(S.dokumenter.filter(d => d.anleggId === id || (d.anleggIds || []).includes(id)), d => (d.type === 'FDV-dokumentasjon' ? '0' : '1') + (d.dato || '')).reverse();
+      return <div>{D.length ? D.map(d => <div key={d.id} className="small" style={{ display: 'flex', gap: 8, padding: '3px 0', borderBottom: '1px solid var(--line)' }}>
+        <span style={{ flex: 1 }}>{d.fil ? <FileLink fil={d.fil}>{d.tittel}</FileLink> : <a href="#" onClick={e => { e.preventDefault(); closeRef.c?.(); editDok(d.id); }}>{d.tittel}</a>}{d.laast ? ' 🔒' : ''}</span>
+        <span className="muted">{d.type}</span><span className="muted">{fd(d.dato)}</span>{d.prosjektId && <span className="muted" title="Fra prosjekt">{byId('prosjekter', d.prosjektId)?.navn?.slice(0, 28)}</span>}</div>)
+        : <p className="small muted" style={{ margin: 0 }}>Ingen dokumenter koblet til systemet ennå.</p>}
+        {canEdit() && <button type="button" className="btn sm" style={{ marginTop: 6 }} onClick={() => { closeRef.c?.(); editDok(undefined, { eiendomId: v.eiendomId, anleggId: id, type: 'FDV-dokumentasjon', tittel: 'FDV – ' + aNavn(id) }); }}>+ Legg til dokument</button>}</div>; } } as Field] : []),
     { k: 'notat', label: 'Notater', type: 'textarea' },
   ];
   // Eksisterende system: vis standardkontroller for typen og hvilke som mangler

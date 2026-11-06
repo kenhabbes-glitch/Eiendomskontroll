@@ -133,7 +133,7 @@ export async function ferdigstill(pid: string, opt: { lukkAvvik: boolean; dato?:
     if (opt.lukkAvvik) for (const a of S.avvik.filter(a => a.anleggId === gml.id && !AV_LUKKET.includes(a.status)))
       await save('avvik', { ...a, status: 'Lukket', lukket: dato, logg: [...(a.logg || []), { t: new Date().toISOString(), s: 'Lukket', k: `Systemet er erstattet i prosjekt «${p.navn}»`, av }] });
     // Prosjektets dokumenter knyttes til det nye systemet
-    for (const d of S.dokumenter.filter(d => d.prosjektId === pid && !d.anleggId)) await save('dokumenter', { ...d, anleggId: nid });
+    for (const d of S.dokumenter.filter(d => d.prosjektId === pid && !d.anleggId && !d.nySysRef)) await save('dokumenter', { ...d, anleggId: nid });
     await save('anlegg', { ...byId('anlegg', gml.id)!, arkivert, utskiftProsjektId: pid });
     logg.push({ t: new Date().toISOString(), k: `Nytt system ${aNavn(nid)} erstatter det gamle. Gammelt system, ${gamleK.length} kontroller og komponenter er arkivert.`, av });
   }
@@ -149,6 +149,8 @@ export async function ferdigstill(pid: string, opt: { lukkAvvik: boolean; dato?:
       await save('oppgaver', { malKey: k, eiendomId: p.eiendomId, anleggId: sid, navn: m.n, kategori: m.k, type: m.t, hjemmel: m.h, intervall: { n: m.i[0], enhet: m.i[1] }, utfores: m.u, ansvar: ns.ansvar === 'Leietaker' ? 'Leietaker' : 'Eier', leietakerId: ns.ansvar === 'Leietaker' ? (p.leietakerId || '') : '', nesteFrist: addInt(dato, { n: m.i[0], enhet: m.i[1] }), aktiv: true, historikk: [], fraProsjekt: pid }); }
     ns.opprettetId = sid; logg.push({ t: new Date().toISOString(), k: `Nytt system registrert: ${aNavn(sid)}`, av });
   }
+  // FDV og andre dokumenter som venter på et nytt system, kobles nå til systemet som ble opprettet
+  { const { kobleNyeSystemer } = await import('./prosjektArkiv'); await kobleNyeSystemer(pid, nid || '', nyeS); }
   logg.push({ t: new Date().toISOString(), k: 'Prosjekt ferdigstilt', av });
   await save('prosjekter', { ...byId('prosjekter', pid)!, nyeSystemer: nyeS, status: 'Ferdigstilt', fase: 'garanti', fullfort: dato, nyttSystemId: nid || p.nyttSystemId || '', logg,
     garantiTil: p.garantiTil || addDays(dato, 365 * 5) });

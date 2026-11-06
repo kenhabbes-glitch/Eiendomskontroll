@@ -63,10 +63,14 @@ function Arbeidsflate({ pid, oid, close }: { pid: string; oid: string; close: ()
   const D = S.dokumenter.filter(d => d.prosjektId === pid && d.oppgaveId === oid);
   const lastOpp = async (fil: File) => { const r = await uploadFile(fil, p.eiendomId); if (!r) return; await save('dokumenter', { eiendomId: p.eiendomId, leietakerId: '', prosjektId: pid, oppgaveId: oid, anleggId: '', type: 'Annet', tittel: `${fil.name} – ${f.tittel}`, dato: today(), fil: r }); toast('Lastet opp'); };
   const fagL = [...new Set([...(p.fag || []).map((x: Rec) => x.fag), ...FAG])];
+  // Etter ferdigstilling er arbeidsdokumentene låst – bare oppgaver i garantiperioden kan endres
+  const laast = p.status === 'Ferdigstilt' && o0.fase !== 'garanti';
 
   return <ModalFrame title={<span>{f.tittel}<Hjelp k={hjelpFor(f.tittel || '')} /> <span className="small muted" style={{ fontWeight: 400 }}>· {FASER.find(x => x[0] === f.fase)?.[1]}</span></span>} close={close}
-    foot={<><button className="btn danger" onClick={slett}>Slett</button><span style={{ flex: 1 }} /><button className="btn" onClick={close}>Avbryt</button>
+    foot={laast ? <><span className="small muted" style={{ flex: 1 }}>Prosjektet er ferdigstilt – arbeidsdokumentene er låst. Låste PDF-er ligger under Dokumenter.</span><button className="btn" onClick={close}>Lukk</button></> : <><button className="btn danger" onClick={slett}>Slett</button><span style={{ flex: 1 }} /><button className="btn" onClick={close}>Avbryt</button>
       <button className="btn" disabled={busy} onClick={() => lagre()}>Lagre</button>{f.status !== 'Ferdig' && <button className="btn pri" disabled={busy} onClick={() => lagre(true)}>Lagre og marker ferdig</button>}</>}>
+    {laast && <div className="note small" style={{ marginBottom: 10 }}>🔒 Låst etter ferdigstilling {fd(p.fullfort)}. Endringer lagres ikke. Tillegg i garantiperioden registreres på oppgaver i garantifasen.</div>}
+    <fieldset disabled={laast} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
     <div className="pa-grid">
       <Felt l="Oppgave"><input value={f.tittel || ''} onChange={e => setF({ tittel: e.target.value })} /></Felt>
       <Felt l="Status" half><select value={f.status} onChange={e => setF({ status: e.target.value })}>{['Ikke startet', 'Pågår', 'Ferdig', 'Ikke relevant'].map(s => <option key={s}>{s}</option>)}</select></Felt>
@@ -95,6 +99,7 @@ function Arbeidsflate({ pid, oid, close }: { pid: string; oid: string; close: ()
     <Felt l="Notat"><textarea rows={3} value={f.notat || ''} onChange={e => setF({ notat: e.target.value })} placeholder="Vurderinger, avklaringer, hvem som er kontaktet …" /></Felt>
     <div className="pa-seksjon"><b>Vedlegg</b> <label className="btn sm" style={{ marginLeft: 8 }}>+ Last opp<input type="file" multiple style={{ display: 'none' }} onChange={async e => { for (const x of Array.from(e.target.files || [])) await lastOpp(x); e.target.value = ''; }} /></label>
       {D.length ? D.map(d => <div key={d.id} className="small" style={{ padding: '3px 0' }}><FileLink fil={d.fil}>{d.tittel}</FileLink> <span className="muted">· {fd(d.dato)}</span></div>) : <p className="small muted" style={{ margin: '4px 0 0' }}>Tilbud, tegninger, referater, bilder … Lagres også under prosjektets dokumenter.</p>}</div>
+    </fieldset>
     {['beskrivelse', 'overslag', 'ramme', 'kalkyle', 'tilbud'].includes(type) && <p className="small muted">Innholdet tas med i beslutningsnotatet for fasen. Lag notatet med «Beslutningsnotat» på fasen når oppgavene er klare.</p>}
   </ModalFrame>;
 }

@@ -6,6 +6,7 @@ import { ikDekning } from '../lib/utils';
 import { S, canEdit, save } from '../lib/store';
 import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2, sysKostNaa, sysKostUtskift, sysKostTip, kompAar, egetAar, sysNaaverdi, kompNaaverdi, nvTip, saStatus, taggerFor, erForslag, harForslag } from '../lib/utils';
 const justTip = (a: any) => { const y = Math.max(compYear(a) || YEAR, YEAR); return `${kostTip(a)}. Prisjustert med KPI til utskiftingsåret ${y}.`; };
+import { today } from '../lib/utils';
 import { aNavn, byId, compRest, compYear, dUntil, docCoverage, eNavn, fd, intTxt, knok, lNavn, openAvvik, pad, pliktStatus, sortBy, tfmKomp, tfmSys, type Rec } from '../lib/utils';
 import { editAnlegg, editAvvik, editDok, editKomponent, toggleDokNA, utfor, visOppgave } from '../lib/actions';
 import { enhetStatus } from '../lib/oppslag';
@@ -73,7 +74,7 @@ export function DokTable({ list, showE = true }: { list: Rec[]; showE?: boolean 
   return <Wrap><table><thead><tr><th>NS 3451</th><th>Dokument</th><th>Type</th>{showE && <th>Eiendom</th>}<th>Dato</th><th>Gyldig til</th><th>Fil / plassering</th></tr></thead><tbody>
     {L.map(d => { const gd = d.gyldigTil ? dUntil(d.gyldigTil)! : null;
       return <tr key={d.id} className="click" onClick={() => editDok(d.id)}>
-        <td className="mono small" title={NS_DOK[dokNs(d)]}>={dokNs(d)}</td><td><b style={{ fontWeight: 500 }}>{d.tittel}</b>{d.leietakerId && lNavn(d.leietakerId) && <div className="small muted">{lNavn(d.leietakerId)}</div>}</td>
+        <td className="mono small" title={NS_DOK[dokNs(d)]}>={dokNs(d)}</td><td><b style={{ fontWeight: 500 }}>{d.tittel}</b>{d.laast ? ' 🔒' : ''}{d.leietakerId && lNavn(d.leietakerId) && <div className="small muted">{lNavn(d.leietakerId)}</div>}{(d.anleggId || (d.anleggIds || []).length > 0) && <div className="small muted">System: {[d.anleggId, ...(d.anleggIds || [])].filter((x, i, A) => x && A.indexOf(x) === i).map((x: string) => aNavn(x)).join(', ')}</div>}{d.arkiv && <div className="small" style={{ color: d.arkiv.minstTil && d.arkiv.minstTil < today() ? (d.arkiv.klasse === 'person' ? 'var(--red)' : 'var(--amber)') : 'var(--muted)' }}>{!d.arkiv.minstTil ? 'Oppbevares i byggets levetid' : d.arkiv.minstTil < today() ? (d.arkiv.klasse === 'person' ? `Inneholder personopplysninger – bør slettes (frist ${fd(d.arkiv.minstTil)})` : `Oppbevaringstiden er ute (${fd(d.arkiv.minstTil)}) – vurder sletting`) : `Oppbevares minst til ${fd(d.arkiv.minstTil)}`}</div>}</td>
         <td className="small">{d.type}</td>{showE && <td>{eNavn(d.eiendomId)}</td>}<td className="small">{fd(d.dato)}</td>
         <td>{d.gyldigTil ? (gd! < 0 ? <Chip c="red">Utløpt {fd(d.gyldigTil)}</Chip> : gd! <= 90 ? <Chip c="amber">{fd(d.gyldigTil)}</Chip> : <span className="small">{fd(d.gyldigTil)}</span>) : <span className="muted">–</span>}</td>
         <td className="small" onClick={stop}>{d.fil ? <FileLink fil={d.fil} /> : d.plassering || '–'}</td></tr>; })}
