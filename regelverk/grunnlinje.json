@@ -1,0 +1,619 @@
+{
+  "kontrollert": "2026-11-06T17:25:10.469Z",
+  "av": "kenhabbes-glitch",
+  "kilde": "Lovdata – gjeldende lover og sentrale forskrifter (NLOD 2.0)",
+  "datasett": {
+    "gjeldende-lover.tar.bz2": "2026-11-04T02:32:00Z",
+    "lovtidend-avd1-2001-2025.tar.bz2": "2026-11-03T02:31:00Z",
+    "gjeldende-sentrale-forskrifter.tar.bz2": "2026-11-06T02:31:00Z",
+    "lovtidend-avd1-2026.tar.bz2": "2026-11-06T02:30:00Z",
+    "lovtidend-avd2-2001-2025.tar.bz2": "2026-11-06T02:31:00Z",
+    "lovtidend-avd2-2026.tar.bz2": "2026-11-06T02:31:00Z"
+  },
+  "data": {
+    "pbl": {
+      "finnes": true,
+      "fil": "nl-20080627-071.xml",
+      "lenke": "https://lovdata.no/lov/2008-06-27-71",
+      "tittel": "Lov om planlegging og byggesaksbehandling (plan- og bygningsloven)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Plan- og bygningsloven – pbl",
+        "id": "kode"
+      },
+      "dokHash": "6a5bffd2ae8c9bcd",
+      "metode": "merking",
+      "par": {
+        "§ 19-2": {
+          "hash": "678d2a3555b99a9d",
+          "tekst": "§ 19-2 . Dispensasjonsvedtaket Kommunen kan gi varig eller midlertidig dispensasjon fra bestemmelser fastsatt i eller i medhold av denne lov. Det kan settes vilkår for dispensasjonen. Dispensasjon kan ikke gis dersom hensynene bak bestemmelsen det dispenseres fra, hensynene i lovens formålsbestemmelse eller nasjonale eller regionale interesser, blir vesentlig tilsidesatt. Fordelene ved å gi dispensasjon skal være klart større enn ulempene. Ved dispensasjon fra loven og forskriften til loven skal det legges særlig vekt på dispensasjonens konsekvenser for helse, miljø, jordvern, sikkerhet og tilgjengelighet. Departementet kan i forskrift gi regler for omfanget av dispensasjoner og fastsette tidsfrist for behandling av dispensasjonssaker, herunder fastsette tidsfrist for andre myndigheters uttalelse i dispensasjonssaker og gi regler om beregning av frister, adgang til fristforlengelse og konsekvenser av fristoverskridelse. Endret ved lover 8 mai 2009 nr. 27 , 20 juni 2014 nr. 52 (ikr. 1 juli 2015 iflg. res. 6 feb 2015 nr. 91 ), 28 apr 2017 nr. 20 (ikr. 1 juli 2017 iflg. res. 28 apr 2017 nr. 501 ), 18 juni 2021 nr. 130 (ikr. 1 juli 2021 iflg. res. 18 juni 2021 nr. 2008 ), 20 juni 2025 nr. 93 (i kraft 1 juli 2025 iflg. res. 20. juni 2025 nr. 1328 ). <span"
+        },
+        "§ 20-1": {
+          "hash": "854e9ca551dc14d9",
+          "tekst": "§ 20-1 . Tiltak som omfattes av byggesaksbestemmelsene 1 Følgende tiltak omfattes av byggesaksbestemmelsene i denne lov: oppføring, tilbygging, påbygging, underbygging eller plassering av bygning, konstruksjon eller anlegg vesentlig endring eller vesentlig reparasjon av tiltak som nevnt under bokstav a fasadeendring varig eller tidsbestemt bruksendring, vesentlig utvidelse eller vesentlig endring av tidligere drift av tiltak som nevnt under bokstav a riving av tiltak som nevnt i bokstav a oppføring, endring eller reparasjon av bygningstekniske installasjoner oppdeling eller sammenføyning av bruksenheter i boliger oppføring av innhegning mot veg plassering av skilt- og reklameinnretninger plassering av midlertidige bygninger, konstruksjoner eller anlegg vesentlig terrenginngrep anlegg av veg, parkeringsplass og landingsplass opprettelse av ny grunneiendom, ny anleggseiendom eller nytt jordsameie, eller opprettelse av ny festegrunn for bortfeste som kan gjelde i mer enn ti år, eller matrikkelomforming, arealoverføring, endring av festegrunn eller andre endringer av grenser for matrikkelenheter, jf. matrikkellova , unntatt endringer som bare omfatter eierseksjoner hovedombygging. Departementet kan gi forskrifter om hvilke tiltak som omfattes av bestemmelsen. Tilføyd ved lov 8 mai 2009 nr. 27 , endret ved lover 25 juni 2010 nr. 48 , 20 juni 2014 nr. 52 (ikr. 1 juli 2015 iflg. res. 6 feb 2015 nr. 91 ), 21 juni 2017 nr. 97 (ikr. 1 juli 2017 iflg. res. 21 juni 2017 nr. 834 ), 20 apr 2018 nr. 12 (i kraft 1 jan 2021 iflg. res. 29 april 2020 nr. 885 ), 11 mai 2021 nr. 37 (i kraft 1 jan 2023 iflg. res. 14 okt 2022 nr. 1738 ), 20 juni 2025 nr. 93 (i kraft 1 juli 2025 iflg. res. 20. juni 2025 nr. 1328 ). 1 I kraft 1. juli 2010, se § 34-3 . Iflg. res. 18 juni 2010 nr. 896 er installasjon av nytt ildsted frem til 1. juli 2011 unntatt fra krav om søknad og tillatelse, jf. første ledd bokstav f, dersom arbeidet kontrolleres av kvalifisert kontrollør. <span"
+        },
+        "§ 20-2": {
+          "hash": "360afb9495e8bf96",
+          "tekst": "§ 20-2 . Søknadsplikt Tiltak som nevnt i § 20-1 , kan ikke utføres uten at søknad på forhånd er sendt kommunen og den deretter har gitt tillatelse, med mindre unntak følger av §§ 20-5 , 20-6 , 20-7 eller 20-8 . Der det kreves dispensasjon, kan ikke tiltaket utføres før dette er søkt om og gitt. Tiltak etter § 20-1 inndeles i følgende kategorier: søknadspliktige tiltak med krav om ansvarlige foretak, jf. § 20-3 søknadspliktige tiltak som kan forestås av tiltakshaver, jf. § 20-4 tiltak som er unntatt fra søknadsplikt, jf. §§ 20-5 til 20-8 Reglene i kapittel 24 om kontroll gjelder uavhengig av søknadsplikt, med unntak av §§ 20-7 og 20-8 . Departementet kan gi forskrifter om søknadsplikt og tillatelse etter denne bestemmelsen. Tilføyd ved lov 8 mai 2009 nr. 27 , endret ved lov 20 juni 2014 nr. 52 (ikr. 1 juli 2015 iflg. res. 6 feb 2015 nr. 91 ). <span"
+        },
+        "§ 20-3": {
+          "hash": "330e91094d325169",
+          "tekst": "§ 20-3 . Søknadspliktige tiltak med krav om ansvarlige foretak Søknad, prosjektering og utførelse av tiltak som nevnt i § 20-1 , skal forestås av foretak med ansvarsrett etter kapittel 23 , med mindre unntak følger av §§ 20-4 til 20-8 . Departementet kan gi forskrifter om hvilke tiltak som omfattes av bestemmelsen. Tilføyd ved lov 8 mai 2009 nr. 27 , endret ved lover 25 juni 2010 nr. 48 , 20 juni 2014 nr. 52 (ikr. 1 juli 2015 iflg. res. 6 feb 2015 nr. 91 ). <span"
+        },
+        "§ 20-4": {
+          "hash": "bbcbb4ff406d8b81",
+          "tekst": "§ 20-4 . Søknadspliktige tiltak som kan forestås av tiltakshaver Følgende tiltak er unntatt fra reglene i § 20-3 : mindre tiltak på bebygd eiendom alminnelige driftsbygninger i landbruket midlertidige bygninger, konstruksjoner eller anlegg som nevnt i § 20-1 første ledd bokstav j og som ikke skal plasseres for lengre tidsrom enn 2 år opprettelse av ny grunneiendom og andre tiltak som nevnt i § 20-1 første ledd bokstav m andre mindre tiltak som etter kommunens skjønn kan forestås av tiltakshaver Departementet kan gi forskrift om hvilke tiltak som omfattes av bestemmelsen. Tilføyd ved lov 8 mai 2009 nr. 27 , endret ved lover 20 juni 2014 nr. 52 (ikr. 1 juli 2015 iflg. res. 6 feb 2015 nr. 91 ), 21 juni 2017 nr. 97 (ikr. 1 juli 2017 iflg. res. 21 juni 2017 nr. 834 ), 20 juni 2025 nr. 93 (i kraft 1 juli 2025 iflg. res. 20. juni 2025 nr. 1328 ). <span"
+        },
+        "§ 20-5": {
+          "hash": "62997fb035eb74c6",
+          "tekst": "§ 20-5 . Tiltak som er unntatt fra søknadsplikt For følgende tiltak som nevnt i § 20-1 , er søknad og tillatelse ikke nødvendig dersom disse er i samsvar med plan: mindre frittliggende bygning som oppføres på bebygd eiendom, og som ikke kan brukes til beboelse frittliggende bygning som er større enn bygninger som nevnt i bokstav a, som oppføres på bebygd eiendom, og som verken skal brukes til beboelse eller annet varig opphold, og som ikke underbygges med kjeller mindre frittliggende byggverk knyttet til drift av jordbruks-, skogbruks- og reindriftsområder mindre tiltak i eksisterende byggverk mindre tiltak utendørs fasadeendring som ikke fører til at bygningens karakter endres, samt tilbakeføring av fasade til tidligere dokumentert utførelse andre mindre tiltak som kommunen finner grunn til å frita fra søknadsplikten Departementet kan gi forskrift om hvilke tiltak som omfattes av bokstav a-e. Departementet kan gi forskrift om tiltakshavers rapportering til kommunen når tiltak etter denne bestemmelse er ferdigstilt. Søknad og tillatelse er heller ikke nødvendig for tiltak som nevnt i § 20-1 første ledd bokstav j når tiltaket ikke skal stå lengre enn to måneder. Søknad og tillatelse er heller ikke nødvendig for tiltak som nevnt i § 20-1 bokstav m når tiltaket skjer som ledd i jordskifte i samsvar med en rettslig bindende plan tiltaket skjer etter krav som nevnt i matrikkellova § 9 første ledd bokstav g eksisterende matrikkelenhet registrert som offentlig veg skal deles i forbindelse med at ansvaret for administrasjonen av offentlige veger skal endres mellom staten, et statlig utbyggingsselskap for veg, fylkeskommunen eller kommunen tiltaket behandles som en grensejustering eller sammenslåing etter matrikkellova . Departementet kan i forskrift unnta andre tiltak fra bestemmelsene i §§ 20-2 første ledd og 20-3 , herunder plassering av anleggsbrakker i mer enn 2 måneder i direkte tilknytning til bygge- eller anleggstomt hvor arbeid pågår. Tiltakshaver er ansvarlig for at tiltak som nevnt i første til tredje ledd, utføres i samsvar med de krav som ellers følger av bestemmelser gitt i eller i medhold av lov. Tiltak kan ikke settes i gang før det er gitt nødvendig tillatelse eller samtykke fra andre berørte myndigheter, jf. § 21-5 . Tilføyd ved lov 20 juni 2014 nr. 52 (ikr. 1 juli 2015 iflg. res. 6 feb 2015 nr. 91 ), endret ved lover 21 juni 2017 nr. 97 (ikr. 1 juli 2017 iflg. res. 21 juni 2017 nr. 834 ), 21 juni 2019 nr. 68 (ikr. 1 jan 2020 iflg. res. 21 juni 2019 nr. 869 ), 20 juni 2025 nr. 93 (i kraft 1 juli 2025 iflg. res. 20. juni 2025 nr. 1328 ). <span"
+        },
+        "§ 21-3": {
+          "hash": "6c2692c57de87310",
+          "tekst": "§ 21-3 . Nabovarsel Før søknad sendes inn, skal naboer og gjenboere varsles av søker hvis ikke disse skriftlig har meddelt at de ikke har merknader til søknaden. I varselet skal det gis melding om at mulige merknader må være kommet til søker innen en frist på minst 2 uker etter at varselet er sendt og grunnlagsmaterialet for søknaden er gjort tilgjengelig. Dersom grunneiers adresse ikke er kjent eller ikke finnes i matrikkelen, kan varsling unnlates. Varsel etter første ledd kan unnlates når arbeidet ikke, eller i liten grad, berører interessene til naboer og gjenboere. Kommunen kan likevel kreve varsling av naboer og gjenboere som ikke er varslet, dersom den finner at vilkårene for unnlatt varsling ikke er oppfylt. Kommunen kan også kreve at andre eiere eller festere enn de som er nevnt i første ledd, skal varsles. Ved riving skal søkeren også varsle dem som har pengeheftelser i eiendommen. Ved delt søknad skal det bare sendes nabovarsel for søknad om rammetillatelse og søknad om tiltak som nevnt i § 20-1 første ledd bokstav m som ikke er avklart i rammetillatelsen, eller endringssøknad om det samme. Det kreves ikke nabovarsel som nevnt i første ledd når tiltaket er i samsvar med reguleringsplan som er så detaljert at naboer og gjenboere kunne vurdere konsekvensene av tiltaket opp mot sine interesser ved planbehandlingen, og naboer og gjenboere ble varslet i samsvar med § 12-10 tredje ledd. Er det mer enn 5 år siden naboer og gjenboere fikk slikt varsel, gjelder ikke unntaket fra nabovarsling. Departementet kan gi forskrifter med nærmere bestemmelser om nabovarsling. Tilføyd ved lov 8 mai 2009 nr. 27 , endret ved lov 20 juni 2014 nr. 52 (ikr. 1 juli 2015 iflg. res. 6 feb 2015 nr. 91 ). <span"
+        },
+        "§ 29-9": {
+          "hash": "046a0230a5dd6368",
+          "tekst": "§ 29-9 . Heis, rulletrapp og rullende fortau. Sikkerhetskontroll Heis, rulletrapp og rullende fortau skal være slik utført, og driften av slikt anlegg så betryggende, at bruken av anlegget ikke kan medføre personskade. Kravene i § 29-3 første ledd gjelder tilsvarende. Kommunen kan føre sikkerhetskontroll med anlegg når dette er i drift. Sikkerhetskontroll kan også føres av departementet eller den det bemyndiger. Utgifter for gjennomføring av sikkerhetskontroll av anlegg i drift kan kreves dekket hos anleggseier. Avdekker sikkerhetskontroll feil eller mangler som kan medføre fare for skade på person, skal den som utfører sikkerhetskontrollen, straks sette anlegget ut av drift inntil kommunen kan treffe vedtak i saken. Eieren av anlegget er ansvarlig for at: anlegg som er i bruk er sikkerhetsmessig forsvarlig, det utføres vedlikehold, ettersyn, nødvendige reparasjoner og sikkerhetskontroll med anlegget, vedlikehold og ettersyn utføres av fagkyndig personell og at sikkerhetskontroll gjennomføres av kommunen eller organ med særskilt bemyndigelse av departementet og det for hvert enkelt anlegg foreligger dokumentasjon for oppfyllelse av krav gitt i eller i medhold av denne lov, herunder hvordan vedlikehold, ettersyn, nødvendig reparasjon og sikkerhetskontroll er planlagt og utført. Anlegg kan ikke settes i drift uten at det foreligger nødvendig tillatelse etter § 21-10 . Denne paragrafen gjelder tilsvarende for heis, rulletrapp og rullende fortau i eksisterende byggverk. Anlegg kan ikke holdes i drift uten at kravene i fjerde ledd er ivaretatt. Departementet kan ved forskrift gi nærmere bestemmelser bl.a. om sikkerhetskontroll og reparasjon av anlegg som er i drift, om kvalifikasjonskrav til kontrollpersonell og om anleggseierens plikter, og at de bestemmelser som gjelder for heis, rulletrapp og rullende fortau helt eller delvis også skal gjelde for andre permanente løfteinnretninger. Tilføyd ved lov 8 mai 2009 nr. 27 . <span"
+        }
+      }
+    },
+    "tek17": {
+      "finnes": true,
+      "fil": "sf-20170619-0840.xml",
+      "lenke": "https://lovdata.no/forskrift/2017-06-19-840",
+      "tittel": "Forskrift om tekniske krav til byggverk (Byggteknisk forskrift)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Byggteknisk forskrift (TEK17)",
+        "id": "kode"
+      },
+      "dokHash": "19e92062c41fe7b7",
+      "metode": "merking",
+      "par": {
+        "§ 4-1": {
+          "hash": "e7d729d3a721fca4",
+          "tekst": "§ 4-1 . Dokumentasjon for driftsfasen (1) Ansvarlig prosjekterende og ansvarlig utførende skal, innenfor sitt ansvarsområde, framlegge den nødvendige dokumentasjonen for ansvarlig søker. Dokumentasjonen skal gi grunnlag for hvordan igangsetting, forvaltning, drift og vedlikehold av byggverket, tekniske installasjoner og anlegg skal utføres på en tilfredsstillende måte. (2) I tilfeller der slik dokumentasjon åpenbart er overflødig, bortfaller kravet. <span"
+        },
+        "§ 9-6": {
+          "hash": "976c2fc64143c92b",
+          "tekst": "§ 9-6 . Avfallsplan (1) For følgende tiltak skal det utarbeides en avfallsplan som gjør rede for planlagt håndtering av byggavfallet fordelt på ulike avfallstyper og -mengder: oppføring, tilbygging, påbygging og underbygging av bygningen dersom tiltaket overskrider 300 m 2 BRA vesentlig endring, herunder fasadeendring, eller vesentlig reparasjon av bygningen dersom tiltaket omfatter mer enn 100 m 2 BRA av bygningen riving av bygning eller del av bygning som overskrider 100 m 2 BRA oppføring, tilbygging, påbygging, underbygging, endring eller riving av bygninger, konstruksjoner og anlegg dersom tiltaket genererer over 10 tonn bygg- og rivningsavfall. (2) Tiltak som omfatter flere bygninger, konstruksjoner eller anlegg skal vurderes under ett. Endret ved forskrift 29 mai 2022 nr. 945 (i kraft 1 juli 2022, se endringsforskriftens del II for overgangsregel som gjelder frem til 1. juli 2023). <span"
+        },
+        "§ 9-7": {
+          "hash": "fa1d6f918fe0f3d7",
+          "tekst": "§ 9-7 . Kartlegging av farlig avfall, bygningsfraksjoner som må fjernes og materialer som er egnet for ombruk. Krav til rapportering (1) For tiltak i eksisterende byggverk skal det foretas kartlegging av bygningsdeler, installasjoner og lignende som kan utgjøre farlig avfall etter avfallsforskriften . Det samme gjelder andre bygningsfraksjoner som avfallsforskriften stiller krav om å fjerne. (2) For tiltak nevnt i § 9-6 første ledd bokstav b til d skal det utarbeides en egen rapport fra miljøkartleggingen. (3) For søknadspliktige tiltak nevnt i § 9-6 første ledd bokstav b til d skal det for eksisterende boligblokk og yrkesbygning kartlegges om noen av bygningsfraksjonene som skal fjernes, er egnet for ombruk. Det skal utarbeides en egen rapport fra ombrukskartleggingen. (4) Rapporten fra miljøkartleggingen skal minst inneholde opplysninger om hvem kartleggingen er utført av dato for kartleggingen byggeår og tidligere bruk, hvis dette er kjent resultat av representative materialprøver og analyser forekomsten og mengden av farlig avfall og andre bygningsfraksjoner som må fjernes, fordelt på type plassering av farlig avfall og andre bygningsfraksjoner som må fjernes i byggverket, angitt med bilde eller tegning der det kan være tvil hvordan farlig avfall er identifisert gjennom merking, skilting eller andre tiltak hvordan det farlige avfallet og andre bygningsfraksjoner som må fjernes, er planlagt fjernet hvor det farlige avfallet er planlagt levert alle funn av farlig avfall og andre bygningsfraksjoner som må fjernes, sammenstilt i en tabell. (5) Rapporten fra ombrukskartleggingen skal minst inneholde opplysninger om hvem kartleggingen er utført av dato for kartleggingen navn på kommune, gnr. og bnr. byggeår og tidligere bruk, hvis dette er kjent forekomsten av, mengden av og typen materialer eller bygningsfraksjoner egnet for ombruk, samt vurdering av restlevetid opprinnelig byggevaredokumentasjon, hvis dette finnes alle identifiserte materialer eller bygningsfraksjoner egnet for ombruk sammenstilt i en tabell i henhold til Norsk Standard NS 3451:2022 Bygningsdelstabell og systemkodetabell for bygninger og tilhørende uteområder. Endret ved forskrifter 3 mars 2020 nr. 242 (i kraft 1 juli 2020), 29 mai 2022 nr. 945 (i kraft 1 juli 2022, se endringsforskriftens del II for overgangsregel som gjelder frem til 1. juli 2023). <span"
+        },
+        "§ 9-8": {
+          "hash": "e4f62e7945aeec3b",
+          "tekst": "§ 9-8 . Avfallssortering Minimum 70 vektprosent av avfallet som oppstår i tiltak etter § 9-6 første ledd skal sorteres i rene avfallstyper, og alt avfall skal leveres til godkjent avfallsmottak, ombruk eller direkte til gjenvinning. Endret ved forskrift 29 mai 2022 nr. 945 (i kraft 1 juli 2022, se endringsforskriftens del II for overgangsregel som gjelder frem til 1. juli 2023). <span"
+        },
+        "§ 9-9": {
+          "hash": "81e0dadefe48175b",
+          "tekst": "§ 9-9 . Sluttrapport for faktisk disponering av avfall For tiltak etter § 9-6 første ledd skal det utarbeides en sluttrapport som viser faktisk disponering av avfallet, fordelt på ulike avfallstyper og avfallsmengder. Levering til godkjent avfallsmottak, ombruk eller direkte til gjenvinning skal dokumenteres. Endret ved forskrift 29 mai 2022 nr. 945 (i kraft 1 juli 2022, se endringsforskriftens del II for overgangsregel som gjelder frem til 1. juli 2023). <span"
+        },
+        "§ 16-1": {
+          "hash": "7cffd2e645f06fb1",
+          "tekst": "§ 16-1 . Administrative bestemmelser (1) For heis, rulletrapp, rullende fortau, løfteplattform, løftebord og trappeheis gjelder, i tillegg til de krav som følger av plan- og bygningsloven § 29-9 , følgende: Løfteinnretning skal ikke tas i bruk etter ulykke, ombygging eller flytting før sikkerhetskontrollorgan har foretatt kontroll og kommunen har gitt driftstillatelse. Når feil på installasjon kan medføre fare for personsikkerhet, skal løfteinnretning settes ut av drift og forholdet meldes til kommune og eier. Eier skal umiddelbart melde ulykker og hendelser til kommunen og sikkerhetskontrollorgan. Sikkerhetskontrollorgan skal innrapportere ulykker og hendelser til Direktoratet for byggkvalitet. Utført reparasjonsarbeid skal føres i loggbok for hver løfteinnretning. Loggboken skal være tilgjengelig ved sikkerhetskontroll. Eier skal få utført sikkerhetskontroll minst hvert annet år når løfteinnretningen er i drift. Sikkerhetskontroll kan i tillegg foretas ved stikkprøver av løfteinnretning i drift. Ved skifte av eier og når installasjonen tas permanent ut av drift, skal eier melde dette til kommunen og nasjonalt installasjonsregister. (2) Kravene i første ledd gjelder ikke for: Løfteplattformer og løftebord som utelukkende brukes i arbeidssammenheng Løfteplattformer og løftebord som er beregnet for bil- eller varetransport, når innretningen betjenes av operatør på utsiden av innretningen og ikke er beregnet for at personer skal oppholde seg på innretningen under bruk og ikke er ment for bruk av allmennheten. Automatiske parkeringsanlegg uten persontransport. Med arbeidssammenheng i bokstav a menes at innretningen eksempelvis brukes som ledd i vareproduksjon, intern varetransport, oppføring, drift eller vedlikehold av byggverk, eller for atkomst til særlige arbeidsplasser. (3) For løfteplattform og trappeheis som er tildelt eller utlånt som hjelpemiddel fra Arbeids- og velferdsetaten, eller som er innenfor en boenhet, gjelder følgende: Eier av løfteinnretning er ansvarlig for at løfteinnretning som er i bruk, er sikkerhetsmessig forsvarlig og at det utføres vedlikehold og ettersyn med denne. Eier skal umiddelbart melde ulykker og hendelser til kommunen og til Direktoratet for byggkvalitet. Når feil på installasjonen kan medføre fare for personsikkerhet, skal løfteinnretningen settes ut av drift. Endret ved forskrift 12 juni 2026 nr. 1085 (i kraft 1 juli 2026). <span"
+        }
+      }
+    },
+    "sak10": {
+      "finnes": true,
+      "fil": "sf-20100326-0488.xml",
+      "lenke": "https://lovdata.no/forskrift/2010-03-26-488",
+      "tittel": "Forskrift om byggesak (byggesaksforskriften)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Byggesaksforskriften (SAK 10)",
+        "id": "kode"
+      },
+      "dokHash": "559c1fee3d8b5dc9",
+      "metode": "merking",
+      "par": {
+        "§ 3-1": {
+          "hash": "17abf3002710f3a0",
+          "tekst": "§ 3-1 . Mindre tiltak på bebygd eiendom Som mindre tiltak etter plan- og bygningsloven § 20-4 første ledd bokstav a regnes oppføring, endring, fjerning og riving mv. av følgende tiltak, og som er i samsvar med plan- og bygningsloven § 1-6 andre ledd: et enkelt tilbygg hvor verken samlet bruksareal (BRA) eller bebygd areal (BYA) er over 50 m 2 . Tilbygget kan i tillegg være underbygget med kjeller. En enkelt frittliggende bygning som ikke skal brukes til beboelse, og hvor verken samlet bruksareal (BRA) eller bebygd areal (BYA) er over 70 m 2 . Bygningen kan oppføres i inntil én etasje og kan i tillegg være underbygget med kjeller. Varig og tidsbestemt bruksendring fra tilleggsdel til hoveddel eller omvendt innenfor en bruksenhet Skilt- og reklameinnretning inntil 6,5 m 2 montert på vegg, eller med høyde inntil 3,5 m og bredde inntil 1,5 m montert frittstående på terreng. Bestemmelsen omfatter ikke plassering av slike skilt- og reklameinnretninger som kan utgjøre fare for personsikkerhet og ikke når flere skal monteres på samme sted eller på samme fasade. Frittliggende boligbygning inntil 30 m 2 BRA med én boenhet i én etasje uten kjeller som ikke på noe punkt overstiger en høyde på 4,5 m over bakken. Endret ved forskrifter 8 mars 2015 nr. 206 (i kraft 1 juli 2015), 30 nov 2015 nr. 1371 (i kraft 1 jan 2016), 24 juni 2017 nr. 975 (i kraft 1 juli 2017), 6 feb 2023 nr. 156 (i kraft 1 juli 2023). <span"
+        },
+        "§ 4-1": {
+          "hash": "07b7bd95618b1a59",
+          "tekst": "§ 4-1 . Tiltak som ikke krever søknad og tillatelse Oppføring, endring, fjerning, riving og opparbeidelse av følgende tiltak er unntatt fra kravet om byggesaksbehandling, dersom tiltaket ikke er i strid med lovens bestemmelser med tilhørende forskrifter, kommuneplanens arealdel og reguleringsplan, tillatelser eller annet regelverk: Frittliggende bygning på bebygd eiendom som ikke skal brukes til beboelse, og som verken har et samlet bruksareal (BRA) eller bebygd areal (BYA) på over 50 m 2 . Mønehøyden skal ikke være over 4,0 m og gesimshøyde ikke over 3,0 m. Høyde måles i forhold til ferdig planert terrengs gjennomsnittsnivå rundt bygningen. Bygningen kan oppføres i én etasje og kan ikke underbygges med kjeller. Tiltaket skal plasseres minst 1,0 m fra nabogrense og annen bygning på eiendommen. Bygningen må ikke plasseres over ledninger i grunnen. Tilbygg som verken har et samlet bruksareal (BRA) eller bebygd areal (BYA) på over 15 m 2 . Tilbygget må være understøttet. Tilbygget kan ikke overstige to etasjer eller plan på det eksisterende byggverket. Frittliggende byggverk som er knyttet til drift av jordbruks, skogbruks- eller reindriftsområder, og som verken har et samlet bruksareal (BRA) eller bebygd areal (BYA) på over 15 m 2 . Bygningen kan oppføres i én etasje og kan ikke underbygges med kjeller. Terrasser som har en høyde på inntil 1,0 m fra eksisterende terreng, er forbundet med en bygning, og ikke stikker lenger ut fra bygningens fasadeliv enn 4,0 m. Slike terrasser kan ha et tilhørende rekkverk på inntil 1,2 m, men kan ikke være overbygde. Avstanden til nabogrensen skal være minst 1,0 m. Følgende mindre tiltak i eksisterende byggverk: ikke-bærende vegg innenfor en branncelle eller et lydområde reparasjon av bygningstekniske installasjoner installering, endring og reparasjon av våtrom i eksisterende byggverk innenfor en bruksenhet eller branncelle installering og endring av enkle installasjoner i eksisterende byggverk innenfor en bruksenhet eller branncelle installering, endring og reparasjon av ildsted i eksisterende byggverk innenfor en bruksenhet eller branncelle. Følgende mindre tiltak utendørs: Levegg (skjermvegg) med høyde inntil 1,8 m og lengde inntil 10,0 m. Leveggen kan være frittstående eller forbundet med bygning, og avstand til nabogrense skal ikke være mindre enn 1,0 m levegg (skjermvegg) med høyde inntil 1,8 m og lengde inntil 5,0 m. Leveggen kan være frittstående eller forbundet med bygnings og kan plasseres inntil nabogrense innhegning mot veg inntil 1,5 m høyde skilt- og reklameinnretning inntil 3,0 m 2 som monteres flatt på vegg. Unntaket omfatter ikke montering av flere skilt- og reklameinnretninger på samme fasade småcellebasestasjoner med volum inntil 30 liter, jf. lov om elektronisk kommunikasjon § 1-5 nr. 32 . Antennesystem med høyde inntil 5,0 m. Parabolantenne kan ha diameter inntil 1,2 m. Panelantenne plassert på vegg kan ha høyde inntil 2,0 m. Bestemmelsen omfatter ikke plassering av antennesystem som kan utgjøre fare for personsikkerhet eller når flere antennesystemer skal plasseres på samme sted eller på samme fasade mindre forstøtningsmur på inntil 1,0 m høyde og avstand fra nabogrense på minst 1,0 m eller forstøtningsmur på inntil 1,5 m høyde og avstand fra nabogrense på minst 4,0 m mindre fylling eller planering av terreng. Tiltaket må uansett ikke føre til mer enn 3,0 m avvik fra opprinnelig terrengnivå i spredtbygd strøk, eller 1,5 m avvik fra opprinnelig terrengnivå i tettbygd strøk. På eiendom for rekke- eller kjedehus o.l. med tett bebyggelse må avviket ikke være mer enn 0,5 m fra opprinnelig terrengnivå. Avstand fra fyllingsfoten til nabogrense må være minst 1,0 m graving for kabler lokal drenering, samt reparasjoner ved rør- og ledningsbrudd intern veg på tomt og biloppstillingsplasser for tomtens bruk som ikke krever vesentlig terrenginngrep. Unntaket omfatter også anlegg av oppstillingsplass for landbruksmaskiner til bruk på landbrukseiendom. Avstand til nabogrense må være minst 1,0 m. Tiltakshaver har ansvar for at tiltaket utføres i samsvar med vilkårene i første ledd. Tiltak etter denne bestemmelsen kan ikke settes i gang før det er gitt nødvendig tillatelse eller samtykke fra berørte myndigheter. For tiltak unntatt etter første ledd bokstav a, b, c, d og f må plasseringen ikke komme i strid med veglovas bestemmelser om for eksempel avkjøring, frisiktsoner, avstand til veimidte, eller byggeforbudssonen etter jernbaneloven § 10 . For tiltak etter første ledd bokstav a, b og c skal tiltakshaver melde fra til kommunen om tiltaket og plasseringen senest innen fire uker etter at det er ferdigstilt, slik at kommunen kan oppdatere kart- og matrikkeldata. Meldingen skal inneholde følgende opplysninger: dato tiltaket ble ferdigstilt matrikkelnummer, jf. matrikkelloven § 3 første ledd bokstav c (kommune-, gårds- og bruksnummer, ev. festenummer og seksjonsnummer) kart over eiendommen som viser omriss av tiltaket med målte avstander til grenser og andre bygninger på eiendommen tiltakets areal i bruksareal (BRA), bebygd areal (BYA) og bruttoareal (BTA) pr. etasje bygningstype etter matrikkelen for frittstående bygg Hva rommet/rommene i tilbygget skal brukes til. Endret ved forskrifter 22 juni 2011 nr. 674 (i kraft 1 juli 2011), 3 nov 2011 nr. 1100 (i kraft 1 jan 2012), 25 juni 2013 nr. 788 , 8 mars 2015 nr. 206 (i kraft 1 juli 2015), 6 des 2016 nr. 1451 (i kraft 1 jan 2017), 9 feb 2021 nr. 410 (i kraft 1 mai 2021), 18 des 2024 nr. 3185 (i kraft 1 jan 2025). <span"
+        },
+        "§ 5-2": {
+          "hash": "15fd9877db323b6b",
+          "tekst": "§ 5-2 . Varsel til naboer og gjenboere Når nabo- eller gjenboereiendom er en festet tomt (matrikulert festeenhet), skal både eier og fester varsles. Varsel skal inneholde de opplysninger etter § 5-4 som skal gis ved søknad, i den grad det berører naboers eller gjenboeres interesser. Målsatt situasjonsplan, snitt- og fasadetegninger skal vedlegges varselet, med mindre det ikke er relevant. Når tiltaket medfører endret bruk, skal nabovarsel også inneholde opplysninger om tidligere bruk. Dersom tiltaket er avhengig av dispensasjon, skal det opplyses om hvilken bestemmelse det er behov for å dispensere fra. Hvis dispensasjonen berører interesser til naboer eller gjenboere, skal begrunnelsen for søknaden om dispensasjon vedlegges. Nabovarsel og kvittering for nabovarsel kan gis ved elektronisk kommunikasjon, personlig overlevering eller registrert postsending. Dersom søknad sendes kommunen senere enn ett år etter utsending av nabovarsel, og det ikke er gitt varsel etter plan- og bygningsloven § 12-10 tredje ledd, skal det sendes nytt nabovarsel til alle naboer og gjenboere. Tidsfristen på 5 år etter plan- og bygningsloven § 21-3 femte ledd om unntak fra nabovarsling gjelder fra naboer og gjenboere ble varslet etter plan- og bygningsloven § 12-10 . Det kreves ikke nabovarsel for innvendige fysiske arbeider i eksisterende byggverk. Det samme gjelder ved riving av gjenstående deler av eksisterende byggverk som er ødelagt av brann, naturskade, ulykke eller lignende akutt hendelse, eller der kommunen har gitt pålegg etter plan- og bygningsloven § 31-5 og pålegget ikke omfatter tillatelse til riving. Endret ved forskrifter 9 des 2011 nr. 1324 (i kraft 1 jan 2012), 8 mars 2015 nr. 206 (i kraft 1 juli 2015), 24 juni 2017 nr. 975 (i kraft 1 juli 2017). <span"
+        }
+      }
+    },
+    "bhf": {
+      "finnes": true,
+      "fil": "sf-20090803-1028.xml",
+      "lenke": "https://lovdata.no/forskrift/2009-08-03-1028",
+      "tittel": "Forskrift om sikkerhet, helse og arbeidsmiljø på bygge- eller anleggsplasser (byggherreforskriften)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Byggherreforskriften",
+        "id": "kode"
+      },
+      "dokHash": "e11618bb482722d8",
+      "metode": "merking",
+      "par": {
+        "§ 3": {
+          "hash": "cd747bdc56ecd1bf",
+          "tekst": "§ 3 . Hvem forskriften retter seg mot Byggherren, koordinatoren, den prosjekterende, arbeidsgiveren og enmannsbedriften skal sørge for at bestemmelsene i denne forskriften blir gjennomført. Det samme gjelder for byggherrens representant. Dersom byggherren er forbruker, jf. § 4 bokstav d, gjelder kun § 10 om forhåndsmelding. <span"
+        },
+        "§ 4": {
+          "hash": "fb205a1e75aa7fc0",
+          "tekst": "§ 4 . Definisjoner I forskriften menes med bygge- eller anleggsarbeid oppføring av bygninger innrednings-, utsmykkings- og installasjonsarbeid montering og demontering av prefabrikkerte elementer riving, demontering, ombygging og istandsetting sanering og vedlikeholdsarbeid, utenom arbeid som er rutinemessig eller mindre omfattende alminnelig anleggsvirksomhet graving, sprengning og annet grunnarbeid annet arbeid som utføres i tilknytning til bygge- eller anleggsarbeid. byggherre: enhver fysisk eller juridisk person som får utført et bygge- eller anleggsarbeid. byggherrens representant: enhver fysisk eller juridisk person som skal utføre konkrete plikter etter denne forskriften på byggherrens vegne, i henhold til skriftlig avtale med byggherren. forbruker: en fysisk person som ikke hovedsakelig handler som ledd i næringsvirksomhet. koordinator: enhver fysisk eller juridisk person som sørger for koordinering av prosjektering eller utførelse på vegne av byggherren. prosjekterende: enhver fysisk eller juridisk person som har til oppdrag å tegne, beregne, planlegge eller beskrive hele eller deler av bygget eller anlegget som skal oppføres. enmannsbedrift: virksomhet som ikke sysselsetter arbeidstakere. Endret ved forskrift 11 sep 2020 nr. 1755 (i kraft 1 jan 2021). Kapittel 2. Byggherrens plikter <span"
+        },
+        "§ 5": {
+          "hash": "c0c726303a783555",
+          "tekst": "§ 5 . Generelle plikter Byggherren skal gjennom hele prosessen sørge for at hensynet til sikkerhet, helse og arbeidsmiljø på bygge- eller anleggsplassen blir ivaretatt sikre at pliktene som er pålagt de prosjekterende, arbeidsgiverne og enmannsbedriftene i denne forskriften blir gjennomført sørge for og legge til rette for nødvendig dialog og samhandling mellom prosjekterende, arbeidsgivere og enmannsbedrifter for å sikre at hensynet til arbeidstakernes sikkerhet, helse og arbeidsmiljø blir ivaretatt ved prosjektering og utførelse av bygge- eller anleggsarbeider. Byggherren skal under planleggingen og prosjekteringen ivareta sikkerhet, helse og arbeidsmiljø ved de arkitektoniske, tekniske eller organisasjonsmessige valg som foretas kartlegge risikoforhold som har betydning for arbeidene som skal utføres vurdere risikoen som er kartlagt etter bokstav b og utarbeide planer med tiltak for å fjerne eller redusere risikoen dokumentere kartleggingen, risikovurderingen og planene etter bokstav b og c sørge for at det avsettes tilstrekkelig tid til prosjektering og utførelse av de forskjellige arbeidsoperasjoner dokumentere vurderingene som ligger til grunn for den tid som avsettes etter bokstav e. Byggherren skal under utførelsen av arbeidene ivareta hensynet til sikkerhet, helse og arbeidsmiljø ved koordinering og oppfølging av virksomhetenes arbeid på bygge- eller anleggsplassen. Endret ved forskrift 11 sep 2020 nr. 1755 (i kraft 1 jan 2021). <span"
+        },
+        "§ 6": {
+          "hash": "0fdddf9c8c8f3b04",
+          "tekst": "§ 6 . Risikoforhold mv. som skal inngå i tilbudsgrunnlaget Byggherren skal innarbeide i tilbudsgrunnlaget: de risikoforholdene som er avdekket under planlegging og prosjektering og som ikke er fjernet, jf. § 5 andre ledd bokstav b planer med tiltak som følger av kartleggingen og risikovurderingen etter § 5 andre ledd bokstav c. Endret ved forskrift 11 sep 2020 nr. 1755 (i kraft 1 jan 2021). <span"
+        },
+        "§ 7": {
+          "hash": "19940361c6c90c67",
+          "tekst": "§ 7 . Plan for sikkerhet, helse og arbeidsmiljø Byggherren skal før oppstart av arbeidet på bygge- eller anleggsplassen sørge for at det utarbeides en skriftlig plan for sikkerhet, helse og arbeidsmiljø. Byggherren skal sørge for at planen er lett tilgjengelig på bygge- eller anleggsplassen og at den oppdateres fortløpende dersom det oppstår endringer som har betydning for sikkerhet, helse og arbeidsmiljø. Byggherren skal sørge for at arbeidsgivere og enmannsbedrifter: gjøres kjent med planen får informasjon når det skjer endringer i planen under prosjektets framdrift som kan ha betydning for arbeidstakernes sikkerhet, helse og arbeidsmiljø. Byggherren skal oppbevare planen i seks måneder etter at bygge- eller anleggsarbeidet er avsluttet. Endret ved forskrift 11 sep 2020 nr. 1755 (i kraft 1 jan 2021). <span"
+        },
+        "§ 8": {
+          "hash": "78376f6078a681a4",
+          "tekst": "§ 8 . Krav til planen for sikkerhet, helse og arbeidsmiljø Planen for sikkerhet, helse og arbeidsmiljø skal beskrive hvordan risikoforholdene som følger av byggherrens og de prosjekterendes valg, skal håndteres. Planen skal bygge på risikovurderinger, tilpasses det aktuelle bygge- eller anleggsarbeidet og inneholde et organisasjonskart som beskriver rollefordelingen og entrepriseformen en fremdriftsplan som beskriver når og hvor de ulike arbeidsoperasjoner skal utføres, hvor det tas hensyn til koordinering av de forskjellige arbeidsoperasjonene en beskrivelse av de spesifikke tiltakene som er nødvendige for å redusere fare for liv og helse forbundet med blant annet: arbeid nær installasjoner i grunnen arbeid nær høyspentledninger og elektriske installasjoner arbeid på steder med passerende trafikk arbeid hvor arbeidstakere kan bli utsatt for ras eller synke i gjørme arbeid som innebærer bruk av sprengstoff arbeid i sjakter, underjordisk masseforflytning og arbeid i tunneler arbeid som innebærer fare for drukning arbeid i senkekasser der luften er komprimert arbeid som innebærer bruk av dykkerutstyr arbeid som innebærer at personer kan bli skadet ved fall eller av fallende gjenstander arbeid som innebærer riving av bærende konstruksjoner arbeid med montering og demontering av tunge elementer arbeid som innebærer fare for helseskadelig eksponering for støv, gass, støy eller vibrasjoner arbeid som utsetter personer for kjemiske eller biologiske stoffer som kan medføre en belastning for sikkerhet, helse og arbeidsmiljø eller som innebærer et lov- eller forskriftsfestet krav til helsekontroll arbeid med ioniserende stråling som krever at det utpekes kontrollerte eller overvåkede soner arbeid som innebærer brann- og eksplosjonsfare arbeid som innebærer fare for helseskadelig ergonomiske belastninger. en rutine for behandling av endringer og oppdatering av planen. Endret ved forskrift 11 sep 2020 nr. 1755 (i kraft 1 jan 2021). <span"
+        },
+        "§ 9": {
+          "hash": "597fb4018271a870",
+          "tekst": "§ 9 . Forebyggende tiltak Byggherren skal i forbindelse med arbeidet på den enkelte bygge- eller anleggsplassen særlig stille krav om at det treffes nødvendige tiltak for å sikre at uvedkommende ikke får atkomst til bygge- eller anleggsplassen at det tas hensyn til andre virksomheter på eller i nærheten av bygge- eller anleggsplassen god orden og fullt forsvarlige hygieniske forhold sikker atkomst til arbeidsplassene og sikre ferdselsveier avmerking og tilrettelegging av områder for lagring og oppbevaring av forskjellige materialer, særlig når det dreier seg om farlige materialer eller stoffer vedlikehold, kontroll før igangsettelse og kontroll av anlegg og utstyr, for å kunne rette opp feil som kan påvirke arbeidstakernes sikkerhet, helse og arbeidsmiljø lagring, håndtering og fjerning av avfall og farlige materialer forsvarlige arbeidstidsordninger tilfredsstillende personalrom forsvarlig innkvartering. <span"
+        },
+        "§ 10": {
+          "hash": "dff2561cd857c78f",
+          "tekst": "§ 10 . Forhåndsmelding Byggherren skal sørge for at det senest en uke før arbeidet igangsettes sendes en forhåndsmelding på fastsatt elektronisk skjema til Arbeidstilsynet om bygge- eller anleggsarbeidet, dersom arbeidet vil vare utover 15 virkedager eller den forventede arbeidsmengde overstiger 250 dagsverk. Dersom byggherren er forbruker skal forhåndsmeldingen sendes inn av den virksomheten som påtar seg å utføre bygge- eller anleggsarbeidet. Byggherren skal sørge for at forhåndsmeldingen er oppdatert. Oppdatert forhåndsmelding skal settes opp synlig på bygge- eller anleggsplassen. Forhåndsmeldingen skal inneholde følgende opplysninger: dato for oversendelsen bygge- eller anleggsplassens nøyaktige adresse prosjektets art byggherrens navn, organisasjonsnummer, adresse og telefonnummer byggherrens representant sitt navn, organisasjonsnummer, adresse og telefonnummer koordinatorenes navn, organisasjonsnummer, adresse og telefonnummer angivelse av prosjekterende virksomheter og deres organisasjonsnummer angivelse av utførende virksomheter og deres organisasjonsnummer forventet dato for arbeidsstart på bygge- eller anleggsplassen forventet varighet av arbeidet på bygge- eller anleggsplassen forventet største antall arbeidstakere samtidig på bygge- eller anleggsplassen planlagt antall virksomheter. Dersom aktørene som nevnt i fjerde ledd bokstav d til g er en juridisk person, skal det oppgis navn og telefonnummer til en kontaktperson. Endret ved forskrift 11 sep 2020 nr. 1755 (i kraft 1 jan 2021). <span"
+        },
+        "§ 12": {
+          "hash": "47a60f1d9e482d98",
+          "tekst": "§ 12 . Dokumentasjon for fremtidige arbeider Byggherren skal sørge for at det utarbeides dokumentasjon for bygningen eller anlegget om de forhold som kan ha betydning for sikkerhet, helse og arbeidsmiljø ved fremtidige arbeider. Dokumentasjonen skal beskrive bygget eller anleggets konstruksjon og utforming, samt de byggeprodukter som er brukt. Beskrivelsen skal være i det omfang som er nødvendig for å ivareta sikkerhet, helse og arbeidsmiljø ved drift, vedlikehold, endring og riving. Byggherren skal sørge for at dokumentasjonen overleveres til eieren av bygget eller anlegget etter ferdigstillelse eller etter at brukstillatelse er gitt. Endret ved forskrift 11 sep 2020 nr. 1755 (i kraft 1 jan 2021). <span"
+        },
+        "§ 13": {
+          "hash": "fc7687ee58ed78bb",
+          "tekst": "§ 13 . Utpeking og oppfølging av koordinator Arbeidet med sikkerhet, helse og arbeidsmiljø skal koordineres dersom det er flere prosjekterende eller dersom det er flere utførende virksomheter på bygge- eller anleggsplassen samtidig eller etter hverandre. Byggherren kan selv ha rollen som koordinator eller velge å utpeke en ekstern koordinator. Byggherren kan utpeke en koordinator for hele prosjektet, eller en for planleggings- og prosjekteringsfasen og en for utførelsesfasen, som på byggherrens vegne utfører koordineringen etter § 14 . Utpeking av koordinator fritar ikke byggherren for sitt ansvar på området. Koordinatoren skal ikke ha andre plikter eller oppgaver som kan komme i konflikt med rollen som koordinator. Byggherren skal før valg av koordinator vurdere om slik konflikt kan oppstå. Vurderingen skal dokumenteres. Byggherren skal gjennom en skriftlig avtale klargjøre hvilke plikter og fullmakter som koordinatoren skal ha. I tilfeller der byggherren selv har rollen som koordinator, skal det foreligge en tilsvarende skriftlig beskrivelse. Byggherren skal jevnlig følge opp at koordinatoren oppfyller sine plikter. Byggherren skal dokumentere oppfølgingen. Koordinatoren skal ha den nødvendige kunnskap om sikkerhet, helse og arbeidsmiljø, inkludert arbeidsmiljølovgivningen og inneha nødvendig kompetanse for å følge opp aktuelle risikoforhold i prosjektet. Endret ved forskrift 11 sep 2020 nr. 1755 (i kraft 1 jan 2021). <span"
+        },
+        "§ 14": {
+          "hash": "7870431a7d7e7c7e",
+          "tekst": "§ 14 . Koordinering og oppfølging av arbeidet med sikkerhet, helse og arbeidsmiljø Koordineringen og oppfølgingen skal ivareta hensynet til sikkerhet, helse og arbeidsmiljø på bygge- eller anleggsplassen. Koordineringen og oppfølgingen skal sørge for å legge til rette for dialog og samhandling mellom involverte aktører. Koordineringen og oppfølgingen i prosjekteringsfasen omfatter å sørge for informasjonsdeling mellom de enkelte prosjekterende slik at risiko håndteres helhetlig påse at resultater av kartlegging og risikovurdering med tiltak innarbeides i tilbudsgrunnlag til utførende virksomheter sørge for utarbeidelse av planen for sikkerhet, helse og arbeidsmiljø. Koordineringen og oppfølgingen i utførelsesfasen omfatter å følge opp de risikoforhold som fremgår av byggherrens plan for sikkerhet, helse og arbeidsmiljø følge opp at virksomhetene gjennomfører planen for sikkerhet, helse og arbeidsmiljø følge opp at det utarbeides tidsplaner som sikrer at det avsettes tilstrekkelig tid til utførelse av de forskjellige arbeidsoperasjoner sørge for at de enkelte virksomheters arbeid som kan påvirke hverandre med hensyn til sikkerhet, helse og arbeidsmiljø, blir koordinert følge opp at kravene etter § 9 gjennomføres sørge for at det føres oversiktslister etter § 15 . Endret ved forskrifter 11 sep 2020 nr. 1755 (i kraft 1 jan 2021), 15 des 2021 nr. 3600 (i kraft 1 jan 2022). <span"
+        },
+        "§ 15": {
+          "hash": "e28ac7246d32c6f3",
+          "tekst": "§ 15 . Oversiktsliste Byggherren skal som ledd i arbeidet med sikkerhet, helse og arbeidsmiljø føre en oversiktsliste over alle som skal utføre arbeid på bygge- eller anleggsplassen. Oversiktslisten skal føres elektronisk, kontrolleres og oppdateres daglig. Oversiktslisten skal inneholde følgende opplysninger: navn og adresse på bygge- eller anleggsplassen navn på byggherren navn på arbeidsgivere eller enmannsbedrifter eller for innleide arbeidstakere navnet på innleievirksomheten organisasjonsnummer for registreringspliktige virksomheter navn, fødselsdato, arbeidsgiver og HMS-kortnummer på alle som skal utføre arbeid på bygge- eller anleggsplassen. Oversiktslisten skal være tilgjengelig og skal på oppfordring vises til arbeidsgiveren, verneombudet, Arbeidstilsynet og skattemyndighetene. Oversiktslister skal oppbevares i seks måneder etter at bygge- eller anleggsarbeidet er avsluttet. Endret ved forskrifter 3 juni 2016 nr. 568 som endret ved forskrifter 29 juni 2016 nr. 835 og 5 mai 2017 nr. 545 (i kraft 1 juli 2017), 11 sep 2020 nr. 1755 (i kraft 1 jan 2021). <span"
+        }
+      }
+    },
+    "fob": {
+      "finnes": true,
+      "fil": "sf-20151217-1710.xml",
+      "lenke": "https://lovdata.no/forskrift/2015-12-17-1710",
+      "tittel": "Forskrift om brannforebygging",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Forskrift om brannforebygging",
+        "id": "kode"
+      },
+      "dokHash": "025df22ec95069a5",
+      "metode": "merking",
+      "par": {
+        "§ 4": {
+          "hash": "9ee23b58760d2c4e",
+          "tekst": "§ 4 . Kunnskap og informasjon om brannsikkerhet i byggverk Eieren av et byggverk skal kjenne kravene til brannsikkerhet som gjelder for byggverket. Eieren skal ha kunnskap om bygningsdeler, installasjoner og utstyr i byggverket som skal oppdage brann eller begrense konsekvensene av brann. Eieren skal gjøre den som har rett til å bruke byggverket kjent med kravene som gjelder for bruken av byggverket, og med alle egenskapene ved byggverket som har betydning for brannsikkerheten. Er det flere som har rett til å bruke byggverket, skal eieren sikre at all bruk samordnes på en måte som bidrar til å forebygge brann. <span"
+        },
+        "§ 5": {
+          "hash": "593297d2486bf6b3",
+          "tekst": "§ 5 . Kontroll og vedlikehold av bygningsdeler og sikkerhetsinnretninger Eieren av et byggverk skal sørge for at bygningsdeler, installasjoner og utstyr i byggverket som skal oppdage brann eller begrense konsekvensene av brann, blir kontrollert og vedlikeholdt slik at de fungerer som forutsatt. Kontrollen skal avklare om sikkerhetsinnretningene: oppfyller kravene til brannsikkerhet som gjelder for byggverket fungerer hver for seg og sammen med hverandre. Kontrollens omfang og hyppighet skal være tilpasset sikkerhetsinnretningene og byggverkets størrelse, kompleksitet, bruk og risiko. <span"
+        },
+        "§ 6": {
+          "hash": "69a79f3d0416dffa",
+          "tekst": "§ 6 . Kontroll og vedlikehold av fyringsanlegg Eieren av et byggverk skal melde fra til kommunen når det er installert nytt ildsted eller gjort andre vesentlige endringer av fyringsanlegget. Eieren skal sørge for at fyringsanlegget virker som forutsatt. Dersom det blir oppdaget feil på anlegget som vesentlig øker risikoen for brann, skal anlegget stenges for bruk dersom feilen ikke utbedres umiddelbart. Etter å ha mottatt et varsel om feiing eller tilsyn, skal eieren sørge for at feieren har tilfredsstillende atkomst til hele fyringsanlegget. <span"
+        },
+        "§ 7": {
+          "hash": "26ec0ea8afee6819",
+          "tekst": "§ 7 . Brannvarsling og manuelt slokkeutstyr i bolig og fritidsbolig Eieren av boliger og fritidsboliger skal sørge for at byggverkene har brannalarmanlegg eller et tilstrekkelig antall røykvarslere. Det skal være minst én detektor eller røykvarsler i hver etasje, som skal dekke kjøkken, stue, sone utenfor soverom og sone utenfor tekniske rom. Alarmen skal kunne høres tydelig på oppholdsrom og soverom når dørene mellom rommene er lukket. Eieren skal sørge for at boliger og fritidsboliger er utstyrt med minst ett av følgende slokkeutstyr som kan brukes i alle rom: formfast brannslange med innvendig diameter på minst 10 mm fast tilkoblet vannforsyningsnett pulverapparat på minst 6 kg med ABC-pulver skum- eller vannapparat på minst 9 liter skum- eller vannapparat på minst 6 liter med effektivitetsklasse på minst 21A annet manuelt slokkeutstyr med tilsvarende slokkekapasitet. Eieren skal sørge for at røykvarslere og manuelt slokkeutstyr i boliger og fritidsboliger blir kontrollert ved funksjonsprøve eller ettersyn i samsvar med leverandørens anvisninger, og at de vedlikeholdes slik at de fungerer som forutsatt. <span"
+        },
+        "§ 8": {
+          "hash": "4704770a36e73aff",
+          "tekst": "§ 8 . Oppgradering av byggverk Eieren av et byggverk skal sørge for å oppgradere sikkerhetsnivået i byggverket slik at det minst tilsvarer nivået som fremkommer av de samlede kravene gitt i byggeforskrift 15. november 1984 nr. 1892 eller senere byggeregler. Oppgraderingen kan skje ved bygningstekniske tiltak, andre risikoreduserende tiltak eller ved en kombinasjon av slike. Oppgraderingsplikten gjelder så langt den kan gjennomføres innenfor en praktisk og økonomisk forsvarlig ramme. <span"
+        },
+        "§ 12": {
+          "hash": "bf62a678a2546d60",
+          "tekst": "§ 12 . Brukerens systematiske sikkerhetsarbeid En virksomhet som har rett til å bruke et byggverk skal fastsette mål og iverksette planer og tiltak for å redusere risikoen for brann i byggverket. Virksomheten skal iverksette: rutiner som sikrer at byggverket brukes i samsvar med kravene til brannsikkerhet som gjelder for byggverket rutiner for evakuering og redning ved brann i byggverket rutiner som sikrer at personer med arbeidsplass i byggverket har tilstrekkelige kunnskaper og ferdigheter i å forebygge og bekjempe brann rutiner som sikrer at alle som oppholder seg i byggverket får tilstrekkelig informasjon om hvordan de skal unngå brann og opptre ved brann rutiner for å avdekke, rette opp og forebygge mangler ved det systematiske sikkerhetsarbeidet. Det systematiske sikkerhetsarbeidet skal være tilpasset risikoen for brann som følge av virksomhetens bruk av byggverket. <span"
+        },
+        "§ 13": {
+          "hash": "ff71f8c6ec043274",
+          "tekst": "§ 13 . Brukerens dokumentasjon En virksomhet som har rett til å bruke et byggverk skal dokumentere at virksomhetens plikter etter § 11 og § 12 er oppfylt. Kapittel 4. Kommunens forebyggende plikter <span"
+        },
+        "§ 14": {
+          "hash": "397daee368ef2a8a",
+          "tekst": "§ 14 . Kartlegging av risikoen for brann Kommunen skal kartlegge sannsynligheten for brann og konsekvensene brann kan få for liv, helse, miljø og materielle verdier i kommunen. Kommunen skal herunder kartlegge utsatte grupper i kommunen som har en særlig risiko for å omkomme i eller bli skadet av brann, og brannobjekter der brann kan føre til tap av mange menneskeliv. <span"
+        },
+        "§ 15": {
+          "hash": "82a1769bc398ffa7",
+          "tekst": "§ 15 . Planlegging av det forebyggende arbeidet Kommunen skal fastsette satsingsområder og planlegge samarbeid og tiltak for å redusere den kartlagte risikoen for brann på en effektiv måte. Satsningsområdene og tiltakene skal prioriteres og begrunnes. <span"
+        },
+        "§ 16": {
+          "hash": "ff5d1facb211309a",
+          "tekst": "§ 16 . Gjennomføring av det forebyggende arbeidet Kommunen skal gjennomføre tiltak i samsvar med planen for det forebyggende arbeidet, og på bakgrunn av hendelser, bekymringsmeldinger og lignende som gir ny kunnskap om risikoen for brann. <span"
+        },
+        "§ 17": {
+          "hash": "5dfcb4a837e8ce8e",
+          "tekst": "§ 17 . Feiing og tilsyn med fyringsanlegg Kommunen skal sørge for at røykkanaler i fyringsanlegg som brukes til oppvarming av byggverk, blir feiet ved behov. Feiingen skal utføres på en faglig tilfredsstillende måte som medfører minst mulig ulempe for eiere og brukere. Etter feiingen skal feieren sørge for at all sot blir fjernet og brakt til egnet sted. Kommunen skal sørge for at det ved behov blir ført tilsyn med fyringsanlegg som brukes til oppvarming av byggverk. Kommunen skal sørge for at det blir ført tilsyn med fyringsanlegget etter brann eller eksplosjon i eller i tilknytning til fyringsanlegget. <span"
+        }
+      }
+    },
+    "brannlov": {
+      "finnes": true,
+      "fil": "nl-20020614-020.xml",
+      "lenke": "https://lovdata.no/lov/2002-06-14-20",
+      "tittel": "Lov om vern mot brann, eksplosjon og ulykker med farlig stoff og om brannvesenets redningsoppgaver (brann- og eksplosjonsvernloven)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Brann- og eksplosjonsvernloven",
+        "id": "kode"
+      },
+      "dokHash": "6f1aea6739cd1dfb",
+      "metode": "merking",
+      "par": {
+        "§ 6": {
+          "hash": "db97de9171adda6f",
+          "tekst": "§ 6 . Forebyggende sikringstiltak og vedlikehold Eier av byggverk, område, transportmiddel, produksjonsutstyr, annen innretning eller produkt plikter å sørge for nødvendige sikringstiltak for å forebygge og begrense brann, eksplosjon eller annen ulykke. Eier og bruker av byggverk, område, transportmiddel, produksjonsutstyr, annen innretning eller produkt plikter å holde bygningstekniske konstruksjoner, sikkerhetsinnretninger og øvrige sikringstiltak til vern mot brann, eksplosjon eller annen ulykke i forsvarlig stand og påse at disse til enhver tid virker etter sin hensikt. Eier eller bruker skal etter en eventuell brann, eksplosjon eller annen ulykke sørge for vakthold og andre nødvendige sikringstiltak når leder av brannvesenet krever dette. Departementet kan gi forskrifter om eiers og brukers plikter til rapportering, sikringstiltak, vedlikehold og vakthold etter denne bestemmelsen. <span"
+        },
+        "§ 13": {
+          "hash": "b71e6912f89ebf76",
+          "tekst": "§ 13 . Særskilte brannobjekter Kommunen skal identifisere og føre fortegnelse over byggverk, opplag, områder, tunneler, virksomheter m.m. hvor brann kan medføre tap av mange liv eller store skader på helse, miljø eller materielle verdier. Kommunen skal sørge for at det føres tilsyn i byggverk m.m. som nevnt i første ledd for å påse at disse er tilstrekkelig sikret mot brann. Tilsynet skal omfatte alle forhold av betydning for brannsikkerheten, herunder bygningsmessige, tekniske, utstyrsmessige og organisatoriske brannsikringstiltak og forhold av betydning for gjennomføring av brannbekjempelse og øvrig redningsinnsats. Kommunen skal overfor sentral tilsynsmyndighet kunne dokumentere hvordan tilsyn med byggverk m.m. som nevnt i første ledd, som kommunen eier eller bruker, er gjennomført, og hvordan eventuelle pålegg er fulgt opp. Kommunen kan ved enkeltvedtak bestemme at det skal føres tilsyn med andre byggverk m.m. enn de som er omfattet av første ledd. Kommunestyret selv kan fastsette lokal forskrift om tilsyn med andre byggverk m.m. enn de som er omfattet av første ledd. Departementet kan gi forskrifter om tilsyn med særskilte brannobjekter. Endret ved lov 29 mai 2015 nr. 36 (ikr. 29 mai 2015 iflg. res. 29 mai 2015 nr. 553 ). <span"
+        },
+        "§ 19": {
+          "hash": "1fb4754bec330563",
+          "tekst": "§ 19 . Sikkerhet i virksomhet Virksomheter skal sørge for at sikkerheten i forhold til brann, eksplosjon, håndtering av farlig stoff og transport av farlig gods på veg og jernbane blir ivaretatt på en forsvarlig måte. Sikkerhetshensyn skal være integrert i alle virksomhetens faser, herunder planlegging, prosjektering, etablering, drift og avvikling. Virksomheter skal gjøre arbeidstakere og andre som utfører oppgaver i eller på vegne av virksomheten kjent med plikten i henhold til § 25 i denne loven. Virksomheten skal gi opplæring slik at alle arbeidsoppgaver kan gjennomføres på en sikker måte både ved normal drift og ved unormale situasjoner og driftsbetingelser. Opplæringen skal også omfatte rutiner og forholdsregler ved ulykker. Plikten til å sørge for at sikkerheten i virksomheten blir ivaretatt ligger hos ledelsen. Endret ved lov 19 juni 2009 nr. 84 . <span"
+        },
+        "§ 20": {
+          "hash": "9ff080f2b24ff84f",
+          "tekst": "§ 20 . Sikkerhetsnivå i virksomhet med farlig stoff m.m. Virksomheter har plikt til å sørge for at enhver håndtering av farlig stoff og farlig gods skjer på en slik måte at mennesker, miljø og omgivelser er tilfredsstillende sikret. Risikoen skal være redusert til et nivå som med rimelighet kan oppnås. Sikkerhetsnivået etter første ledd skal etableres gjennom tekniske og organisatoriske tiltak i virksomheten, eventuelt i kombinasjon med arealmessige begrensninger i området rundt denne, og dokumenteres overfor sentral tilsynsmyndighet. Arealmessige begrensninger fastsettes etter bestemmelsene i plan- og bygningsloven . Uttalelse fra sentral tilsynsmyndighet skal innhentes før arealmessige begrensninger fastsettes. Kostnader forbundet med etablering av arealmessige begrensninger, herunder eventuelle kostnader ved ekspropriasjon, bæres av virksomheten. Departementet kan fastsette forskrifter om nivåer og kriterier for akseptabel risiko. <span"
+        }
+      }
+    },
+    "ikf": {
+      "finnes": true,
+      "fil": "sf-19961206-1127.xml",
+      "lenke": "https://lovdata.no/forskrift/1996-12-06-1127",
+      "tittel": "Forskrift om systematisk helse-, miljø- og sikkerhetsarbeid i virksomheter (Internkontrollforskriften)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Internkontrollforskriften",
+        "id": "kode"
+      },
+      "dokHash": "c5c7d7f706d97c3e",
+      "metode": "merking",
+      "par": {
+        "§ 4": {
+          "hash": "e6c27e7f9d146a8c",
+          "tekst": "§ 4 . Plikt til internkontroll Den som er ansvarlig for virksomheten skal sørge for at det innføres og utøves internkontroll i virksomheten og at dette gjøres i samarbeid med arbeidstakerne og deres representanter. Arbeidstakerne skal medvirke ved innføring og utøvelse av internkontroll. <span"
+        },
+        "§ 5": {
+          "hash": "bcffab8917203fef",
+          "tekst": "§ 5 . Innholdet i det systematiske helse-, miljø- og sikkerhetsarbeidet. Krav til dokumentasjon Internkontrollen skal tilpasses virksomhetens art, aktiviteter, risikoforhold og størrelse i det omfang som er nødvendig for å etterleve krav i eller i medhold av helse-, miljø- og sikkerhetslovgivningen. Internkontroll innebærer at virksomheten skal: Dokumentasjon 1. sørge for at de lover og forskrifter i helse-, miljø- og sikkerhetslovgivningen som gjelder for virksomheten er tilgjengelig, og ha oversikt over de krav som er av særlig viktighet for virksomheten – 2. sørge for at arbeidstakerne har tilstrekkelig kunnskaper og ferdigheter i det systematiske helse-, miljø- og sikkerhetsarbeidet, herunder informasjon om endringer – 3. sørge for at arbeidstakerne medvirker slik at samlet kunnskap og erfaring utnyttes – 4. fastsette mål for helse, miljø og sikkerhet må dokumenteres skriftlig 5. ha oversikt over virksomhetens organisasjon, herunder hvordan ansvar, oppgaver og myndighet for arbeidet med helse, miljø og sikkerhet er fordelt må dokumenteres skriftlig 6. kartlegge farer og problemer og på denne bakgrunn vurdere risiko, samt utarbeide tilhørende planer og tiltak for å redusere risikoforholdene må dokumenteres skriftlig 7. iverksette rutiner for å avdekke, rette opp og forebygge overtredelser av krav fastsatt i eller i medhold av helse-, miljø- og sikkerhets- lovgivningen må dokumenteres skriftlig 8. foreta systematisk overvåkning og gjennomgang av internkontrollen for å sikre at den fungerer som forutsatt må dokumenteres skriftlig Internkontrollen skal dokumenteres i den form og det omfang som er nødvendig på bakgrunn av virksomhetens art, aktiviteter, risikoforhold og størrelse. Dokumentasjon som følger av krav i eller i medhold av helse-, miljø- og sikkerhetslovgivningen, for eksempel instrukser, tillatelser, kompetansebevis, sertifikater o.l. skal inngå. Skriftlig dokumentasjon etter denne forskrift skal minst omfatte annet ledd nr. 4) til og med nr. 8) i denne paragraf. Frivillige sertifikater kan også inngå som en del av dokumentasjonen. <span"
+        },
+        "§ 6": {
+          "hash": "482527c064fc466d",
+          "tekst": "§ 6 . Samordning Når flere virksomheter utøver arbeid på samme arbeidsplass, skal de, når det er nødvendig, skriftlig avtale hvem av dem som skal ha ansvaret for å samordne internkontrollen for deres felles aktiviteter eller områder. Kommer slik avtale ikke i stand, kan tilsynsmyndighetene bestemme hvem av dem som skal ha dette ansvaret. Dersom hensynet til helse, miljø eller sikkerhet tilsier en annen ansvarsplassering, kan tilsynsmyndighetene omgjøre en inngått avtale. Når en virksomhet som oppdragsgiver engasjerer oppdragstakere e.l. til å utføre oppgaver på virksomhetens eget område eller anlegg, skal oppdragstakers internkontroll såvidt mulig legges til grunn for de aktiviteter som omfattes av oppdraget. Dette gjelder både der oppdraget utføres av oppdragstaker personlig, ved egne ansatte eller andre. Oppdragsgiver skal informere om fellesregler o.l. og påse at mulige mangler blir korrigert eller nødvendige tilpasninger foretatt i sin egen eller oppdragstakers internkontroll. <span"
+        }
+      }
+    },
+    "aml": {
+      "finnes": true,
+      "fil": "nl-20050617-062.xml",
+      "lenke": "https://lovdata.no/lov/2005-06-17-62",
+      "tittel": "Lov om arbeidsmiljø, arbeidstid og stillingsvern mv. (arbeidsmiljøloven)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Arbeidsmiljøloven – aml",
+        "id": "kode"
+      },
+      "dokHash": "d68110db3ea33861",
+      "metode": "merking",
+      "par": {
+        "§ 2-2": {
+          "hash": "733206a40df52286",
+          "tekst": "§ 2-2 . Arbeidsgivers plikter overfor andre enn egne arbeidstakere (1) Når andre enn arbeidsgivers egne arbeidstakere, herunder innleide arbeidstakere eller selvstendige oppdragstakere, utfører arbeidsoppgaver i tilknytning til arbeidsgivers aktivitet eller innretning, skal arbeidsgiver: sørge for at egen virksomhet er innrettet og egne arbeidstakeres arbeid er ordnet og blir utført på en slik måte at også andre enn egne arbeidstakere er sikret et fullt forsvarlig arbeidsmiljø, samarbeide med andre arbeidsgivere for å sikre et fullt forsvarlig arbeidsmiljø, sørge for at innleid arbeidstakers arbeidstid er i samsvar med bestemmelsene i kapittel 10 . (2) Hovedbedriften skal ha ansvaret for samordningen av de enkelte virksomheters helse-, miljø- og sikkerhetsarbeid. Dersom det samtidig sysselsettes mer enn 10 arbeidstakere, og ingen virksomhet kan regnes som hovedbedrift, skal det skriftlig avtales hvem som skal ha ansvaret for samordningen. Kommer slik avtale ikke i stand, skal det meldes til Arbeidstilsynet som bestemmer hvem som skal ha ansvaret for samordningen. (3) Departementet kan i forskrift gi nærmere bestemmelser om gjennomføringen av arbeidsgivers plikter etter denne paragraf. Endret ved lover 15 des 2006 nr. 69 (ikr. 1 jan 2007 iflg. res. 15 des 2006 nr. 1406 ), 22 juni 2012 nr. 33 (ikr. 1 jan 2013 iflg. res. 22 juni 2012 nr. 607 ), 17 mars 2023 nr. 3 (i kraft 1 jan 2024 iflg. res. 17 mars 2023 nr. 341 ). <span"
+        },
+        "§ 3-1": {
+          "hash": "bc10b2c07f220b5b",
+          "tekst": "§ 3-1 . Krav til systematisk helse-, miljø- og sikkerhetsarbeid (1) For å sikre at hensynet til arbeidstakers helse, miljø og sikkerhet blir ivaretatt, skal arbeidsgiver sørge for at det utføres systematisk helse-, miljø- og sikkerhetsarbeid på alle plan i virksomheten. Dette skal gjøres i samarbeid med arbeidstakerne og deres tillitsvalgte. (2) Systematisk helse-, miljø- og sikkerhetsarbeid innebærer at arbeidsgiver skal: fastsette mål for helse, miljø og sikkerhet, ha oversikt over virksomhetens organisasjon, herunder hvordan ansvar, oppgaver og myndighet for arbeidet med helse, miljø og sikkerhet er fordelt, kartlegge farer og problemer og på denne bakgrunn vurdere risikoforholdene i virksomheten, utarbeide planer og iverksette tiltak for å redusere risikoen, under planlegging og gjennomføring av endringer i virksomheten, vurdere om arbeidsmiljøet vil være i samsvar med lovens krav, og iverksette de nødvendige tiltak, iverksette rutiner for å avdekke, rette opp og forebygge overtredelser av krav fastsatt i eller i medhold av denne lov, sørge for systematisk arbeid med forebygging og oppfølging av sykefravær, sørge for løpende kontroll med arbeidsmiljøet og arbeidstakernes helse når risikoforholdene i virksomheten tilsier det, jf. bokstav c, foreta systematisk overvåking og gjennomgang av det systematiske helse-, miljø- og sikkerhetsarbeidet for å sikre at det fungerer som forutsatt. (3) Departementet kan i forskrift gi nærmere bestemmelser om gjennomføringen av kravene i denne paragraf, herunder om krav til dokumentasjon av det systematiske helse-, miljø- og sikkerhetsarbeidet. <span"
+        }
+      }
+    },
+    "forurensning": {
+      "finnes": true,
+      "fil": "sf-20040601-0931.xml",
+      "lenke": "https://lovdata.no/forskrift/2004-06-01-931",
+      "tittel": "Forskrift om begrensning av forurensning (forurensningsforskriften)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Forurensningsforskriften",
+        "id": "kode"
+      },
+      "dokHash": "755dfe088998a12e",
+      "metode": "merking",
+      "par": {
+        "§ 15-1": {
+          "hash": "736c820c5c2189c0",
+          "tekst": "§ 15-1 . Virkeområde for kapittel 15 Kapittel 15 gjelder for utslipp, herunder påslipp, av oljeholdig avløpsvann fra bensinstasjoner, vaskehaller for kjøretøy, motorverksteder, bussterminaler, verksteder og klargjøringssentraler for kjøretøyer, anleggsmaskiner og skinnegående materiell, og anlegg for understellsbehandling som enten har vaskeplass, smørehall, servicehall eller lignende. <span"
+        },
+        "§ 15-2": {
+          "hash": "264b11d04983548a",
+          "tekst": "§ 15-2 . Forurensningsmyndighet Kommunen er forurensningsmyndighet etter dette kapitlet og fører tilsyn med at bestemmelsene og vedtak fattet i medhold av dette kapitlet følges. <span"
+        },
+        "§ 15-3": {
+          "hash": "a3d8d2a776887eee",
+          "tekst": "§ 15-3 . Krav om tillatelse Ingen kan sette i verk nye utslipp eller øke utslipp vesentlig uten at tillatelse er gitt i medhold av § 15-5 . Utslipp etablert før 1. januar 2007, som ikke økes vesentlig, er tillatt i den grad dette følger av § 15-10 . <span"
+        },
+        "§ 15-4": {
+          "hash": "a6b58e73c9b15f60",
+          "tekst": "§ 15-4 . Søknad om tillatelse Ved etablering av nye utslipp eller vesentlig økning av eksisterende utslipp av oljeholdig avløpsvann, skal den ansvarlige sørge for at det er utarbeidet en skriftlig, fullstendig søknad som inneholder de nødvendige opplysningene for kommunens behandling, herunder: den ansvarliges navn og adresse, om utslippet skal etableres og drives i samsvar med kravene i § 15-7 eller om det søkes om å fravike disse kravene, dokumentasjon på hvordan utslipp skal etableres og drives, plassering av avløpsanlegg og utslippsted på kart i målestokk 1:1000 eller større, beskrivelse av utslippsstedet og mengde avløpsvann, interesser som antas å bli berørt av etableringen, herunder interesser knyttet til drikkevannsforsyning, rekreasjon eller næringsvirksomhet, oversikt over hvem som skal varsles, og samtykke fra kommunens planmyndighet dersom utslippet er i strid med endelige planer etter plan- og bygningsloven . eventuelle parter og andre som kan bli særlig berørt av saken er varslet om innholdet i søknaden. Kopi av varselet skal sendes til kommunen samtidig med at parter og andre blir varslet. I varselet skal det fremgå at uttalelser må være kommet til søker innen en frist på minst fire uker etter at varselet er sendt. søknad er sendt til kommunen, etter at uttalelsesfristen er utløpt, sammen med kvittering for at varselbrev er sendt og eventuelle uttalelser. Reglene om varsel og granneskjønn i granneloven § 6 til § 8 gjelder ikke for utslipp etter denne forskrift. <span"
+        },
+        "§ 15-5": {
+          "hash": "d0febfc0f4c1351a",
+          "tekst": "§ 15-5 . Behandling av søknad Fullstendig søknad i overensstemmelse med krav i § 15-7 skal avgjøres av kommunen innen seks uker. Dersom kommunen ikke har avgjort slik søknad innen fristens utløp, regnes tillatelse for gitt såfremt det ikke er grunn til å tro at noen part vil være misfornøyd med dette. Klagefristen begynner å løpe fra den dagen fristen utløper. Fullstendig søknad om tillatelse til utslipp med krav som fraviker § 15-7 skal avgjøres uten ugrunnet opphold. Kommunen kan under behandling av søknaden fastsette krav som fraviker § 15-7 , herunder fastsette krav til utslippssted, -anordning og -dyp, eller nekte etablering av utslipp. Der søknad om utslipp er i samsvar med § 15-7 , kan kommunen kun varsle om utvidet saksbehandlingstid dersom fristen på seks uker ikke er utløpt, og dersom det foreligger særlige forhold som brukerkonflikter eller lignende. Når kommunen avgjør om det skal fastsettes andre krav, skal det legges vekt på de forurensningsmessige ulemper ved tiltaket sammenholdt med de fordeler og ulemper som tiltaket for øvrig vil medføre. Kommunen skal samordne behandling av søknad om utslippstillatelse etter dette kapitlet med byggesaksbehandling etter plan- og bygningsloven . Er arbeidet ikke igangsatt senest tre år etter at fullstendig søknad er sendt kommunen, eller innstilles arbeidet i lengre tid enn to år, faller retten til å etablere utslippet bort. Dersom utslippet fremdeles er aktuelt, må ny søknad sendes inn. Endret ved forskrift 14 sep 2006 nr. 1098 (i kraft 1 jan 2007). <span"
+        },
+        "§ 15-6": {
+          "hash": "f0d19bd89c727c75",
+          "tekst": "§ 15-6 . Lokal forskrift Kommunen kan fastsette lokal forskrift dersom det er nødvendig ut i fra forurensningsmessige forhold eller brukerinteresser. Kravene i lokal forskrift skal erstatte kravene i § 15-7 . <span"
+        },
+        "§ 15-7": {
+          "hash": "ea0dccb4f790c2ef",
+          "tekst": "§ 15-7 . Utslipp Ved utslipp av oljeholdig avløpsvann skal oljeinnholdet ikke overstige 50 mg/l. Oljeholdig avløpsvann skal før utslipp passere sandfang eller lignende renseinnretning dimensjonert for maksimal reell vannbelastning. Nødvendig sikkerhet mot akuttutslipp skal ivaretas. Den fastsatte grenseverdien nevnt i første ledd må overholdes under normale driftsforhold. Virksomheten skal ha dokumentasjon som viser hvordan grenseverdiene overholdes. Det skal være tilrettelagt for å ta representative prøver og utføre målinger av avløpsvannet fra nye renseinnretninger. Prøvene skal analyseres av laboratorier som er akkreditert for de aktuelle analysene. Analysemetoder nevnt i vedlegg 2 punkt 2.2 til kapittel 11 skal benyttes. Alternativt kan analysemetoder med dokumentert høy korrelasjon med analysemetodene i vedlegg 2 punkt 2.2 til kapittel 11 benyttes. <span"
+        },
+        "§ 15-8": {
+          "hash": "37ffb14afb9f4c8d",
+          "tekst": "§ 15-8 . Endring og omgjøring av tillatelse Kommunen kan i medhold av forurensningsloven § 18 oppheve eller endre vilkår i tillatelse og om nødvendig kalle tillatelsen tilbake. <span"
+        },
+        "§ 15-9": {
+          "hash": "65415a9cdba8710c",
+          "tekst": "§ 15-9 . Klage Enkeltvedtak truffet i medhold av dette kapitlet av forvaltningsorgan opprettet i medhold av kommuneloven , kan påklages til kommunestyret eller særskilt klagenemnd, jf. forurensningsloven § 85 annet ledd. For enkeltvedtak truffet av kommunestyret er statsforvalteren klageinstans. Endret ved forskrift 14 des 2020 nr. 3341 (i kraft 1 juni 2021). <span"
+        },
+        "§ 15-10": {
+          "hash": "9420dd53dc21ca53",
+          "tekst": "§ 15-10 . Forholdet til eksisterende utslipp Tillatelser til utslipp av oljeholdig avløpsvann gitt i medhold av forurensningsloven og tilhørende forskrifter før 1. januar 2007, er fortsatt gjeldende med følgende endring: § 15-7 erstatter tillatelsens krav til utslipp fra 31. desember 2007, dersom tillatelsens krav til rensing er mer lempelig enn rensekravene i § 15-7 . Endret ved forskrift 14 sep 2006 nr. 1098 (i kraft 1 jan 2007). Kapittel 15A. Påslipp Fastsatt med hjemmel i lov 13. mars 1981 nr. 6 om vern mot forurensninger og om avfall (Forurensningsloven) § 9 , § 31 , § 52a og § 81 . Kapittel 15A tilføyd ved forskrift 15 des 2005 nr. 1691 (i kraft 1 jan 2006). <span"
+        },
+        "§ 15A-1": {
+          "hash": "087b55fd5c243641",
+          "tekst": "§ 15A-1 . Virkeområde for kapittel 15A Kapittel 15A gjelder for påslipp av avløpsvann til offentlig avløpsnett fra virksomhet og utslipp, herunder påslipp, av fotokjemikalieholdig og amalgamholdig avløpsvann. § 15A-4 femte ledd gjelder for påslipp av oppmalt matavfall til offentlig avløpsnett fra virksomhet og husholdning. § 15A-4 gjelder ikke for påslipp av oljeholdig avløpsvann fra virksomhet som omfattes av kapittel 15 . <span"
+        },
+        "§ 15A-2": {
+          "hash": "fcad2b86d95bc73d",
+          "tekst": "§ 15A-2 . Forurensningsmyndighet Kommunen er forurensningsmyndighet etter § 15A-4 og fører tilsyn med at bestemmelsen og vedtak fattet i medhold av denne bestemmelsen følges. Statsforvalteren er forurensningsmyndighet etter § 15A-5 og § 15A-6 , og fører tilsyn med at disse bestemmelsene og vedtak fattet i medhold av disse bestemmelsene følges. Endret ved forskrift 14 des 2020 nr. 3341 (i kraft 1 juni 2021). <span"
+        },
+        "§ 15A-3": {
+          "hash": "d5f2ba3ec2092b39",
+          "tekst": "§ 15A-3 . Lovlig utslipp Ingen kan sette i verk påslipp fra virksomhet uten at dette er lovlig i henhold til forurensningsloven og tilhørende forskrifter, herunder i overensstemmelse med eventuelle vilkår gitt i medhold av § 15A-4 . Ingen kan sette i verk eller øke utslipp av fotokjemikalieholdig eller amalgamholdig avløpsvann uten at utslippet, herunder påslippet, etableres og drives i samsvar med kravene som fremgår av § 15A-5 til § 15A-7 . <span"
+        },
+        "§ 15A-4": {
+          "hash": "6e4e5d5cc9bd47a8",
+          "tekst": "§ 15A-4 . Påslipp til offentlig avløpsnett I tillegg til eventuelle krav fastsatt i utslippstillatelse av statlig forurensningsmyndighet kan kommunen i enkeltvedtak eller i forskrift ved påslipp av avløpsvann til offentlig avløpsnett fra virksomhet fastsette krav om: innhold i og mengde av avløpsvann eller i særlige tilfeller renseeffekt, fettavskiller, sandfang eller silanordning for avløpsvann med tilhørende vilkår, tilrettelegging for prøvetaking og mengdemåling av avløpsvann, varsling av unormale påslipp av avløpsvann, og utslippskontroll og rapportering av fastsatte krav til avløpsvann og avløpsgebyrer. Krav i medhold av første ledd kan kun fastsettes for å sikre at: avløpsanlegget kan overholde utslippskrav, avløpsanlegget og dertil hørende utstyr ikke skades, driften av avløpsanlegget med tilhørende slambehandling ikke vanskeliggjøres, avløpsslammet kan disponeres på en forsvarlig og miljømessig akseptabel måte, eller helsen til personalet som arbeider med avløpsnettet og på renseanlegget beskyttes. Med avløpsvann fra virksomhet menes alt avløpsvann fra bygninger og anlegg som benyttes i handel, industri, transport, herunder veger, og annen virksomhet unntatt avløpsvann fra husholdninger. Kommunen kan i forskrift fastsette søknadssystem med standardkrav for nye påslipp fra virksomhet eller påslipp fra virksomhet som økes vesentlig og gi nærmere bestemmelser om gjennomføringen av dette. Kommunen kan i forskrift forby påslipp av oppmalt matavfall til offentlig avløpsnett fra virksomhet og husholdning. Slike påslipp er forbudt fra 1. januar 2007 såfremt ikke kommunen i forskrift gjør unntak fra forbudet. <span"
+        },
+        "§ 15A-5": {
+          "hash": "fca02b32fe39a06a",
+          "tekst": "§ 15A-5 . Fotokjemikalieholdig avløpsvann Ved utslipp av skyllevann fra prosessene innen foto, røntgen og grafisk industri skal skyllevannet avsølves til maks 0,1 mg per liter skyllevann før utslipp dersom forbruket av film- og papirmateriale er på over 2500 m 2 per år. <span"
+        },
+        "§ 15A-6": {
+          "hash": "f905f03ae1edd1be",
+          "tekst": "§ 15A-6 . Amalgamholdig avløpsvann Ved utslipp av amalgamholdig avløpsvann fra tannklinikker og tannlegekontorer skal avløpsvann være tilkoblet amalgamavskiller. Kravet om amalgamavskiller gjelder også utslagsvask og lignende som mottar amalgam. Amalgamavskillere installert etter 1. januar 2006 skal ha en dokumentert renseeffekt på minst 95% amalgam i henhold til NS-EN-ISO-11143 og være utstyrt med varsel som viser når det er behov for å tømme eller skifte avfallsenhet. Amalgamavskillere installert før 1. januar 2006 skal ha dokumentert typegodkjennelse av Miljødirektoratet. Endret ved forskrifter 21 juni 2010 nr. 1073 , 15 mars 2013 nr. 284 (i kraft 1 juli 2013). <span"
+        },
+        "§ 15A-7": {
+          "hash": "36e4254ac1bbde46",
+          "tekst": "§ 15A-7 . Forholdet til eksisterende utslipp Kommunen kan fastsette krav i medhold av § 15A-4 for påslipp etablert før 1. januar 2006. Tillatelser til ervervsmessig innsamling, mottak eller behandling av andres fotokjemikalier gitt i medhold av forurensningsloven og tilhørende forskrifter før 1. januar 2006 er fortsatt gjeldende. Tillatelser til utslipp av fotokjemikalier gitt i medhold av forurensningsloven og tilhørende forskrifter før 1. januar 2006 er fortsatt gjeldende. Statsforvalteren kan i det enkelte tilfellet i medhold av forurensningsloven § 18 oppheve eller endre vilkår i tillatelse og om nødvendig kalle tillatelsen tilbake. Tillatelser til utslipp fra virksomheter innen foto, røntgen og grafisk industri gitt i medhold av forurensningsloven § 11 oppheves fra 1. januar 2006. Utslippene er lovlige fra 1. januar 2006 dersom kravene i § 15A-5 er oppfylt. Endret ved forskrift 14 des 2020 nr. 3341 (i kraft 1 juni 2021). Kapittel 15B. Rensing av avløpsvann Fastsatt med hjemmel i lov 13. mars 1981 nr. 6 om vern mot forurensninger og om avfall (Forurensningsloven) § 9 . Jf. EØS-avtalen vedlegg XX nr. 13 (direktiv 91/271/EØF med endringer ved direktiv 98/15/EF ). Kapittel 15B tilføyd ved forskrift 15 des 2005 nr. 1691 (i kraft 1 jan 2007). <span"
+        }
+      }
+    },
+    "produkt": {
+      "finnes": true,
+      "fil": "sf-20040601-0922.xml",
+      "lenke": "https://lovdata.no/forskrift/2004-06-01-922",
+      "tittel": "Forskrift om begrensning i bruk av helse- og miljøfarlige kjemikalier og andre produkter (produktforskriften)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Produktforskriften",
+        "id": "kode"
+      },
+      "dokHash": "3218cd751a797345",
+      "metode": "merking",
+      "par": {
+        "§ 6a-1": {
+          "hash": "71969de0ce421d31",
+          "tekst": "§ 6a-1 . Gjennomføring av EU-rettsakter om fluorholdige stoffer EØS-avtalens vedlegg II kapittel XVII nr. 9b og vedlegg XX kapittel III nr. 21aq (forordning (EU) nr. 517/2014 , forordning (EU) 2015/2065 , forordning (EU) 2015/2066 , forordning (EU) 2015/2067 , forordning (EU) 2015/2068 , forordning (EF) nr. 1497/2007 , forordning (EF) nr. 1516/2007 , forordning (EF) nr. 304/2008 , forordning (EF) nr. 306/2008 og forordning (EF) nr. 307/2008 ) om fluorholdige klimagasser gjelder som forskrift med de tilpasninger som følger av vedlegg XX, protokoll 1 til avtalen og avtalen for øvrig. Tilføyd ved forskrift 6 mai 2010 nr. 722 , endret ved forskrifter 14 des 2018 nr. 2032 , 15 juni 2019 nr. 934 . <span"
+        },
+        "§ 6a-2": {
+          "hash": "905d260d3a8834e7",
+          "tekst": "§ 6a-2 . Forbud mot import og eksport Det er fra 1. januar 2019 forbudt å importere og eksportere HFK i bulk til og fra Norge uten tillatelse fra Miljødirektoratet. Miljødirektoratet kan gi slik tillatelse i henhold til nedfasingsplan gitt i vedlegg I og for øvrig der dette er i samsvar med Norges folkerettslige forpliktelser. Tillatelse til import og eksport av HFK gis for ett år om gangen. Forbudet gjelder HFK som angitt i vedlegg I til forordning (EU) nr. 517/2014 . Søknad om import eller eksport av HFK må sendes Miljødirektoratet innen 15. oktober hvert år. Tilføyd ved forskrift 6 mai 2010 nr. 722 , endret ved forskrifter 14 des 2018 nr. 2032 , 15 juni 2019 nr. 934 . <span"
+        },
+        "§ 6a-3": {
+          "hash": "a7cce2138756df48",
+          "tekst": "§ 6a-3 . Ansvarlig myndighet Miljødirektoratet er ansvarlig myndighet. Miljødirektoratet eller den offentlige eller private institusjonen direktoratet bemyndiger, fatter vedtak om sertifisering av foretak og relevant personell der forordningene stiller krav om slik sertifisering. Tilføyd ved forskrift 6 mai 2010 nr. 722 , endret ved forskrifter 15 mars 2013 nr. 284 (i kraft 1 juli 2013), 15 juni 2019 nr. 934 . <span"
+        },
+        "§ 6a-3a": {
+          "hash": "1d18119a494d0ad4",
+          "tekst": "§ 6a-3a . Sertifikat for personell som håndterer fluorholdige stoffer Sertifikat utstedt i medhold av § 6a-3 andre ledd og forordning (EU) nr. 517/2014 artikkel 10 skal ha en gyldighet på 5 år fra utstedelsesdato. Etter dette tidspunktet må sertifikatet fornyes. Miljødirektoratet fastsetter nærmere krav til slik resertifisering. Tilføyd ved forskrift 14 des 2018 nr. 2032 . <span"
+        },
+        "§ 6a-4": {
+          "hash": "b2d4416c26164b43",
+          "tekst": "§ 6a-4 . Rapporteringskrav for SF6-gass for importører og anleggseiere Importører av SF6-gass og eiere av anlegg som har installert SF6-gass skal innen 15. mars hvert år sende Miljødirektoratet informasjon om beholdning, import og forbruk av SF6-gass det foregående året, samt informasjon om gjenvinning og behandling av SF6-gass fra anlegg som har slik gass installert. Tilføyd ved forskrift 6 mai 2010 nr. 722 , endret ved forskrifter 15 mars 2013 nr. 284 (i kraft 1 juli 2013), 14 des 2018 nr. 2032 . <span"
+        },
+        "§ 6a-5": {
+          "hash": "b564c46bb76a0ad2",
+          "tekst": "§ 6a-5 . Gebyr Kostnadene forbundet med sertifiseringsordninger etter kapitlet her skal dekkes gjennom innkreving av gebyr fra de som søker om sertifikat. Miljødirektoratet fastsetter gebyrsatsene for de ulike sertifikatene. Miljødirektoratet kan endre gebyrsatsene med virkning fra 1. januar påfølgende år. Gebyrsatsene kan ikke gjøres større enn at innkrevd gebyr dekker samlede kostnader forbundet med sertifiseringsordningen. Miljødirektoratet eller den direktoratet bemyndiger skal kreve inn gebyret. Tilføyd ved forskrift 6 mai 2010 nr. 722 , endret ved forskrift 15 mars 2013 nr. 284 (i kraft 1 juli 2013). <span"
+        },
+        "§ 6a-6": {
+          "hash": "c1b441709f324ec8",
+          "tekst": "§ 6a-6 . Overtredelsesgebyr Miljødirektoratet kan ved overtredelse av følgende bestemmelser i regelverket som er gjennomført i § 6a-1 ilegge den ansvarlige for overtredelsen et overtredelsesgebyr: forordning (EU) nr. 517/2014 om fluorholdige klimagasser, artikkel 3 om forebygging av utslipp av fluorholdige klimagasser, forordning (EU) nr. 517/2014 om fluorholdige klimagasser, artikkel 11 nr. 4 om ulovlig kjøp og salg av fluorholdige klimagasser, forordning (EU) nr. 517/2014 om fluorholdige klimagasser, artikkel 11 nr. 5 om salg av ikke-hermetisk lukket utstyr med fluorholdige klimagasser uten å kontrollere at installasjon gjøres av sertifisert virksomhet. For ileggelse av overtredelsesgebyr gjelder bestemmelsene i kapittel 6b. Tilføyd ved forskrift 29 sep 2023 nr. 1587 . Vedlegg til kapittel 6a Tilføyd ved forskrift 6 mai 2010 nr. 722 . Vedlegg 1 Nedfasingsplan for import av HFK til Norge: Utregning av basisnivå Gjennomsnittlig forbruksnivå av HFK i 2011–2013 1. trinn Fra og med 2019 – 10 prosent reduksjon i forhold til basisnivå 2. trinn Fra og med 2024 – 40 prosent reduksjon i forhold til basisnivå 3. trinn Fra og med 2029 – 70 prosent reduksjon i forhold til basisnivå 4. trinn Fra og med 2034 – 80 prosent reduksjon i forhold til basisnivå Platå Fra og med 2036 – 85 prosent reduksjon i forhold til basisnivå Forbruk er lik importert mengde HFK i bulk minus eksportert mengde HFK i bulk, angitt i CO 2 -ekvivalenter. Tildelingskriterier: Virksomheter som har dokumentert import av HFK i referanseperioden for tildeling kan tildeles sin relative andel av 89 % av den totale importkvoten for kommende år. Nye virksomheter som ønsker å importere HFK (som ikke har dokumentert import i referanseperioden) og virksomheter med dokumentert import i referanseperioden som har økt behov for import av HFK, kan tildeles en forholdsmessig del av de resterende 11 % av den totale importkvoten. Importkvoter tildeles iht. forordning (EU) nr. 517/2014 vedlegg VI. Referanseperioden for tildeling for årene 2019–2023 er årene 2015 til og med år 2017. Referanseperioden for tildeling for årene 2024–2028 er årene 2020 til og med år 2022. Referanseperioden for tildeling for årene 2029–2033 er årene 2025 til og med år 2027. Referanseperioden for tildeling for årene 2034–2036 er årene 2030 til og med år 2032. Tilføyd ved forskrift 6 mai 2010 nr. 722 , endret ved forskrift 14 des 2018 nr. 2032 . Forordninger Nedenfor gjengis forordning (EU) nr. 517/2014 om fluorholdige gasser, forordning (EU) 2015/2065 om format for rapportering av sertifiseringsprogrammer, forordning (EU) 2015/2066 om sertifisering av personell som utfører arbeid på elektriske brytere med fluorholdige klimagasser, forordning (EU) 2015/2067 om sertifisering vedr. kjøleanlegg, forordning (EU) 2015/2068 om merking av produkter og utstyr, forordning (EF) nr. 1497/2007 om lekkasjekontroll ved stasjonære brannslukkingsanlegg, forordning (EF) nr. 1516/2007 om lekkasjekontroll ved kjøleanlegg, forordning (EF) nr. 304/2008 om sertifisering vedr. stasjonære brannslukkingsanlegg, forordning (EF) nr. 306/2008 om sertifisering vedr. løsemidler, forordning (EF) nr. 307/2008 om opplæringsbevis vedr. luftkondisjoneringsanlegg i biler. Forordning (EU) nr. 517/2014 For å lese forordningen se her: (pdf) Uoffisiell oversettelse. Forordning (EU) 2015/2065 For å lese forordningen se her: (pdf) Engelsk versjon. Forordning (EU) nr. 2015/2066 For å lese forordningen se her: (pdf) Engelsk versjon. Forordning (EU) 2015/2067 For å lese forordningen se her: (pdf) Engelsk versjon. Forordning (EU) 2015/2068 For å lese forordningen se her: (pdf) Engelsk versjon. Forordning (EF) nr. 1497/2007 For å lese forordningen se her: (pdf) Forordning (EF) nr. 1516/2007 For å lese forordningen se her: (pdf) Forordning (EF) nr. 304/2008 For å lese forordningen se her: (pdf) Forordning (EF) nr. 306/2008 For å lese forordningen se her: (pdf) Forordning (EF) nr. 307/2008 For å lese forordningen se her: (pdf) Tilføyd ved forskrift 14 des 2018 nr. 2032 . Endret uten kunngjøring i Norsk Lovtidend 18 jan 2019. Endret ved forskrift 15 juni 2019 nr. 934 . Kapittel 6b. Overtredelsesgebyr Tilføyd ved forskrift 29 sep 2023 nr. 1587 . <span"
+        }
+      }
+    },
+    "trykk": {
+      "finnes": false
+    },
+    "fel": {
+      "finnes": true,
+      "fil": "sf-19981106-1060.xml",
+      "lenke": "https://lovdata.no/forskrift/1998-11-06-1060",
+      "tittel": "Forskrift om elektriske lavspenningsanlegg",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Forskrift om elektriske lavspenningsanlegg - FEL",
+        "id": "kode"
+      },
+      "dokHash": "c3067e986d14f953",
+      "metode": "merking",
+      "par": {}
+    },
+    "fse": {
+      "finnes": true,
+      "fil": "sf-20060428-0458.xml",
+      "lenke": "https://lovdata.no/forskrift/2006-04-28-458",
+      "tittel": "Forskrift om sikkerhet ved arbeid i og drift av elektriske anlegg.",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Forskrift om sikkerhet ved elektriske anlegg",
+        "id": "kode"
+      },
+      "dokHash": "17b109e7ac168cd0",
+      "metode": "merking",
+      "par": {}
+    },
+    "miljohelse": {
+      "finnes": true,
+      "fil": "sf-20030425-0486.xml",
+      "lenke": "https://lovdata.no/forskrift/2003-04-25-486",
+      "tittel": "Forskrift om miljørettet helsevern",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Forskrift om miljørettet helsevern",
+        "id": "kode"
+      },
+      "dokHash": "cf39d1c8c3b41734",
+      "metode": "merking",
+      "par": {}
+    },
+    "straalevern": {
+      "finnes": true,
+      "fil": "sf-20161216-1659.xml",
+      "lenke": "https://lovdata.no/forskrift/2016-12-16-1659",
+      "tittel": "Forskrift om strålevern og bruk av stråling (strålevernforskriften)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Strålevernforskriften",
+        "id": "kode"
+      },
+      "dokHash": "5f001453faea1a7a",
+      "metode": "merking",
+      "par": {}
+    },
+    "energimerk": {
+      "finnes": true,
+      "fil": "sf-20091218-1665.xml",
+      "lenke": "https://lovdata.no/forskrift/2009-12-18-1665",
+      "tittel": "Forskrift om energimerking av bygninger og energivurdering av varme- og klimaanlegg (energimerkeforskriften for bygninger)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Energimerkeforskriften for bygninger",
+        "id": "kode"
+      },
+      "dokHash": "3c15f32b51d65784",
+      "metode": "merking",
+      "par": {}
+    },
+    "lekeplass": {
+      "finnes": true,
+      "fil": "sf-19960719-0703.xml",
+      "lenke": "https://lovdata.no/dokument/SF/forskrift/1996-07-19-703",
+      "tittel": "Forskrift om sikkerhet ved lekeplassutstyr",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Forskrift om sikkerhet ved lekeplassutstyr",
+        "id": "kode"
+      },
+      "dokHash": "753d0c5d0d83aac6",
+      "metode": "merking",
+      "par": {}
+    },
+    "skatt": {
+      "finnes": true,
+      "fil": "nl-19990326-014.xml",
+      "lenke": "https://lovdata.no/lov/1999-03-26-14",
+      "tittel": "Lov om skatt av formue og inntekt (skatteloven)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Skatteloven – sktl",
+        "id": "kode"
+      },
+      "dokHash": "b86e267e5936d267",
+      "metode": "merking",
+      "par": {
+        "§ 14-41": {
+          "hash": "884927a7cc8c0c06",
+          "tekst": "§ 14-41 . Avskrivningsgrupper (saldogrupper) (1) Driftsmidler som avskrives etter § 14-40 , inndeles i følgende saldogrupper: kontormaskiner o.l. ervervet forretningsverdi vogntog, lastebiler, busser, varebiler, drosjebiler og kjøretøy for transport av funksjonshemmede personbiler, traktorer, maskiner, redskap, instrumenter, inventar m.v. skip, fartøyer, rigger m.v. fly, helikopter anlegg for overføring og distribusjon av elektrisk kraft og elektroteknisk utrustning i kraftforetak, og slike driftsmidler benyttet i annen virksomhet bygg og anlegg, hoteller, losjihus, bevertningssteder m.v. Som anlegg regnes blant annet tekniske hjelpe- og tilleggsinstallasjoner i industrianlegg mv., herunder renseanlegg, trykkluftanlegg, kjølesystem og lignende. Som anlegg regnes også frukt- og bærfelt. forretningsbygg. fast teknisk installasjon i bygninger, herunder varmeanlegg, kjøle- og fryseanlegg, elektrisk anlegg, sanitæranlegg, heisanlegg o.l. Departementet kan gi forskrift om avgrensning av fast teknisk installasjon. (2) Når de enkelte delene av et bygg kan henføres til forskjellige avskrivningsgrupper eller ikke er avskrivbare (kombinerte bygg), bedømmes bygget under ett i forhold til spørsmålet om avskrivning på grunnlag av leieverdien for de forskjellige delene. Er bygget delt opp i eierseksjoner, bedømmes hver eierseksjon for seg. (3) Bygningsmessig arbeid ved montering av produksjonsmaskineri kan avskrives sammen med dette i gruppe d. (4) Driftsmidler som inngår i gruppe a, b, c og d avskrives under ett. Grupperingen foretas for hver av skattyterens næringer, jf. § 14-42 første ledd, og for hver kommune når samme næring drives i flere kommuner, jf. § 14-45 første ledd. I gruppene e, f, g, h og i føres hvert enkelt driftsmiddel på egen saldo. Driftsmidler som inngår i gruppe j skal avskrives under ett for hver bygning. Endret ved lover 21 des 2001 nr. 112 (f o m inntektsåret 2002), 12 des 2008 nr. 99 (f o m inntektsåret 2009, se dens X), 19 juni 2009 nr. 54 (f o m inntektsåret 2009), 9 des 2011 nr. 52 (f o m inntektsåret 2012), 20 des 2019 nr. 94 (ikr. 1 jan 2020 med virkning fra inntektsåret 2020). <span"
+        },
+        "§ 14-43": {
+          "hash": "cc1c31247b72dfa8",
+          "tekst": "§ 14-43 . Avskrivningssatser (1) Saldo for driftsmidler m.v. som nevnt i § 14-41 første ledd kan avskrives med inntil følgende sats: kontormaskiner og lignende – 30 prosent ervervet forretningsverdi – 20 prosent vogntog, lastebiler, busser, varebiler, drosjebiler og kjøretøyer for transport av funksjonshemmede – 24 prosent personbiler, traktorer, maskiner, redskap, instrumenter, inventar, mv. – 20 prosent. skip, fartøyer, rigger m.v. – 14 prosent fly, helikopter – 12 prosent anlegg for overføring og distribusjon av elektrisk kraft og elektroteknisk utrustning i kraftforetak, og slike driftsmidler benyttet i annen virksomhet – 5 prosent bygg og anlegg, hoteller, losjihus, bevertningssteder mv. – 4 prosent forretningsbygg – 2 prosent fast teknisk installasjon i bygninger – 10 prosent. (2) Forhøyet avskrivningssats gjelder for bygg med en så enkel konstruksjon at det må anses å ha en brukstid på ikke over 20 år fra oppføringen. Saldo for slikt bygg kan avskrives med inntil 10 prosent. Det samme gjelder for anlegg med en brukstid på ikke over 20 år fra det er nytt. (3) Forhøyet avskrivningssats gjelder for saldo for husdyrbygg i jord- og skogbruk. Saldo for slikt bygg kan avskrives med inntil 6 prosent. Når de enkelte delene av et bygg kan henføres til forskjellige avskrivningsgrupper eller avskrivningssatser, eller ikke er avskrivbare, kan bygget avskrives med forhøyet sats for husdyrbygg dersom 50 prosent eller mer av bygningens areal benyttes til dette formål. Departementet kan gi forskrift om avgrensning av husdyrbygg i jord- og skogbruk. Forhøyet avskrivningssats gjelder også for frukt- og bærfelt. Fruktfelt kan avskrives med 10 prosent. Bærfelt kan avskrives med 20 prosent. (4) – – – (5) Driftsmiddel som nevnt i saldogruppe d, som er ervervet fra og med det tidspunktet Kongen bestemmer og ut inntektsåret 2020, kan i tillegg til avskrivning etter første ledd, avskrives med inntil 10 prosent av kostpris i inntektsåret 2020. Tilsvarende gjelder påkostning på driftsmiddel i saldogruppe d, jf. § 14-40 tredje ledd. Avskrivning etter første punktum gjelder ikke ved erverv av driftsmidler fra nærstående part. Som nærstående part anses part definert som nærstående etter skatteloven § 6-41 femte ledd. Departementet kan i forskrift gi regler om utfylling og gjennomføring av dette ledd. (6) Departementet kan i forskrift gi nærmere regler, herunder regler om utfylling, gjennomføring og ikraftsetting, om hvilke skip som kan føres på ny midlertidig skattemessig saldo for skip i nærskipsfart med virkning for inntektsåret 2020. Ny midlertidig skattemessig saldo for skip i nærskipsfart kan ikke gjelde for skip ervervet fra nærstående part. Som nærstående part anses part definert som nærstående etter skatteloven § 6-41 femte ledd. Endret ved lover 17 des 1999 nr. 94 (f o m inntektsåret 2000), 15 des 2000 nr. 95 (f o m inntektsåret 2000), 15 juni 2001 nr. 44 (f o m inntektsåret 2000), 21 des 2001 nr. 112 (f o m inntektsåret 2002), 20 des 2002 nr. 99 (f o m inntektsåret 2003), 12 des 2008 nr. 99 (f o m inntektsåret 2009). 27 feb 2009 nr. 9 (for inntektsåret 2009), 9 des 2011 nr. 52 (f o m inntektsåret 2012), 13 des 2013 nr. 117 (f o m inntektsåret 2014), 19 des 2014 nr. 80 , 19 des 2014 nr. 80 (f o m inntektsåret 2015, se dens XIII), 20 des 2016 nr. 111 (med virkning fra inntektsåret 2017), 20 des 2016 nr. 111 som endret ved lov 19 des 2017 nr. 129 (ikr. 26 jan 2018 med virkning f o m inntektsåret 2017 iflg. res. 26 jan 2018 nr. 107 ), 20 des 2019 nr. 94 (ikr. 1 jan 2020 med virkning fra inntektsåret 2020), 23 juni 2020 nr. 103 (med virkning for inntektsåret 2020), 23 juni 2020 nr. 103 (i kraft 20 juli 2020 iflg. forskrift 29 sep 2020 nr. 1900 med virkning for inntektsåret 2020), 20 des 2023 nr. 98 (i kraft 1 jan 2024 med virkning fra inntektsåret 2024). <span"
+        }
+      }
+    },
+    "bokforing": {
+      "finnes": true,
+      "fil": "nl-20041119-073.xml",
+      "lenke": "https://lovdata.no/lov/2004-11-19-73",
+      "tittel": "Lov om bokføring (bokføringsloven)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Bokføringsloven",
+        "id": "kode"
+      },
+      "dokHash": "b4960673ed0dd42f",
+      "metode": "merking",
+      "par": {
+        "§ 13": {
+          "hash": "b622d7d77b7fc94d",
+          "tekst": "§ 13 . Oppbevaring Som oppbevaringspliktig regnskapsmateriale regnes: årsregnskap og annen pliktig regnskapsrapportering, årsberetning og revisjonsberetning, spesifikasjoner av pliktig regnskapsrapportering som nevnt i § 5 , eller bokførte opplysninger som er nødvendig for å kunne utarbeide slike spesifikasjoner av pliktig regnskapsrapportering, dokumentasjon av bokførte opplysninger og slettede opplysninger, dokumentasjon av kontrollsporet mv. og dokumentasjon av balansen, revisors skriftlige kommunikasjon med styret etter revisorloven § 9-5 , avtaler som gjelder virksomheten, med unntak av avtaler av mindre betydning, korrespondanse som gir vesentlig tilleggsinformasjon i tilknytning til en bokført opplysning, utgående pakksedler eller tilsvarende dokumentasjon som følger varen eller sendes til kjøper på annen måte, prisoversikter som kreves utarbeidet ifølge lov eller forskrift. Regnskapsmateriale som nevnt i første ledd nr. 1 til 4 skal oppbevares i Norge i fem år etter regnskapsårets slutt. Regnskapsmateriale som nevnt i første ledd nr. 5 til 8 skal oppbevares i Norge i tre år og seks måneder etter regnskapsårets slutt. Originalt regnskapsmateriale kan erstattes ved overføring av regnskapsinformasjon til andre media hvis muligheten til å etterprøve pliktig regnskapsrapportering i regnskapsmaterialets oppbevaringstid ikke svekkes. Departementet kan i forskrift fastsette nærmere krav til oppbevaringsmedier. Oppbevaringspliktig regnskapsmateriale skal oppbevares ordnet og være betryggende sikret mot ødeleggelse, tap og endring. Regnskapsmaterialet skal kunne fremlegges for offentlig kontrollmyndighet i hele oppbevaringstiden i en form som muliggjør etterkontroll. Regnskapsmaterialet skal være tilgjengelig i lesbar form og skal kunne skrives ut på papir i hele oppbevaringsperioden. Departementet kan i forskrift fastsette krav om lengre oppbevaringstid for nærmere angitte typer primærdokumentasjon enn det som følger av annet ledd når det finnes nødvendig av hensyn til pliktig regnskapsrapportering eller skatte- og avgiftskontroll. Departementet kan i forskrift eller ved enkeltvedtak gjøre unntak fra bestemmelsene i annet ledd om oppbevaringssted og oppbevaringstid. Endret ved lover 22 juni 2012 nr. 35 (ikr. 1 juli 2012 iflg. res. 22 juni 2012 nr. 566 , og med virkning for regnskapsår påbegynt etter 31 des 2012 iflg. res. 7 sep 2012 nr. 864 ), 13 des 2013 nr. 121 (ikr. 1 feb 2014 iflg. res. 24 jan 2014 nr. 53 ), 20 nov 2020 nr. 128 (ikr. 1 jan 2021 iflg. res. 20 nov 2020 nr. 2420 ). Endres ved lov 19 juni 2026 nr. 39 (i kraft 1 jan 2027 iflg. res. 19 juni 2026 nr. 1154 ). <span"
+        }
+      }
+    },
+    "personvern": {
+      "finnes": true,
+      "fil": "nl-20180615-038.xml",
+      "lenke": "https://lovdata.no/lov/2018-06-15-38",
+      "tittel": "Lov om behandling av personopplysninger (personopplysningsloven)",
+      "meta": {
+        "sistEndret": "ved",
+        "ikraft": "av siste endring",
+        "korttittel": "Personopplysningsloven",
+        "id": "kode"
+      },
+      "dokHash": "67a6d99e178ab6db",
+      "metode": "merking",
+      "par": {}
+    }
+  }
+}

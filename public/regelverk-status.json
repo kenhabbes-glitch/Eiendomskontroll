@@ -1,0 +1,129 @@
+{
+  "sjekket": "2026-11-06T17:25:10.469Z",
+  "kontrollertMot": "2026-11-06T17:25:10.469Z",
+  "kilde": "Lovdata (NLOD 2.0)",
+  "antallKilder": 20,
+  "endringer": [],
+  "kilder": [
+    {
+      "navn": "Plan- og bygningsloven",
+      "lenke": "https://lovdata.no/lov/2008-06-27-71",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Byggteknisk forskrift (TEK17)",
+      "lenke": "https://lovdata.no/forskrift/2017-06-19-840",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Byggesaksforskriften (SAK10)",
+      "lenke": "https://lovdata.no/forskrift/2010-03-26-488",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Byggherreforskriften",
+      "lenke": "https://lovdata.no/forskrift/2009-08-03-1028",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Forskrift om brannforebygging",
+      "lenke": "https://lovdata.no/forskrift/2015-12-17-1710",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Brann- og eksplosjonsvernloven",
+      "lenke": "https://lovdata.no/lov/2002-06-14-20",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Internkontrollforskriften",
+      "lenke": "https://lovdata.no/forskrift/1996-12-06-1127",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Arbeidsmiljøloven",
+      "lenke": "https://lovdata.no/lov/2005-06-17-62",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Forurensningsforskriften",
+      "lenke": "https://lovdata.no/forskrift/2004-06-01-931",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Produktforskriften (F-gass)",
+      "lenke": "https://lovdata.no/forskrift/2004-06-01-922",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Forskrift om håndtering av trykkpåkjent utstyr",
+      "lenke": "",
+      "sistEndret": "",
+      "finnes": false
+    },
+    {
+      "navn": "Forskrift om elektriske lavspenningsanlegg (FEL)",
+      "lenke": "https://lovdata.no/forskrift/1998-11-06-1060",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Forskrift om sikkerhet ved arbeid i og drift av elektriske anlegg (FSE)",
+      "lenke": "https://lovdata.no/forskrift/2006-04-28-458",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Forskrift om miljørettet helsevern (legionella)",
+      "lenke": "https://lovdata.no/forskrift/2003-04-25-486",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Strålevernforskriften (radon)",
+      "lenke": "https://lovdata.no/forskrift/2016-12-16-1659",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Energimerkeforskriften",
+      "lenke": "https://lovdata.no/forskrift/2009-12-18-1665",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Forskrift om sikkerhet ved lekeplassutstyr",
+      "lenke": "https://lovdata.no/dokument/SF/forskrift/1996-07-19-703",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Skatteloven (saldoavskrivning)",
+      "lenke": "https://lovdata.no/lov/1999-03-26-14",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Bokføringsloven",
+      "lenke": "https://lovdata.no/lov/2004-11-19-73",
+      "sistEndret": "ved",
+      "finnes": true
+    },
+    {
+      "navn": "Personopplysningsloven",
+      "lenke": "https://lovdata.no/lov/2018-06-15-38",
+      "sistEndret": "ved",
+      "finnes": true
+    }
+  ]
+}
