@@ -1,128 +1,134 @@
 {
-  "sjekket": "2026-11-06T17:25:10.469Z",
-  "kontrollertMot": "2026-11-06T17:25:10.469Z",
+  "sjekket": "2026-11-06T17:27:55.209Z",
+  "kontrollertMot": "2026-11-06T17:27:55.209Z",
   "kilde": "Lovdata (NLOD 2.0)",
-  "antallKilder": 20,
+  "antallKilder": 21,
   "endringer": [],
   "kilder": [
     {
       "navn": "Plan- og bygningsloven",
       "lenke": "https://lovdata.no/lov/2008-06-27-71",
-      "sistEndret": "ved",
+      "sistEndret": "lov/2026-06-12-22 fra 2026-07-01",
       "finnes": true
     },
     {
       "navn": "Byggteknisk forskrift (TEK17)",
       "lenke": "https://lovdata.no/forskrift/2017-06-19-840",
-      "sistEndret": "ved",
+      "sistEndret": "forskrift/2026-09-11-1792 fra 2026-10-01",
       "finnes": true
     },
     {
       "navn": "Byggesaksforskriften (SAK10)",
       "lenke": "https://lovdata.no/forskrift/2010-03-26-488",
-      "sistEndret": "ved",
+      "sistEndret": "forskrift/2026-07-03-1502",
       "finnes": true
     },
     {
       "navn": "Byggherreforskriften",
       "lenke": "https://lovdata.no/forskrift/2009-08-03-1028",
-      "sistEndret": "ved",
+      "sistEndret": "forskrift/2023-08-29-1367 fra 2024-01-01",
       "finnes": true
     },
     {
       "navn": "Forskrift om brannforebygging",
       "lenke": "https://lovdata.no/forskrift/2015-12-17-1710",
-      "sistEndret": "ved",
+      "sistEndret": "forskrift/2020-06-11-1176",
       "finnes": true
     },
     {
       "navn": "Brann- og eksplosjonsvernloven",
       "lenke": "https://lovdata.no/lov/2002-06-14-20",
-      "sistEndret": "ved",
+      "sistEndret": "lov/2025-04-25-12 fra 2026-01-01",
       "finnes": true
     },
     {
       "navn": "Internkontrollforskriften",
       "lenke": "https://lovdata.no/forskrift/1996-12-06-1127",
-      "sistEndret": "ved",
+      "sistEndret": "forskrift/2025-06-06-941 fra 2026-01-01",
       "finnes": true
     },
     {
       "navn": "Arbeidsmiljøloven",
       "lenke": "https://lovdata.no/lov/2005-06-17-62",
-      "sistEndret": "ved",
+      "sistEndret": "lov/2026-06-19-33 fra 2026-07-01",
       "finnes": true
     },
     {
       "navn": "Forurensningsforskriften",
       "lenke": "https://lovdata.no/forskrift/2004-06-01-931",
-      "sistEndret": "ved",
+      "sistEndret": "forskrift/2026-07-02-1508",
       "finnes": true
     },
     {
       "navn": "Produktforskriften (F-gass)",
       "lenke": "https://lovdata.no/forskrift/2004-06-01-922",
-      "sistEndret": "ved",
+      "sistEndret": "forskrift/2026-09-17-1870",
       "finnes": true
     },
     {
-      "navn": "Forskrift om håndtering av trykkpåkjent utstyr",
-      "lenke": "",
-      "sistEndret": "",
-      "finnes": false
+      "navn": "Forskrift om håndtering av farlig stoff",
+      "lenke": "https://lovdata.no/forskrift/2009-06-08-602",
+      "sistEndret": "forskrift/2015-06-26-774 fra 2015-07-01",
+      "finnes": true
+    },
+    {
+      "navn": "Forskrift om utførelse av arbeid",
+      "lenke": "https://lovdata.no/forskrift/2011-12-06-1357",
+      "sistEndret": "forskrift/2026-09-29-1949",
+      "finnes": true
     },
     {
       "navn": "Forskrift om elektriske lavspenningsanlegg (FEL)",
       "lenke": "https://lovdata.no/forskrift/1998-11-06-1060",
-      "sistEndret": "ved",
+      "sistEndret": "forskrift/2005-06-30-744",
       "finnes": true
     },
     {
       "navn": "Forskrift om sikkerhet ved arbeid i og drift av elektriske anlegg (FSE)",
       "lenke": "https://lovdata.no/forskrift/2006-04-28-458",
-      "sistEndret": "ved",
+      "sistEndret": "forskrift/2023-12-18-2278 fra 2024-01-01",
       "finnes": true
     },
     {
       "navn": "Forskrift om miljørettet helsevern (legionella)",
       "lenke": "https://lovdata.no/forskrift/2003-04-25-486",
-      "sistEndret": "ved",
+      "sistEndret": "forskrift/2026-05-27-910",
       "finnes": true
     },
     {
       "navn": "Strålevernforskriften (radon)",
       "lenke": "https://lovdata.no/forskrift/2016-12-16-1659",
-      "sistEndret": "ved",
+      "sistEndret": "forskrift/2026-06-26-1397 fra 2026-07-01",
       "finnes": true
     },
     {
       "navn": "Energimerkeforskriften",
       "lenke": "https://lovdata.no/forskrift/2009-12-18-1665",
-      "sistEndret": "ved",
+      "sistEndret": "forskrift/2025-04-02-591 fra 2026-01-01",
       "finnes": true
     },
     {
       "navn": "Forskrift om sikkerhet ved lekeplassutstyr",
-      "lenke": "https://lovdata.no/dokument/SF/forskrift/1996-07-19-703",
-      "sistEndret": "ved",
+      "lenke": "https://lovdata.no/forskrift/1996-07-19-703",
+      "sistEndret": "forskrift/2014-09-12-1171 fra 2014-09-15",
       "finnes": true
     },
     {
       "navn": "Skatteloven (saldoavskrivning)",
       "lenke": "https://lovdata.no/lov/1999-03-26-14",
-      "sistEndret": "ved",
+      "sistEndret": "lov/2026-06-23-66 fra 2026-07-01",
       "finnes": true
     },
     {
       "navn": "Bokføringsloven",
       "lenke": "https://lovdata.no/lov/2004-11-19-73",
-      "sistEndret": "ved",
+      "sistEndret": "lov/2020-11-20-128 fra 2021-01-01",
       "finnes": true
     },
     {
       "navn": "Personopplysningsloven",
       "lenke": "https://lovdata.no/lov/2018-06-15-38",
-      "sistEndret": "ved",
+      "sistEndret": "lov/2021-06-18-124 fra 2022-01-01",
       "finnes": true
     }
   ]

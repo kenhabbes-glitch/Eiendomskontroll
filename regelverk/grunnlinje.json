@@ -1,14 +1,14 @@
 {
-  "kontrollert": "2026-11-06T17:25:10.469Z",
+  "kontrollert": "2026-11-06T17:27:55.209Z",
   "av": "kenhabbes-glitch",
   "kilde": "Lovdata – gjeldende lover og sentrale forskrifter (NLOD 2.0)",
   "datasett": {
-    "gjeldende-lover.tar.bz2": "2026-11-04T02:32:00Z",
-    "lovtidend-avd1-2001-2025.tar.bz2": "2026-11-03T02:31:00Z",
-    "gjeldende-sentrale-forskrifter.tar.bz2": "2026-11-06T02:31:00Z",
-    "lovtidend-avd1-2026.tar.bz2": "2026-11-06T02:30:00Z",
+    "lovtidend-avd2-2026.tar.bz2": "2026-11-06T02:31:00Z",
     "lovtidend-avd2-2001-2025.tar.bz2": "2026-11-06T02:31:00Z",
-    "lovtidend-avd2-2026.tar.bz2": "2026-11-06T02:31:00Z"
+    "lovtidend-avd1-2026.tar.bz2": "2026-11-06T02:30:00Z",
+    "gjeldende-lover.tar.bz2": "2026-11-04T02:32:00Z",
+    "gjeldende-sentrale-forskrifter.tar.bz2": "2026-11-06T02:31:00Z",
+    "lovtidend-avd1-2001-2025.tar.bz2": "2026-11-03T02:31:00Z"
   },
   "data": {
     "pbl": {
@@ -17,7 +17,7 @@
       "lenke": "https://lovdata.no/lov/2008-06-27-71",
       "tittel": "Lov om planlegging og byggesaksbehandling (plan- og bygningsloven)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "lov/2026-06-12-22 fra 2026-07-01",
         "ikraft": "av siste endring",
         "korttittel": "Plan- og bygningsloven – pbl",
         "id": "kode"
@@ -65,7 +65,7 @@
       "lenke": "https://lovdata.no/forskrift/2017-06-19-840",
       "tittel": "Forskrift om tekniske krav til byggverk (Byggteknisk forskrift)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2026-09-11-1792 fra 2026-10-01",
         "ikraft": "av siste endring",
         "korttittel": "Byggteknisk forskrift (TEK17)",
         "id": "kode"
@@ -105,7 +105,7 @@
       "lenke": "https://lovdata.no/forskrift/2010-03-26-488",
       "tittel": "Forskrift om byggesak (byggesaksforskriften)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2026-07-03-1502",
         "ikraft": "av siste endring",
         "korttittel": "Byggesaksforskriften (SAK 10)",
         "id": "kode"
@@ -133,7 +133,7 @@
       "lenke": "https://lovdata.no/forskrift/2009-08-03-1028",
       "tittel": "Forskrift om sikkerhet, helse og arbeidsmiljø på bygge- eller anleggsplasser (byggherreforskriften)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2023-08-29-1367 fra 2024-01-01",
         "ikraft": "av siste endring",
         "korttittel": "Byggherreforskriften",
         "id": "kode"
@@ -197,7 +197,7 @@
       "lenke": "https://lovdata.no/forskrift/2015-12-17-1710",
       "tittel": "Forskrift om brannforebygging",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2020-06-11-1176",
         "ikraft": "av siste endring",
         "korttittel": "Forskrift om brannforebygging",
         "id": "kode"
@@ -257,7 +257,7 @@
       "lenke": "https://lovdata.no/lov/2002-06-14-20",
       "tittel": "Lov om vern mot brann, eksplosjon og ulykker med farlig stoff og om brannvesenets redningsoppgaver (brann- og eksplosjonsvernloven)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "lov/2025-04-25-12 fra 2026-01-01",
         "ikraft": "av siste endring",
         "korttittel": "Brann- og eksplosjonsvernloven",
         "id": "kode"
@@ -289,7 +289,7 @@
       "lenke": "https://lovdata.no/forskrift/1996-12-06-1127",
       "tittel": "Forskrift om systematisk helse-, miljø- og sikkerhetsarbeid i virksomheter (Internkontrollforskriften)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2025-06-06-941 fra 2026-01-01",
         "ikraft": "av siste endring",
         "korttittel": "Internkontrollforskriften",
         "id": "kode"
@@ -317,7 +317,7 @@
       "lenke": "https://lovdata.no/lov/2005-06-17-62",
       "tittel": "Lov om arbeidsmiljø, arbeidstid og stillingsvern mv. (arbeidsmiljøloven)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "lov/2026-06-19-33 fra 2026-07-01",
         "ikraft": "av siste endring",
         "korttittel": "Arbeidsmiljøloven – aml",
         "id": "kode"
@@ -341,7 +341,7 @@
       "lenke": "https://lovdata.no/forskrift/2004-06-01-931",
       "tittel": "Forskrift om begrensning av forurensning (forurensningsforskriften)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2026-07-02-1508",
         "ikraft": "av siste endring",
         "korttittel": "Forurensningsforskriften",
         "id": "kode"
@@ -425,7 +425,7 @@
       "lenke": "https://lovdata.no/forskrift/2004-06-01-922",
       "tittel": "Forskrift om begrensning i bruk av helse- og miljøfarlige kjemikalier og andre produkter (produktforskriften)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2026-09-17-1870",
         "ikraft": "av siste endring",
         "korttittel": "Produktforskriften",
         "id": "kode"
@@ -463,8 +463,45 @@
         }
       }
     },
-    "trykk": {
-      "finnes": false
+    "farligstoff": {
+      "finnes": true,
+      "fil": "sf-20090608-0602.xml",
+      "lenke": "https://lovdata.no/forskrift/2009-06-08-602",
+      "tittel": "Forskrift om håndtering av brannfarlig, reaksjonsfarlig og trykksatt stoff samt utstyr og anlegg som benyttes ved håndteringen",
+      "meta": {
+        "sistEndret": "forskrift/2015-06-26-774 fra 2015-07-01",
+        "ikraft": "av siste endring",
+        "korttittel": "Forskrift om håndtering av farlig stoff",
+        "id": "kode"
+      },
+      "dokHash": "066fd3e91cb4a481",
+      "metode": "merking",
+      "par": {
+        "§ 9": {
+          "hash": "6e85c231a45ac717",
+          "tekst": "§ 9 . Kontroll Ved konstruksjon, produksjon, installasjon, endring og reparasjon av utstyr og anlegg skal det gjennomføres kontroll for å påse at utstyr og anlegg er formålstjenlig og sikkert. Kravet til kontroll gjelder både nytt og brukt utstyr. Ved virksomheter som skal ha samtykke etter § 17 eller utstyr og anlegg som representerer en potensiell høy risiko, skal kontroll av utstyr og anlegg utføres av uavhengig kontrollør i form av teknisk kontrollorgan, brukerinspektorat eller akkreditert inspeksjonsorgan. Med utstyr og anlegg som representerer en høy potensiell risiko menes i denne paragraf kjeler som er beregnet for produksjon av damp eller hetvann med temperatur over 110 °C, og hvor produktet av trykk i bar og volum i liter er større enn 3 000 og hvor trykket er større enn 0,5 bar overtrykk og volumet er større enn 100 liter, anlegg som alene eller sammenkoblet inneholder mer enn 400 liter giftig gass kategori 1, 2 eller 3, gassanlegg for bruk av brannfarlig gass kategori 1 og 2 tilknyttet fast rørnett med over- eller undergrunnstank, rørsystem for distribusjon av gass, eller flaskebatteri. Når slike gassanlegg er tilknyttet frittliggende eneboliger eller frittliggende fritidsboliger, og hvor trykket er maksimalt 100 mbar når gassen føres inn i boligen, kreves likevel ikke at kontrollen skal utføres av uavhengig kontrollør. Eier og bruker skal sørge for at utstyr og anlegg underlegges systematisk tilstandskontroll for å påse at den tekniske tilstand er tilfredsstillende. Hyppighet og omfang av den systematiske tilstandskontrollen må tilpasses utstyrets og anleggets driftsbetingelser. Systematisk tilstandskontroll av utstyr og anlegg skal utføres av uavhengig kontrollør dersom virksomheten skal ha samtykke etter § 17 , eller utstyret og anlegget representerer en høy potensiell risiko, jf. første ledd. Når gassanlegg i boliger er tilknyttet fast rørnett med over- eller undergrunnstank, rørsystem for distribusjon av gass, eller flaskebatteri, skal det til enhver tid foreligge avtale med kontrollør om gjennomføring av den systematiske tilstandskontrollen etter annet ledd. Gassflasker for LPG skal gjennomgå periodisk kontroll etter prosedyrene som er fastsatt for slike flasker i forskrift 1. april 2009 nr. 384 om landtransport av farlig gods, ADR kapittel 4 og 6 og i overensstemmelse med fristen som fremkommer av merkingen på flasken. Nye og kontrollerte gassflasker for LPG skal merkes med dato for neste periodiske kontroll slik at kontrollintervallet blir på maksimalt 10 år, med følgende unntak: For gassflasker for LPG av komposittmateriale skal kontrollintervallet fastsettes av den myndigheten som har utstedt typegodkjenningen eller av et organ som denne myndigheten har utpekt. For sveisede gassflasker for LPG av stål kan kontrollintervallet etter søknad utvides til 15 år etter betingelsene i forskrift 1. april 2009 nr. 384 om landtransport av farlig gods, ADR 4.1.4.1 P200, (12). Endret ved forskrift 26 juni 2015 nr. 774 (i kraft 1 juli 2015). Endres ved forskrift 4 feb 2026 nr. 140 (i kraft 1 jan 2027, endring endret ved forskrift 20 feb 2026 nr. 244 ). <span"
+        }
+      }
+    },
+    "utforelse": {
+      "finnes": true,
+      "fil": "sf-20111206-1357.xml",
+      "lenke": "https://lovdata.no/forskrift/2011-12-06-1357",
+      "tittel": "Forskrift om utførelse av arbeid, psykososialt arbeidsmiljø, bruk av arbeidsutstyr og tilhørende tekniske krav (forskrift om utførelse av arbeid)",
+      "meta": {
+        "sistEndret": "forskrift/2026-09-29-1949",
+        "ikraft": "av siste endring",
+        "korttittel": "Forskrift om utførelse av arbeid",
+        "id": "kode"
+      },
+      "dokHash": "08cf1a72a02d61cf",
+      "metode": "merking",
+      "par": {
+        "§ 10-6": {
+          "hash": "08eef9c8df0c23c7",
+          "tekst": "§ 10-6 . Alminnelige plikter for arbeidsgiver ved bruk av arbeidsutstyr Arbeidsgiver skal sørge for at det kun brukes arbeidsutstyr som er i samsvar med forskriftskravene til det aktuelle arbeidsutstyret. Ved bruk av maskiner og annet arbeidsutstyr som er produsert og satt i omsetning før 1. januar 1995, skal arbeidsgiver sørge for at det kun brukes utstyr som er i samsvar med kravene i kapitlene 10 , 18 og 19 . Ved bruk av maskiner omsatt etter 1. januar 1995, skal arbeidsgiver sørge for at maskinen til enhver tid er i samsvar med helse- og sikkerhetskravene som gjaldt da arbeidsutstyret ble produsert og satt i omsetning. Arbeidsutstyr skal brukes til de arbeidsoperasjoner og under de forhold som det er beregnet for. Arbeidsutstyr skal ikke brukes til persontransport med mindre det er konstruert og bygget for det. Endret ved forskrifter 22 des 2014 nr. 1894 (i kraft 1 jan 2015), 21 juni 2016 nr. 761 (i kraft 1 juli 2016, tidligere § 10-5). <span"
+        }
+      }
     },
     "fel": {
       "finnes": true,
@@ -472,7 +509,7 @@
       "lenke": "https://lovdata.no/forskrift/1998-11-06-1060",
       "tittel": "Forskrift om elektriske lavspenningsanlegg",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2005-06-30-744",
         "ikraft": "av siste endring",
         "korttittel": "Forskrift om elektriske lavspenningsanlegg - FEL",
         "id": "kode"
@@ -487,7 +524,7 @@
       "lenke": "https://lovdata.no/forskrift/2006-04-28-458",
       "tittel": "Forskrift om sikkerhet ved arbeid i og drift av elektriske anlegg.",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2023-12-18-2278 fra 2024-01-01",
         "ikraft": "av siste endring",
         "korttittel": "Forskrift om sikkerhet ved elektriske anlegg",
         "id": "kode"
@@ -502,7 +539,7 @@
       "lenke": "https://lovdata.no/forskrift/2003-04-25-486",
       "tittel": "Forskrift om miljørettet helsevern",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2026-05-27-910",
         "ikraft": "av siste endring",
         "korttittel": "Forskrift om miljørettet helsevern",
         "id": "kode"
@@ -517,7 +554,7 @@
       "lenke": "https://lovdata.no/forskrift/2016-12-16-1659",
       "tittel": "Forskrift om strålevern og bruk av stråling (strålevernforskriften)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2026-06-26-1397 fra 2026-07-01",
         "ikraft": "av siste endring",
         "korttittel": "Strålevernforskriften",
         "id": "kode"
@@ -532,7 +569,7 @@
       "lenke": "https://lovdata.no/forskrift/2009-12-18-1665",
       "tittel": "Forskrift om energimerking av bygninger og energivurdering av varme- og klimaanlegg (energimerkeforskriften for bygninger)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2025-04-02-591 fra 2026-01-01",
         "ikraft": "av siste endring",
         "korttittel": "Energimerkeforskriften for bygninger",
         "id": "kode"
@@ -544,10 +581,10 @@
     "lekeplass": {
       "finnes": true,
       "fil": "sf-19960719-0703.xml",
-      "lenke": "https://lovdata.no/dokument/SF/forskrift/1996-07-19-703",
+      "lenke": "https://lovdata.no/forskrift/1996-07-19-703",
       "tittel": "Forskrift om sikkerhet ved lekeplassutstyr",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "forskrift/2014-09-12-1171 fra 2014-09-15",
         "ikraft": "av siste endring",
         "korttittel": "Forskrift om sikkerhet ved lekeplassutstyr",
         "id": "kode"
@@ -562,7 +599,7 @@
       "lenke": "https://lovdata.no/lov/1999-03-26-14",
       "tittel": "Lov om skatt av formue og inntekt (skatteloven)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "lov/2026-06-23-66 fra 2026-07-01",
         "ikraft": "av siste endring",
         "korttittel": "Skatteloven – sktl",
         "id": "kode"
@@ -586,7 +623,7 @@
       "lenke": "https://lovdata.no/lov/2004-11-19-73",
       "tittel": "Lov om bokføring (bokføringsloven)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "lov/2020-11-20-128 fra 2021-01-01",
         "ikraft": "av siste endring",
         "korttittel": "Bokføringsloven",
         "id": "kode"
@@ -606,7 +643,7 @@
       "lenke": "https://lovdata.no/lov/2018-06-15-38",
       "tittel": "Lov om behandling av personopplysninger (personopplysningsloven)",
       "meta": {
-        "sistEndret": "ved",
+        "sistEndret": "lov/2021-06-18-124 fra 2022-01-01",
         "ikraft": "av siste endring",
         "korttittel": "Personopplysningsloven",
         "id": "kode"
