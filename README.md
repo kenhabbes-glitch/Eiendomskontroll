@@ -115,3 +115,15 @@ Kjør `supabase/migrations/004_epost.sql`. Deretter setter administrator avsende
 
 ## DWG-tegninger
 Plantegninger kan lastes opp som DWG. Filen leses i nettleseren av LibreDWG (WebAssembly, GPLv3) i en egen Web Worker (`public/dwg/`), gjøres om til et bilde og får **målestokk automatisk** ut fra tegningsenheten (INSUNITS, kan overstyres ved opplasting). Original-DWG lagres sammen med tegningen. Se `public/dwg/README.txt` og `tools/dwg-worker/BUILD.md`. DXF støttes foreløpig ikke.
+
+## Brannvern – informasjon til leietakere (migrering 013)
+
+Kjør `supabase/migrations/013_brannvern.sql` i SQL Editor. Den legger bare til tre databasefunksjoner som leietakere bruker fra portalen (`bekreft_brannvern`, `oppdater_brannvernansvarlig`, `bekreft_brann_midlertidig`); ingen tabeller endres.
+
+Bygger på forskrift om brannforebygging § 4 (eier skal gjøre leietakerne kjent med kravene til brannsikkerhet og samordne bruken), § 10 (dokumentasjon) og §§ 11–13 (leietakers plikter).
+
+- **Eiendom → Brannvern**: brannkort (risikoklasse, forutsetninger fra brannkonseptet, alarmorganisering, oppstillingsplass, husregler, vedlagte rømningsplaner) som publiseres i versjoner.
+- **Brannvernpakke**: PDF per leietaker med byggets brannsikkerhet, brannsikringsinstallasjoner (også komponenter plassert innenfor leietakerens areal på tegningene), husregler, leietakers plikter og signaturside. Lagres som dokument på leietakeren og vises i portalen.
+- **Bekreftelse**: leietaker bekrefter i portalen, eller eier registrerer signert papir/e-post. Ny versjon eller mer enn 12 måneder gammel bekreftelse gir oppfølging på Oversikt.
+- **Redusert brannsikkerhet**: midlertidige varsler (alarm ute av drift o.l.) vises øverst i portalen til de avsluttes, med lesebekreftelse per leietaker.
+- **Samordning**: brannvernansvarlig, samordningsavtale og siste brannøvelse per leietaker, og felles årlig brannøvelse i kontrollplanen.

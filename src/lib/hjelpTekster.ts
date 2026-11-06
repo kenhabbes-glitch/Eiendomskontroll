@@ -109,6 +109,17 @@ En måler er en komponent i systemet den hører til (f.eks. trykkmåler under sp
 
 Firmaets egen administrator fordeler byggene på sine ansatte. Avsluttes eller utløper oppdraget, mister hele firmaet tilgangen umiddelbart. Firmaet kan ikke gi tilgangen videre.` },
   'side.data': { gruppe: 'Sider', tittel: 'Import og eksport', tekst: `Ta sikkerhetskopi av alle data som en fil, eller les inn data fra en tidligere kopi.` },
+  'side.brannvern': { gruppe: 'Sider', tittel: 'Brannvern – informasjon til leietakere', tekst: `Forskrift om brannforebygging § 4 sier at eier skal kjenne kravene til brannsikkerhet i bygget, gjøre leietakerne kjent med dem og samordne bruken når flere virksomheter leier i bygget. Etter § 10 skal eier kunne dokumentere at det er gjort.
+
+Slik fungerer det:
+- Brannkort: fyll ut risikoklasse, forutsetninger fra brannkonseptet, alarmorganisering, oppstillingsplass, husregler og velg rømningsplaner som skal legges ved.
+- Publiser: hver publisering får et versjonsnummer. Endrer du brannkortet senere (ombygging, nytt brannkonsept, ny oppstillingsplass), publiserer du en ny versjon, og alle leietakerne må få og bekrefte den på nytt.
+- Brannvernpakke: appen lager en PDF per leietaker med byggets brannsikkerhet, installasjonene (også komponenter plassert i leietakerens areal på tegningen), husregler, leietakerens plikter etter §§ 11–13 og en signaturside. Pakken legges i leietakerens dokumenter og vises i portalen.
+- Bekreftelse: leietakeren bekrefter i portalen. Har leietakeren ikke innlogging, kan du registrere signert papir eller e-post. Bekreftelsen må fornyes hvert år.
+- Redusert brannsikkerhet: er alarmen ute av drift, en rømningsvei stengt eller sprinkleren frakoblet, varsler du leietakerne. Varselet vises øverst i portalen til det avsluttes, og du ser hvem som har lest det.
+- Samordning: oversikten viser brannvernansvarlig, samordningsavtale og siste brannøvelse per leietaker, og du kan legge en felles årlig brannøvelse i kontrollplanen.
+
+Leietakerens egne plikter (rutiner, opplæring, øvelser) følges opp som før under Internkontroll og plikter.` },
   'side.portal': { gruppe: 'Sider', tittel: 'Mitt leieforhold', tekst: `Her ser du leieavtalen din, hva du som leietaker har ansvar for, og hvilke plikter du må dokumentere (f.eks. internkontroll og brannvernleder). Last opp dokumentasjon og bekreft når en plikt er utført.` },
 
   // ---------------- Begreper

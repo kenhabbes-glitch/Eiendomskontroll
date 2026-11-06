@@ -3,6 +3,7 @@ import { kanRedigereE } from '../lib/store';
 import { Hjelp } from '../components/Hjelp';
 import { DOK_LEIE } from '../lib/catalog';
 import { AnsvarKort } from './Kontrakt';
+import { BrannvernKort } from '../lib/brannvern';
 import { finnMal, kontraktKey, pliktKeysFor } from '../lib/kontrakt';
 import { S, isAdmin, useStore } from '../lib/store';
 import { leieAreal, byId, eNavn, fd, intTxt, m2, pliktStatus } from '../lib/utils';
@@ -74,6 +75,7 @@ export function LeietakerView({ id }: { id: string }) {
           : <p className="small muted" style={{ margin: 0 }}>{rensOrgnr(l.orgnr || '').length === 9 ? 'Ikke hentet ennå.' : 'Legg inn org.nr. for å hente opplysninger og overvåke status (konkurs, avvikling).'}</p>}</div>
     </div>
     <AnsvarKort l={l} />
+    <BrannvernKort l={l} />
     <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Internkontroll og plikter<Hjelp id="ik.underpunkt" /><Hjelp id="ik.send" /></h2>{(() => { const mangler = pliktKeysFor(l).filter(k => !(l.plikter || []).some((p: any) => p.key === k)); return mangler.length > 0 && <button className="btn sm pri" onClick={() => leggTilStandardPlikter(id)} title={mangler.map(k => PLIKTER[k].n).join('\n')}>+ Legg til {mangler.length} manglende plikter</button>; })()}<button className="btn sm" onClick={() => nyPlikt(id)}>+ Legg til plikt</button><button className="btn sm" onClick={() => sendSjekkliste(id)} title="Send lenke eller Excel-pakke til leietaker for utfylling">✉ Send sjekkliste til leietaker</button><button className="btn sm" onClick={() => importerPakke(id)} title="Les inn utfylt Excel-sjekkliste og mapper (ZIP) fra leietaker">⇪ Importer utfylt sjekkliste</button></div>
       <div className="tbl-wrap"><table><thead><tr><th>Plikt</th><th>Hjemmel</th><th>Frekvens</th><th>Sist bekreftet</th><th>Neste</th><th>Status</th><th /></tr></thead><tbody>
         {(l.plikter || []).length ? l.plikter.map((p: any, i: number) => { const s = pliktStatus(p); const d = p.dokId && byId('dokumenter', p.dokId);
