@@ -74,7 +74,7 @@ export function showModal(title: ReactNode, body: (close: () => void) => ReactNo
 export function confirmBox(text: string, okTxt = 'Slett'): Promise<boolean> {
   return new Promise(res => {
     let done = false;
-    openModal({ onClose: () => { if (!done) res(false); }, render: close => <ModalFrame title="Bekreft" close={close} foot={<><button className="btn" onClick={close}>Avbryt</button><button className="btn pri" autoFocus onClick={() => { done = true; res(true); close(); }}>{okTxt}</button></>}><p style={{ margin: 0 }}>{text}</p></ModalFrame> });
+    openModal({ onClose: () => { if (!done) res(false); }, render: close => <ModalFrame title="Bekreft" close={close} foot={<><button className="btn" onClick={close}>Avbryt</button><button className="btn pri" autoFocus onClick={() => { done = true; res(true); close(); }}>{okTxt}</button></>}><p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{text}</p></ModalFrame> });
   });
 }
 export function copyText(t: string) { navigator.clipboard.writeText(t).then(() => toast('Kopiert'), () => toast('Kunne ikke kopiere – merk teksten og kopier manuelt')); }
