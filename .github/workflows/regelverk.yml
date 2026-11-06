@@ -1,0 +1,67 @@
+# Ukentlig regelverkssjekk: sammenligner lovene og forskriftene appen viser til med gjeldende tekst hos Lovdata
+# (åpne data, NLOD 2.0). Ved endringer opprettes en GitHub-sak med før/etter-tekst, utvikler får e-post og det føres
+# en hendelse i appens hendelseslogg. Statusen vises på siden «Regelverk og plikter».
+#
+# Oppsett (én gang):
+#   GitHub → Settings → Secrets and variables → Actions:
+#     REGELVERK_TOKEN  – lang tilfeldig verdi (samme som i Netlify)
+#     APP_URL          – f.eks. https://eiendomskontroll.netlify.app
+#   Netlify → Environment variables: REGELVERK_TOKEN (samme verdi) og UTVIKLER_EPOST
+name: Regelverkssjekk
+on:
+  schedule:
+    - cron: '17 5 * * 1'   # mandager 05:17 UTC
+  workflow_dispatch:
+    inputs:
+      godkjenn:
+        description: 'Appen er oppdatert – gjør gjeldende regelverk til ny grunnlinje'
+        type: boolean
+        default: false
+permissions:
+  contents: write
+  issues: write
+concurrency: { group: regelverk, cancel-in-progress: false }
+jobs:
+  sjekk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HAR_TOKEN: ${{ secrets.REGELVERK_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Sjekk mot Lovdata
+        run: node scripts/regelverkssjekk.mjs ${{ inputs.godkjenn && '--godkjenn' || '' }}
+      - name: Opprett eller oppdater GitHub-sak
+        id: sak
+        if: hashFiles('regelverk/varsel.json') != ''
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          TYPE=$(node -p "require('./regelverk/varsel.json').type")
+          NR=$(gh issue list --label regelverk --state open --json number --jq '.[0].number' || true)
+          if [ "$TYPE" = "godkjent" ]; then
+            if [ -n "$NR" ]; then gh issue close "$NR" --comment "Appen er kontrollert mot gjeldende regelverk. Ny grunnlinje er lagret."; fi
+            exit 0
+          fi
+          gh label create regelverk --color B60205 --description "Endringer i lover og forskrifter" 2>/dev/null || true
+          if [ -n "$NR" ]; then gh issue comment "$NR" --body-file regelverk/rapport.md; URL=$(gh issue view "$NR" --json url --jq .url)
+          else URL=$(gh issue create --title "Regelverk: endringer som kan kreve oppdatering av appen ($(date +%d.%m.%Y))" --label regelverk --body-file regelverk/rapport.md); fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+      - name: Varsle appen (e-post til utvikler og hendelseslogg)
+        if: hashFiles('regelverk/varsel.json') != '' && env.HAR_TOKEN == 'true'
+        env:
+          REGELVERK_TOKEN: ${{ secrets.REGELVERK_TOKEN }}
+          APP_URL: ${{ secrets.APP_URL }}
+          ISSUE: ${{ steps.sak.outputs.url }}
+        run: |
+          node -e "
+            const v=require('./regelverk/varsel.json'); const k=require('./regelverk/kilder.json');
+            fetch((process.env.APP_URL||'https://eiendomskontroll.netlify.app').replace(/\/+$/,'')+'/.netlify/functions/arbeidsordre',{method:'POST',headers:{'Content-Type':'application/json','x-regelverk-token':process.env.REGELVERK_TOKEN},
+              body:JSON.stringify({action:'regelverk_varsel',varsel:v,issue:process.env.ISSUE||'',antall:k.kilder.length})}).then(async r=>{const t=await r.text();console.log(r.status,t);if(!r.ok)process.exit(1)});"
+      - name: Lagre status og grunnlinje
+        run: |
+          rm -f regelverk/varsel.json
+          git config user.name "regelverkssjekk"; git config user.email "actions@users.noreply.github.com"
+          git add regelverk public/regelverk-status.json
+          git diff --cached --quiet || (git commit -m "Regelverkssjekk $(date +%Y-%m-%d)" && git push)

@@ -1,3 +1,4 @@
+import { RegelverkStatus } from '../components/RegelverkStatus';
 import React from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { KATS, KOMP, MALER, PLIKTER, TFM_KODER } from '../lib/catalog';
@@ -52,6 +53,7 @@ export function Regelverk() {
   return <>
     <div className="head"><div className="grow"><h1>Regelverk og eiers plikter<Hjelp id="side.regelverk" /></h1><p className="sub">Hva som hviler på eier av næringseiendom, og grunnlaget for malene i programmet</p></div></div>
     <div className="note" style={{ marginBottom: 16 }}>Oversikten er et arbeidsverktøy, ikke juridisk rådgivning. Krav og intervaller avhenger av byggets bruk, størrelse og anleggenes utførelse, og regelverket endres. Kontroller mot <a href="https://lovdata.no" target="_blank" rel="noopener noreferrer">Lovdata</a>, DSB, DiBK, NVE og Miljødirektoratet, og mot krav fra forsikringsselskapet.</div>
+    <RegelverkStatus />
     <Sok q={f.q} set={q => setF({ q })} n={n} />
     {n === 0 && <Tom />}
     <div className="grid g2">{sek.map(([t, l]) => <div key={t} className="card rules"><h3>{t}</h3><ul>{l.map((h, i) => <Li key={i} h={h} />)}</ul></div>)}</div>

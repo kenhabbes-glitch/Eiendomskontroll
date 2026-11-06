@@ -465,6 +465,39 @@ const handler = async (req: Request) => {
     return json(200, await koSend(o, til, String(body.melding || '').slice(0, 2000), base, p));
   }
 
+  // Regelverkssjekk mot Lovdata (kalles ukentlig av GitHub Actions med REGELVERK_TOKEN)
+  if (body.action === 'regelverk_varsel') {
+    const forv = (process.env.REGELVERK_TOKEN || '').trim(); const fikk = (req.headers.get('x-regelverk-token') || '').trim();
+    const { timingSafeEqual } = await import('node:crypto');
+    if (forv.length < 24 || fikk.length !== forv.length || !timingSafeEqual(Buffer.from(fikk), Buffer.from(forv))) return json(403, { error: 'Ikke tillatt' });
+    const v = body.varsel || {}; const E: any[] = Array.isArray(v.endringer) ? v.endringer.slice(0, 50) : []; const PR: string[] = Array.isArray(v.problemer) ? v.problemer.slice(0, 50).map(String) : [];
+    const type = ['startet', 'endringer', 'godkjent'].includes(v.type) ? v.type : 'endringer';
+    const kort = type === 'godkjent' ? 'Regelverk: appen er kontrollert og oppdatert mot gjeldende lover og forskrifter (Lovdata).'
+      : type === 'startet' ? `Regelverk: overvåking av ${body.antall || ''} lover og forskrifter mot Lovdata er startet.`
+      : `Regelverk: ${E.length} endring(er) hos Lovdata i regelverk appen viser til – ${E.map(e => e.navn).slice(0, 6).join(', ')}. Tekster i appen oppdateres i en programoppdatering.`;
+    // Hendelseslogg: én rad per organisasjon, synlig for administratorene
+    const { data: orger } = await admin.from('organisasjoner').select('id');
+    const rader = (orger || []).map((o: any) => ({ bruker_id: null, bruker: 'Regelverkssjekk (Lovdata)', tabell: 'hendelse', rad_id: null, eiendom_id: null, org_id: o.id, handling: 'regelverk', tekst: kort.slice(0, 1000),
+      endringer: { type, sjekket: v.sjekket || new Date().toISOString(), endringer: E.map(e => ({ navn: String(e.navn || ''), tekst: String(e.tekst || '').slice(0, 500), lenke: String(e.lenke || ''), paragrafer: (e.paragrafer || []).slice(0, 30) })), issue: String(body.issue || '') } }));
+    if (rader.length) { const { error } = await admin.from('hendelseslogg').insert(rader); if (error) console.error('regelverk logg', error.message); }
+    // E-post til utvikler
+    const til = (process.env.UTVIKLER_EPOST || process.env.EPOST_SVAR || '').split(/[,;\s]+/).filter(x => /^\S+@\S+\.\S+$/.test(x));
+    let sendt = 0; const grunner: string[] = [];
+    if (til.length && type !== 'godkjent') {
+      const { data: op } = await admin.from('epost_oppsett').select('org_id').not('hemmelig', 'is', null).limit(1);
+      const oppsett = await hentOppsett((process.env.REGELVERK_ORG || '').trim() || op?.[0]?.org_id || null);
+      const emne = type === 'startet' ? 'Eiendomskontroll: regelverksovervåking startet' : `Eiendomskontroll: ${E.length} regelverksendring(er) må vurderes i appen`;
+      const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:720px;color:#1d2521"><h2 style="margin:0 0 8px">${esc(emne)}</h2><p>${esc(kort)}</p>
+        ${E.length ? `<ul>${E.map(e => `<li><b>${esc(e.navn)}</b> – ${esc(e.tekst)}${e.lenke ? ` (<a href="${esc(e.lenke)}">Lovdata</a>)` : ''}</li>`).join('')}</ul>` : ''}
+        ${PR.length ? `<p><b>Merknader:</b></p><ul>${PR.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+        ${body.issue ? `<p><a href="${esc(String(body.issue))}">Se detaljer med før/etter-tekst i GitHub-saken</a></p>` : ''}
+        <p style="font-size:12px;color:#6b736d">Når appen er oppdatert: kjør arbeidsflyten «Regelverkssjekk» med «godkjenn», så blir gjeldende tekst ny grunnlinje. Kilde: Lovdata (NLOD 2.0).</p></div>`;
+      for (const t of til) { const r = await sendEpost(t, emne, html, `${emne}\n\n${kort}\n\n${String(v.rapport || '').slice(0, 20000)}`, undefined, undefined, oppsett).catch((e: any) => ({ sendt: false, grunn: e?.message }));
+        if ((r as any).sendt) sendt++; else grunner.push((r as any).grunn || 'ukjent'); }
+    } else if (!til.length) grunner.push('UTVIKLER_EPOST er ikke satt i Netlify');
+    return json(200, { ok: true, logget: rader.length, sendt, grunner });
+  }
+
   // Daglig automatisk utsending (kalles av den planlagte funksjonen ko-auto)
   if (body.action === 'ko_auto') {
     const forventet = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('ko-auto:' + key)).then(b => Buffer.from(b).toString('hex'));
