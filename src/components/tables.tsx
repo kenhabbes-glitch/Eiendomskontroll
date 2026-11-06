@@ -1,3 +1,4 @@
+import { bvStatus } from '../lib/brannvern';
 import { TgForslagChip } from './TgKg';
 import React, { type ReactNode } from 'react';
 import { Hjelp } from './Hjelp';
@@ -199,7 +200,7 @@ export function ServiceavtaleTable({ es, visAnb = false, showE = true }: { es: R
 
 export function LeieTable({ list, showE = true }: { list: Rec[]; showE?: boolean }) {
   if (!list.length) return <Wrap><Empty t="Ingen leietakere">Legg til leietakere med avtaleperiode, vedlikeholdsansvar og internkontrollplikter.</Empty></Wrap>;
-  return <Wrap><table><thead><tr><th>Leietaker</th>{showE && <th>Eiendom</th>}<th>Leieobjekt</th><th className="num">Areal</th><th>Avtale utløper</th><th>Internkontroll / plikter</th><th className="num">Åpne avvik</th><th>Brukere</th></tr></thead><tbody>
+  return <Wrap><table><thead><tr><th>Leietaker</th>{showE && <th>Eiendom</th>}<th>Leieobjekt</th><th className="num">Areal</th><th>Avtale utløper</th><th>Internkontroll / plikter</th><th>Brannvern-info</th><th className="num">Åpne avvik</th><th>Brukere</th></tr></thead><tbody>
     {sortBy(list, l => l.navn).map(l => { const ps = (l.plikter || []).map(pliktStatus).filter((s: any) => s.t !== 'Ikke relevant'); const bad = ps.filter((s: any) => s.o >= 2).length; const d = l.slutt ? dUntil(l.slutt)! : null; const varsel = (+l.varsel || 12) * 30.5;
       const users = S.profiles.filter(p => p.leietaker_id === l.id && p.rolle === 'leietaker').length;
       return <tr key={l.id} className="click" onClick={() => go('leietaker/' + l.id)}>
@@ -207,6 +208,7 @@ export function LeieTable({ list, showE = true }: { list: Rec[]; showE?: boolean
         <td className="small">{l.lokale || '–'}</td><td className="num">{(() => { const la = leieAreal(l); return la.verdi === null ? '–' : <>{m2(la.verdi)}{la.adv.length > 0 && <span data-tip={la.adv.join('\n')} style={{ color: 'var(--amber)', marginLeft: 4 }}>⚠</span>}{la.kilde === 'overstyrt' && <div className="small muted">overstyrt</div>}</>; })()}</td>
         <td>{d === null ? <span className="muted">–</span> : d < 0 ? <Chip c="red">Utløpt {fd(l.slutt)}</Chip> : d <= varsel ? <Chip c="amber">{fd(l.slutt)}</Chip> : <span className="small">{fd(l.slutt)}</span>}</td>
         <td>{ps.length ? (bad ? <Chip c="red">{bad} av {ps.length} mangler</Chip> : <Chip c="green">{ps.length} av {ps.length} OK</Chip>) : <span className="muted">–</span>}</td>
+        <td>{(() => { const b = bvStatus(l); return <Chip c={b.c} title={b.hint}>{b.t}</Chip>; })()}</td>
         <td className="num">{openAvvik().filter(a => a.leietakerId === l.id).length}</td>
         <td className="small">{users ? `${users} bruker${users > 1 ? 'e' : ''}` : <span className="muted">Ingen</span>}</td></tr>; })}
   </tbody></table></Wrap>;

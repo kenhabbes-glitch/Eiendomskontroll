@@ -7,6 +7,7 @@ import { isStaff } from '../lib/store';
 import { PortefoljeStatistikk } from './Portefolje';
 import { tilGodkjenning, vurderPlikt } from './Sjekkliste';
 import { Hjelp } from '../components/Hjelp';
+import { bvOppfolging, aktiveMidl } from '../lib/brannvern';
 import { DOK_PAAKREVD } from '../lib/catalog';
 import { S, canEdit, isAdmin, state, useStore } from '../lib/store';
 import { aNavn, kNavn, activeTasks, compRest, docCoverage, dUntil, eNavn, fd, openAvvik, pliktStatus, sortBy, today } from '../lib/utils';
@@ -55,6 +56,7 @@ export function Oversikt() {
       {K(OA.length, 'Åpne avvik', `${krit.length} kritiske/høye · ${avForf.length} over frist`, avForf.length || krit.length ? 'bad' : OA.length ? 'warn' : 'ok', 'avvik')}
       {ed && K(cov.length, 'Dokumenter mangler/utløpt', `${dokExp.length} utløper innen 90 d`, cov.length ? 'warn' : 'ok', 'dokumenter')}
       {ed && K(ikMiss.length, 'Leietakerplikter ubekreftet', `hos ${ikL.length} leietakere`, ikMiss.length ? 'warn' : 'ok', 'leietakere')}
+      {ed && (() => { const bvL = bvOppfolging(); const midl = S.eiendommer.reduce((n, e) => n + aktiveMidl(e).length, 0); return K(bvL.length, 'Brannvern-info til leietakere', midl ? `${midl} varsel om redusert brannsikkerhet` : 'ikke sendt, ubekreftet eller mangler ansvarlig', midl ? 'bad' : bvL.length ? 'warn' : 'ok', 'leietakere'); })()}
       {K(lev.length, 'Ved levetidsslutt', '≤ 3 år igjen eller TG3', lev.length ? 'warn' : 'ok', ed ? 'vedlikehold' : 'tfm')}
       {ed && K(lAv.length, 'Leieavtaler til fornyelse', 'innenfor varslingsfrist', lAv.length ? 'warn' : 'ok', 'leietakere')}
     </div>

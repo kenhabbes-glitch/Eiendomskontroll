@@ -8,6 +8,7 @@ import { autoTfm, editAnlegg, editAvvik, editDok, editEiendom, editKomponent, ed
 import { AvvikTable, CoverageTable, DokTable, LeieTable, ServiceavtaleTable, TaskTable, TfmTree } from '../components/tables';
 import { Chip, DueChip, Empty } from '../components/ui';
 import { ArealSection } from './Arealer';
+import { BrannvernSection, bvStatus, mangelAnsvarlig, aktiveMidl } from '../lib/brannvern';
 import { kartUrl, seEiendomUrl, enhetStatus } from '../lib/oppslag';
 
 const go = (p: string) => { location.hash = '#/' + p; };
@@ -35,6 +36,7 @@ export function Eiendom({ id }: { id: string }) {
   if (!e) return <Empty t="Fant ikke eiendommen"><a href="#/eiendommer">Tilbake</a></Empty>;
   const T = S.oppgaver.filter(o => o.eiendomId === id); const A = S.avvik.filter(a => a.eiendomId === id); const D = S.dokumenter.filter(d => d.eiendomId === id); const AN = S.anlegg.filter(a => a.eiendomId === id); const L = S.leietakere.filter(l => l.eiendomId === id);
   const tabs: [string, string, number | ''][] = [['info', 'Oversikt', ''], ['anlegg', 'Systemer og komponenter (TFM)', AN.length], ['kontroll', 'Kontrollplan', T.filter(o => o.aktiv !== false).length], ['avvik', 'Avvik', A.filter(a => !AV_LUKKET.includes(a.status)).length], ['dok', 'Dokumenter', D.length]];
+  tabs.push(['brann', 'Brannvern', ed ? L.filter(l => bvStatus(l).o >= 1 || mangelAnsvarlig(l)).length + aktiveMidl(e).length || '' : aktiveMidl(e).length || '']);
   if (ed) tabs.push(['leie', 'Leietakere', L.length]);
   tabs.push(['areal', 'Tegninger og arealer', S.tegninger.filter(t => t.eiendomId === id).length]);
   const cur = tabs.some(t => t[0] === tab) ? tab : 'info';
@@ -64,6 +66,7 @@ export function Eiendom({ id }: { id: string }) {
   if (cur === 'dok') c = <><div className="toolbar"><button className="btn pri" onClick={() => editDok(undefined, { eiendomId: id })}>+ Dokument</button></div>{ed && <CoverageTable es={[e]} />}<div className="sec"><h2>Serviceavtaler for systemer</h2><ServiceavtaleTable es={[e]} showE={false} visAnb /></div><div className="sec"><h2>Alle dokumenter</h2><DokTable list={D} showE={false} /></div></>;
   if (cur === 'leie') c = <><div className="toolbar"><button className="btn pri" onClick={() => editLeietaker(undefined, { eiendomId: id })}>+ Leietaker</button></div><LeieTable list={L} showE={false} /></>;
   if (cur === 'areal') c = <ArealSection eid={id} />;
+  if (cur === 'brann') c = <BrannvernSection eid={id} />;
   return <>
     <p className="small" style={{ margin: '0 0 6px' }}><a href="#/eiendommer">← Eiendommer</a></p>
     <div className="head"><div className="grow"><h1>{e.navn}</h1><p className="sub">{[e.adresse, e.poststed, e.kategori].filter(Boolean).join(' · ')}</p></div>{ed && <button className="btn" onClick={() => editEiendom(id)}>Rediger</button>}<button className="btn" onClick={() => editAvvik(undefined, { eiendomId: id })}>+ Avvik</button></div>
