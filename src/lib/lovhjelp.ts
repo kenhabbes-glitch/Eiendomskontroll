@@ -3,7 +3,7 @@
 export type Hjelp = { tittel: string; tekst: string; kilde?: [string, string][] };
 
 const BHF: [string, string] = ['Byggherreforskriften (Lovdata)', 'https://lovdata.no/dokument/SF/forskrift/2009-08-03-1028'];
-const BHF_AT: [string, string] = ['Arbeidstilsynet: byggherreforskriften med kommentarer (PDF)', 'https://arbeidstilsynet.no/globalassets/regelverkspdfer/byggherreforskriften'];
+const BHF_AT: [string, string] = ['Arbeidstilsynet: byggherreforskriften med kommentarer', 'https://www.arbeidstilsynet.no/regelverk/forskrifter/byggherreforskriften/'];
 const PBL: [string, string] = ['Plan- og bygningsloven (Lovdata)', 'https://lovdata.no/dokument/NL/lov/2008-06-27-71'];
 const SAK: [string, string] = ['DiBK: byggesaksforskriften § 4-1 med veiledning', 'https://www.dibk.no/regelverk/sak/2/4/4-1'];
 
@@ -12,22 +12,22 @@ export const HJELP: Record<string, Hjelp> = {
     tekst: 'Byggherren skal kartlegge risikoforhold som kan oppstå på grunn av byggherrens planer – valg av løsninger, materialer, rekkefølge og tidsbruk – og planlegge tiltak som reduserer risikoen.\n\nVurder hver arbeidsoperasjon: Hva kan gå galt (fall, ras, strøm, støv/asbest, tunge løft, trafikk, arbeid i drift med leietakere til stede)? Hvor sannsynlig er det, og hvor alvorlig blir konsekvensen?\n\nRisikoforholdene og foreløpige tiltak skal med i tilbudsgrunnlaget (§ 6) og inn i SHA-planen (§ 8), slik at entreprenørene kan prise og planlegge dem.',
     kilde: [BHF_AT, BHF] },
   bhf_shaplan: { tittel: 'Behov for SHA-plan (byggherreforskriften §§ 7 og 8)',
-    tekst: 'Før arbeidet starter skal byggherren sørge for en skriftlig plan for sikkerhet, helse og arbeidsmiljø (SHA-plan). Planen skal blant annet beskrive organisering, fremdrift med nok tid til arbeidsoperasjonene, risikoforhold og spesifikke tiltak for arbeid som kan innebære særlig fare, og rutiner for avvik og endringer.\n\nVurder først om forskriften gjelder: den gjelder ikke når byggherren er forbruker, og rutinemessig eller mindre omfattende vedlikehold er unntatt. En næringseiendom som får utført ombygging, rehabilitering eller utskifting av anlegg er normalt omfattet.\n\nDokumenter vurderingen – også når konklusjonen er at det ikke trengs egen plan.',
+    tekst: 'Før arbeidet starter skal byggherren sørge for en skriftlig plan for sikkerhet, helse og arbeidsmiljø (SHA-plan) (§ 7). Det er ingen størrelsesgrense – kravet gjelder alt bygge- og anleggsarbeid som omfattes av forskriften. Planen skal være tilgjengelig på plassen, oppdateres ved endringer, gjøres kjent for alle arbeidsgivere og enmannsbedrifter og oppbevares i seks måneder etter ferdigstillelse.\n\nInnhold (§ 8): bygger på risikovurderingen og er tilpasset prosjektet – organisasjonskart og kontraktsform, fremdriftsplan som viser når og hvor arbeidsoperasjonene skjer, spesifikke tiltak for arbeid med særlig fare (forskriften lister 17 kategorier, f.eks. fall, arbeid nær installasjoner i grunnen, riving av bærende konstruksjoner) og rutine for oppdatering. Generelle tiltak er ikke nok.\n\nVurder først om forskriften gjelder: byggherrens plikter gjelder ikke når byggherren er forbruker (§ 3). Vedlikehold er med i definisjonen av bygge- og anleggsarbeid, unntatt arbeid som er rutinemessig eller mindre omfattende (§ 4 bokstav a). Ombygging, rehabilitering og utskifting av anlegg i en næringseiendom er normalt omfattet.\n\nDokumenter vurderingen.',
     kilde: [BHF_AT, BHF] },
   bhf_kp: { tittel: 'Koordinator for prosjektering – KP (byggherreforskriften §§ 13 og 14)',
-    tekst: 'Når mer enn én arbeidsgiver eller enmannsbedrift skal arbeide på plassen (underentreprenører teller med), skal byggherren utpeke koordinator for prosjekteringsfasen.\n\nKP koordinerer prosjekteringen slik at SHA ivaretas, og sørger for at SHA-planen utarbeides. Byggherren kan være KP selv, men må ha nødvendig kunnskap om SHA og praktisk erfaring. Utpekingen skal være skriftlig, og byggherren skal følge opp at koordinatoren gjør jobben.',
+    tekst: 'Koordinering kreves når det er flere prosjekterende eller flere utførende virksomheter i prosjektet – samtidig eller etter hverandre (§ 13). Med bare én prosjekterende og én utførende, eller når samme virksomhet både prosjekterer og utfører, kreves ikke koordinator, men byggherren har fortsatt oppfølgingsplikter.\n\nKP deler informasjon mellom de prosjekterende, sørger for at risikoforhold og tiltak kommer med i tilbudsgrunnlaget og at SHA-planen utarbeides (§ 14). Byggherren kan være koordinator selv eller utpeke en ekstern, med skriftlig avtale og dokumentert oppfølging. Koordinatoren må ha kunnskap om SHA og praktisk erfaring fra bygg og anlegg.',
     kilde: [BHF_AT] },
   bhf_ku: { tittel: 'Koordinator for utførelse – KU (byggherreforskriften §§ 13 og 14)',
-    tekst: 'Ved mer enn én arbeidsgiver eller enmannsbedrift skal byggherren også utpeke koordinator for utførelsen.\n\nKU følger opp risikoforholdene i SHA-planen, oppdaterer planen ved behov, koordinerer virksomheter som kan påvirke hverandres sikkerhet, følger opp at arbeidsgiverne gjennomfører planen og sørger for oversiktslister (§ 15). Utpekes skriftlig, og byggherren skal følge opp jevnlig.',
+    tekst: 'Kreves når det er flere utførende virksomheter (inkludert underentreprenører), samtidig eller etter hverandre (§ 13).\n\nKU følger opp risikoforholdene i SHA-planen, oppdaterer planen ved behov, koordinerer virksomheter som kan påvirke hverandres sikkerhet, følger opp at tidsplanene gir nok tid, at kravene i § 9 gjennomføres, og sørger for elektronisk oversiktsliste over alle på plassen som oppdateres daglig (§ 15). Koordineringen er noe annet enn hovedbedriftens samordningsplikt etter arbeidsmiljøloven. Utpekes skriftlig, og byggherren skal følge opp jevnlig.',
     kilde: [BHF_AT] },
   bhf_forhandsmelding: { tittel: 'Forhåndsmelding til Arbeidstilsynet (byggherreforskriften § 10)',
     tekst: 'Forhåndsmelding kreves når arbeidet skal vare mer enn 15 virkedager, eller den forventede arbeidsmengden overstiger 250 dagsverk.\n\nMeldingen sendes elektronisk (Altinn) og må være Arbeidstilsynet i hende senest én uke før oppstart. Den skal holdes oppdatert og henges synlig opp på byggeplassen. Innhold er bl.a. adresse, type prosjekt, byggherre, koordinatorer, prosjekterende og utførende, forventet start, varighet og maks antall arbeidstakere samtidig.\n\nEstimer dagsverk som antall personer × antall dager (f.eks. 4 personer i 70 dager = 280 dagsverk → melding kreves).',
     kilde: [['Arbeidstilsynet: § 10 forhåndsmelding', 'https://arbeidstilsynet.no/en/laws-and-regulations/regulations/construction-client-regulations/2/section10'], BHF] },
   bhf_tilbud: { tittel: 'SHA i tilbudsgrunnlaget (byggherreforskriften § 6)',
-    tekst: 'Byggherren skal beskrive risikoforhold i prosjektet og foreløpige planer for hvordan risikoen skal reduseres i tilbudsgrunnlaget, sammen med krav som kan ha økonomisk eller tidsmessig betydning (f.eks. arbeid i drift, arbeidstider, støyrestriksjoner, adkomst).\n\nLegg ved byggherrens SHA-plan (eller utkast) og risikovurderingen, slik at tilbyderne kan prise tiltakene.',
+    tekst: 'Tilbudsgrunnlaget skal inneholde risikoforholdene som er avdekket, men ikke eliminert, og planene for tiltak som følger av risikovurderingen, sammen med krav som kan ha økonomisk eller tidsmessig betydning (f.eks. arbeid i drift, arbeidstider, støyrestriksjoner, adkomst).\n\nLegg ved byggherrens SHA-plan (eller utkast) og risikovurderingen, slik at tilbyderne kan prise tiltakene.',
     kilde: [BHF_AT] },
   bhf_dok: { tittel: 'Dokumentasjon for fremtidig arbeid (byggherreforskriften § 12)',
-    tekst: 'Byggherren skal sørge for dokumentasjon som er nødvendig for sikkert arbeid senere – drift, vedlikehold, ombygging og riving – og at den overleveres eieren av bygget etter ferdigstillelse. Eksempler: forankringspunkter på tak, adkomst til tekniske rom, farlige stoffer som er brukt, særlige risikoforhold ved anlegget.',
+    tekst: 'Byggherren skal sørge for dokumentasjon som er nødvendig for sikkert arbeid senere – drift, vedlikehold, ombygging og riving – og at den overleveres eieren av bygget ved ferdigstillelse eller når brukstillatelse gis. Eksempler: forankringspunkter på tak, adkomst til tekniske rom, farlige stoffer som er brukt, særlige risikoforhold ved anlegget.',
     kilde: [BHF_AT] },
   pbl_soknad: { tittel: 'Søknadsplikt (plan- og bygningsloven § 20-1 og § 20-2)',
     tekst: 'Tiltak som oppføring, endring og reparasjon av bygningstekniske installasjoner, fasadeendring, bruksendring, riving og oppdeling eller sammenføyning av bruksenheter er søknadspliktige etter § 20-1. Hovedregelen (§ 20-2) er at de ikke kan utføres før kommunen har gitt tillatelse.\n\nVurder om tiltaket berører bærende konstruksjoner, brannskiller, rømningsveier, fasade eller bruken av lokalene – da er det som regel søknadspliktig.',
@@ -45,7 +45,7 @@ export const HJELP: Record<string, Hjelp> = {
     tekst: 'Er tiltaket i strid med reguleringsplan eller byggteknisk forskrift, må det søkes dispensasjon. Det kan bare gis når hensynene bak bestemmelsen ikke blir vesentlig tilsidesatt og fordelene er klart større enn ulempene. Regn med lengre saksbehandling.',
     kilde: [PBL] },
   tek_miljo: { tittel: 'Miljøkartlegging og avfallsplan (TEK17 §§ 9-6 og 9-7)',
-    tekst: 'Ved rehabilitering og riving over visse størrelser (bl.a. over 100 m² BRA berørt, eller over 10 tonn avfall) kreves avfallsplan, og bygningsdeler som kan inneholde farlig avfall – asbest, PCB, KFK, tungmetaller, bromerte flammehemmere – skal kartlegges før arbeidet starter (miljøsaneringsbeskrivelse).\n\nKartleggingen er også viktig for SHA: funn av asbest gir egne krav til arbeidet.',
+    tekst: 'Når endring eller riving berører en del av bygningen på over 100 m² BRA, eller tiltaket gir over 10 tonn bygg- og rivningsavfall, kreves avfallsplan (§ 9-6). Bygningsdeler og installasjoner som kan være farlig avfall – asbest, PCB, KFK, tungmetaller, bromerte flammehemmere – skal kartlegges, og det skal lages miljøkartleggingsrapport/miljøsaneringsbeskrivelse før arbeidet starter (§ 9-7). Fra 2023 omfatter § 9-7 også kartlegging av materialer som egner seg for ombruk, og minst 70 % av avfallet skal sorteres (§ 9-8).\n\nProsjektering og utførelse av miljøsanering er ansvarsbelagt i søknadspliktige tiltak. Kartleggingen er også viktig for SHA: funn av asbest gir egne krav til arbeidet.',
     kilde: [['DiBK: byggteknisk forskrift (TEK17)', 'https://www.dibk.no/regelverk/byggteknisk-forskrift-tek17']] },
   tg_kg: { tittel: 'Tilstandsgrad og konsekvensgrad (NS 3424)',
     tekst: 'Tilstandsgrad: TG0 ingen symptomer, TG1 svake, TG2 middels, TG3 store symptomer eller sammenbrudd. Konsekvensgrad (KG0–KG3) beskriver hvor alvorlig følgen er for sikkerhet, helse, miljø, økonomi og drift. TG3 kombinert med høy KG bør gi tiltak raskt.' },
@@ -59,7 +59,7 @@ export const HJELP: Record<string, Hjelp> = {
 export function hjelpFor(t: string): string | undefined {
   const s = t.toLowerCase();
   if (/risikovurdering av arbeidet|risikovurdering/.test(s)) return 'bhf_risiko';
-  if (/sha-plan vurdert|behov for sha-plan/.test(s)) return 'bhf_shaplan';
+  if (/sha-plan vurdert|behov for sha-plan|sha-plan og behov/.test(s)) return 'bhf_shaplan';
   if (/sha-plan del av konkurranse|sha-plan.*tilbud/.test(s)) return 'bhf_tilbud';
   if (/koordinator for prosjektering|\(kp\)/.test(s)) return 'bhf_kp';
   if (/koordinator for utførelse|\(ku\)/.test(s)) return 'bhf_ku';
@@ -82,7 +82,7 @@ export function hjelpFor(t: string): string | undefined {
 export function verktoyFor(t: string): 'risiko' | 'vurdering' | 'org' | 'plan' | undefined {
   const s = t.toLowerCase();
   if (/risikovurdering av arbeidet/.test(s)) return 'risiko';
-  if (/behov for sha-plan|forhåndsmelding/.test(s)) return 'vurdering';
+  if (/behov for sha-plan|sha-plan og behov|forhåndsmelding/.test(s)) return 'vurdering';
   if (/koordinator/.test(s)) return 'org';
   if (/sha-plan del av/.test(s)) return 'plan';
   return undefined;

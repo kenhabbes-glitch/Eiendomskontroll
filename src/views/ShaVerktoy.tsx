@@ -17,15 +17,18 @@ export function shaKonklusjon(v: Rec = {}, p?: Rec) {
   const V = v.vurdering || {}; const utf = (p?.faser || []).find((f: Rec) => f.k === 'utf') || {};
   const dagerPlan = virkedager(utf.start, utf.slutt); const dager = n(V.dager) || dagerPlan; const dagsverk = n(V.dagsverk) || (dager && n(V.personer) ? dager * n(V.personer) : 0);
   const gjelder = V.forbruker === 'ja' ? false : V.vedlikehold === 'ja' ? false : V.vedlikehold === 'nei' ? true : null;
-  const koord = V.flere === 'ja' ? true : V.flere === 'nei' ? false : null;
+  const jn = (x?: string) => x === 'ja' ? true : x === 'nei' ? false : null;
+  const kp = jn(V.flereP ?? V.flere), ku = jn(V.flereU ?? V.flere);
+  // Koordinering kreves når det er flere prosjekterende eller flere utførende (§ 13)
+  const koord = kp || ku ? true : kp === false && ku === false ? false : null;
   const fm = dager > 15 || dagsverk > 250 ? true : dager || dagsverk ? false : null;
-  return { gjelder, koord, fm, dager, dagerPlan, dagsverk, vurdert: !!(V.vedlikehold && V.flere) };
+  return { gjelder, koord, kp, ku, fm, dager, dagerPlan, dagsverk, vurdert: !!(V.vedlikehold && (V.flere || (V.flereP && V.flereU))) };
 }
 /** Hvilke sjekkpunkter som kan krysses av ut fra innholdet i SHA-verktøyet */
 export function shaAvkrysning(t: string, v: Rec = {}, p?: Rec): boolean {
   const k = shaKonklusjon(v, p); const s = t.toLowerCase(); const O = v.org || {};
   if (/risikovurdering av arbeidet/.test(s)) return (v.risiko || []).length > 0;
-  if (/behov for sha-plan/.test(s)) return k.vurdert;
+  if (/behov for sha-plan|sha-plan og behov/.test(s)) return k.vurdert;
   if (/koordinator for prosjektering/.test(s)) return !!O.kp || k.koord === false;
   if (/koordinator for utførelse/.test(s)) return !!O.ku || k.koord === false;
   if (/forhåndsmelding/.test(s)) return !!v.vurdering?.forhandsmeldt || k.fm === false;
@@ -44,7 +47,8 @@ export function Sha({ v, set, p, fane, setFane }: { v: Rec; set: (x: Rec) => voi
 
     {fane === 'vurdering' && <>
       <div className="sha-q"><span>Er arbeidet rutinemessig eller mindre omfattende vedlikehold? <Hjelp k="bhf_shaplan" /></span><JN v={V.vedlikehold} set={x => setV({ vedlikehold: x })} /></div>
-      <div className="sha-q"><span>Vil mer enn én arbeidsgiver eller enmannsbedrift arbeide på plassen (underentreprenører teller med)? <Hjelp k="bhf_kp" /></span><JN v={V.flere} set={x => setV({ flere: x })} /></div>
+      <div className="sha-q"><span>Blir det flere prosjekterende (rådgivere, arkitekt, entreprenørs prosjekterende)? <Hjelp k="bhf_kp" /></span><JN v={V.flereP ?? V.flere} set={x => setV({ flereP: x })} /></div>
+      <div className="sha-q"><span>Blir det flere utførende virksomheter – samtidig eller etter hverandre (underentreprenører teller med)? <Hjelp k="bhf_ku" /></span><JN v={V.flereU ?? V.flere} set={x => setV({ flereU: x })} /></div>
       <div className="sha-q"><span>Forventet varighet og arbeidsmengde på byggeplassen <Hjelp k="bhf_forhandsmelding" />{k.dagerPlan ? <div className="small muted">Utførelsesfasen i fremdriftsplanen: {k.dagerPlan} virkedager</div> : null}</span>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}><label className="small">Virkedager <input className="num" style={{ width: 70 }} value={V.dager ?? ''} placeholder={k.dagerPlan ? String(k.dagerPlan) : ''} onChange={e => setV({ dager: e.target.value })} /></label>
           <label className="small">Personer i snitt <input className="num" style={{ width: 60 }} value={V.personer ?? ''} onChange={e => setV({ personer: e.target.value })} /></label>
@@ -55,7 +59,7 @@ export function Sha({ v, set, p, fane, setFane }: { v: Rec; set: (x: Rec) => voi
 
       <div className="sha-konk"><b>Konklusjon</b>
         <div>{k.gjelder === false ? '○ Byggherreforskriften gjelder trolig ikke (rutinemessig/mindre vedlikehold). Begrunn vurderingen i notatet.' : k.gjelder ? '● Byggherreforskriften gjelder. Byggherren skal sørge for skriftlig SHA-plan før oppstart (§ 7) og ta risikoforhold med i tilbudsgrunnlaget (§ 6).' : '… Svar på spørsmålet om vedlikehold.'}</div>
-        <div>{k.koord ? '● Koordinator for prosjektering (KP) og for utførelse (KU) skal utpekes skriftlig (§ 13).' : k.koord === false ? '○ Bare én virksomhet – koordinatorer kreves ikke. Vurder på nytt hvis det kommer inn underentreprenører.' : '… Svar på spørsmålet om flere virksomheter.'}</div>
+        <div>{k.koord ? '● Koordinering kreves (§ 13): byggherren utpeker skriftlig koordinator for prosjekteringsfasen (KP) og for utførelsesfasen (KU) – byggherren kan selv ha rollen med nødvendig kompetanse.' : k.koord === false ? '○ Én prosjekterende og én utførende – koordinator kreves ikke, men byggherren har fortsatt oppfølgingsplikter (§ 14). Vurder på nytt hvis det kommer inn flere virksomheter.' : '… Svar på spørsmålene om flere prosjekterende og flere utførende.'}</div>
         <div>{k.fm ? <>● Forhåndsmelding til Arbeidstilsynet kreves ({k.dager ? `${k.dager} virkedager` : ''}{k.dager && k.dagsverk ? ', ' : ''}{k.dagsverk ? `${k.dagsverk} dagsverk` : ''}). Sendes i Altinn senest én uke før oppstart og henges opp på plassen (§ 10).</> : k.fm === false ? `○ Forhåndsmelding kreves ikke (${k.dager || '?'} virkedager, ${k.dagsverk || '?'} dagsverk – grensen er over 15 virkedager eller over 250 dagsverk).` : '… Fyll inn varighet og arbeidsmengde.'}</div>
         {k.fm && <div style={{ marginTop: 6 }}><label className="small">Forhåndsmelding sendt dato <input type="date" value={V.forhandsmeldt || ''} onChange={e => setV({ forhandsmeldt: e.target.value })} /></label> <a className="small" href="https://www.altinn.no/" target="_blank" rel="noopener noreferrer">Altinn ↗</a> <span className="small muted">(søk «forhåndsmelding»)</span></div>}
       </div>
