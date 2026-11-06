@@ -10,7 +10,7 @@ import { Gantt, GanttForklaring } from '../components/Gantt';
 import { nsNavn } from '../components/NsVelger';
 
 const kr = (v: any) => nok(Math.round(+v || 0));
-const RAP_CSS = `.rap{font:10.5pt/1.5 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:#1d2521}.rap h1{font-size:18pt;margin:0 0 2px}.rap h2{font-size:12pt;margin:20px 0 6px;padding-bottom:3px;border-bottom:1px solid #d7dbd5}
+export const RAP_CSS = `.rap{font:10.5pt/1.5 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:#1d2521}.rap h1{font-size:18pt;margin:0 0 2px}.rap h2{font-size:12pt;margin:20px 0 6px;padding-bottom:3px;border-bottom:1px solid #d7dbd5}
 .rap h3{font-size:10.5pt;margin:12px 0 4px}.rap table{border-collapse:collapse;width:100%;margin:4px 0 8px;font-size:9.5pt}.rap th,.rap td{border-bottom:1px solid #e3e6e1;padding:4px 6px;text-align:left;vertical-align:top}
 .rap th{background:#f4f5f2;font-weight:600;position:static}.rap td.n,.rap th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.rap .sum td{font-weight:700;border-top:1.5px solid #9aa39d}
 .rap .meta{color:#6b736d;font-size:9.5pt}.rap .rkpi{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.rap .rkpi>div{flex:1;min-width:120px;border:1px solid #e3e6e1;border-radius:6px;padding:6px 10px}

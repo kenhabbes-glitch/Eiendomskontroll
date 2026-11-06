@@ -1,6 +1,6 @@
 // Prosjektmodul: liste og prosjektside (oversikt, faser og oppgaver, økonomi, FDV, systembytte, logg).
 import React, { useState } from 'react';
-import { Hjelp } from '../components/Hjelp';
+import { Hjelp } from '../components/LovHjelp';
 import { S, save, removeDoc, toast, useStore, kanRedigereE, uploadFile, state } from '../lib/store';
 import { byId, fd, today, sortBy, eNavn, aNavn, nok, toCsv, type Rec } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, openModal, ModalFrame, FileLink, TgChip } from '../components/ui';
@@ -11,6 +11,8 @@ import { lNavn } from '../lib/utils';
 import { NsVelger, nsNavn } from '../components/NsVelger';
 import { Sel, eiendomOpts, useFilter } from './common';
 import { aapneOppgave, nyOppgave } from './ProsjektArbeid';
+import { Hjelp } from '../components/LovHjelp';
+import { hjelpFor } from '../lib/lovhjelp';
 import { lagRapport, Rapporter, StatusChip } from './ProsjektRapport';
 import { Gantt, GanttForklaring } from '../components/Gantt';
 import { faseGodkjent, ganttRader, krevGodkjenning, sisteBeslutning } from '../lib/prosjektArbeid';
@@ -188,7 +190,7 @@ function Oppgaver({ p, kan }: { p: Rec; kan: boolean }) {
       {L.map(o => { const sen = o.frist && o.frist < today() && !['Ferdig', 'Ikke relevant'].includes(o.status);
         return <div key={o.id} className="rk-rad" style={{ opacity: o.status === 'Ikke relevant' ? .5 : 1 }}>
           <input type="checkbox" style={{ width: 'auto' }} disabled={!kan} checked={o.status === 'Ferdig'} onChange={e => settO(o.id, { status: e.target.checked ? 'Ferdig' : 'Pågår', ferdig: e.target.checked ? today() : '' })} />
-          <span style={{ flex: 1, minWidth: 180, textDecoration: o.status === 'Ferdig' ? 'line-through' : undefined, cursor: 'pointer' }} onClick={() => kan ? aapneOppgave(p.id, o.id) : redOppg(o)}>{o.tittel}{o.notat && <span className="small muted"> – {o.notat}</span>}</span>
+          <span style={{ flex: 1, minWidth: 180, textDecoration: o.status === 'Ferdig' ? 'line-through' : undefined, cursor: 'pointer' }} onClick={() => kan ? aapneOppgave(p.id, o.id) : redOppg(o)}>{o.tittel}{o.notat && <span className="small muted"> – {o.notat}</span>}</span><Hjelp k={hjelpFor(o.tittel || '')} />
           {o.fag && <Chip>{o.fag}</Chip>}{kan && <button className="btn ghost sm" title="Åpne arbeidsflaten" onClick={() => aapneOppgave(p.id, o.id)}>Åpne ›</button>}<span className="small muted">{o.ansvarlig}</span><span className="small" style={{ color: sen ? 'var(--red)' : 'var(--muted)' }}>{o.frist ? fd(o.frist) : ''}</span>
           {o.status === 'Pågår' && <Chip c="amber">Pågår</Chip>}</div>; })}
     </div>; })}</>;

@@ -9,7 +9,7 @@ export const n = (v: any) => +String(v ?? '').replace(/\s/g, '').replace(',', '.
 /** Hvilken arbeidsflate en oppgave får. Eksplisitt o.type vinner, ellers utledes fra tittelen. */
 export const OTYPER: [string, string][] = [
   ['generell', 'Generell oppgave (notat, sjekkpunkter, vedlegg)'], ['beskrivelse', 'Prosjektbeskrivelse (behov, mål, omfang, risiko)'], ['overslag', 'Grovt kostnadsoverslag'],
-  ['ramme', 'Finansiering og budsjettramme'], ['kalkyle', 'Detaljert kostnadskalkyle'], ['sjekk', 'Sjekkliste'], ['tilbud', 'Tilbud og evaluering'], ['kontrakt', 'Kontrakt'],
+  ['ramme', 'Finansiering og budsjettramme'], ['kalkyle', 'Detaljert kostnadskalkyle'], ['sjekk', 'Sjekkliste'], ['sha', 'SHA: vurdering, risiko, koordinatorer og SHA-plan'], ['tilbud', 'Tilbud og evaluering'], ['kontrakt', 'Kontrakt'],
   ['moter', 'Møter og referater'], ['endringer', 'Endringsmeldinger og tillegg'], ['mangler', 'Overtakelse og mangelliste'],
 ];
 export function oppgaveType(o: Rec): string {
@@ -23,14 +23,19 @@ export function oppgaveType(o: Rec): string {
   if (/kontrakt signert|kontrakt/.test(t)) return 'kontrakt';
   if (/oppstartsmøte|byggemøte|befaring|ettårsbefaring/.test(t)) return 'moter';
   if (/endringsmelding|tillegg/.test(t)) return 'endringer';
+  if (/byggherreforskrift|sha-plan|\bsha\b/.test(t)) return 'sha';
   if (/mangel|overtakelse/.test(t)) return 'mangler';
   if (SJEKK_FOR(t)) return 'sjekk';
   return 'generell';
 }
+export const FORHMELD = 'Forhåndsmelding til Arbeidstilsynet (ved over 15 virkedager eller 250 dagsverk)';
+/** Retter sjekkpunkttekster som er lagret med eldre ordlyd */
+export const rettSjekk = (L: Rec[] = []) => L.map(x => /^Forhåndsmelding til Arbeidstilsynet \(ved over 30 dager/.test(x.t) ? { ...x, t: FORHMELD } : x);
 /** Forhåndsdefinerte sjekkpunkter for kjente oppgaver */
 const SJEKKLISTER: [RegExp, string[]][] = [
   [/søknadsplikt/, ['Er tiltaket søknadspliktig etter pbl. § 20-1?', 'Unntak etter pbl. § 20-5 / SAK10 § 4-1 vurdert', 'Behov for ansvarlig søker og ansvarsrett avklart', 'Nabovarsel sendt (ved søknad)', 'Dispensasjon nødvendig?', 'Tillatelse mottatt / søknad ikke nødvendig – begrunnelse dokumentert']],
-  [/byggherreforskrift|sha/, ['Risikovurdering av arbeidet gjort', 'Behov for SHA-plan vurdert (flere virksomheter / risikofylt arbeid)', 'Koordinator for prosjektering (KP) utpekt', 'Koordinator for utførelse (KU) utpekt', 'Forhåndsmelding til Arbeidstilsynet (ved over 30 dager og 20 arbeidstakere / 500 dagsverk)', 'SHA-plan del av konkurransegrunnlaget']],
+  [/byggherreforskrift|sha-plan og koordinator/, ['Risikovurdering av arbeidet gjort', 'Behov for SHA-plan vurdert (flere virksomheter / risikofylt arbeid)', 'Koordinator for prosjektering (KP) utpekt', 'Koordinator for utførelse (KU) utpekt', FORHMELD, 'SHA-plan del av konkurransegrunnlaget', 'Dokumentasjon for fremtidig drift og vedlikehold planlagt (§ 12)']],
+  [/hms \/ sha fulgt opp|sha fulgt opp/, ['SHA-plan oppdatert etter kontrahering og gjort kjent', 'Koordinator for utførelse (KU) følger opp', 'Vernerunder gjennomført jevnlig', 'Oversiktslister føres (§ 15)', 'Forhåndsmelding oppdatert og hengt opp på byggeplassen', 'Uønskede hendelser og avvik fulgt opp']],
   [/leietakere og varsle|konsekvenser for leietaker/, ['Berørte leietakere identifisert', 'Konsekvens for drift og adkomst vurdert', 'Leietakere varslet skriftlig med tidsplan', 'Behov for midlertidige løsninger avklart', 'Leieavtalens bestemmelser om arbeider i bygget vurdert']],
   [/tilstandsvurdering|registrering/, ['Befaring gjennomført', 'Tilstandsgrad (TG) og konsekvensgrad (KG) satt for berørte systemer', 'Bilder og målinger dokumentert', 'Miljøkartlegging (asbest, PCB o.l.) vurdert', 'Anbefalte tiltak beskrevet']],
   [/konkurransegrunnlag/, ['Beskrivelse og mengder', 'Tegninger', 'Kontraktsbestemmelser (NS 8405/8406/8407)', 'SHA-plan', 'Fremdriftskrav og frister', 'Tildelingskriterier og vekting', 'Tilbudsfrist og befaring']],
@@ -136,7 +141,7 @@ export const trafikklysForslag = (s: Rec) => ({
 });
 
 export async function sha256(t: string) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
-export const ARBEID_VIA_PROSJEKT = ['beskrivelse', 'overslag', 'ramme', 'kalkyle', 'tilbud', 'kontrakt', 'moter', 'endringer', 'mangler'];
+export const ARBEID_VIA_PROSJEKT = ['sha', 'beskrivelse', 'overslag', 'ramme', 'kalkyle', 'tilbud', 'kontrakt', 'moter', 'endringer', 'mangler'];
 export async function oppdaterP(pid: string, patch: Rec, loggTekst?: string) {
   const p = byId('prosjekter', pid)!;
   await save('prosjekter', { ...p, ...patch, logg: loggTekst ? [...(p.logg || []), { t: new Date().toISOString(), k: loggTekst, av: state.me?.navn || state.me?.epost }] : p.logg });

@@ -5,16 +5,19 @@ import { byId, fd, today, nok, type Rec } from '../lib/utils';
 import { openModal, ModalFrame, confirmBox, FileLink, Chip } from '../components/ui';
 import { NsVelger, nsNavn } from '../components/NsVelger';
 import { FASER, FAG, KLASSER, uid } from '../lib/prosjekt';
-import { OTYPER, PASLAG, kalkSum, linjeSum, n, oppgaveType, oppdaterP, standardSjekk, tilbudScore, type Linje } from '../lib/prosjektArbeid';
+import { OTYPER, PASLAG, kalkSum, linjeSum, n, oppgaveType, oppdaterP, rettSjekk, standardSjekk, tilbudScore, type Linje } from '../lib/prosjektArbeid';
+import { Hjelp } from '../components/LovHjelp';
+import { hjelpFor, verktoyFor } from '../lib/lovhjelp';
+import { Sha, shaAvkrysning, type ShaFane } from './ShaVerktoy';
 
 const kr = (v: number) => nok(Math.round(v));
 type Kol = { k: string; l: string; w?: number | string; type?: 'text' | 'number' | 'date' | 'select' | 'check' | 'area'; opts?: string[]; ph?: string; dl?: string[] };
 
 /** Enkel radredigering (tabell) brukt i flere arbeidsflater */
-export function Rader({ v, set, kol, ny, tom, sum }: { v: Rec[]; set: (x: Rec[]) => void; kol: Kol[]; ny: () => Rec; tom?: string; sum?: (r: Rec) => React.ReactNode }) {
+export function Rader({ v, set, kol, ny, tom, sum, sumL = 'Sum' }: { v: Rec[]; set: (x: Rec[]) => void; kol: Kol[]; ny: () => Rec; tom?: string; sum?: (r: Rec) => React.ReactNode; sumL?: string }) {
   const endre = (i: number, p: Rec) => set(v.map((r, j) => j === i ? { ...r, ...p } : r));
   return <div className="pa-rader">
-    {v.length ? <div className="tbl-wrap"><table className="pa-tbl"><thead><tr>{kol.map(c => <th key={c.k} style={{ width: c.w }}>{c.l}</th>)}{sum && <th className="num">Sum</th>}<th style={{ width: 30 }} /></tr></thead><tbody>
+    {v.length ? <div className="tbl-wrap"><table className="pa-tbl"><thead><tr>{kol.map(c => <th key={c.k} style={{ width: c.w }}>{c.l}</th>)}{sum && <th className="num">{sumL}</th>}<th style={{ width: 30 }} /></tr></thead><tbody>
       {v.map((r, i) => <tr key={r.id || i}>{kol.map(c => <td key={c.k}>
         {c.type === 'select' ? <select value={r[c.k] || ''} onChange={e => endre(i, { [c.k]: e.target.value })}><option value="">–</option>{(c.opts || []).map(o => <option key={o}>{o}</option>)}</select>
           : c.type === 'check' ? <input type="checkbox" style={{ width: 'auto' }} checked={!!r[c.k]} onChange={e => endre(i, { [c.k]: e.target.checked })} />
@@ -27,7 +30,7 @@ export function Rader({ v, set, kol, ny, tom, sum }: { v: Rec[]; set: (x: Rec[])
     <button type="button" className="btn sm" onClick={() => set([...v, { id: uid(), ...ny() }])}>+ Legg til</button>
   </div>;
 }
-const Felt = ({ l, children, half, hint }: { l: string; children: React.ReactNode; half?: boolean; hint?: string }) => <label className={'pa-felt' + (half ? ' half' : '')}><span>{l}</span>{children}{hint && <small className="muted">{hint}</small>}</label>;
+const Felt = ({ l, children, half, hint }: { l: React.ReactNode; children: React.ReactNode; half?: boolean; hint?: string }) => <label className={'pa-felt' + (half ? ' half' : '')}><span>{l}</span>{children}{hint && <small className="muted">{hint}</small>}</label>;
 const Tekst = ({ v, set, k, l, rows = 3, ph }: { v: Rec; set: (p: Rec) => void; k: string; l: string; rows?: number; ph?: string }) => <Felt l={l}><textarea rows={rows} value={v[k] || ''} placeholder={ph} onChange={e => set({ [k]: e.target.value })} /></Felt>;
 
 export function aapneOppgave(pid: string, oid: string) { openModal({ wide: true, render: close => <Arbeidsflate pid={pid} oid={oid} close={close} /> }); }
@@ -39,17 +42,20 @@ export function nyOppgave(pid: string, fase: string) {
 function Arbeidsflate({ pid, oid, close }: { pid: string; oid: string; close: () => void }) {
   useStore();
   const p = byId('prosjekter', pid); const o0 = (p?.oppgaver || []).find((x: Rec) => x.id === oid);
-  const [f, setF0] = useState<Rec>(() => ({ ...o0, sjekk: o0?.sjekk?.length ? o0.sjekk : standardSjekk(o0 || {}) }));
+  const [f, setF0] = useState<Rec>(() => ({ ...o0, sjekk: o0?.sjekk?.length ? rettSjekk(o0.sjekk) : standardSjekk(o0 || {}) }));
   const type = oppgaveType(f);
-  const [A, setA0] = useState<Rec>(() => ({ ...(p?.arbeid || {}) }));
+  const [A, setA0] = useState<Rec>({}); // bare endrede deler; resten leses fra prosjektet
+  const [shaFane, setShaFane] = useState<ShaFane>('vurdering');
   const [busy, setBusy] = useState(false);
   if (!p || !o0) return <ModalFrame title="Oppgave" close={close}><p>Fant ikke oppgaven.</p></ModalFrame>;
   const setF = (x: Rec) => setF0(v => ({ ...v, ...x }));
-  const a: Rec = A[type] || {}; const setA = (x: Rec) => setA0(v => ({ ...v, [type]: { ...(v[type] || {}), ...x } }));
+  const PA: Rec = p.arbeid || {}; const get = (k: string) => A[k] ?? PA[k];
+  const a: Rec = get(type) || {}; const setA = (x: Rec) => setA0(v => ({ ...v, [type]: { ...((v[type] ?? PA[type]) || {}), ...x } }));
   const lagre = async (ferdig?: boolean) => {
     setBusy(true);
-    const ny = { ...f, ...(ferdig ? { status: 'Ferdig', ferdig: today() } : f.status === 'Ferdig' && !f.ferdig ? { ferdig: today() } : {}) };
-    const P = byId('prosjekter', pid)!;
+    const P = byId('prosjekter', pid)!; const sha = A.sha ?? P.arbeid?.sha;
+    const sjekk = type === 'sha' && sha ? (f.sjekk || []).map((x: Rec) => x.ok || !shaAvkrysning(x.t, sha, P) ? x : { ...x, ok: true }) : f.sjekk;
+    const ny = { ...f, sjekk, ...(ferdig ? { status: 'Ferdig', ferdig: today() } : f.status === 'Ferdig' && !f.ferdig ? { ferdig: today() } : {}) };
     await oppdaterP(pid, { oppgaver: (P.oppgaver || []).map((x: Rec) => x.id === oid ? ny : x), arbeid: { ...(P.arbeid || {}), ...A } }, ferdig || (ny.status === 'Ferdig' && o0.status !== 'Ferdig') ? `Ferdig: ${ny.tittel}` : undefined);
     setBusy(false); toast('Lagret'); close();
   };
@@ -58,7 +64,7 @@ function Arbeidsflate({ pid, oid, close }: { pid: string; oid: string; close: ()
   const lastOpp = async (fil: File) => { const r = await uploadFile(fil, p.eiendomId); if (!r) return; await save('dokumenter', { eiendomId: p.eiendomId, leietakerId: '', prosjektId: pid, oppgaveId: oid, anleggId: '', type: 'Annet', tittel: `${fil.name} – ${f.tittel}`, dato: today(), fil: r }); toast('Lastet opp'); };
   const fagL = [...new Set([...(p.fag || []).map((x: Rec) => x.fag), ...FAG])];
 
-  return <ModalFrame title={<span>{f.tittel} <span className="small muted" style={{ fontWeight: 400 }}>· {FASER.find(x => x[0] === f.fase)?.[1]}</span></span>} close={close}
+  return <ModalFrame title={<span>{f.tittel}<Hjelp k={hjelpFor(f.tittel || '')} /> <span className="small muted" style={{ fontWeight: 400 }}>· {FASER.find(x => x[0] === f.fase)?.[1]}</span></span>} close={close}
     foot={<><button className="btn danger" onClick={slett}>Slett</button><span style={{ flex: 1 }} /><button className="btn" onClick={close}>Avbryt</button>
       <button className="btn" disabled={busy} onClick={() => lagre()}>Lagre</button>{f.status !== 'Ferdig' && <button className="btn pri" disabled={busy} onClick={() => lagre(true)}>Lagre og marker ferdig</button>}</>}>
     <div className="pa-grid">
@@ -74,15 +80,17 @@ function Arbeidsflate({ pid, oid, close }: { pid: string; oid: string; close: ()
     </div>
 
     <div className="pa-seksjon">
-      {type === 'beskrivelse' && <Beskrivelse v={a} set={setA} risiko={A.risiko || []} setRisiko={r => setA0(v => ({ ...v, risiko: r }))} p={p} />}
-      {(type === 'overslag' || type === 'kalkyle') && <Kalkyle v={a} set={setA} p={p} type={type} fraOverslag={A.overslag} />}
-      {type === 'ramme' && <Ramme v={a} set={setA} overslag={A.overslag} kalkyle={A.kalkyle} />}
+      {type === 'beskrivelse' && <Beskrivelse v={a} set={setA} risiko={get('risiko') || []} setRisiko={r => setA0(v => ({ ...v, risiko: r }))} p={p} />}
+      {(type === 'overslag' || type === 'kalkyle') && <Kalkyle v={a} set={setA} p={p} type={type} fraOverslag={get('overslag')} />}
+      {type === 'ramme' && <Ramme v={a} set={setA} overslag={get('overslag')} kalkyle={get('kalkyle')} />}
       {type === 'tilbud' && <Tilbud v={a} set={setA} fagL={fagL} />}
-      {type === 'kontrakt' && <Kontrakt v={a} set={setA} tilbud={A.tilbud} p={p} />}
+      {type === 'kontrakt' && <Kontrakt v={a} set={setA} tilbud={get('tilbud')} p={p} />}
       {type === 'moter' && <Moter v={a} set={setA} />}
       {type === 'endringer' && <Endringer v={a} set={setA} fagL={fagL} p={p} />}
       {type === 'mangler' && <Mangler v={a} set={setA} fagL={fagL} />}
-      {(type === 'sjekk' || type === 'generell' || (f.sjekk || []).length > 0) && <Sjekk v={f.sjekk || []} set={s => setF({ sjekk: s })} tittel={type === 'sjekk' ? 'Sjekkliste' : 'Sjekkpunkter'} />}
+      {(type === 'sjekk' || type === 'generell' || type === 'sha' || (f.sjekk || []).length > 0) && <Sjekk v={f.sjekk || []} set={s => setF({ sjekk: s })} tittel={type === 'sjekk' || type === 'sha' ? 'Sjekkliste' : 'Sjekkpunkter'}
+        verktoy={type === 'sha' ? (t: string) => { const vk = verktoyFor(t); return vk ? { tekst: vk === 'risiko' ? 'Lag risikovurdering' : vk === 'vurdering' ? 'Vurder' : vk === 'org' ? 'Registrer' : 'Lag SHA-plan', apne: () => { setShaFane(vk); setTimeout(() => document.getElementById('sha-verktoy')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }, ferdig: shaAvkrysning(t, get('sha') || {}, p) } : null; } : undefined} />}
+      {type === 'sha' && <div id="sha-verktoy" className="pa-seksjon"><Sha v={get('sha') || {}} set={x => setA0(v => ({ ...v, sha: { ...((v.sha ?? PA.sha) || {}), ...x } }))} p={p} fane={shaFane} setFane={setShaFane} /></div>}
     </div>
     <Felt l="Notat"><textarea rows={3} value={f.notat || ''} onChange={e => setF({ notat: e.target.value })} placeholder="Vurderinger, avklaringer, hvem som er kontaktet …" /></Felt>
     <div className="pa-seksjon"><b>Vedlegg</b> <label className="btn sm" style={{ marginLeft: 8 }}>+ Last opp<input type="file" multiple style={{ display: 'none' }} onChange={async e => { for (const x of Array.from(e.target.files || [])) await lastOpp(x); e.target.value = ''; }} /></label>
@@ -91,11 +99,13 @@ function Arbeidsflate({ pid, oid, close }: { pid: string; oid: string; close: ()
   </ModalFrame>;
 }
 
-function Sjekk({ v, set, tittel }: { v: Rec[]; set: (x: Rec[]) => void; tittel: string }) {
+function Sjekk({ v, set, tittel, verktoy }: { v: Rec[]; set: (x: Rec[]) => void; tittel: string; verktoy?: (t: string) => { tekst: string; apne: () => void; ferdig: boolean } | null }) {
   const [ny, setNy] = useState('');
   return <div><b>{tittel}</b> <span className="small muted">{v.filter(x => x.ok).length}/{v.length}</span>
-    {v.map((x, i) => <div key={x.id} className="rk-rad"><input type="checkbox" style={{ width: 'auto' }} checked={!!x.ok} onChange={e => set(v.map((y, j) => j === i ? { ...y, ok: e.target.checked } : y))} />
-      <span style={{ flex: 1, textDecoration: x.ok ? 'line-through' : undefined }}>{x.t}</span><button type="button" className="btn ghost sm" onClick={() => set(v.filter((_, j) => j !== i))}>✕</button></div>)}
+    {v.map((x, i) => { const vk = verktoy?.(x.t); return <div key={x.id} className="rk-rad"><input type="checkbox" style={{ width: 'auto' }} checked={!!x.ok} onChange={e => set(v.map((y, j) => j === i ? { ...y, ok: e.target.checked } : y))} />
+      <span style={{ flex: 1 }}><span style={{ textDecoration: x.ok ? 'line-through' : undefined }}>{x.t}</span><Hjelp k={hjelpFor(x.t)} />{vk?.ferdig && !x.ok && <span className="small" style={{ color: 'var(--green)', marginLeft: 8 }}>✓ utfylt – krysses av når du lagrer</span>}</span>
+      {vk && <button type="button" className="btn sm" onClick={vk.apne}>{vk.tekst} ›</button>}
+      <button type="button" className="btn ghost sm" onClick={() => set(v.filter((_, j) => j !== i))}>✕</button></div>; })}
     <div style={{ display: 'flex', gap: 6, marginTop: 6 }}><input value={ny} placeholder="Nytt sjekkpunkt" onChange={e => setNy(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && ny.trim()) { e.preventDefault(); set([...v, { id: uid(), t: ny.trim(), ok: false }]); setNy(''); } }} />
       <button type="button" className="btn sm" onClick={() => { if (ny.trim()) { set([...v, { id: uid(), t: ny.trim(), ok: false }]); setNy(''); } }}>Legg til</button></div></div>;
 }
@@ -198,7 +208,7 @@ function Kontrakt({ v, set, tilbud, p }: { v: Rec; set: (x: Rec) => void; tilbud
     {valgt && !v.part && <p><button type="button" className="btn sm" onClick={() => set({ part: valgt.leverandor, sum: valgt.pris, fag: valgt.fag })}>Hent fra anbefalt tilbud ({valgt.leverandor}, {kr(n(valgt.pris))})</button></p>}
     <div className="pa-grid">
       <Felt l="Kontraktspart" half><input value={v.part || ''} onChange={e => set({ part: e.target.value })} /></Felt>
-      <Felt l="Kontraktsform" half><input value={v.form || ''} list="dl-ns84" onChange={e => set({ form: e.target.value })} /></Felt>
+      <Felt l={<>Kontraktsform <Hjelp k="ns84" /></>} half><input value={v.form || ''} list="dl-ns84" onChange={e => set({ form: e.target.value })} /></Felt>
       <Felt l="Kontraktssum (kr eks. mva)" half><input className="num" value={v.sum ?? ''} onChange={e => set({ sum: e.target.value })} /></Felt>
       <Felt l="Fag" half><input value={v.fag || ''} onChange={e => set({ fag: e.target.value })} /></Felt>
       <Felt l="Signert dato" half><input type="date" value={v.signert || ''} onChange={e => set({ signert: e.target.value })} /></Felt>

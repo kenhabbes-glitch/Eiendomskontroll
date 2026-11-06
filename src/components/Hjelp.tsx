@@ -13,7 +13,7 @@ export function HjelpTekst({ tekst }: { tekst: string }) {
 }
 
 // «?» i sirkel. Bruk id (fra HJELP) eller egen tittel/tekst.
-export function Hjelp({ id, tittel, tekst, size = 16 }: { id?: string; tittel?: string; tekst?: string; size?: number }) {
+export function Hjelp({ id, tittel, tekst, size = 16, kilde }: { id?: string; tittel?: string; tekst?: string; size?: number; kilde?: [string, string][] }) {
   const emne: HjelpEmne | undefined = tekst ? { tittel: tittel || 'Hjelp', tekst, gruppe: 'Begreper' } : hjelpFor(id);
   const [apen, setApen] = useState(false); const [iModal, setIModal] = useState(false); const [pos, setPos] = useState({ x: 0, y: 0, opp: false });
   const knapp = useRef<HTMLButtonElement>(null); const boks = useRef<HTMLDivElement>(null);
@@ -40,6 +40,7 @@ export function Hjelp({ id, tittel, tekst, size = 16 }: { id?: string; tittel?: 
       <div style={{ display: 'flex', alignItems: 'start', gap: 8, marginBottom: 6 }}><b style={{ flex: 1 }}>{emne.tittel}</b>
         <button type="button" className="hjelp-x" aria-label="Lukk" onClick={() => setApen(false)}>×</button></div>
       <HjelpTekst tekst={emne.tekst} />
+      {kilde && kilde.length > 0 && <p className="small" style={{ margin: '0 0 6px' }}>Kilde: {kilde.map(([n, u], i) => <React.Fragment key={u}>{i ? ' · ' : ''}<a href={u} target="_blank" rel="noopener noreferrer">{n}</a></React.Fragment>)}</p>}
       {id && HJELP[id] && !iModal && <a href={'#/hjelp/' + encodeURIComponent(id)} className="small" onClick={() => setApen(false)}>Mer hjelp →</a>}
     </div>, document.body)}
   </>;

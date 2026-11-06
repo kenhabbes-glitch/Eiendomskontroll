@@ -324,3 +324,7 @@ h1 .hjelp-q{position:relative;top:-2px}
 .pf-gate{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:6px 0 2px;border-top:1px dashed var(--line);margin-top:8px}.pf-gate label{display:flex;gap:6px;align-items:center;font-weight:400}
 .pa-svarvalg{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.pa-svar{flex:1;min-width:150px;display:flex;gap:8px;align-items:center;border:2px solid var(--line2);border-radius:8px;padding:10px 12px;cursor:pointer;font-weight:600}
 .pa-svar input{width:auto}.pa-svar.on.green{border-color:var(--green);background:var(--greenbg)}.pa-svar.on.amber{border-color:var(--amber);background:#fff7e6}.pa-svar.on.red{border-color:var(--red);background:#fbefed}
+.sha-tabs{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0 10px;border-bottom:1px solid var(--line)}.sha-tabs button{border:0;background:none;padding:7px 10px;font:inherit;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer}.sha-tabs button.on{color:var(--acc);border-color:var(--acc)}
+.sha-q{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}.sha-q .seg button{min-width:56px}
+.sha-konk{border-radius:8px;padding:10px 12px;margin:10px 0;background:var(--surface2);border:1px solid var(--line)}.sha-konk div{margin:3px 0}
+.sha-rf{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 12px;margin:6px 0}.sha-rf label{display:flex;gap:6px;align-items:flex-start;font-size:13px;font-weight:400}.sha-rf input{width:auto;margin-top:3px}
