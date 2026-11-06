@@ -28,9 +28,9 @@ jobs:
     env:
       HAR_TOKEN: ${{ secrets.REGELVERK_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
       - name: Sjekk mot Lovdata
         run: node scripts/regelverkssjekk.mjs ${{ inputs.godkjenn && '--godkjenn' || '' }}
       - name: Opprett eller oppdater GitHub-sak
