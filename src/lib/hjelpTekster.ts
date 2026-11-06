@@ -113,6 +113,7 @@ Firmaets egen administrator fordeler byggene på sine ansatte. Avsluttes eller u
 
 Slik fungerer det:
 - Brannkort: fyll ut risikoklasse, forutsetninger fra brannkonseptet, alarmorganisering, oppstillingsplass, husregler og velg rømningsplaner som skal legges ved.
+- Hent fra brannkonsept: er brannkonseptet lastet opp som PDF (type «Brannkonsept/brannteknisk dokumentasjon»), kan appen lese det og foreslå risikoklasse, brannklasse (også per etasje), særskilt brannobjekt, personantall, alarm, brannsentral, oppstillingsplass og forutsetninger. Teksten leses i nettleseren og sendes ikke noe sted. Hvert forslag vises med side og utdrag og må godkjennes. Skannede PDF-er uten tekst kan ikke leses.
 - Publiser: hver publisering får et versjonsnummer. Endrer du brannkortet senere (ombygging, nytt brannkonsept, ny oppstillingsplass), publiserer du en ny versjon, og alle leietakerne må få og bekrefte den på nytt.
 - Brannvernpakke: appen lager en PDF per leietaker med byggets brannsikkerhet, installasjonene (også komponenter plassert i leietakerens areal på tegningen), husregler, leietakerens plikter etter §§ 11–13 og en signaturside. Pakken legges i leietakerens dokumenter og vises i portalen.
 - Bekreftelse: leietakeren bekrefter i portalen. Har leietakeren ikke innlogging, kan du registrere signert papir eller e-post. Bekreftelsen må fornyes hvert år.

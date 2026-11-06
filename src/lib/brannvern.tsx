@@ -347,6 +347,7 @@ export function BrannvernSection({ eid }: { eid: string }) {
   const L = sortBy(S.leietakere.filter(l => l.eiendomId === eid), l => l.navn); const I = brannInstallasjoner(eid);
   const midl = b.midlertidig || []; const [visAvsl, setVisAvsl] = useState(false);
   const harKonsept = S.dokumenter.some(d => d.eiendomId === eid && d.type === 'Brannkonsept/brannteknisk dokumentasjon');
+  const harPdfKonsept = S.dokumenter.some(d => d.eiendomId === eid && !d.leietakerId && d.type === 'Brannkonsept/brannteknisk dokumentasjon' && /\.pdf$/i.test(d.fil?.navn || d.fil?.path || ''));
   const samordning = (l: Rec) => S.dokumenter.some(d => d.leietakerId === l.id && d.type === 'Samordningsavtale');
   const ovelse = (l: Rec) => (l.plikter || []).find((p: Rec) => p.key === 'brannovelse')?.sist;
   const felles = S.oppgaver.find(o => o.eiendomId === eid && o.aktiv !== false && /felles brannøvelse|samordningsmøte/i.test(o.navn || ''));
@@ -360,9 +361,10 @@ export function BrannvernSection({ eid }: { eid: string }) {
       <div style={{ flex: 1 }}><b>Redusert brannsikkerhet:</b> {m.tekst}{m.tiltak && <> – {m.tiltak}</>} <span className="small">({fd(m.fra)}{m.til ? '–' + fd(m.til) : ''} · lest av {lest} av {L.length} leietakere)</span></div>{ed && <button className="btn sm" onClick={() => midlertidig(eid, m.id)}>Endre / avslutt</button>}</div>; })}
     <div className="grid g2">
       <div className="card"><div className="toolbar" style={{ marginBottom: 6 }}><h2 style={{ margin: 0, flex: 1 }}>Brannkort {v ? <Chip c="green">v{v} · {fd(b.versjonDato)}</Chip> : <Chip c="amber">ikke publisert</Chip>}{ulagretEndring(e) && <> <Chip c="amber">endret – ikke publisert</Chip></>}</h2>
-        {ed && <><button className="btn sm" onClick={() => editBrannkort(eid)}>Rediger</button><button className="btn sm pri" onClick={() => publiser(eid)} disabled={!!v && !ulagretEndring(e)} title={v && !ulagretEndring(e) ? 'Ingen endringer siden siste versjon' : ''}>Publiser{v ? ' ny versjon' : ''}</button></>}</div>
+        {ed && <>{harPdfKonsept && <button className="btn sm" onClick={() => import('./brannkonseptLes').then(m => m.lesBrannkonsept(eid))} title="Les brannkonseptet (PDF) og foreslå verdier">Hent fra brannkonsept</button>}<button className="btn sm" onClick={() => editBrannkort(eid)}>Rediger</button><button className="btn sm pri" onClick={() => publiser(eid)} disabled={!!v && !ulagretEndring(e)} title={v && !ulagretEndring(e) ? 'Ingen endringer siden siste versjon' : ''}>Publiser{v ? ' ny versjon' : ''}</button></>}</div>
         {dl.length ? <dl className="dl">{dl.map(([k, x]) => <React.Fragment key={k}><dt>{k}</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{x}</dd></React.Fragment>)}</dl> : <p className="small muted">Brannkortet er ikke fylt ut. Hent opplysningene fra brannkonseptet.</p>}
         {!harKonsept && <p className="small" style={{ marginBottom: 0 }}><Chip c="amber">Brannkonsept / brannteknisk dokumentasjon mangler i dokumentarkivet</Chip></p>}
+        {b.kilde?.tittel && <p className="small muted" style={{ marginBottom: 0 }}>Forslag hentet fra «{b.kilde.tittel}» {fd(b.kilde.tid)} – kontrollert og redigert av eier.</p>}
         {(b.logg || []).length > 0 && <details className="small" style={{ marginTop: 8 }}><summary>Versjonshistorikk ({b.logg.length})</summary>{b.logg.slice().reverse().map((x: Rec) => <div key={x.versjon}><b>v{x.versjon}</b> {fd(x.tid)} · {x.tekst} <span className="muted">({x.av})</span></div>)}</details>}
       </div>
       <div className="card"><h2>Brannsikringsinstallasjoner</h2>
