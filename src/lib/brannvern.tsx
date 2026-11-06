@@ -55,10 +55,54 @@ export const HJEMMEL_TEKST: [string, string][] = [
 export const bv = (e?: Rec): Rec => e?.brannvern || {};
 export const bvVersjon = (e?: Rec) => +bv(e).versjon || 0;
 /** Innholdet som inngår i en versjon – brukes til å se om brannkortet er endret siden sist publisering */
-const INNHOLD = ['risikoklasse', 'brannklasse', 'saerskilt', 'saerskiltKat', 'forutsetninger', 'maksPersoner', 'alarm', 'brannsentral', 'oppstilling', 'eierAnsvarlig', 'eierTlf', 'regler', 'vedlegg'];
+const INNHOLD = ['soner', 'risikoklasse', 'brannklasse', 'saerskilt', 'saerskiltKat', 'forutsetninger', 'maksPersoner', 'alarm', 'brannsentral', 'oppstilling', 'eierAnsvarlig', 'eierTlf', 'regler', 'vedlegg'];
 const hash = (b: Rec) => JSON.stringify(INNHOLD.map(k => b[k] ?? ''));
 export const ulagretEndring = (e?: Rec) => { const b = bv(e); return !!b.versjon && b.publisertHash !== hash(b); };
 export const aktiveMidl = (e?: Rec) => (bv(e).midlertidig || []).filter((m: Rec) => !m.avsluttet);
+
+// ---------------- brannklasse og risikoklasse per etasje / bygningsdel
+// Et bygg kan ha ulik risikoklasse (TEK17 § 11-2) i ulike deler, f.eks. handel i 1. etasje (RK 5) og kontor over (RK 2),
+// og brannkonseptet kan angi ulik brannklasse (§ 11-3) for ulike deler. Er «soner» fylt ut, gjelder de i stedet for feltene for hele bygget.
+export type Sone = { id: string; navn: string; etasjer: string; risikoklasse: string; brannklasse: string; maksPersoner?: number | ''; merknad?: string };
+export const soner = (e?: Rec): Sone[] => (bv(e).soner || []).filter((z: Sone) => z.navn || z.risikoklasse || z.brannklasse);
+/** «1», «2-5», «-1, 1» → etasjenumre */
+export function etasjeSett(t: string): number[] {
+  const ut: number[] = [];
+  for (const del of String(t || '').split(/[,;]/).map(x => x.trim()).filter(Boolean)) {
+    const m = del.match(/^(-?\d+)\s*(?:[–—]|-|til)\s*(-?\d+)$/);
+    if (m) { const a = +m[1], b = +m[2]; for (let i = Math.min(a, b); i <= Math.max(a, b) && ut.length < 200; i++) ut.push(i); }
+    else if (/^-?\d+$/.test(del)) ut.push(+del);
+  }
+  return ut;
+}
+/** Etasjene der leietakeren har areal tegnet inn */
+export const leietakerEtasjer = (l: Rec) => [...new Set(S.tegninger.filter(t => t.eiendomId === l.eiendomId && (t.soner || []).some((z: Rec) => z.kat === 'leie' && z.leietakerId === l.id)).map(t => +t.etasje))];
+/** Sonene som gjelder leietakerens lokaler (tom hvis det ikke kan avgjøres fra tegningene) */
+export function sonerFor(e: Rec, l: Rec): Sone[] { const et = leietakerEtasjer(l); if (!et.length) return []; return soner(e).filter(z => etasjeSett(z.etasjer).some(n => et.includes(n))); }
+const rk = (v?: string) => v ? 'RK ' + v : '–'; const bk = (v?: string) => v ? 'BKL ' + v : '–';
+export function klasseTekst(e?: Rec) { const Z = soner(e); const b = bv(e); return Z.length ? Z.map(z => `${z.navn || 'Etg. ' + z.etasjer}: ${rk(z.risikoklasse)}, ${bk(z.brannklasse)}`).join(' · ') : [b.risikoklasse && rk(b.risikoklasse), b.brannklasse && bk(b.brannklasse)].filter(Boolean).join(', '); }
+
+function SoneEditor({ v, set }: { v: Rec; set: (p: Record<string, any>) => void }) {
+  const Z: Sone[] = v.soner || []; const upd = (i: number, p: Partial<Sone>) => set({ soner: Z.map((z, j) => j === i ? { ...z, ...p } : z) });
+  const inp = { border: '1px solid var(--line2)', borderRadius: 7, padding: '5px 7px', width: '100%' } as any;
+  const ny = () => set({ soner: [...Z, { id: crypto.randomUUID(), navn: Z.length ? '' : '1. etasje', etasjer: Z.length ? '' : '1', risikoklasse: Z.length ? '' : v.risikoklasse || '', brannklasse: v.brannklasse || '', maksPersoner: '' }] });
+  if (!Z.length) return <div className="small"><span className="muted">Hele bygget har samme risikoklasse og brannklasse. </span><a href="#" onClick={ev => { ev.preventDefault(); ny(); }}>Har bygget ulik klasse per etasje eller bygningsdel? Del opp</a></div>;
+  return <div className="note small" style={{ color: 'var(--ink)' }}>
+    <table style={{ width: '100%' }}><thead><tr><th style={{ textAlign: 'left' }}>Del av bygget</th><th style={{ textAlign: 'left', width: 90 }}>Etasjer</th><th style={{ textAlign: 'left' }}>Risikoklasse</th><th style={{ textAlign: 'left', width: 95 }}>Brannklasse</th><th style={{ textAlign: 'left', width: 80 }}>Maks pers.</th><th /></tr></thead><tbody>
+      {Z.map((z, i) => <React.Fragment key={z.id}><tr>
+        <td><input style={inp} value={z.navn} placeholder="F.eks. 1. etasje – handel" onChange={ev => upd(i, { navn: ev.target.value })} /></td>
+        <td><input style={inp} value={z.etasjer} placeholder="2-5" onChange={ev => upd(i, { etasjer: ev.target.value })} /></td>
+        <td><select style={inp} value={z.risikoklasse} onChange={ev => upd(i, { risikoklasse: ev.target.value })}><option value="">–</option>{RISIKOKLASSER.map(([a, b]) => <option key={a} value={a}>{b}</option>)}</select></td>
+        <td><select style={inp} value={z.brannklasse} onChange={ev => upd(i, { brannklasse: ev.target.value })}><option value="">–</option>{BRANNKLASSER.map(([a, b]) => <option key={a} value={a}>{b}</option>)}</select></td>
+        <td><input style={inp} inputMode="numeric" value={z.maksPersoner ?? ''} onChange={ev => upd(i, { maksPersoner: ev.target.value === '' ? '' : +ev.target.value.replace(/\D/g, '') })} /></td>
+        <td><button type="button" className="btn sm ghost" title="Fjern" onClick={() => set({ soner: Z.filter((_, j) => j !== i) })}>✕</button></td></tr>
+        <tr><td colSpan={6} style={{ paddingBottom: 6 }}><input style={inp} value={z.merknad || ''} placeholder="Merknad fra brannkonseptet for denne delen (valgfritt), f.eks. egen branncelle, sprinklet, rømning direkte til terreng" onChange={ev => upd(i, { merknad: ev.target.value })} />
+          {z.etasjer && !etasjeSett(z.etasjer).length && <div style={{ color: 'var(--amber)' }}>Skriv etasjer som tall, f.eks. 1 eller 2-5 (kjeller = -1)</div>}</td></tr></React.Fragment>)}
+    </tbody></table>
+    <button type="button" className="btn sm" onClick={ny}>+ Legg til del</button>
+    <div className="muted" style={{ marginTop: 6 }}>Etasjenumrene kobles mot tegningene: leietakeren får klassene for etasjene der arealet er tegnet inn. Uten tegning får leietakeren hele tabellen.</div>
+  </div>;
+}
 
 export const binfo = (l?: Rec): Rec => l?.brannInfo || {};
 export const sisteKvittering = (l: Rec) => sortBy(binfo(l).kvitteringer || [], (k: Rec) => k.tid || '').pop() as Rec | undefined;
@@ -111,11 +155,12 @@ export function editBrannkort(eid: string) {
     values: { regler: STD_REGLER, ...b },
     fields: [
       { k: 's1', label: 'Byggets brannsikkerhet', type: 'sec' },
-      { k: 'risikoklasse', label: 'Risikoklasse', type: 'select', options: RISIKOKLASSER, empty: '–', half: true, hint: 'TEK17 § 11-2 – fra brannkonseptet' },
-      { k: 'brannklasse', label: 'Brannklasse', type: 'select', options: BRANNKLASSER, empty: '–', half: true, hint: 'TEK17 § 11-3' },
+      { k: 'risikoklasse', label: 'Risikoklasse', type: 'select', options: RISIKOKLASSER, empty: '–', half: true, hint: 'TEK17 § 11-2 – fra brannkonseptet', show: v => !(v.soner || []).length },
+      { k: 'brannklasse', label: 'Brannklasse', type: 'select', options: BRANNKLASSER, empty: '–', half: true, hint: 'TEK17 § 11-3', show: v => !(v.soner || []).length },
+      { k: 'soner', label: (b.soner || []).length ? 'Risikoklasse og brannklasse per etasje / bygningsdel (TEK17 §§ 11-2 og 11-3)' : '', type: 'custom', def: b.soner || [], render: (v, set) => <SoneEditor v={v} set={set} /> },
       { k: 'saerskilt', label: 'Registrert som særskilt brannobjekt (brann- og eksplosjonsvernloven § 13)', type: 'checkbox', half: true },
       { k: 'saerskiltKat', label: 'Kategori / merknad', half: true, show: v => !!v.saerskilt, ph: 'F.eks. kategori A – tilsyn fra brannvesenet' },
-      { k: 'maksPersoner', label: 'Maks antall personer (dimensjonerende)', type: 'number', half: true },
+      { k: 'maksPersoner', label: 'Maks antall personer (dimensjonerende)', type: 'number', half: true, show: v => !(v.soner || []).length },
       { k: 'forutsetninger', label: 'Forutsetninger for bruk fra brannkonseptet', type: 'textarea', ph: 'F.eks. brannceller per leieareal, maks brannbelastning, ingen lagring av brannfarlig vare, rømning via to trapperom …', hint: 'Dette er forhold leietaker må respektere for at bygget skal være brannsikkert slik det er prosjektert.' },
       { k: 's2', label: 'Varsling og evakuering', type: 'sec' },
       { k: 'alarm', label: 'Alarmorganisering *', type: 'textarea', ph: 'F.eks. heldekkende brannalarmanlegg med direktevarsling til 110-sentralen. Alarm i hele bygget, ikke forsinket. Vaktselskap X rykker ut.' },
@@ -130,6 +175,8 @@ export function editBrannkort(eid: string) {
     ],
     onSave: async v => {
       const ny: Rec = { ...b }; for (const k of INNHOLD) ny[k] = v[k] ?? ''; ny.maksPersoner = v.maksPersoner === '' ? '' : +v.maksPersoner;
+      ny.soner = (v.soner || []).filter((z: Sone) => z.navn || z.etasjer || z.risikoklasse || z.brannklasse);
+      if (ny.soner.length) { ny.risikoklasse = ''; ny.brannklasse = ''; ny.maksPersoner = ''; }
       await save('eiendommer', { ...e, brannvern: ny }); toast(ny.versjon ? 'Lagret – publiser ny versjon for å sende endringene til leietakerne' : 'Brannkortet er lagret – publiser det når det er klart');
     },
   });
@@ -165,7 +212,16 @@ export async function lagPakkePdf(e: Rec, l: Rec): Promise<Uint8Array> {
   const midl = aktiveMidl(e);
   if (midl.length) { D.h2('Midlertidige tiltak nå'); midl.forEach((m: Rec) => D.p(`!  ${m.tekst}${m.fra ? ' (fra ' + fd(m.fra) + (m.til ? ' til ' + fd(m.til) : '') + ')' : ''}${m.tiltak ? ' – Tiltak: ' + m.tiltak : ''}`, 9, RED)); }
   D.h2('Byggets brannsikkerhet');
-  D.nokkel([['Risikoklasse', b.risikoklasse ? 'RK ' + b.risikoklasse : '–'], ['Brannklasse', b.brannklasse ? 'BKL ' + b.brannklasse : '–'], ['Maks personer', b.maksPersoner ? String(b.maksPersoner) : '–'], ['Særskilt brannobjekt', b.saerskilt ? 'Ja' + (b.saerskiltKat ? ' – ' + b.saerskiltKat : '') : 'Nei']]);
+  const Z = soner(e);
+  if (!Z.length) D.nokkel([['Risikoklasse', rk(b.risikoklasse)], ['Brannklasse', bk(b.brannklasse)], ['Maks personer', b.maksPersoner ? String(b.maksPersoner) : '–'], ['Særskilt brannobjekt', b.saerskilt ? 'Ja' + (b.saerskiltKat ? ' – ' + b.saerskiltKat : '') : 'Nei']]);
+  else {
+    const mine = sonerFor(e, l);
+    if (mine.length) { const z0 = mine[0]; D.nokkel([['Deres lokaler', mine.map(z => z.navn || 'Etg. ' + z.etasjer).join(', ')], ['Risikoklasse', [...new Set(mine.map(z => rk(z.risikoklasse)))].join(' / ')], ['Brannklasse', [...new Set(mine.map(z => bk(z.brannklasse)))].join(' / ')], ['Maks personer', mine.length === 1 && z0.maksPersoner ? String(z0.maksPersoner) : '–']]); }
+    D.p(`Bygget har ulik risikoklasse og/eller brannklasse i ulike deler${mine.length ? ' – deres lokaler er uthevet' : ''}:`, 9, INK);
+    D.tabell([['Del av bygget', 2.2], ['Etasjer', 0.8], ['Risikoklasse', 0.9], ['Brannklasse', 0.9], ['Maks pers.', 0.8, true], ['Merknad', 2.6]],
+      Z.map(z => { const min = mine.some(m => m.id === z.id); return { c: [(min ? '> ' : '') + (z.navn || '–'), z.etasjer || '–', rk(z.risikoklasse), bk(z.brannklasse), z.maksPersoner ? String(z.maksPersoner) : '–', z.merknad || ''], bold: min, fill: min }; }));
+    D.p('Særskilt brannobjekt: ' + (b.saerskilt ? 'Ja' + (b.saerskiltKat ? ' – ' + b.saerskiltKat : '') : 'Nei'), 9, MUTED);
+  }
   if (b.forutsetninger) { D.p('Forutsetninger for bruk fra brannkonseptet – dette må dere respektere:', 9, INK); linjer(b.forutsetninger); }
   D.h2('Varsling og evakuering');
   D.tabell([['', 1.2], ['', 3]], [{ c: ['Alarmorganisering', (b.alarm || '–').replace(/\n/g, ' ')] }, { c: ['Brannsentral / nøkkelboks', b.brannsentral || '–'] }, { c: ['Oppstillingsplass', b.oppstilling || '–'] }, { c: ['Eiers kontakt', [b.eierAnsvarlig, b.eierTlf].filter(Boolean).join(', ') || '–'] }, { c: ['Deres brannvernansvarlige', binfo(l).ansvarlig?.navn ? [binfo(l).ansvarlig.navn, binfo(l).ansvarlig.tlf].filter(Boolean).join(', ') : (l.brannvernleder || 'Ikke meldt – meld inn i portalen')] }]);
@@ -294,7 +350,9 @@ export function BrannvernSection({ eid }: { eid: string }) {
   const samordning = (l: Rec) => S.dokumenter.some(d => d.leietakerId === l.id && d.type === 'Samordningsavtale');
   const ovelse = (l: Rec) => (l.plikter || []).find((p: Rec) => p.key === 'brannovelse')?.sist;
   const felles = S.oppgaver.find(o => o.eiendomId === eid && o.aktiv !== false && /felles brannøvelse|samordningsmøte/i.test(o.navn || ''));
-  const dl: [string, React.ReactNode][] = ([['Risikoklasse', b.risikoklasse ? 'RK ' + b.risikoklasse : ''], ['Brannklasse', b.brannklasse ? 'BKL ' + b.brannklasse : ''], ['Særskilt brannobjekt', b.saerskilt ? 'Ja' + (b.saerskiltKat ? ' – ' + b.saerskiltKat : '') : ''], ['Maks personer', b.maksPersoner ? String(b.maksPersoner) : ''],
+  const Z = soner(e);
+  const dl: [string, React.ReactNode][] = ([['Risikoklasse', Z.length ? '' : b.risikoklasse ? 'RK ' + b.risikoklasse : ''], ['Brannklasse', Z.length ? '' : b.brannklasse ? 'BKL ' + b.brannklasse : ''],
+    ['Klasser per del', Z.length ? <>{Z.map(z => <div key={z.id}><b>{z.navn || 'Etg. ' + z.etasjer}</b> <span className="muted">(etg. {z.etasjer || '–'})</span>: {rk(z.risikoklasse)}, {bk(z.brannklasse)}{z.maksPersoner ? `, maks ${z.maksPersoner} pers.` : ''}{z.merknad && <div className="muted">{z.merknad}</div>}</div>)}</> : ''], ['Særskilt brannobjekt', b.saerskilt ? 'Ja' + (b.saerskiltKat ? ' – ' + b.saerskiltKat : '') : ''], ['Maks personer', b.maksPersoner ? String(b.maksPersoner) : ''],
     ['Alarmorganisering', b.alarm], ['Brannsentral', b.brannsentral], ['Oppstillingsplass', b.oppstilling], ['Eiers kontakt', [b.eierAnsvarlig, b.eierTlf].filter(Boolean).join(', ')], ['Vedlegg', (b.vedlegg || []).map((id: string) => byId('dokumenter', id)?.tittel).filter(Boolean).join(', ')]] as [string, React.ReactNode][]).filter(x => x[1]);
   return <>
     <div className="note small" style={{ color: 'var(--ink)', marginBottom: 12 }}>Eier skal kjenne kravene til brannsikkerhet i bygget, <b>gjøre leietakerne kjent med dem</b> og <b>samordne</b> brannvernet når flere bruker bygget (forskrift om brannforebygging § 4), og kunne <b>dokumentere</b> det (§ 10). Leietakerne har egne plikter etter §§ 11–13.<Hjelp id="side.brannvern" /></div>
@@ -374,7 +432,7 @@ export function PortalBrannvern({ l, refresh }: { l: Rec; refresh: () => Promise
       {!v ? <div className="card"><p className="muted small" style={{ margin: 0 }}>Utleier har ikke publisert brannverninformasjon for bygget ennå.</p></div> :
         <div className="grid g2">
           <div className="card"><div className="toolbar" style={{ marginBottom: 6 }}><h3 style={{ margin: 0, flex: 1 }}>Brannverninformasjon v{v}</h3><Chip c={s.c}>{s.t}</Chip></div>
-            <dl className="dl">{([['Alarm', b.alarm], ['Oppstillingsplass', b.oppstilling], ['Brannsentral', b.brannsentral], ['Utleiers kontakt', [b.eierAnsvarlig, b.eierTlf].filter(Boolean).join(', ')]] as [string, string][]).filter(x => x[1]).map(([k, x]) => <React.Fragment key={k}><dt>{k}</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{x}</dd></React.Fragment>)}</dl>
+            <dl className="dl">{([['Brannklasse / risikoklasse', (() => { const mine = sonerFor(e, l); return mine.length ? mine.map(z => `${z.navn || 'Etg. ' + z.etasjer}: ${rk(z.risikoklasse)}, ${bk(z.brannklasse)}`).join(' · ') : klasseTekst(e); })()], ['Alarm', b.alarm], ['Oppstillingsplass', b.oppstilling], ['Brannsentral', b.brannsentral], ['Utleiers kontakt', [b.eierAnsvarlig, b.eierTlf].filter(Boolean).join(', ')]] as [string, string][]).filter(x => x[1]).map(([k, x]) => <React.Fragment key={k}><dt>{k}</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{x}</dd></React.Fragment>)}</dl>
             {b.forutsetninger && <><h3>Forutsetninger for bruk</h3><p className="small" style={{ whiteSpace: 'pre-wrap' }}>{b.forutsetninger}</p></>}
             <p style={{ marginBottom: 0, display: 'flex', gap: 8, flexWrap: 'wrap' }}>{pakke?.fil && <FileLink fil={pakke.fil}>Les hele brannvernpakken (PDF)</FileLink>}{s.o >= 1 && (+pakke?.brannVersjon === v ? <button className="btn sm pri" onClick={bekreft}>Bekreft at vi har lest og informert de ansatte</button> : <span className="small muted">Utleier sender dere oppdatert brannvernpakke (v{v}) – da kan dere bekrefte her.</span>)}</p></div>
           <div className="card"><h3 style={{ marginTop: 0 }}>Deres brannvernansvarlige</h3>
