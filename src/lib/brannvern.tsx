@@ -188,13 +188,14 @@ export function publiser(eid: string) {
   formModal({
     title: `Publiser versjon ${v} av brannverninformasjonen`, saveTxt: 'Publiser',
     top: <p className="small muted" style={{ marginTop: 0 }}>Når en ny versjon publiseres, må alle leietakerne på eiendommen få den og bekrefte på nytt. Det dokumenterer at endringer i bygget eller brannkonseptet er formidlet (FOB §§ 4 og 10).</p>,
-    fields: [{ k: 'tekst', label: 'Hva er endret?', type: 'textarea', req: true, def: v === 1 ? 'Første versjon' : '', ph: 'F.eks. nytt brannkonsept etter ombygging av 2. etasje, ny oppstillingsplass' }],
+    fields: [{ k: 'tekst', label: 'Hva er endret?', type: 'textarea', req: true, def: v === 1 ? 'Første versjon' : '', ph: 'F.eks. nytt brannkonsept etter ombygging av 2. etasje, ny oppstillingsplass' },
+      { k: 'utsending', label: 'Utsending til leietakerne', type: 'select', def: 'ikke', options: [['ikke', 'Ikke send nå – bare publiser (send senere fra fanen Brannvern)'], ['velg', 'Velg hvilke leietakere som skal få den']],
+        hint: 'Utsending betyr at brannvernpakken (PDF) legges i leietakerens dokumenter og portal. Det sendes ingen e-post.' }],
     onSave: async x => {
       const logg = [...(b.logg || []), { versjon: v, tid: new Date().toISOString(), tekst: x.tekst, av: state.me?.navn || state.me?.epost }];
       await save('eiendommer', { ...e, brannvern: { ...b, versjon: v, versjonDato: today(), publisertHash: hash(b), logg } });
       loggHendelse(`Brannverninformasjon v${v} publisert: ${x.tekst}`, eid, eid);
-      const L = S.leietakere.filter(l => l.eiendomId === eid);
-      if (L.length && await confirmBox(`Versjon ${v} er publisert. Lage og sende brannvernpakken til ${L.length} leietaker${L.length === 1 ? '' : 'e'} nå?`, 'Send til alle')) await sendTilAlle(eid);
+      if (x.utsending === 'velg') setTimeout(() => velgOgSend(eid), 50); else toast(`Versjon ${v} er publisert – ingen pakker er sendt`);
     },
   });
 }
@@ -269,17 +270,34 @@ export async function sendPakke(lid: string, opt: { last?: boolean; stille?: boo
   const dokId = await save('dokumenter', { eiendomId: e.id, leietakerId: l.id, type: DOKTYPE_PAKKE, tittel: `Brannverninformasjon v${v} – ${l.navn}`, dato: today(), fil: f, brannVersjon: v });
   const l2 = byId('leietakere', lid)!; const bi = binfo(l2);
   await save('leietakere', { ...l2, brannInfo: { ...bi, sendt: [...(bi.sendt || []), { versjon: v, tid: new Date().toISOString(), av: state.me?.navn || state.me?.epost, dokId }] } });
-  loggHendelse(`Brannverninformasjon v${v} sendt til ${l.navn}`, lid, e.id);
+  loggHendelse(`Brannverninformasjon v${v} lagt i portalen til ${l.navn} (ingen e-post)`, lid, e.id);
   if (opt.last) lastNed(bytes, navn);
   if (!opt.stille) toast(l.epost || (S.profiles || []).some(p => p.leietaker_id === lid) ? 'Pakken ligger nå i leietakerens portal' : 'Pakken er lagret – leietakeren har ingen innlogging, så send PDF-en på e-post');
   return true;
 }
-export async function sendTilAlle(eid: string) {
-  const L = S.leietakere.filter(l => l.eiendomId === eid && bvStatus(l).o >= 1 && !(sisteSendt(l) && +sisteSendt(l)!.versjon === bvVersjon(byId('eiendommer', eid)) && bvStatus(l).c === 'blue'));
-  if (!L.length) { toast('Alle leietakere har fått gjeldende versjon'); return; }
-  let n = 0; for (const l of L) { toast(`Lager pakke ${n + 1} av ${L.length} …`); if (await sendPakke(l.id, { stille: true })) n++; }
-  toast(`Brannvernpakken er sendt til ${n} leietaker${n === 1 ? '' : 'e'}`);
+/** Velg leietakere som skal få gjeldende versjon. Ingen er valgt på forhånd. */
+export function velgOgSend(eid: string) {
+  const e = byId('eiendommer', eid)!; const v = bvVersjon(e);
+  if (!v) { toast('Publiser brannkortet først'); return; }
+  const L = sortBy(S.leietakere.filter(l => l.eiendomId === eid), l => l.navn);
+  if (!L.length) { toast('Ingen leietakere på eiendommen'); return; }
+  const mangler = (l: Rec) => !(sisteSendt(l) && +sisteSendt(l)!.versjon === v) && !(sisteKvittering(l) && +sisteKvittering(l)!.versjon === v);
+  formModal({
+    title: `Send brannvernpakke v${v} – velg leietakere`, saveTxt: 'Send til valgte',
+    top: <p className="small muted" style={{ marginTop: 0 }}>Pakken lages for hver valgt leietaker og legges i leietakerens dokumenter og portal. <b>Det sendes ingen e-post.</b> Ingen er valgt på forhånd.</p>,
+    fields: [{ k: 'valgt', type: 'custom', def: [], render: (x, set) => { const sel: string[] = x.valgt || []; const tgl = (id: string) => set({ valgt: sel.includes(id) ? sel.filter(y => y !== id) : [...sel, id] });
+      return <div><div className="small" style={{ marginBottom: 6, display: 'flex', gap: 12 }}><a href="#" onClick={ev => { ev.preventDefault(); set({ valgt: L.filter(mangler).map(l => l.id) }); }}>Velg alle som mangler v{v} ({L.filter(mangler).length})</a><a href="#" onClick={ev => { ev.preventDefault(); set({ valgt: [] }); }}>Fjern alle</a></div>
+        <div className="note small" style={{ color: 'var(--ink)' }}>{L.map(l => { const st = bvStatus(l); return <label key={l.id} style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '4px 0', fontWeight: 400, cursor: 'pointer' }}><input type="checkbox" checked={sel.includes(l.id)} onChange={() => tgl(l.id)} /><span style={{ flex: 1 }}>{l.navn}{l.lokale ? <span className="muted"> · {l.lokale}</span> : null}</span><Chip c={st.c}>{st.t}</Chip></label>; })}</div></div>; } }],
+    onSave: async x => {
+      const ids: string[] = x.valgt || []; if (!ids.length) { toast('Velg minst én leietaker, eller trykk Avbryt'); return false; }
+      if (!(await confirmBox(`Legge brannvernpakke v${v} i portalen til ${ids.length} leietaker${ids.length === 1 ? '' : 'e'}?\n\n${ids.map(id => '• ' + (byId('leietakere', id)?.navn || '')).join('\n')}`, 'Send'))) return false;
+      let n = 0; for (const id of ids) { toast(`Lager pakke ${n + 1} av ${ids.length} …`); if (await sendPakke(id, { stille: true })) n++; }
+      toast(`Brannvernpakken er lagt i portalen til ${n} leietaker${n === 1 ? '' : 'e'}`);
+    },
+  });
 }
+/** @deprecated bruk velgOgSend – beholdt for eldre kall */
+export const sendTilAlle = (eid: string) => velgOgSend(eid);
 export async function forhandsvis(lid: string) {
   const l = byId('leietakere', lid)!; const e = byId('eiendommer', l.eiendomId)!;
   if (!bvVersjon(e) && !bv(e).alarm) { toast('Fyll ut brannkortet først'); return; }
@@ -373,7 +391,7 @@ export function BrannvernSection({ eid }: { eid: string }) {
       </div>
     </div>
     <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Informasjon til leietakerne</h2>
-      {ed && <><button className="btn sm" onClick={() => midlertidig(eid)}>Varsle om redusert brannsikkerhet</button><button className="btn sm pri" disabled={!v} onClick={() => sendTilAlle(eid)}>Send til alle som mangler</button></>}</div>
+      {ed && <><button className="btn sm" onClick={() => midlertidig(eid)}>Varsle om redusert brannsikkerhet</button><button className="btn sm pri" disabled={!v} onClick={() => velgOgSend(eid)}>Send til leietakere …</button></>}</div>
       {L.length ? <div className="tbl-wrap"><table><thead><tr><th>Leietaker</th><th>Status</th><th>Brannvernansvarlig</th><th>Samordningsavtale</th><th>Siste brannøvelse</th><th /></tr></thead><tbody>
         {L.map(l => { const s = bvStatus(l); const a = binfo(l).ansvarlig; return <tr key={l.id}>
           <td><a href={'#/leietaker/' + l.id}>{l.navn}</a>{l.lokale && <div className="small muted">{l.lokale}</div>}</td>
@@ -381,7 +399,7 @@ export function BrannvernSection({ eid }: { eid: string }) {
           <td className="small">{a?.navn ? <>{a.navn}{a.tlf ? ', ' + a.tlf : ''}{a.stedfortreder && <div className="muted">Stedfortreder: {a.stedfortreder}</div>}</> : l.brannvernleder || <Chip c="amber">Ikke meldt</Chip>}</td>
           <td>{samordning(l) ? <Chip c="green">Registrert</Chip> : <Chip c="amber">Mangler</Chip>}</td>
           <td className="small">{ovelse(l) ? fd(ovelse(l)) : '–'}</td>
-          <td style={{ whiteSpace: 'nowrap' }}>{ed && <>{v > 0 && <button className="btn sm" onClick={() => sendPakke(l.id)}>Send</button>}<button className="btn sm" onClick={() => forhandsvis(l.id)}>PDF</button><button className="btn sm" onClick={() => registrerKvittering(l.id)} title="Registrer signert papir eller bekreftelse på e-post">Registrer bekreftelse</button><button className="btn sm" onClick={() => editAnsvarlig(l.id)}>Ansvarlig</button></>}<button className="btn sm ghost" onClick={() => kvitteringer(l)}>Historikk</button></td>
+          <td style={{ whiteSpace: 'nowrap' }}>{ed && <>{v > 0 && <button className="btn sm" onClick={async () => { if (await confirmBox(`Legge brannvernpakke v${v} i portalen til ${l.navn}? Det sendes ingen e-post.`, 'Send')) sendPakke(l.id); }}>Send</button>}<button className="btn sm" onClick={() => forhandsvis(l.id)}>PDF</button><button className="btn sm" onClick={() => registrerKvittering(l.id)} title="Registrer signert papir eller bekreftelse på e-post">Registrer bekreftelse</button><button className="btn sm" onClick={() => editAnsvarlig(l.id)}>Ansvarlig</button></>}<button className="btn sm ghost" onClick={() => kvitteringer(l)}>Historikk</button></td>
         </tr>; })}</tbody></table></div> : <div className="tbl-wrap"><Empty t="Ingen leietakere">Legg til leietakere på eiendommen.</Empty></div>}
     </div>
     <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Samordning (FOB § 4)</h2>{ed && !felles && <button className="btn sm" onClick={() => editOppgave(undefined, { eiendomId: eid, navn: 'Felles brannøvelse og samordningsmøte med leietakerne', kategori: 'Brann', type: 'Lovpålagt', ansvar: 'Eier', intervall: { n: 1, enhet: 'år' }, nesteFrist: addDays(today(), 60), hjemmel: 'Forskrift om brannforebygging § 4 (samordning), §§ 11–12; internkontrollforskriften § 6', notat: 'Gjennomgå alarmorganisering, rømningsveier og oppstillingsplass. Avklar ansvar ved brannalarm, felles evakuering og kontaktpersoner. Før deltakerliste og læringspunkter.' })}>+ Planlegg felles brannøvelse</button>}</div>
@@ -401,7 +419,7 @@ export function BrannvernSection({ eid }: { eid: string }) {
 export function BrannvernKort({ l }: { l: Rec }) {
   const s = bvStatus(l); const e = byId('eiendommer', l.eiendomId); const v = bvVersjon(e); const k = sisteKvittering(l); const a = binfo(l).ansvarlig;
   return <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Brannverninformasjon<Hjelp id="side.brannvern" /></h2>
-    {v > 0 && <button className="btn sm pri" onClick={() => sendPakke(l.id)}>Send brannvernpakke v{v}</button>}<button className="btn sm" onClick={() => forhandsvis(l.id)}>Last ned PDF</button><button className="btn sm" onClick={() => registrerKvittering(l.id)}>Registrer bekreftelse</button><button className="btn sm" onClick={() => editAnsvarlig(l.id)}>Brannvernansvarlig</button><button className="btn sm ghost" onClick={() => kvitteringer(l)}>Historikk</button></div>
+    {v > 0 && <button className="btn sm pri" onClick={async () => { if (await confirmBox(`Legge brannvernpakke v${v} i portalen til ${l.navn}? Det sendes ingen e-post.`, 'Send')) sendPakke(l.id); }}>Send brannvernpakke v{v}</button>}<button className="btn sm" onClick={() => forhandsvis(l.id)}>Last ned PDF</button><button className="btn sm" onClick={() => registrerKvittering(l.id)}>Registrer bekreftelse</button><button className="btn sm" onClick={() => editAnsvarlig(l.id)}>Brannvernansvarlig</button><button className="btn sm ghost" onClick={() => kvitteringer(l)}>Historikk</button></div>
     <div className="card"><dl className="dl"><dt>Status</dt><dd><Chip c={s.c}>{s.t}</Chip>{s.hint && <span className="small muted"> {s.hint}</span>}</dd>
       <dt>Sist bekreftet</dt><dd>{k ? `v${k.versjon} ${fd(k.tid)} – ${k.navn || ''} (${k.form || ''})` : '–'}</dd>
       <dt>Brannvernansvarlig</dt><dd>{a?.navn ? [a.navn, a.tlf, a.epost].filter(Boolean).join(' · ') + (a.stedfortreder ? ' · stedfortreder ' + a.stedfortreder : '') : l.brannvernleder || <Chip c="amber">Ikke meldt</Chip>}</dd></dl>
