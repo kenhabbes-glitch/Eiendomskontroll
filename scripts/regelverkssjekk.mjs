@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 const ROT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const API = 'https://api.lovdata.no/v1/publicData';
 const DATASETT = ['gjeldende-lover.tar.bz2', 'gjeldende-sentrale-forskrifter.tar.bz2'];
-const arg = process.argv.slice(2); const GODKJENN = arg.includes('--godkjenn'); const LOKAL = arg.includes('--lokal') ? arg[arg.indexOf('--lokal') + 1] : '';
+const arg = process.argv.slice(2); const GODKJENN = arg.includes('--godkjenn'); const TEST = arg.includes('--test'); const LOKAL = arg.includes('--lokal') ? arg[arg.indexOf('--lokal') + 1] : '';
 const P = { kilder: join(ROT, 'regelverk/kilder.json'), grunn: join(ROT, 'regelverk/grunnlinje.json'), status: join(ROT, 'public/regelverk-status.json'), rapport: join(ROT, 'regelverk/rapport.md'), varsel: join(ROT, 'regelverk/varsel.json'), varslet: join(ROT, 'regelverk/varslet.json') };
 const les = (f, d) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return d; } };
 const skriv = (f, v) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, typeof v === 'string' ? v : JSON.stringify(v, null, 2) + '\n'); };
@@ -145,5 +145,6 @@ if (nytt || forsteGang || GODKJENN) {
   skriv(P.varsel, { type: GODKJENN ? 'godkjent' : forsteGang ? 'startet' : 'endringer', sjekket: naa, endringer: status.endringer, problemer, rapport: md.slice(0, 60000) });
   skriv(P.varslet, { fingeravtrykk: GODKJENN ? '' : fingeravtrykk, tid: naa });
 }
+if (TEST && !existsSync(P.varsel)) skriv(P.varsel, { type: 'test', sjekket: naa, endringer: status.endringer, problemer, rapport: md.slice(0, 60000) });
 console.log(endringer.length ? `${endringer.length} endringer funnet` : 'Ingen endringer', problemer.length ? `· ${problemer.length} merknader` : '', nytt ? '· nytt varsel' : '');
 process.exitCode = 0;

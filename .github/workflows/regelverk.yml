@@ -17,6 +17,10 @@ on:
         description: 'Appen er oppdatert – gjør gjeldende regelverk til ny grunnlinje'
         type: boolean
         default: false
+      testvarsel:
+        description: 'Send et testvarsel (e-post til utvikler og hendelseslogg) for å sjekke oppsettet'
+        type: boolean
+        default: false
 permissions:
   contents: write
   issues: write
@@ -32,13 +36,14 @@ jobs:
       - uses: actions/setup-node@v5
         with: { node-version: 22 }
       - name: Sjekk mot Lovdata
-        run: node scripts/regelverkssjekk.mjs ${{ inputs.godkjenn && '--godkjenn' || '' }}
+        run: node scripts/regelverkssjekk.mjs ${{ inputs.godkjenn && '--godkjenn' || '' }} ${{ inputs.testvarsel && '--test' || '' }}
       - name: Opprett eller oppdater GitHub-sak
         id: sak
         if: hashFiles('regelverk/varsel.json') != ''
         env: { GH_TOKEN: '${{ github.token }}' }
         run: |
           TYPE=$(node -p "require('./regelverk/varsel.json').type")
+          if [ "$TYPE" = "test" ]; then exit 0; fi
           NR=$(gh issue list --label regelverk --state open --json number --jq '.[0].number' || true)
           if [ "$TYPE" = "godkjent" ]; then
             if [ -n "$NR" ]; then gh issue close "$NR" --comment "Appen er kontrollert mot gjeldende regelverk. Ny grunnlinje er lagret."; fi

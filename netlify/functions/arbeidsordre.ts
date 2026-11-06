@@ -473,8 +473,8 @@ const handler = async (req: Request) => {
     if (forv.length < 24) return json(503, { error: 'REGELVERK_TOKEN i Netlify er for kort – bruk minst 24 tegn' });
     if (fikk.length !== forv.length || !timingSafeEqual(Buffer.from(fikk), Buffer.from(forv))) return json(403, { error: 'Ikke tillatt' });
     const v = body.varsel || {}; const E: any[] = Array.isArray(v.endringer) ? v.endringer.slice(0, 50) : []; const PR: string[] = Array.isArray(v.problemer) ? v.problemer.slice(0, 50).map(String) : [];
-    const type = ['startet', 'endringer', 'godkjent'].includes(v.type) ? v.type : 'endringer';
-    const kort = type === 'godkjent' ? 'Regelverk: appen er kontrollert og oppdatert mot gjeldende lover og forskrifter (Lovdata).'
+    const type = ['startet', 'endringer', 'godkjent', 'test'].includes(v.type) ? v.type : 'endringer';
+    const kort = type === 'test' ? `Regelverk: testvarsel – oppsettet for regelverkssjekken virker. ${E.length ? E.length + ' endring(er) venter.' : 'Ingen endringer siden grunnlinjen.'}` : type === 'godkjent' ? 'Regelverk: appen er kontrollert og oppdatert mot gjeldende lover og forskrifter (Lovdata).'
       : type === 'startet' ? `Regelverk: overvåking av ${body.antall || ''} lover og forskrifter mot Lovdata er startet.`
       : `Regelverk: ${E.length} endring(er) hos Lovdata i regelverk appen viser til – ${E.map(e => e.navn).slice(0, 6).join(', ')}. Tekster i appen oppdateres i en programoppdatering.`;
     // Hendelseslogg: én rad per organisasjon, synlig for administratorene
@@ -488,7 +488,7 @@ const handler = async (req: Request) => {
     if (til.length && type !== 'godkjent') {
       const { data: op } = await admin.from('epost_oppsett').select('org_id').not('hemmelig', 'is', null).limit(1);
       const oppsett = await hentOppsett((process.env.REGELVERK_ORG || '').trim() || op?.[0]?.org_id || null);
-      const emne = type === 'startet' ? 'Eiendomskontroll: regelverksovervåking startet' : `Eiendomskontroll: ${E.length} regelverksendring(er) må vurderes i appen`;
+      const emne = type === 'test' ? 'Eiendomskontroll: testvarsel fra regelverkssjekken' : type === 'startet' ? 'Eiendomskontroll: regelverksovervåking startet' : `Eiendomskontroll: ${E.length} regelverksendring(er) må vurderes i appen`;
       const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:720px;color:#1d2521"><h2 style="margin:0 0 8px">${esc(emne)}</h2><p>${esc(kort)}</p>
         ${E.length ? `<ul>${E.map(e => `<li><b>${esc(e.navn)}</b> – ${esc(e.tekst)}${e.lenke ? ` (<a href="${esc(e.lenke)}">Lovdata</a>)` : ''}</li>`).join('')}</ul>` : ''}
         ${PR.length ? `<p><b>Merknader:</b></p><ul>${PR.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
