@@ -768,7 +768,8 @@ export function editDok(id?: string, preset: any = {}) {
     onSave: async x => {
       const fil = x.fil; delete x.fil; const o: Rec = { ...d, ...x };
       if (fil) { const f = await uploadFile(fil, o.eiendomId, o.leietakerId || undefined); if (!f) return false; if (d.fil) await deleteFile(d.fil); o.fil = f; }
-      if (!o.tittel) o.tittel = o.type; await save('dokumenter', o); toast('Dokument lagret');
+      if (!o.tittel) o.tittel = o.type; const nid = await save('dokumenter', o); toast('Dokument lagret');
+      if (fil && o.type === 'Brannkonsept/brannteknisk dokumentasjon' && !o.leietakerId && /\.pdf$/i.test(o.fil?.navn || '') && canEdit()) setTimeout(() => import('./brannkonseptLes').then(m => m.tilbyLesing(o.eiendomId, nid)), 300);
     },
   });
 }
