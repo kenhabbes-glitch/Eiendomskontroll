@@ -163,6 +163,7 @@ export default function App() {
       })()}</nav>
       <div className="sidefoot">
         <a className="userbox" href="#/profil" style={{ textDecoration: 'none' }}><span className="av">{ini}</span><span><div style={{ color: '#fff' }}>{me.navn || me.epost}</div><div className="r">{rolleNavn(me.rolle)}</div></span></a>
+        <AppVersjon />
         <button onClick={() => signOut()}>Logg ut</button>
       </div>
     </aside>
@@ -171,6 +172,18 @@ export default function App() {
       {state.loading && !S.eiendommer.length ? <div className="empty"><b>Laster data …</b></div> : body}
     </main>
     <ModalHost /><Toast /><Tip />
+  </div>;
+}
+
+// Appversjon og tidspunkt for siste bygg (settes av Vite ved bygging, se vite.config.ts)
+export const APP_LAGET_AV = 'Kenneth A Habbestad';
+function AppVersjon() {
+  const t = new Date(__BYGGET__); const ok = !isNaN(t.getTime());
+  const dato = ok ? t.toLocaleString('nb-NO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo' }) : '';
+  return <div className="appversjon" title={__COMMIT__ ? 'Commit ' + __COMMIT__ : undefined}>
+    <div>Versjon {__APP_VERSJON__}{__COMMIT__ ? ' · ' + __COMMIT__ : ''}</div>
+    {dato && <div>Oppdatert {dato.replace(',', ' kl.')}</div>}
+    <div>App laget av {APP_LAGET_AV}</div>
   </div>;
 }
 
