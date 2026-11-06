@@ -48,7 +48,7 @@ const normPar = s => s.replace(/\s+/g, ' ').replace(/§\s*/, '§ ').replace(/\.$
 function tolk(xml) {
   const tittel = tekst((xml.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || xml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [, ''])[1]).replace(/\s+/g, ' ');
   const T = tekst(xml);
-  const felt = navn => { const m = T.match(new RegExp(navn + '\\s*:?\\s*\\n?([^\\n]{3,200})', 'i')); return m ? m[1].trim() : ''; };
+  const felt = navn => { const m = T.match(new RegExp(navn + '(?:\\s+ved)?\\s*:?\\s*\\n?\\s*((?:LOV|FOR)-[^\\n]{3,200}|[^\\n]{3,200})', 'i')); return m ? m[1].trim() : ''; };
   const meta = { sistEndret: felt('Sist endret'), ikraft: felt('Ikrafttredelse'), korttittel: felt('Korttittel'), id: felt('Dato') };
   // Paragrafer: 1) Lovdatas merking (legalArticleValue), 2) tekstoverskrifter «§ 5. Tittel»
   const par = {}; let metode = '';

@@ -62,7 +62,7 @@ export const MALER: Record<string, Mal> = {
   tilbakeslag:{n:"Tilbakeslagssikring – årlig funksjonstest",k:"VVS",t:"Lovpålagt",h:"Kommunale abonnementsvilkår; NS-EN 1717",i:[1,"år"],u:"Rørlegger",lvl:"a"},
   fettutskiller:{n:"Fettutskiller – tømming og kontroll",k:"VVS",t:"Lovpålagt",h:"Forurensningsforskriften kap. 15A; kommunal forskrift",i:[6,"mnd"],u:"Godkjent tømmefirma",lvl:"a"},
   oljeutskiller:{n:"Olje-/sandfangutskiller – tømming og kontroll",k:"VVS",t:"Lovpålagt",h:"Forurensningsforskriften kap. 15; kommunale krav",i:[1,"år"],u:"Godkjent tømmefirma",lvl:"a"},
-  trykk:{n:"Trykkpåkjent utstyr – periodisk kontroll",k:"Annet",t:"Lovpålagt",h:"Forskrift om håndtering av trykkpåkjent utstyr (intervall avhenger av kategori)",i:[1,"år"],u:"Kontrollorgan",lvl:"a"},
+  trykk:{n:"Trykkpåkjent utstyr – periodisk kontroll",k:"Annet",t:"Lovpålagt",h:"Forskrift om utførelse av arbeid § 10-6 (kontroll av arbeidsutstyr) og forskrift om håndtering av farlig stoff § 9 – intervall etter utstyrets kategori og bruk",i:[1,"år"],u:"Kontrollorgan",lvl:"a"},
   lekeplass:{n:"Lekeplassutstyr – årlig hovedinspeksjon",k:"Annet",t:"Lovpålagt",h:"Forskrift om sikkerhet ved lekeplassutstyr; NS-EN 1176-7",i:[1,"år"],u:"Sertifisert inspektør",lvl:"a"},
 };
 export const PROP_MALER=["brann_dok","vernerunde_brann","samordning","brannovelse_bygg","eier_ik","leietaker_ik","energiattest","tilstand","uteomrade","snoeis","radon"];
@@ -228,7 +228,7 @@ export const SERVICEAVTALE: Record<string, { n: 'lov' | 'anb'; h: string }> = {
   oljeutskiller: { n: 'lov', h: 'Forurensningsforskriften kap. 15 og kommunal forskrift: tømming og kontroll av godkjent firma' },
   varmepumpe: { n: 'lov', h: 'Produktforskriften kap. 6a (F-gass): lekkasjekontroll av sertifisert personell/foretak' },
   kjole: { n: 'lov', h: 'Produktforskriften kap. 6a (F-gass): lekkasjekontroll av sertifisert personell/foretak' },
-  trykk: { n: 'lov', h: 'Forskrift om håndtering av trykkpåkjent utstyr: periodisk kontroll av kontrollorgan' },
+  trykk: { n: 'lov', h: 'Forskrift om utførelse av arbeid § 10-6 og forskrift om håndtering av farlig stoff § 9: periodisk kontroll av trykkpåkjent utstyr i bruk' },
   nodlys: { n: 'anb', h: 'Årlig kontroll (NS-EN 50172) – kan gjøres av egen elektroinstallatør. Forsikring kan kreve det' },
   nodstrom: { n: 'anb', h: 'Anbefalt service etter produsentens krav' },
   ventilasjon: { n: 'anb', h: 'Anbefalt for drift, inneklima og energi' },
