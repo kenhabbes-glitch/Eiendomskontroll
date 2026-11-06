@@ -27,11 +27,12 @@ const handler = async (req: Request) => {
   let body: any; try { body = await req.json(); } catch { return json(400, { error: 'Ugyldig forespørsel' }); }
 
   const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+  const egne: string[] = []; // innlogget bruker – alltid tillatt mottaker i testmodus
   const hvem = async () => {
     if (!token) return null; const { data } = await admin.auth.getUser(token); if (!data?.user) return null;
     // Tofaktor: samme regel som i databasen (token er verifisert av getUser, så aal-feltet er til å stole på)
     const { data: mok } = await admin.rpc('mfa_ok_for', { p_uid: data.user.id, p_aal: aalFra(token) }); if (mok === false) return null;
-    const { data: p } = await admin.from('profiles').select('*').eq('id', data.user.id).single(); return p ? { ...p, epost: (p.epost || data.user.email || '').toLowerCase() } : null;
+    const { data: p } = await admin.from('profiles').select('*').eq('id', data.user.id).single(); if (p) egne.push((p.epost || data.user.email || '').toLowerCase()); return p ? { ...p, epost: (p.epost || data.user.email || '').toLowerCase() } : null;
   };
   // Tilgang avgjøres av databasens tilgangsfunksjon (organisasjon, oppdrag og tildeling)
   const niva = async (p: any, eid: string) => { if (!p || !p.aktiv) return null; const { data } = await admin.rpc('niva_for', { p_uid: p.id, eid }); return data as string | null; };
@@ -72,8 +73,13 @@ const handler = async (req: Request) => {
   const orgNavnFor = async (eid: string) => { const { data: e } = await admin.from('eiendommer').select('eier_org_id').eq('id', eid).maybeSingle(); if (!e?.eier_org_id) return ''; const { data: o } = await admin.from('organisasjoner').select('navn').eq('id', e.eier_org_id).maybeSingle(); return o?.navn || ''; };
 
   // E-postoppsett: fra appens Innstillinger (tabellen epost_oppsett), ellers miljøvariabler i Netlify.
-  type Oppsett = { metode: 'smtp' | 'resend' | ''; fraNavn: string; fraEpost: string; svarTil: string; smtpHost: string; smtpPort: number; smtpUser: string; passord: string; kilde: string };
-  const hentOppsett = async (org?: string | null): Promise<Oppsett> => {
+  type Oppsett = { metode: 'smtp' | 'resend' | ''; fraNavn: string; fraEpost: string; svarTil: string; smtpHost: string; smtpPort: number; smtpUser: string; passord: string; kilde: string; testmodus?: boolean; tillatt?: string[] };
+  // Testmodus (standard PÅ til den slås av i Innstillinger): e-post sendes bare til adresser på listen over tillatte,
+  // til den innloggede brukeren selv og til utvikleradressen. Alt annet holdes tilbake og logges.
+  const tmFra = (d: any) => ({ testmodus: d?.testmodus !== false, tillatt: Array.isArray(d?.tillatt) ? d.tillatt.map((x: any) => String(x).trim().toLowerCase()).filter(Boolean) : [] });
+  const hentOppsett = async (org?: string | null): Promise<Oppsett> => ({ ...(await hentOppsett0(org)), ...tmFra(await epostData(org)) });
+  const epostData = async (org?: string | null) => { if (org) { const { data: r } = await admin.from('epost_oppsett').select('data').eq('org_id', org).maybeSingle(); if (r) return r.data || {}; } const { data: alle } = await admin.from('epost_oppsett').select('data'); return (alle || []).some((r: any) => r.data?.testmodus === false) && (alle || []).every((r: any) => r.data?.testmodus === false) ? { testmodus: false } : {}; };
+  const hentOppsett0 = async (org?: string | null): Promise<Oppsett> => {
     const env = (k: string) => (process.env[k] || '').trim();
     const { data: r } = org ? await admin.from('epost_oppsett').select('*').eq('org_id', org).maybeSingle() : { data: null as any };
     const d = r?.data || {};
@@ -95,6 +101,13 @@ const handler = async (req: Request) => {
   const sendEpost = async (til: string, emne: string, html: string, tekst: string, vedlegg0?: Vedlegg | Vedlegg[], svarTil?: string, o0?: Oppsett) => {
     const vedlegg = vedlegg0 ? (Array.isArray(vedlegg0) ? vedlegg0 : [vedlegg0]) : [];
     const o = o0 || await hentOppsett();
+    if (o.testmodus !== false) {
+      const ok = new Set([...(o.tillatt || []), ...egne, ...(process.env.UTVIKLER_EPOST || '').split(/[,;\s]+/)].map(x => x.trim().toLowerCase()).filter(Boolean));
+      if (!ok.has(String(til).trim().toLowerCase())) {
+        await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: 'E-post (testmodus)', tabell: 'hendelse', handling: 'epost', tekst: `Testmodus: e-post til ${til} ble holdt tilbake – «${String(emne).slice(0, 200)}»` });
+        return { sendt: false, holdt: true, grunn: `Testmodus er på – e-posten til ${til} ble IKKE sendt. Legg adressen til i listen over tillatte mottakere (Innstillinger → E-post) eller slå av testmodus for å sende.` };
+      }
+    }
     if (!o.metode) return { sendt: false, grunn: 'E-post er ikke satt opp (Innstillinger → E-post for arbeidsordre)' };
     const fra = o.fraNavn ? `"${o.fraNavn.replace(/"/g, '')}" <${o.fraEpost}>` : o.fraEpost; const replyTo = o.svarTil || svarTil || undefined;
     if (o.metode === 'smtp') {
@@ -126,15 +139,15 @@ const handler = async (req: Request) => {
       const { data: r, error } = await admin.from('epost_oppsett').select('*').eq('org_id', org).maybeSingle();
       if (error) return json(500, { error: 'Tabellen epost_oppsett mangler – kjør 004_epost.sql i Supabase' });
       const o = await hentOppsett(org);
-      return json(200, { data: r?.data || {}, harHemmelig: !!r?.hemmelig, aktiv: { metode: o.metode, kilde: o.kilde, fra: o.fraEpost } });
+      return json(200, { data: r?.data || {}, harHemmelig: !!r?.hemmelig, aktiv: { metode: o.metode, kilde: o.kilde, fra: o.fraEpost, testmodus: o.testmodus !== false, tillatt: o.tillatt || [] } });
     }
     if (body.action === 'epost_lagre') {
-      const d = body.data || {}; const ren = { metode: ['smtp', 'resend'].includes(d.metode) ? d.metode : '', fraNavn: String(d.fraNavn || '').slice(0, 120), fraEpost: String(d.fraEpost || '').trim().slice(0, 200), svarTil: String(d.svarTil || '').trim().slice(0, 200), smtpHost: String(d.smtpHost || '').trim(), smtpPort: +d.smtpPort || 465, smtpUser: String(d.smtpUser || '').trim() };
+      const d = body.data || {}; const ren = { metode: ['smtp', 'resend'].includes(d.metode) ? d.metode : '', fraNavn: String(d.fraNavn || '').slice(0, 120), fraEpost: String(d.fraEpost || '').trim().slice(0, 200), svarTil: String(d.svarTil || '').trim().slice(0, 200), smtpHost: String(d.smtpHost || '').trim(), smtpPort: +d.smtpPort || 465, smtpUser: String(d.smtpUser || '').trim(), testmodus: d.testmodus !== false, tillatt: (Array.isArray(d.tillatt) ? d.tillatt : String(d.tillatt || '').split(/[,;\s]+/)).map((x: any) => String(x).trim().toLowerCase()).filter((x: string) => /^\S+@\S+\.\S+$/.test(x)).slice(0, 50) };
       const { data: gml } = await admin.from('epost_oppsett').select('hemmelig').eq('org_id', org).maybeSingle();
       const hemmelig = typeof body.hemmelig === 'string' && body.hemmelig.trim() ? body.hemmelig.trim() : body.slettHemmelig ? null : gml?.hemmelig ?? null;
       const { error } = await admin.from('epost_oppsett').upsert({ org_id: org, data: ren, hemmelig, endret: new Date().toISOString(), endret_av: p.id });
       if (error) return json(500, { error: 'Kunne ikke lagre: ' + error.message });
-      await admin.from('hendelseslogg').insert({ bruker_id: p.id, bruker: p.navn || p.epost, tabell: 'hendelse', handling: 'innstilling', org_id: org, tekst: `E-postoppsett endret (${ren.metode || 'av'}, avsender ${ren.fraNavn} <${ren.fraEpost}>)${typeof body.hemmelig === 'string' && body.hemmelig.trim() ? ', nytt passord/nøkkel' : ''}` });
+      await admin.from('hendelseslogg').insert({ bruker_id: p.id, bruker: p.navn || p.epost, tabell: 'hendelse', handling: 'innstilling', org_id: org, tekst: `E-postoppsett endret (${ren.metode || 'av'}, avsender ${ren.fraNavn} <${ren.fraEpost}>, testmodus ${ren.testmodus ? 'PÅ' : 'AV'}${ren.tillatt.length ? ', tillatt: ' + ren.tillatt.join(', ') : ''})${typeof body.hemmelig === 'string' && body.hemmelig.trim() ? ', nytt passord/nøkkel' : ''}` });
       return json(200, { ok: true });
     }
     const o = await hentOppsett(org);

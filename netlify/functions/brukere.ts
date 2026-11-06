@@ -42,10 +42,21 @@ const handler = async (req: Request) => {
   let body: any; try { body = await req.json(); } catch { return json(400, { error: 'Ugyldig forespørsel' }); }
   const redirectTo = typeof body.redirectTo === 'string' && /^https?:\/\//.test(body.redirectTo) ? body.redirectTo : undefined;
 
+  // Testmodus (samme innstilling som e-post i arbeidsordre.ts): invitasjoner på e-post sendes bare til tillatte adresser
+  const kanSendeTil = async (epost: string) => {
+    const { data: rader } = await admin.from('epost_oppsett').select('data');
+    const R = (rader || []).map((r: any) => r.data || {}); const av = R.length > 0 && R.every((d: any) => d.testmodus === false);
+    if (av) return true;
+    const ok = new Set([...R.flatMap((d: any) => Array.isArray(d.tillatt) ? d.tillatt : []), me.epost, ...(process.env.UTVIKLER_EPOST || '').split(/[,;\s]+/)].map((x: any) => String(x || '').trim().toLowerCase()).filter(Boolean));
+    if (ok.has(epost.toLowerCase())) return true;
+    await admin.from('hendelseslogg').insert({ bruker_id: me.id, bruker: me.navn || me.epost, tabell: 'hendelse', handling: 'epost', tekst: `Testmodus: invitasjon til ${epost} ble holdt tilbake` });
+    return false;
+  };
   // Finn eller opprett bruker. Finnes e-posten fra før, gjenbrukes brukeren (kan være medlem i flere organisasjoner).
   const finnEllerOpprett = async (epost: string, navn: string, passord?: string): Promise<{ id: string; ny: boolean }> => {
     const { data: p } = await admin.from('profiles').select('id').eq('epost', epost).maybeSingle();
     if (p) { if (passord) await admin.auth.admin.updateUserById(p.id, { password: passord }); return { id: p.id, ny: false }; }
+    if (!passord && !(await kanSendeTil(epost))) throw new Error(`Testmodus for e-post er på – invitasjon til ${epost} ble ikke sendt. Opprett brukeren med passord (testbruker), legg adressen til i listen over tillatte mottakere eller slå av testmodus under Innstillinger → E-post.`);
     const r = passord
       ? await admin.auth.admin.createUser({ email: epost, password: passord, email_confirm: true, user_metadata: { navn, test: true } })
       : await admin.auth.admin.inviteUserByEmail(epost, { data: { navn }, redirectTo });
