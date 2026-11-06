@@ -29,6 +29,7 @@ export function inviter(preset: any = {}) {
     fields: [{ k: 'navn', label: 'Navn', req: true, half: true }, { k: 'epost', label: 'E-post', type: 'email', req: true, half: true }],
     top: <p className="small" style={{ marginTop: 0 }}>Brukeren får e-post med lenke for å velge passord, og ser bare sitt eget leieforhold.</p>,
     onSave: async v => {
+      if (!(await confirmBox(`Sende invitasjon på e-post til ${v.epost.trim()}? Er testmodus på, sendes den ikke.`, 'Send invitasjon'))) return false;
       try { await adminApi({ action: 'inviter', rolle: 'leietaker', leietaker_id: preset.leietaker_id, epost: v.epost.trim(), navn: v.navn, redirectTo: location.origin }); }
       catch (e: any) { toast('Invitasjon feilet: ' + e.message); return false; }
       await reloadAdmin(); toast('Invitasjon sendt til ' + v.epost);

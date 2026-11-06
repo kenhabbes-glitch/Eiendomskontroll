@@ -1,6 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { S, aoApi, isAdmin, saveInnst, toast, useStore } from '../lib/store';
+import { confirmBox, showModal } from '../components/ui';
+import { byId, eNavn } from '../lib/utils';
+
+/** Oversikt over alle e-postadresser appen kan sende til, og om det skjer automatisk */
+function visMottakere() {
+  type R = { epost: string; hvem: string; hva: string; auto?: boolean };
+  const R: R[] = [];
+  for (const l of S.leietakere) {
+    if (l.epost) R.push({ epost: l.epost, hvem: `${l.navn} (leietaker, ${eNavn(l.eiendomId)})`, hva: 'Sjekkliste og invitasjon – bare når du trykker Send' });
+    const a = l.brannInfo?.ansvarlig; if (a?.epost) R.push({ epost: a.epost, hvem: `${a.navn || ''} – brannvernansvarlig hos ${l.navn}`, hva: 'Brukes ikke til utsending i dag' });
+  }
+  for (const p of S.profiles.filter(p => p.rolle === 'leietaker')) R.push({ epost: p.epost, hvem: `${p.navn || ''} (leietakerbruker${p.leietaker_id ? ', ' + (byId('leietakere', p.leietaker_id)?.navn || '') : ''})`, hva: 'Innlogging – ingen utsending fra appen' });
+  for (const o of S.oppgaver.filter(o => o.ao?.epost)) R.push({ epost: o.ao.epost, hvem: `Servicefirma – ${o.navn} (${eNavn(o.eiendomId)})`, hva: o.ao.auto ? `Arbeidsordre sendes AUTOMATISK ${o.ao.dager ?? 14} dager før frist` : 'Arbeidsordre – bare når du trykker Send', auto: !!o.ao.auto && o.aktiv !== false });
+  for (const a of S.anlegg.filter(a => a.leverandorEpost)) R.push({ epost: a.leverandorEpost, hvem: `Leverandør – ${a.navn || a.type} (${eNavn(a.eiendomId)})`, hva: 'Forslag i arbeidsordre – bare når du trykker Send' });
+  const sortert = R.sort((x, y) => (+!!y.auto - +!!x.auto) || x.epost.localeCompare(y.epost));
+  showModal('E-postadresser appen kan sende til', () => <>
+    <p className="small muted" style={{ marginTop: 0 }}>Appen sender aldri e-post til leietakere av seg selv. Det eneste som går automatisk, er arbeidsordre til servicefirma der «Send automatisk før frist» er slått på – de er øverst. I testmodus holdes all e-post tilbake unntatt til deg selv og tillatte adresser.</p>
+    {sortert.length ? <div className="tbl-wrap"><table><thead><tr><th>E-post</th><th>Hvem</th><th>Når</th></tr></thead><tbody>{sortert.map((r, i) => <tr key={i}><td className="mono small">{r.epost}</td><td className="small">{r.hvem}</td><td className="small" style={{ color: r.auto ? 'var(--red)' : undefined }}>{r.hva}</td></tr>)}</tbody></table></div> : <p className="muted">Ingen e-postadresser registrert.</p>}
+  </>, { wide: true });
+}
 import { KPI_STANDARD, RENTE_STANDARD, YEAR, kpiFaktor, kpiInnst, nok, renteInnst } from '../lib/utils';
 
 const SQL_URL = 'https://github.com/kenhabbes-glitch/Eiendomskontroll/blob/main/supabase/migrations/002_innstillinger.sql';
@@ -80,10 +100,19 @@ function EpostKort() {
   if (!d) return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}><h2>E-post for arbeidsordre</h2><p className="muted small">Laster …</p></div>;
   const set = (x: any) => setD({ ...d, ...x });
   const inp = { border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px', width: '100%' } as any;
-  const lagre = async () => { setBusy('Lagrer …'); try { await aoApi({ action: 'epost_lagre', data: d, hemmelig: hem }); setHem(''); toast('E-postoppsett lagret'); await last(); } catch (e: any) { toast(e.message); } setBusy(''); };
+  const lagre = async () => { if (d.testmodus === false && !(await confirmBox('Slå av testmodus? Da sendes e-post til de reelle mottakerne – leietakere, servicefirma og utførende – også automatiske arbeidsordre.', 'Slå av testmodus'))) return; setBusy('Lagrer …'); try { await aoApi({ action: 'epost_lagre', data: { ...d, tillatt: (Array.isArray(d.tillatt) ? d.tillatt : []).filter((x: string) => x) }, hemmelig: hem }); setHem(''); toast('E-postoppsett lagret'); await last(); } catch (e: any) { toast(e.message); } setBusy(''); };
   const test = async () => { setBusy('Sender test …'); try { const r = await aoApi({ action: 'epost_test' }); toast(r.sendt ? 'Testmelding sendt til ' + r.til : r.grunn); } catch (e: any) { toast(e.message); } setBusy(''); };
   return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}>
     <h2>E-post for arbeidsordre</h2>
+    <div className="note" style={{ color: 'var(--ink)', borderColor: d.testmodus !== false ? 'var(--amber)' : 'var(--line2)', marginBottom: 12 }}>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600, cursor: 'pointer' }}><input type="checkbox" checked={d.testmodus !== false} onChange={e => set({ testmodus: e.target.checked })} />Testmodus – ingen e-post sendes ut</label>
+      <div className="small" style={{ marginTop: 4 }}>{d.testmodus !== false
+        ? <>Mens testmodus er på, sender appen <b>ikke</b> e-post til leietakere, servicefirma, utførende eller andre – heller ikke automatiske arbeidsordre og invitasjoner. E-post holdes tilbake og føres i hendelsesloggen, og du får teksten til å sende selv. Unntak: deg selv og adressene under.</>
+        : <span style={{ color: 'var(--red)' }}>Testmodus er AV: e-post sendes til de reelle mottakerne, også automatiske arbeidsordre før frist.</span>}</div>
+      {d.testmodus !== false && <div className="fld" style={{ marginTop: 8, marginBottom: 0 }}><label className="small">Tillatte mottakere i testmodus (én per linje)</label>
+        <textarea style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px', width: '100%', minHeight: 60 }} value={Array.isArray(d.tillatt) ? d.tillatt.join('\n') : d.tillatt || ''} onChange={e => set({ tillatt: e.target.value.split(/[\n,;]+/).map(x => x.trim()) })} placeholder="din.test@epost.no" /></div>}
+      <div className="small" style={{ marginTop: 6 }}><a href="#" onClick={e => { e.preventDefault(); visMottakere(); }}>Se alle e-postadresser appen kan sende til</a></div>
+    </div>
     <p className="small muted" style={{ marginTop: -4 }}>Arbeidsordre og varsler sendes fra denne avsenderen, slik at e-posten ser ut til å komme fra dere. Passord og nøkler lagres på serveren, kan ikke leses av noen brukere i appen og vises aldri igjen etter lagring.</p>
     {feil && <div className="banner">{feil}</div>}
     {aktiv && <p className="small">{aktiv.metode ? <>Aktiv nå: <b>{aktiv.metode === 'smtp' ? 'SMTP' : 'Resend'}</b> fra <b>{aktiv.fra}</b> {aktiv.kilde === 'netlify' && <span className="muted">(fra miljøvariabler i Netlify – det du lagrer her overstyrer dem)</span>}</> : <span style={{ color: 'var(--amber)' }}>Ingen e-posttjeneste er satt opp. Arbeidsordre åpnes i brukerens eget e-postprogram.</span>}</p>}

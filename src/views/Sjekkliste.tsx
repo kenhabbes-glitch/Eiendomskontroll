@@ -58,6 +58,7 @@ export function sendSjekkliste(lid: string) {
     extraFoot: () => <button className="btn" type="button" onClick={() => lastNedPakke(l, '')} title="Last ned ZIP med Excel-sjekkliste og mapper – send den selv">⇩ Last ned pakken</button>,
     top: <p className="small muted" style={{ marginTop: 0 }}>Leietaker får en lenke på e-post. Via lenken opprettes en leietakerbruker (eller de logger inn), krysser av i sjekklisten for hver plikt og laster opp dokumentasjon. Innsendt dokumentasjon havner hos deg til godkjenning.{s ? ` Sist sendt ${fd(s.tid)} til ${s.til}.` : ''}</p>,
     onSave: async x => {
+      if (!(await confirmBox(`Sende e-post med sjekklisten til ${String(x.epost).trim()} (${l.navn})? Er testmodus på, holdes e-posten tilbake og du får teksten i stedet.`, 'Send e-post'))) return false;
       try {
         let vedlegg: any;
         if (x.maate !== 'lenke') { const b = await lagPakke(l, x.frist); vedlegg = { navn: pakkeNavn(l) + '.zip', base64: await blobTilBase64(b), type: 'application/zip' }; }
