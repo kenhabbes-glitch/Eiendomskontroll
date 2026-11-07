@@ -51,7 +51,7 @@ begin
       values (r->>'k', lower(r->>'m'), least(greatest(coalesce((r->>'g')::int, 0), 0), 5), least(greatest(coalesce((r->>'a')::int, 0), 0), 5))
       on conflict (kontekst, markor) do update set g = f.g + excluded.g, a = f.a + excluded.a, endret = now();
       n := n + 1;
-    exception when check_violation or invalid_text_representation then null; -- hopp over ugyldige
+    exception when check_violation or invalid_text_representation or not_null_violation then null; -- hopp over ugyldige
     end;
   end loop;
   return n;
@@ -59,8 +59,8 @@ end $$;
 
 create or replace function public.felles_hent(p_kontekster text[]) returns table (kontekst text, markor text, g int, a int)
 language sql stable security definer set search_path = public as $$
-  select kontekst, markor, g, a from felles_laering
-  where auth.uid() is not null and kontekst = any (p_kontekster[1:10])
+  select f.kontekst, f.markor, f.g, f.a from felles_laering f
+  where auth.uid() is not null and f.kontekst = any (p_kontekster[1:10])
 $$;
 
 -- Del en fast mal for en leverandør (org.nr). Bare struktur og korte overskrifter/statusord.
@@ -69,7 +69,7 @@ language plpgsql security definer set search_path = public as $$
 declare t text := p_mal->>'type'; m jsonb;
 begin
   if auth.uid() is null then raise exception 'Ingen tilgang'; end if;
-  if p_orgnr !~ '^[0-9]{9}$' or t not in ('status', 'seksjon', 'prefiks') then raise exception 'Ugyldig mal'; end if;
+  if p_orgnr !~ '^[0-9]{9}$' or t is null or t not in ('status', 'seksjon', 'prefiks') then raise exception 'Ugyldig mal'; end if;
   m := jsonb_build_object('type', t,
     'avvik', coalesce((select jsonb_agg(v) from (select felles_vask(x, 25) v from jsonb_array_elements_text(coalesce(p_mal->'avvik', '[]')) x limit 8) s where v <> ''), '[]'),
     'ok',    coalesce((select jsonb_agg(v) from (select felles_vask(x, 25) v from jsonb_array_elements_text(coalesce(p_mal->'ok', '[]')) x limit 8) s where v <> ''), '[]'),
