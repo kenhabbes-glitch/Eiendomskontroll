@@ -550,7 +550,7 @@ export function utfor(id: string, pre?: UtforPreset) {
     ...(pre?.filer?.length ? [{ k: 'filerInfo', type: 'custom', label: 'Rapport og vedlegg fra servicefirmaet', render: () => <div className="small">{pre.filer!.map((f: any) => <div key={f.path}><FileLink fil={f} /></div>)}<div className="muted">Lagres som dokumenter på kontrollen.</div></div> } as Field] : []),
     { k: 'fil', label: pre?.filer?.length ? 'Ekstra rapport / sjekkliste (valgfritt)' : 'Rapport / sjekkliste', type: 'file' },
     { k: 'les', type: 'custom', render: (v: any, set: any) => { const K = pdfKilder(v.fil, pre?.filer); if (!K.length) return null;
-      return <div className="note small" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', color: 'var(--ink)' }}><span style={{ flex: 1 }}>Appen kan lese PDF-rapporten og foreslå avvik. Rapporten leses her i nettleseren.</span>
+      return <div className="note small" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', color: 'var(--ink)' }}><span style={{ flex: 1 }}>Appen kan lese rapporten (PDF eller bilde) og foreslå avvik. Rapporten leses her i nettleseren.</span>
         <button type="button" className="btn sm pri" onClick={() => lesRapport(o, K, (avs, ok) => { const eks = (v.avs || []).filter((r: any) => r.t?.trim());
           set(ok ? { res: 'OK – ingen avvik' } : { res: 'Avvik funnet', avs: [...eks, ...avs.map(x => ({ ...nyRad(), t: x.t, a: x.a }))] }); })}>Les avvik fra rapporten</button></div>; } } as Field,
   ];

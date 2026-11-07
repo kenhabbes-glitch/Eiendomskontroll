@@ -5,12 +5,13 @@ import type { Rec } from '../lib/utils';
 import { AV_ALV } from '../lib/catalog';
 import { openModal, ModalFrame, Chip, confirmBox } from '../components/ui';
 import { Hjelp } from '../components/Hjelp';
-import { ORD_TYPER, STD_ORD, alleOrd, finnLeverandor, kontekster, laer, laeringsOversikt, lagreOrd, lesInnst, nullstillLaering, pdfLinjer, vurder, type Forslag, type Ord, type OrdType } from '../lib/rapportLesing';
+import { MALTYPER, ORD_TYPER, STD_ORD, alleOrd, brukMal, finnLeverandor, foreslaMal, kontekster, laer, laeringsOversikt, lagreMal, lagreOrd, lesInnst, levNokkel, nullstillLaering, ocrLinjer, pdfLinjer, vurder, type Forslag, type Mal, type Ord, type OrdType } from '../lib/rapportLesing';
 
-type Kilde = { navn: string; hent: () => Promise<ArrayBuffer> };
+type Kilde = { navn: string; pdf: boolean; hent: () => Promise<ArrayBuffer> };
+const erPdf = (n: string, t = '') => /pdf/i.test(t) || /\.pdf$/i.test(n); const erBilde = (n: string, t = '') => /^image\//i.test(t) || /\.(jpe?g|png|webp|bmp|tiff?)$/i.test(n);
 export const pdfKilder = (fil?: File | null, filer?: Rec[]): Kilde[] => [
-  ...(fil && /pdf/i.test(fil.type || fil.name) ? [{ navn: fil.name, hent: () => fil.arrayBuffer() }] : []),
-  ...(filer || []).filter(f => /\.pdf$/i.test(f.navn || f.path || '') || /pdf/i.test(f.type || '')).map(f => ({ navn: f.navn || String(f.path).split('/').pop(), hent: async () => { const { data, error } = await sb.storage.from('filer').download(f.path); if (error || !data) throw new Error('Kunne ikke hente filen'); return data.arrayBuffer(); } })),
+  ...(fil && (erPdf(fil.name, fil.type) || erBilde(fil.name, fil.type)) ? [{ navn: fil.name, pdf: erPdf(fil.name, fil.type), hent: () => fil.arrayBuffer() }] : []),
+  ...(filer || []).filter(f => erPdf(f.navn || f.path || '', f.type) || erBilde(f.navn || f.path || '', f.type)).map(f => ({ navn: f.navn || String(f.path).split('/').pop(), pdf: erPdf(f.navn || f.path || '', f.type), hent: async () => { const { data, error } = await sb.storage.from('filer').download(f.path); if (error || !data) throw new Error('Kunne ikke hente filen'); return data.arrayBuffer(); } })),
 ];
 
 export function lesRapport(o: Rec, kilder: Kilde[], onBruk: (avs: { t: string; a: string }[], ok: boolean) => void) {
@@ -22,12 +23,25 @@ function Leser({ o, kilder, close, onBruk }: { o: Rec; kilder: Kilde[]; close: (
   const [i, setI] = useState(0); const [st, setSt] = useState<'laster' | 'klar' | 'feil'>('laster'); const [feil, setFeil] = useState('');
   const [linjer, setLinjer] = useState<string[]>([]); const [tom, setTom] = useState(false); const [lev, setLev] = useState('');
   const [F, setF] = useState<Forslag[]>([]); const [ok, setOk] = useState(''); const [ign, setIgn] = useState<Set<string>>(new Set()); const [busy, setBusy] = useState(false);
+  const [sek, setSek] = useState(''); const [malBrukt, setMalBrukt] = useState(''); const [ocr, setOcr] = useState<{ p: number; t: string } | null>(null); const [erOcr, setErOcr] = useState(false);
   const ctx = kontekster(o, lev);
-  useEffect(() => { let av = false; setSt('laster');
-    (async () => { try { const r = await pdfLinjer(await kilder[i].hent()); if (av) return; setLinjer(r.linjer); setTom(r.tomTekst); const l = finnLeverandor(r.linjer) || o.utfores || ''; setLev(l);
-      const v = vurder(r.linjer, kontekster(o, l)); setF(v.forslag); setOk(v.okFunnet); setSt('klar'); } catch (e: any) { if (!av) { setFeil(e?.message || String(e)); setSt('feil'); } } })();
+  const analyser = (L: string[], l: string) => {
+    const m = lesInnst().maler[levNokkel(l)]; const mf = m ? brukMal(L, m) : [];
+    const v = vurder(L, kontekster(o, l)); setOk(v.okFunnet); setSek(v.seksjonNavn);
+    if (mf.length) { setF(mf); setMalBrukt(m!.navn || 'Mal for leverandøren'); } else { setF(v.forslag); setMalBrukt(m ? '' : ''); }
+  };
+  const kjorOcr = async (buf?: ArrayBuffer) => {
+    setOcr({ p: 0, t: 'Starter tekstgjenkjenning …' });
+    try { const L = await ocrLinjer(buf || await kilder[i].hent(), kilder[i].pdf, (p, t) => setOcr(x => ({ p: p < 0 ? (x?.p || 0) : p, t: t || x?.t || '' })));
+      setLinjer(L); setTom(L.join('').length < 30); setErOcr(true); const l = finnLeverandor(L) || lev || o.utfores || ''; setLev(l); analyser(L, l); }
+    catch (e: any) { toast(e?.message || String(e)); } finally { setOcr(null); }
+  };
+  useEffect(() => { let av = false; setSt('laster'); setErOcr(false);
+    (async () => { try { const buf = await kilder[i].hent(); if (!kilder[i].pdf) { if (av) return; setSt('klar'); setLinjer([]); setTom(true); await kjorOcr(buf); return; }
+      const r = await pdfLinjer(buf); if (av) return; setLinjer(r.linjer); setTom(r.tomTekst); const l = finnLeverandor(r.linjer) || o.utfores || ''; setLev(l);
+      analyser(r.linjer, l); setSt('klar'); } catch (e: any) { if (!av) { setFeil(e?.message || String(e)); setSt('feil'); } } })();
     return () => { av = true; }; }, [i]);
-  const omvurder = (l: string) => { setLev(l); const v = vurder(linjer, kontekster(o, l)); setF(v.forslag); setOk(v.okFunnet); };
+  const omvurder = (l: string) => { setLev(l); analyser(linjer, l); };
   const upd = (id: string, p: Partial<Forslag>) => setF(L => L.map(f => f.id === id ? { ...f, ...p } : f));
   const valgte = F.filter(f => f.valgt && !ign.has(f.id));
   const bruk = async (somOk = false) => {
@@ -49,7 +63,11 @@ function Leser({ o, kilder, close, onBruk }: { o: Rec; kilder: Kilde[]; close: (
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
         <span className="small">Leverandør (lærer per leverandør):</span><input value={lev} onChange={e => setLev(e.target.value)} onBlur={e => omvurder(e.target.value)} style={{ width: 260, padding: '4px 8px' }} placeholder="Firma eller org.nr." />
         <span className="small muted">{linjer.length} linjer lest · {lesInnst().laering['lev:' + lev.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 60)]?.n || 0} tidligere rapporter fra leverandøren</span></div>
-      {tom && <div className="note small" style={{ marginBottom: 10 }}>PDF-en ser ut til å være skannet (bilde uten tekst). Avvikene må føres inn for hånd.</div>}
+      {ocr ? <div className="note small" style={{ marginBottom: 10 }}><b>{ocr.t}</b><div style={{ height: 6, background: 'var(--line)', borderRadius: 3, marginTop: 6 }}><div style={{ width: `${Math.round(ocr.p * 100)}%`, height: 6, background: 'var(--acc)', borderRadius: 3, transition: 'width .3s' }} /></div><span className="muted">Teksten gjenkjennes her i nettleseren – rapporten sendes ikke ut. Første gang lastes norsk språkdata (ca. 10 MB).</span></div>
+        : tom && !erOcr ? <div className="note small" style={{ marginBottom: 10, display: 'flex', gap: 10, alignItems: 'center' }}><span style={{ flex: 1 }}>{kilder[i].pdf ? 'PDF-en ser ut til å være skannet (bilde uten tekst).' : 'Filen er et bilde.'} Appen kan lese teksten med tekstgjenkjenning (OCR) – det tar fra noen sekunder til et minutt per side.</span><button className="btn sm pri" onClick={() => kjorOcr()}>Les med tekstgjenkjenning</button></div>
+        : tom ? <div className="note small" style={{ marginBottom: 10 }}>Fant ingen lesbar tekst. Avvikene må føres inn for hånd.</div> : null}
+      {erOcr && !ocr && linjer.length > 0 && <div className="note small" style={{ marginBottom: 10 }}>Teksten er lest med tekstgjenkjenning – kontroller forslagene ekstra nøye (skrivefeil kan forekomme).</div>}
+      {malBrukt && <div className="note small" style={{ marginBottom: 10, color: 'var(--ink)' }}>✓ Fast mal for leverandøren er brukt: <b>{malBrukt}</b></div>}
       {ok && <div className="note small" style={{ marginBottom: 10, color: 'var(--green)' }}>Rapporten inneholder «{ok.slice(0, 120)}»{F.length ? '' : ' – den ser ut til å være uten avvik.'}</div>}
       {!F.length && !tom ? <p className="small muted">Fant ingen linjer som ser ut som avvik. Legg til ord som leverandøren bruker under Innstillinger → Lesing av rapporter, så finner appen dem neste gang.</p>
         : <div className="tbl-wrap" style={{ maxHeight: '52vh' }}><table className="pa-tbl"><thead><tr><th style={{ width: 30 }} /><th>Forslag (kan rettes)</th><th style={{ width: 110 }}>Alvorlighet</th><th style={{ width: 70 }} title="Hvor sikker appen er">Sikker</th><th style={{ width: 90 }} title="Ikke foreslå denne teksten igjen fra denne leverandøren">Ignorer</th></tr></thead><tbody>
@@ -61,9 +79,36 @@ function Leser({ o, kilder, close, onBruk }: { o: Rec; kilder: Kilde[]; close: (
             <td><Chip c={f.score >= 0.65 ? 'green' : f.score >= 0.45 ? 'amber' : ''}>{Math.round(f.score * 100)} %</Chip></td>
             <td style={{ textAlign: 'center' }}><input type="checkbox" style={{ width: 'auto' }} checked={ign.has(f.id)} onChange={e => setIgn(s => { const n = new Set(s); e.target.checked ? n.add(f.id) : n.delete(f.id); return n; })} /></td></tr>)}
         </tbody></table></div>}
+      {linjer.length > 0 && lev && <MalPanel lev={lev} linjer={linjer} valgte={valgte} sek={sek} etter={() => analyser(linjer, lev)} />}
       <details style={{ marginTop: 10 }}><summary className="small">Vis all tekst fra rapporten</summary><pre className="small" style={{ whiteSpace: 'pre-wrap', maxHeight: 260, overflow: 'auto', background: 'var(--surface2)', padding: 8, borderRadius: 6 }}>{linjer.map((l, j) => `${String(j + 1).padStart(3)}  ${l}`).join('\n')}</pre></details>
     </>}
   </ModalFrame>;
+}
+
+// ---------------- Fast mal for leverandøren
+function MalPanel({ lev, linjer, valgte, sek, etter }: { lev: string; linjer: string[]; valgte: Forslag[]; sek: string; etter: () => void }) {
+  useStore(); const k = levNokkel(lev); const eks = lesInnst().maler[k];
+  const tom = (): Mal => ({ type: 'status', avvik: ['Avvik'], ok: ['OK'], start: '', slutt: '', prefiks: '', navn: lev, laget: new Date().toISOString().slice(0, 10), kilde: 'egen' });
+  const [apen, setApen] = useState(false); const [m, setM] = useState<Mal>(eks || tom());
+  const set = (x: Partial<Mal>) => setM(v => ({ ...v, ...x })); const treff = brukMal(linjer, m);
+  const lagre = async () => { await lagreMal(k, { ...m, laget: new Date().toISOString().slice(0, 10) }); toast('Malen er lagret – den brukes neste gang en rapport fra leverandøren leses'); setApen(false); etter(); };
+  const liste = (a: string[]) => a.join(', '); const fra = (t: string) => t.split(',').map(x => x.trim()).filter(Boolean);
+  if (!apen) return <p className="small" style={{ margin: '10px 0 0' }}>{eks ? <>Fast mal for <b>{lev}</b>: {MALTYPER.find(t => t[0] === eks.type)?.[1]}. <a href="#" onClick={e => { e.preventDefault(); setM(eks); setApen(true); }}>Endre</a> · <a href="#" onClick={async e => { e.preventDefault(); await lagreMal(k, null); toast('Malen er slettet'); etter(); }}>Slett</a></>
+    : <>Har rapportene fra <b>{lev}</b> alltid samme oppsett? <a href="#" onClick={e => { e.preventDefault(); const f = foreslaMal(linjer, valgte, sek); setM({ ...tom(), ...(f || {}) }); setApen(true); }}>Lag fast mal</a> – da blir treffsikkerheten nesten 100 %.</>}</p>;
+  return <div className="card" style={{ marginTop: 10, background: 'var(--surface2)' }}>
+    <b>Fast mal for {lev}</b>
+    <div className="seg" style={{ margin: '8px 0' }}>{MALTYPER.map(([t, l]) => <button key={t} type="button" className={'btn sm' + (m.type === t ? ' pri' : '')} onClick={() => set({ type: t })}>{l}</button>)}</div>
+    <p className="small muted" style={{ marginTop: 0 }}>{MALTYPER.find(t => t[0] === m.type)?.[2]}</p>
+    <div className="pa-grid">
+      {m.type === 'status' && <><label className="pa-felt half"><span>Status som betyr avvik (kommaseparert)</span><input value={liste(m.avvik)} onChange={e => set({ avvik: fra(e.target.value) })} placeholder="Avvik, X, Ikke OK, TG2" /></label>
+        <label className="pa-felt half"><span>Status som betyr OK</span><input value={liste(m.ok)} onChange={e => set({ ok: fra(e.target.value) })} placeholder="OK, Godkjent, I.R." /></label></>}
+      {m.type === 'seksjon' && <><label className="pa-felt half"><span>Overskrift der avvikene starter</span><input value={m.start} onChange={e => set({ start: e.target.value })} placeholder="Registrerte avvik" /></label>
+        <label className="pa-felt half"><span>Overskrift der avvikene slutter (valgfritt)</span><input value={m.slutt} onChange={e => set({ slutt: e.target.value })} placeholder="Signatur" /></label></>}
+      {m.type === 'prefiks' && <label className="pa-felt half"><span>Linjer som starter med</span><input value={m.prefiks} onChange={e => set({ prefiks: e.target.value })} placeholder="AV-" /></label>}
+    </div>
+    <p className="small" style={{ margin: '4px 0' }}>Malen finner <b>{treff.length}</b> avvik i denne rapporten{treff.length ? ': ' + treff.slice(0, 3).map(f => '«' + f.tekst.slice(0, 50) + '»').join(', ') + (treff.length > 3 ? ' …' : '') : ''}.</p>
+    <div style={{ display: 'flex', gap: 6 }}><button type="button" className="btn sm pri" disabled={!treff.length} onClick={lagre}>Lagre mal</button><button type="button" className="btn sm" onClick={() => setApen(false)}>Avbryt</button></div>
+  </div>;
 }
 
 // ---------------- Innstillinger: ordliste og læring
@@ -86,6 +131,9 @@ export function RapportLesingKort() {
       {LO.map(x => <tr key={x.k}><td className="small">{x.navn}</td><td className="num">{x.rapporter}</td><td className="small">{x.beste.map(b => `${b.m} ${b.g}/${b.a}`).join(' · ')}</td><td className="num">{x.ignorert}</td></tr>)}</tbody></table></div>
       : <p className="small muted">Ingenting lært ennå. Læringen starter første gang noen bruker «Les avvik fra rapporten».</p>}
       {!ro && LO.length > 0 && <button className="btn sm" onClick={async () => { if (await confirmBox('Nullstille alt appen har lært? Ordlisten beholdes.', 'Nullstill')) { await nullstillLaering(); toast('Læringen er nullstilt'); } }}>Nullstill læring</button>}</>}
+    {Object.keys(I.maler || {}).length > 0 && <div className="pu-rad"><b className="small">Faste maler per leverandør</b>
+      {Object.entries(I.maler).map(([k, m]) => <div key={k} className="small" style={{ display: 'flex', gap: 8, padding: '3px 0' }}><span style={{ flex: 1 }}>{m.navn || k.slice(4)} – {MALTYPER.find(t => t[0] === m.type)?.[1]}: {m.type === 'status' ? m.avvik.join(', ') : m.type === 'prefiks' ? m.prefiks : `${m.start}${m.slutt ? ' → ' + m.slutt : ''}`}{m.kilde === 'felles' ? ' (felles)' : ''}</span>
+        {!ro && <a href="#" onClick={async e => { e.preventDefault(); await lagreMal(k, null); }}>Slett</a>}</div>)}</div>}
     <p className="small muted">Standardord: {STD_ORD.length}. Egne ord vises i blått.</p>
   </div>;
 }

@@ -25,10 +25,12 @@ export const STD_ORD: Ord[] = [
 ].map(x => ({ ...x, kilde: 'standard' as const }));
 
 type Laering = { m: Record<string, { g: number; a: number }>; ign: string[]; n: number };
-type Innst = { ord: Ord[]; fjernet: string[]; laering: Record<string, Laering> };
-export const lesInnst = (): Innst => ({ ord: [], fjernet: [], laering: {}, ...(S.innst.rapportlesing || {}) });
+export type Mal = { type: 'status' | 'seksjon' | 'prefiks'; avvik: string[]; ok: string[]; start: string; slutt: string; prefiks: string; navn: string; laget: string; kilde?: 'egen' | 'felles' };
+type Innst = { ord: Ord[]; fjernet: string[]; laering: Record<string, Laering>; maler: Record<string, Mal> };
+export const lesInnst = (): Innst => ({ ord: [], fjernet: [], laering: {}, maler: {}, ...(S.innst.rapportlesing || {}) });
+export const levNokkel = (lev: string) => lev ? 'lev:' + norm(lev).slice(0, 60) : '';
 export const alleOrd = (I = lesInnst()) => [...STD_ORD.filter(x => !I.fjernet.includes(x.t + ':' + x.o)), ...I.ord];
-const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').replace(/[^\p{L}\p{N} %:.,/-]/gu, '').trim();
+export const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').replace(/[^\p{L}\p{N} %:.,/-]/gu, '').trim();
 const hashL = (s: string) => { const t = norm(s).replace(/\d+/g, '#'); let h = 0; for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return String(h >>> 0); };
 const har = (l: string, o: string) => { const s = ' ' + norm(l) + ' '; const w = norm(o); return w.length <= 3 ? new RegExp(`(^|[^\\p{L}])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\p{L}]|$)`, 'u').test(s) : s.includes(w); };
 
@@ -59,7 +61,7 @@ export type Forslag = { id: string; tekst: string; linje: number; treff: string[
 export function kontekster(o: Rec, leverandor: string) { const a = o.anleggId ? S.anlegg.find(x => x.id === o.anleggId) : null; return [leverandor && 'lev:' + norm(leverandor).slice(0, 60), a?.type && 'type:' + a.type, 'type:' + (o.type || 'kontroll')].filter(Boolean) as string[]; }
 export function finnLeverandor(linjer: string[]): string {
   const t = linjer.slice(0, 25);
-  const org = t.join(' ').match(/(\b(?:org\.?\s*nr\.?|organisasjonsnummer)\s*:?\s*)(\d{3}\s?\d{3}\s?\d{3})/i); if (org) return 'orgnr ' + org[2].replace(/\s/g, '');
+  const org = t.join(' ').match(/(\b(?:org\.?\s*nr\.?|organisasjonsnummer)\s*:?\s*)(\d{3}[\s.]?\d{3}[\s.]?\d{3})/i); if (org) return 'orgnr ' + org[2].replace(/\D/g, '');
   const as = t.find(l => /\b(as|asa|ans|da)\b\.?$/i.test(l.trim()) && l.length < 60); return as ? as.trim() : '';
 }
 export function vurder(linjer: string[], ctx: string[], I = lesInnst()) {
@@ -118,4 +120,66 @@ export async function nullstillLaering() { const I = lesInnst(); await saveInnst
 export function laeringsOversikt(I = lesInnst()) {
   return Object.entries(I.laering).map(([k, l]) => ({ k, navn: k.startsWith('lev:') ? 'Leverandør: ' + k.slice(4) : 'Anleggstype: ' + k.slice(5), rapporter: l.n, ignorert: l.ign.length,
     beste: Object.entries(l.m).map(([m, s]) => ({ m: m === '§seksjon' ? '(linjer under avviksoverskrift)' : m, g: s.g, a: s.a })).sort((a, b) => (b.g + b.a) - (a.g + a.a)).slice(0, 6) })).sort((a, b) => b.rapporter - a.rapporter);
+}
+
+// ---------------- Faste maler per leverandør (rapporter med samme oppsett hver gang)
+export const MALTYPER: [Mal['type'], string, string][] = [
+  ['status', 'Statuskolonne', 'Hver linje har en status, f.eks. «OK» eller «Avvik» – linjer med avviksstatus blir avvik'],
+  ['seksjon', 'Avsnitt fra–til', 'Alt mellom en fast overskrift og neste faste overskrift blir avvik'],
+  ['prefiks', 'Linjer som starter med', 'F.eks. «AV-», «Avvik nr» eller «Mangel:»'],
+];
+const ordTreff = (l: string, v: string) => { const w = v.trim(); if (!w) return false; const re = new RegExp(`(^|[\\s:;|/(\\[-])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[\\s:;|/)\\].,-])`, 'i'); return re.test(' ' + l + ' '); };
+export function brukMal(linjer: string[], m: Mal): Forslag[] {
+  const ut: Forslag[] = []; const IGN = alleOrd().filter(x => x.t === 'ignorer').map(x => x.o);
+  const ny = (l: string, i: number, tekst: string): Forslag => { const HOY = alleOrd().filter(x => x.t === 'hoy').map(x => x.o), LAV = alleOrd().filter(x => x.t === 'lav').map(x => x.o);
+    return { id: 'm' + i, tekst: tekst.replace(/^[-•*–\d.)\s|:]+/, '').replace(/[\s|:;-]+$/, '').slice(0, 300), linje: i, treff: ['§mal'], score: 0.92, alv: HOY.some(o => har(l, o)) ? 'Høy' : LAV.some(o => har(l, o)) ? 'Lav' : 'Middels', valgt: true, hash: hashL(l) }; };
+  if (m.type === 'status') linjer.forEach((l, i) => { const t = m.avvik.find(v => ordTreff(l, v)); if (!t || m.ok.some(v => ordTreff(l, v))) return;
+    const tekst = l.replace(new RegExp(`(^|\\s)${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[\\s:;|/)\\].,-])`, 'i'), ' ').replace(/\s+/g, ' ').trim(); if (tekst.length >= 4) ut.push(ny(l, i, tekst)); });
+  if (m.type === 'prefiks' && m.prefiks.trim()) linjer.forEach((l, i) => { if (norm(l).startsWith(norm(m.prefiks))) ut.push(ny(l, i, l.slice(m.prefiks.length))); });
+  if (m.type === 'seksjon' && m.start.trim()) { let inne = false;
+    linjer.forEach((l, i) => { if (!inne) { if (norm(l).includes(norm(m.start))) inne = true; return; }
+      if (m.slutt.trim() && norm(l).includes(norm(m.slutt))) { inne = false; return; }
+      if (l.trim().length < 4 || IGN.some(o => har(l, o))) return;
+      const p = ut[ut.length - 1]; if (p && p.linje === i - 1 && /^[a-zæøå(]/.test(l.trim())) { p.tekst = (p.tekst + ' ' + l.trim()).slice(0, 400); p.linje = i; } else ut.push(ny(l, i, l)); }); }
+  return ut.slice(0, 80);
+}
+/** Forslag til mal ut fra hvilke linjer brukeren har godtatt */
+export function foreslaMal(linjer: string[], valgte: Forslag[], seksjonNavn: string): Partial<Mal> | null {
+  if (!valgte.length) return seksjonNavn ? { type: 'seksjon', start: seksjonNavn } : null;
+  if (valgte.length >= 2) {
+  const sist = valgte.map(f => (linjer[f.linje] || f.tekst).trim().split(/\s+/).pop() || '').map(x => x.replace(/[.:;,]$/, ''));
+  const f0 = sist[0]; if (f0 && f0.length >= 1 && sist.filter(x => x.toLowerCase() === f0.toLowerCase()).length >= Math.max(2, valgte.length * 0.7)) return { type: 'status', avvik: [f0] };
+  const forst = valgte.map(f => (linjer[f.linje] || '').trim().split(/\s+/)[0] || ''); const p0 = forst[0].replace(/\d+.*$/, '');
+  if (p0.length >= 2 && forst.every(x => x.toLowerCase().startsWith(p0.toLowerCase()))) return { type: 'prefiks', prefiks: p0 };
+  }
+  if (!seksjonNavn) return null;
+  const etter = Math.max(...valgte.map(f => f.linje)) + 1; const neste = linjer.slice(etter).find(l => l.trim().length >= 4 && !/^[a-zæøå(]/.test(l.trim()));
+  return { type: 'seksjon', start: seksjonNavn, slutt: neste ? neste.split(/[:–-]/)[0].trim().slice(0, 40) : '' };
+}
+export async function lagreMal(levKey: string, mal: Mal | null) { const I = lesInnst(); const maler = { ...I.maler }; if (mal) maler[levKey] = mal; else delete maler[levKey]; await saveInnst('rapportlesing', { ...I, maler }); }
+
+// ---------------- Tekstgjenkjenning (OCR) for skannede rapporter og bilder – kjører i nettleseren
+const TESS = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/';
+let tessP: Promise<any> | null = null;
+function lastTesseract(): Promise<any> {
+  if ((window as any).Tesseract) return Promise.resolve((window as any).Tesseract);
+  if (!tessP) tessP = new Promise((ok, feil) => { const s = document.createElement('script'); s.src = TESS + 'tesseract.min.js'; s.onload = () => ok((window as any).Tesseract); s.onerror = () => feil(new Error('Kunne ikke laste tekstgjenkjenningen')); document.head.appendChild(s); });
+  tessP.catch(() => { tessP = null; }); return tessP;
+}
+/** Leser tekst fra bilder av sider. pdf: tegner sidene med pdf.js først. framdrift(0–1, tekst) */
+export async function ocrLinjer(data: ArrayBuffer, erPdf: boolean, framdrift: (p: number, t: string) => void, maksSider = 10): Promise<string[]> {
+  const T = await lastTesseract(); framdrift(0.02, 'Laster språkdata (norsk) …');
+  const w = await T.createWorker('nor', 1, { workerPath: TESS + 'worker.min.js', corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1', langPath: 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/nor/4.0.0_best_int',
+    logger: (m: any) => { if (m.status === 'recognizing text') framdrift(-1, ''); } });
+  const ut: string[] = [];
+  try {
+    const bilder: (HTMLCanvasElement | Blob)[] = [];
+    if (erPdf) { const L = await lastPdfjs(); const doc = await L.getDocument({ data: new Uint8Array(data), isEvalSupported: false }).promise;
+      for (let p = 1; p <= Math.min(doc.numPages, maksSider); p++) { const side = await doc.getPage(p); const vp = side.getViewport({ scale: 2 }); const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+        await side.render({ canvasContext: c.getContext('2d')!, viewport: vp }).promise; bilder.push(c); } }
+    else bilder.push(new Blob([data]));
+    for (let i = 0; i < bilder.length; i++) { framdrift(0.05 + 0.95 * i / bilder.length, `Gjenkjenner tekst, side ${i + 1} av ${bilder.length} …`);
+      const r = await w.recognize(bilder[i]); for (const l of r.data.lines || []) { const t = String(l.text || '').replace(/\s+/g, ' ').trim(); if (t && (l.confidence ?? 100) > 35) ut.push(t); } }
+  } finally { await w.terminate().catch(() => null); }
+  framdrift(1, 'Ferdig'); return ut;
 }
