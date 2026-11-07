@@ -77,7 +77,7 @@ export function kontrollFerdigstill(p: Rec): Mangel[] {
 }
 
 // ---------------- PDF med brytning av lange tekster i tabeller og avsnitt
-class ArkivDoc extends Doc {
+export class ArkivDoc extends Doc {
   static async lag(tittel: string) { const d = Object.assign(new ArkivDoc(), await Doc.ny(tittel)) as ArkivDoc; d.nyside(); return d; }
   linjer(s: any, max: number, size = 8.5, bold = false) { const ut: string[] = []; for (const avs of safe(s).split('\n')) { let l = ''; for (const o of avs.split(' ')) { const nn = l ? l + ' ' + o : o; if (this.w(nn, size, bold) > max && l) { ut.push(l); l = o; } else l = nn; } ut.push(l); } return ut; }
   tekst(s: any, size = 9, color = INK) { if (!String(s ?? '').trim()) return; const L = this.linjer(s, this.page.getWidth() - 2 * M, size); for (const l of L) { this.plass(size + 4); this.t(l, M, this.y - size, size, color); this.y -= size + 3.5; } this.y -= 4; }

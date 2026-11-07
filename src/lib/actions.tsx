@@ -12,6 +12,8 @@ import { ServiceHistorikk } from '../views/Servicehistorikk';
 import { alleSjekkmaler } from '../views/Sjekkmaler';
 import { sysSjekkFor, sysSjekkAvvik } from './komponentsjekk';
 import { aktivtProsjektFor, opprettUtskifting } from './prosjekt';
+import { rapportFor, gjentatte, GJENTATT_MIN, GJENTATT_MND } from './avvikLenker';
+import { TILSYN_KILDER, TS_TYPER, MYND } from './tilsyn';
 import { MEDIER, MAALER_KODER, sisteAvl, enhet as mEnhet, grenseTekst, tall as mTall, fmt as mFmt } from './maaler';
 import { SysSjekkVelger, SysSjekkKort } from '../components/SysSjekk';
 import { alleMaler, finnMal, kopi, kontraktKey, fordeling, pliktKeysFor, OMR, ANS_VALG } from './kontrakt';
@@ -567,13 +569,13 @@ export function utfor(id: string, pre?: UtforPreset) {
       if (!dokId && dokIds.length) dokId = dokIds[0];
       const ids: string[] = [];
       for (const t of sjAv) avs.push({ ...nyRad(), t, l: o.ansvar === 'Leietaker' ? (o.leietakerId || nyRad().l) : '' });
-      for (const a of avs) ids.push(await save('avvik', { tittel: a.t.trim(), eiendomId: o.eiendomId, anleggId: o.anleggId || '', komponentId: a.k || '', alv: a.a, status: 'Ny', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, ansvar: a.an || 'Eier', leietakerId: a.an === 'Leietaker' ? (a.l || '') : '', utbedresAv: a.an === 'Leverandør/entreprenør' ? (a.u || '') : '', oppdaget: x.dato, frist: addDays(x.dato, AV_FRIST[a.a]), logg: [{ t: new Date().toISOString(), s: 'Ny', k: 'Registrert fra kontroll: ' + o.navn, av: state.me?.navn }] }));
+      for (const a of avs) ids.push(await save('avvik', { tittel: a.t.trim(), eiendomId: o.eiendomId, anleggId: o.anleggId || '', komponentId: a.k || '', alv: a.a, status: 'Ny', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, dokId, ansvar: a.an || 'Eier', leietakerId: a.an === 'Leietaker' ? (a.l || '') : '', utbedresAv: a.an === 'Leverandør/entreprenør' ? (a.u || '') : '', oppdaget: x.dato, frist: addDays(x.dato, AV_FRIST[a.a]), logg: [{ t: new Date().toISOString(), s: 'Ny', k: 'Registrert fra kontroll: ' + o.navn, av: state.me?.navn }] }));
       // Avvik fra komponentsjekklisten: de som er registrert i appen finnes allerede, de fra servicefirmaets lenke opprettes nå
       const kpNy: Record<string, any> = R ? { ...R.kp } : {};
       for (const [kid, s] of rAvvik) {
         if (s.avvikIds?.length) { ids.push(...s.avvikIds); continue; }
         const k = byId('komponenter', kid); const kl = k ? kNavn(kid) : 'Komponent';
-        const aid = await save('avvik', { tittel: `${kl}: ${s.avvik.join('; ')}`.slice(0, 200), eiendomId: o.eiendomId, anleggId: o.anleggId || '', komponentId: k ? kid : '', alv: 'Middels', status: 'Ny', kilde: 'Servicerapport', oppgaveId: o.id,
+        const aid = await save('avvik', { tittel: `${kl}: ${s.avvik.join('; ')}`.slice(0, 200), eiendomId: o.eiendomId, anleggId: o.anleggId || '', komponentId: k ? kid : '', alv: 'Middels', status: 'Ny', kilde: 'Servicerapport', oppgaveId: o.id, dokId,
           ansvar: o.ansvar === 'Leietaker' ? 'Leietaker' : 'Eier', leietakerId: o.ansvar === 'Leietaker' ? (o.leietakerId || '') : '', beskrivelse: s.avvik.map((t: string) => '• ' + t).join('\n') + (s.komm ? '\n\n' + s.komm : ''),
           plassering: k?.plassering || '', pos: k?.pos?.tegningId ? k.pos : null, vedlegg: s.filer || [], oppdaget: x.dato, frist: addDays(x.dato, AV_FRIST.Middels),
           logg: [{ t: new Date().toISOString(), s: 'Ny', k: `Registrert fra komponentkontroll: ${o.navn}${s.av ? ' (' + s.av + (s.firma ? ', ' + s.firma : '') + ')' : ''}`, av: state.me?.navn }] });
@@ -684,6 +686,27 @@ export function visOppgave(id: string) {
 }
 
 // ================= AVVIK =================
+/** Rapporten avviket kom fra, og varsel om gjentatte avvik på samme komponent/system */
+function AvvikKoblinger({ id, lukk }: { id: string; lukk: () => void }) {
+  useStore(); const a = byId('avvik', id); if (!a) return null;
+  const r = rapportFor(a); const G = gjentatte(a); const m = a.komponentId ? byId('komponenter', a.komponentId) : a.anleggId ? byId('anlegg', a.anleggId) : null;
+  const aid = a.komponentId ? m?.anleggId : a.anleggId; const pr = aid ? aktivtProsjektFor(aid) : null; const ed = kanRedigereE(a.eiendomId);
+  const fremskynd = async () => { if (!m) return; const aar = new Date().getFullYear() + 1;
+    if (!(await confirmBox(`Sette utskiftingsår for ${a.komponentId ? kNavn(m.id) : aNavn(m.id)} til ${aar} i vedlikeholdsplanen?`, 'Sett utskiftingsår'))) return;
+    await save(a.komponentId ? 'komponenter' : 'anlegg', { ...m, planAar: aar, notat: [m.notat, `Utskifting fremskyndet til ${aar} etter ${G.length} avvik på ${GJENTATT_MND} mnd (avvik #${a.nr}).`].filter(Boolean).join('\n') }); toast('Utskiftingsår satt til ' + aar); };
+  return <>
+    {r && (r.dok || r.oppgave) && <div className="note small" style={{ color: 'var(--ink)' }}><b>Kilde: </b>
+      {r.dok?.fil ? <FileLink fil={r.dok.fil}>{r.dok.tittel}</FileLink> : r.dok ? r.dok.tittel : 'Ingen rapportfil lagret'}{r.dokIds.length > 1 ? ` (+${r.dokIds.length - 1} vedlegg)` : ''}
+      {r.oppgave && <> · fra kontrollen <a href="#" onClick={e => { e.preventDefault(); lukk(); visOppgave(r.oppgave!.id); }}>{r.oppgave.navn}</a>{r.dato ? ' ' + fd(r.dato) : ''}</>}</div>}
+    {G.length >= GJENTATT_MIN && <div className="note small" style={{ marginTop: 12, borderColor: 'var(--amber)', color: 'var(--ink)' }}>
+      <b>↻ {G.length} avvik på {a.komponentId ? 'denne komponenten' : 'dette systemet'} siste {GJENTATT_MND} måneder.</b> Gjentatte feil kan bety at {a.komponentId ? 'komponenten' : 'systemet'} bør skiftes i stedet for å repareres.
+      <ul style={{ margin: '6px 0', paddingLeft: 18 }}>{G.slice(0, 8).map(x => <li key={x.id}>{x.id === id ? <b>#{x.nr} {x.tittel} (dette)</b> : <a href="#" onClick={e => { e.preventDefault(); lukk(); editAvvik(x.id); }}>#{x.nr} {x.tittel}</a>} <span className="muted">· {fd(x.oppdaget)} · {x.status}</span></li>)}</ul>
+      {ed && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {aid && (pr ? <button type="button" className="btn sm" onClick={() => { lukk(); location.hash = '#/prosjekt/' + pr.id; }}>Åpne utskiftingsprosjektet</button>
+          : <button type="button" className="btn sm pri" onClick={async () => { const pid = await opprettUtskifting(aid); if (pid) { await save('avvik', { ...byId('avvik', id)!, logg: [...(byId('avvik', id)!.logg || []), { t: new Date().toISOString(), s: a.status, k: `Utskiftingsprosjekt opprettet etter ${G.length} gjentatte avvik`, av: state.me?.navn }] }); lukk(); location.hash = '#/prosjekt/' + pid; } }}>Opprett utskiftingsprosjekt for {aNavn(aid)}</button>)}
+        {m && <button type="button" className="btn sm" onClick={fremskynd}>Fremskynd utskifting i vedlikeholdsplanen{m.planAar ? ` (nå ${m.planAar})` : ''}</button>}</div>}</div>}
+  </>;
+}
 export function editAvvik(id?: string, preset: any = {}) {
   const a: Rec = id ? byId('avvik', id)! : { status: 'Ny', alv: 'Middels', kilde: 'Eier/drift', ansvar: 'Eier', oppdaget: today(), eiendomId: S.eiendommer[0]?.id, ...preset } as any;
   const staff = isStaff();
@@ -694,6 +717,14 @@ export function editAvvik(id?: string, preset: any = {}) {
     { k: 'komponentId', label: 'Komponent (TFM)', type: 'select', options: () => sortBy(S.komponenter, c => kNavn(c.id)).map(c => [c.id, eNavn(c.eiendomId) + ' – ' + kNavn(c.id)] as [string, string]), empty: '–' },
     { k: 'alv', label: 'Alvorlighet', type: 'select', options: AV_ALV, half: true }, { k: 'status', label: 'Status', type: 'select', options: AV_STATUS, half: true },
     { k: 'kilde', label: 'Kilde', type: 'select', options: AV_KILDE, half: true }, { k: 'meldtAv', label: 'Meldt av / referanse', half: true, ph: 'Navn, rapportnr., tilsynsref.' },
+    { k: 'secTs', label: 'Tilsyn', type: 'sec', show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType },
+    { k: 'tsType', label: 'Type', type: 'select', options: TS_TYPER, empty: '–', half: true, show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType, hint: 'Pålegg er et vedtak med frist – klarer dere ikke fristen, be skriftlig om utsettelse før den går ut' },
+    { k: 'tsPunkt', label: 'Punkt i tilsynsrapporten', half: true, show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType },
+    { k: 'tsMyndighet', label: 'Myndighet / avdeling', half: true, show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType, ph: 'F.eks. Brannvesenet' },
+    { k: 'tsRef', label: 'Saksnummer / referanse', half: true, show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType },
+    { k: 'tsDato', label: 'Tilsynsdato', type: 'date', half: true, show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType },
+    { k: 'tsSvarfrist', label: 'Frist for tilbakemelding til myndigheten', type: 'date', half: true, show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType },
+    { k: 'tsTiltak', label: 'Tiltak (tas med i tilbakemeldingen)', type: 'textarea', show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType, ph: 'Hva er gjort eller planlagt, av hvem og når' },
     { k: 'ansvar', label: 'Ansvarlig for utbedring', type: 'select', options: UTBEDRER, half: true },
     { k: 'utbedresAv', label: 'Serviceselskap / leverandør', half: true, show: x => x.ansvar === 'Leverandør/entreprenør', ph: 'Firma som skal rette avviket' },
     ...(canEdit() ? [{ k: 'leietakerId', label: 'Leietaker', type: 'select', options: (v?: any) => S.leietakere.filter(l => !v?.eiendomId || l.eiendomId === v.eiendomId).map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true, show: (x: any) => ['Leietaker', 'Felles'].includes(x.ansvar) || !!x.leietakerId, hint: 'Leietakeren som skal utbedre, eller som deler ansvaret' } as Field] : []),
@@ -711,6 +742,7 @@ export function editAvvik(id?: string, preset: any = {}) {
   let touchedFrist = false; const lukkRef: { c?: () => void } = {};
   lukkRef.c = formModal({
     title: id ? `Avvik #${a.nr || ''}` : 'Nytt avvik', fields, values: { ...a, komm: '', bilder: [] }, wide: true, readOnly: !staff,
+    top: id ? <div style={{ marginBottom: 10 }}><AvvikKoblinger id={id} lukk={() => lukkRef.c?.()} /></div> : undefined,
     onChange: (k, v) => { if (k === 'frist') touchedFrist = true; if (k === 'komponentId' && v.komponentId) { const c = byId('komponenter', v.komponentId); if (c) return { anleggId: c.anleggId, eiendomId: c.eiendomId }; } if (!id && !touchedFrist && (k === 'alv' || k === 'oppdaget')) return { frist: addDays(v.oppdaget || today(), AV_FRIST[v.alv]) }; },
     bottom: () => <>
       {id && staff && <AoPanel id={id} lukk={() => lukkRef.c?.()} />}
@@ -725,7 +757,8 @@ export function editAvvik(id?: string, preset: any = {}) {
     </>,
     extraFoot: close => id && canEdit() ? <button className="btn danger" onClick={async () => { if (await confirmBox('Slette avviket permanent? Vanligvis bør avvik heller settes til «Avvist» eller «Lukket» slik at historikken bevares.')) { await removeDoc('avvik', id); close(); } }}>Slett</button> : null,
     onSave: async x => {
-      const komm = x.komm; const bilder: File[] = x.bilder || []; delete x.komm; delete x.bilder; delete x.secPos; delete x.secFoto;
+      const komm = x.komm; const bilder: File[] = x.bilder || []; delete x.komm; delete x.bilder; delete x.secPos; delete x.secFoto; delete x.secTs;
+      if (TILSYN_KILDER.includes(x.kilde) && !x.tsMyndighet) x.tsMyndighet = MYND[x.kilde];
       if (x.ansvar !== 'Leietaker' && x.ansvar !== 'Felles' && !canEdit()) delete x.leietakerId;
       if (x.komponentId) { const kc = byId('komponenter', x.komponentId); if (kc) { x.anleggId = kc.anleggId; x.eiendomId = kc.eiendomId; } }
       const base: Rec = id ? { ...(byId('avvik', id) || a) } : a; // ferske felt (plassering, tildeling, vedlegg, logg) kan være endret mens skjemaet var åpent

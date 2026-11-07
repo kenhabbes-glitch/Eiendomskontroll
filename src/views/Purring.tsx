@@ -8,6 +8,7 @@ import { Hjelp } from '../components/Hjelp';
 import { editAvvik } from '../lib/actions';
 import { mineAo } from './Arbeidsordre';
 import { settFilter } from './common';
+import { svarfristSnart } from './Tilsyn';
 
 export const PURR_STD = { paLogging: true, paLoggingDager: 7, ansvarlig: false, ansvarligFor: 3, ansvarligGjenta: 7, ansvarligMaks: 3, eier: false, eierEtter: 14, eierEpost: '', ukentlig: false, ukentligEpost: '' };
 export const purrInnst = () => ({ ...PURR_STD, ...(S.innst.avvikPurring || {}) });
@@ -62,11 +63,11 @@ const nokkel = () => `ek-purring-vist:${state.me?.id || ''}`;
 export function visPurringVedPalogging() {
   const c = purrInnst(); if (!c.paLogging || !state.me) return;
   try { if (localStorage.getItem(nokkel()) === today()) return; } catch { }
-  const L = purreListe(c.paLoggingDager); if (!L.over.length && !L.snart.length && !L.kontroll.length) return;
+  const L = purreListe(c.paLoggingDager); const T = canEdit() ? svarfristSnart(14) : []; if (!L.over.length && !L.snart.length && !L.kontroll.length && !T.length) return;
   openModal({ wide: true, render: close => <PurreSkjerm close={close} /> });
 }
 function PurreSkjerm({ close }: { close: () => void }) {
-  useStore(); const c = purrInnst(); const L = purreListe(c.paLoggingDager); const staff = canEdit();
+  useStore(); const c = purrInnst(); const L = purreListe(c.paLoggingDager); const staff = canEdit(); const T = staff ? svarfristSnart(14) : [];
   const ferdig = (gaa?: string) => { try { localStorage.setItem(nokkel(), today()); } catch { } close(); if (gaa === 'avvik') { settFilter('avvik', { st: 'apne', e: '', a: '', k: '', an: '', q: '', fr: 'purring' }); location.hash = '#/avvik'; } else if (gaa) location.hash = gaa; };
   const Rad = ({ a, over }: { a: Rec; over?: boolean }) => { const d = dUntil(a.frist) as number;
     return <tr className="click" onClick={() => { ferdig(); editAvvik(a.id); }}>
@@ -78,6 +79,9 @@ function PurreSkjerm({ close }: { close: () => void }) {
   return <ModalFrame title={<span>Avvik som trenger oppfølging<Hjelp id="side.avvik" /></span>} close={() => ferdig()}
     foot={<><span className="small muted" style={{ flex: 1 }}>Vises én gang per dag.{staff ? ' Kan slås av under Innstillinger → Purring på avvik.' : ''}</span>
       <button className="btn" onClick={() => ferdig()}>Lukk</button><button className="btn pri" onClick={() => ferdig(staff ? 'avvik' : '#/arbeidsordre')}>Gå til listen</button></>}>
+    {T.length > 0 && <div className="note" style={{ marginBottom: 12, borderColor: 'var(--red)' }}><b>Svarfrist til myndigheten</b>
+      {T.map(s => { const d = dUntil(s.svarfrist) as number; return <div key={s.key} className="small" style={{ marginTop: 4 }}>{s.myndighet}{s.ref ? ' · ' + s.ref : ''} – {eNavn(s.eiendomId)}: <b style={{ color: d < 0 ? 'var(--red)' : undefined }}>{fd(s.svarfrist)} {d < 0 ? `(${-d} d over)` : d === 0 ? '(i dag)' : `(om ${d} d)`}</b> · {s.apne} åpne forhold</div>; })}
+      <button className="btn sm" style={{ marginTop: 8 }} onClick={() => ferdig('#/tilsyn')}>Åpne tilsynssaker</button></div>}
     {L.over.length > 0 && <><h3 style={{ margin: '0 0 6px', color: 'var(--red)' }}>Over frist ({L.over.length})</h3><Tab l={L.over} over /></>}
     {L.snart.length > 0 && <><h3 style={{ margin: '14px 0 6px' }}>Frist innen {c.paLoggingDager} dager ({L.snart.length})</h3><Tab l={L.snart} /></>}
     {L.kontroll.length > 0 && <><h3 style={{ margin: '14px 0 6px' }}>Utført – venter på din kontroll ({L.kontroll.length})</h3>

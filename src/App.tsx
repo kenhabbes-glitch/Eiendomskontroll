@@ -3,6 +3,7 @@ import './views/KomponentRunde';
 import { svaktPassord, PASSORDKRAV } from './lib/utils';
 import { MfaSkjerm } from './components/Tofaktor';
 import { visPurringVedPalogging } from './views/Purring';
+import { TilsynView, svarfristSnart } from './views/Tilsyn';
 import React, { useEffect, useState } from 'react';
 import { mineOrg } from './lib/store';
 import { autoKvitterIK } from './lib/actions';
@@ -49,6 +50,7 @@ const I: Record<string, string> = {
   runde: 'M5 20a2 2 0 100-4 2 2 0 000 4zM19 8a2 2 0 100-4 2 2 0 000 4zM7 18h6a3 3 0 000-6h-2a3 3 0 010-6h6',
   prosjekter: 'M3 7h18v13H3zM8 7V4h8v3M3 12h18',
   arkiv: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
+  tilsyn: 'M9 11l3 3 8-8M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9',
   avvik: 'M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z',
   leietakere: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8',
   tfm: 'M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L2 12V2h10l8.6 8.6a2 2 0 010 2.8zM7 7h.01',
@@ -70,6 +72,7 @@ function navFor(): [string, string][] {
   if (isTenant()) return [['portal', 'Mitt leieforhold'], ['regelverk', 'Plikter og regelverk'], ['hjelp', 'Hjelp']];
   if (isUtforer()) return [['arbeidsordre', 'Mine arbeidsordre'], ['hjelp', 'Hjelp']];
   const n: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['kontroller', 'Kontrollplan'], ['runde', 'Kontrollrunde'], ['avvik', 'Avvik'], ['arbeidsordre', 'Mine arbeidsordre']];
+  if (canEdit()) n.splice(5, 0, ['tilsyn', 'Tilsynssaker']);
   if (canEdit()) n.push(['leietakere', 'Leietakere']);
   n.push(['maalere', 'Målere'], ['tfm', 'TFM-register'], ['arealer', 'Tegninger og arealer'], ['dokumenter', 'Dokumenter']);
   if (canEdit()) n.push(['vedlikehold', 'Vedlikeholdsplan'], ['prosjekter', 'Prosjekter']);
@@ -125,6 +128,7 @@ export default function App() {
     case 'eiendom': body = <Eiendom id={r.id!} />; break;
     case 'kontroller': body = <Kontrollplan />; break;
     case 'avvik': body = <AvvikView />; break;
+    case 'tilsyn': body = <TilsynView />; break;
     case 'leietakere': body = <Leietakere />; break;
     case 'leietaker': body = <LeietakerView id={r.id!} />; break;
     case 'tfm': body = <TfmRegister />; break;
@@ -152,7 +156,7 @@ export default function App() {
       <nav id="nav">{(() => {
         const lenke = ([k, l]: [string, string], sub = false) => <a key={k} href={'#/' + k} className={(cur === k ? 'on' : '') + (sub ? ' navsub' : '')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={I[k]} /></svg>{l}
-          {k === 'kontroller' && forf > 0 && <span className="n">{forf}</span>}{k === 'avvik' && avv > 0 && <span className="n">{avv}</span>}{k === 'arbeidsordre' && mineAo().length > 0 && <span className="n">{mineAo().length}</span>}
+          {k === 'kontroller' && forf > 0 && <span className="n">{forf}</span>}{k === 'avvik' && avv > 0 && <span className="n">{avv}</span>}{k === 'tilsyn' && svarfristSnart(14).length > 0 && <span className="n">{svarfristSnart(14).length}</span>}{k === 'arbeidsordre' && mineAo().length > 0 && <span className="n">{mineAo().length}</span>}
         </a>;
         const adm = nav.filter(n => ADMIN_NAV.includes(n[0])); const vanlig = nav.filter(n => !ADMIN_NAV.includes(n[0]));
         const iAdm = adm.some(n => n[0] === cur); const apen = admApen || iAdm;

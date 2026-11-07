@@ -1,3 +1,4 @@
+import { gjentattTelling, gjentattAntall, GJENTATT_MIN, GJENTATT_MND } from '../lib/avvikLenker';
 import { bvStatus } from '../lib/brannvern';
 import { TgForslagChip } from './TgKg';
 import React, { type ReactNode } from 'react';
@@ -54,11 +55,12 @@ export function AvvikTable({ list, showE = true }: { list: Rec[]; showE?: boolea
   if (!list.length) return <Wrap><Empty t="Ingen avvik">Avvik registreres fra kontroller, servicerapporter, tilsyn eller meldinger fra leietakere.</Empty></Wrap>;
   const ao: Record<string, number> = { Kritisk: 0, 'Høy': 1, Middels: 2, Lav: 3 };
   const L = list.slice().sort((a, b) => (+AV_LUKKET.includes(a.status) - +AV_LUKKET.includes(b.status)) || (ao[a.alv] - ao[b.alv]) || String(a.frist || '9').localeCompare(String(b.frist || '9')));
+  const GT = gjentattTelling();
   return <Wrap><table><thead><tr><th className="num">Nr</th><th>Avvik</th>{showE && <th>Eiendom</th>}<th>Alvorlighet</th><th>Status</th><th>Frist</th><th>Ansvar</th><th>Kilde</th></tr></thead><tbody>
-    {L.map(a => { const closed = AV_LUKKET.includes(a.status); const kc = a.komponentId && byId('komponenter', a.komponentId);
+    {L.map(a => { const closed = AV_LUKKET.includes(a.status); const kc = a.komponentId && byId('komponenter', a.komponentId); const gj = closed ? 0 : gjentattAntall(a, GT);
       return <tr key={a.id} className="click" onClick={() => editAvvik(a.id)}>
         <td className="num muted">{a.nr}</td>
-        <td><b style={{ fontWeight: 500 }}>{a.tittel}</b>{kc ? <div className="small muted mono">{tfmKomp(kc)}</div> : a.anleggId ? <div className="small muted">{aNavn(a.anleggId)}</div> : null}
+        <td><b style={{ fontWeight: 500 }}>{a.tittel}</b>{gj >= GJENTATT_MIN && <span className="chip amber" style={{ marginLeft: 6 }} title={`${gj} avvik på samme ${a.komponentId ? 'komponent' : 'system'} siste ${GJENTATT_MND} mnd`}>↻ {gj}</span>}{a.tilsyn?.type && <span className="chip red" style={{ marginLeft: 6 }} title="Tilsynsavvik">{a.tilsyn.type}</span>}{kc ? <div className="small muted mono">{tfmKomp(kc)}</div> : a.anleggId ? <div className="small muted">{aNavn(a.anleggId)}</div> : null}
           {(a.pos || a.tildeltId) && <div className="small muted">{a.pos && <span style={{ color: '#b42318' }} title="Plassert på tegning">▲ </span>}{a.tildeltId && <>→ {tildeltNavn(a.tildeltId) || 'ekstern'}</>}</div>}</td>
         {showE && <td>{eNavn(a.eiendomId)}</td>}
         <td><AlvChip a={a.alv} /></td>
