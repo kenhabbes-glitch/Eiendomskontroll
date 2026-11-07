@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { AV_LUKKET, DOK_PAAKREVD } from '../lib/catalog';
 import { eierRapport } from './EierRapport';
+import { capexRapport } from './CapexRapport';
 import { S, canEdit, isAdmin, useStore, mineOrg } from '../lib/store';
 import { activeTasks, byId, dUntil, openAvvik, sortBy } from '../lib/utils';
 import { autoTfm, editAnlegg, editAvvik, editDok, editEiendom, editKomponent, editLeietaker, editOppgave, generatePlan, importTfm, visOppgave } from '../lib/actions';
@@ -70,7 +71,7 @@ export function Eiendom({ id }: { id: string }) {
   if (cur === 'brann') c = <BrannvernSection eid={id} />;
   return <>
     <p className="small" style={{ margin: '0 0 6px' }}><a href="#/eiendommer">← Eiendommer</a></p>
-    <div className="head"><div className="grow"><h1>{e.navn}</h1><p className="sub">{[e.adresse, e.poststed, e.kategori].filter(Boolean).join(' · ')}</p></div>{ed && <button className="btn" onClick={() => eierRapport(id)} title="Status på eiers lovpålagte oppgaver og dokumenter">Statusrapport til eier</button>}{ed && <button className="btn" onClick={() => editEiendom(id)}>Rediger</button>}<button className="btn" onClick={() => editAvvik(undefined, { eiendomId: id })}>+ Avvik</button></div>
+    <div className="head"><div className="grow"><h1>{e.navn}</h1><p className="sub">{[e.adresse, e.poststed, e.kategori].filter(Boolean).join(' · ')}</p></div>{ed && <button className="btn" onClick={() => capexRapport(id)} title="Utskiftingsbehov og langtidsvedlikehold for valgfri periode">Capex-rapport</button>}{ed && <button className="btn" onClick={() => eierRapport(id)} title="Status på eiers lovpålagte oppgaver og dokumenter">Statusrapport til eier</button>}{ed && <button className="btn" onClick={() => editEiendom(id)}>Rediger</button>}<button className="btn" onClick={() => editAvvik(undefined, { eiendomId: id })}>+ Avvik</button></div>
     <div className="tabs">{tabs.map(([k, l, n]) => <a key={k} className={cur === k ? 'on' : ''} onClick={() => setTab(k)}>{l}{n !== '' && <span className="c">{n}</span>}</a>)}</div>
     {c}
   </>;

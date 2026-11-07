@@ -6,6 +6,7 @@ import { S, useStore, kanRedigereE } from '../lib/store';
 import { YEAR, aNavn, compYear, eNavn, kNavn, knok, nok, kostJustert, kpiInnst, kostNaa, egetAar, sysKomp, naaverdi, renteInnst, erForslag, harForslag } from '../lib/utils';
 import { editAnlegg, editKomponent } from '../lib/actions';
 import { AnleggTable } from '../components/tables';
+import { capexRapport } from './CapexRapport';
 import { Chip, ForslagMerke, TgChip } from '../components/ui';
 import { Sel, eiendomOpts, useFilter } from './common';
 
@@ -32,7 +33,7 @@ export function Vedlikehold() {
   const akutt = items.filter(i => i.late || i.a.tg === 'TG3');
   const byY: Record<number, typeof items> = {}; items.forEach(i => { (byY[i.y!] = byY[i.y!] || []).push(i); });
   return <>
-    <div className="head"><div className="grow"><h1>Vedlikeholdsplan<Hjelp id="side.vedlikehold" /></h1><p className="sub">Langsiktig utskiftingsplan basert på installasjonsår, levetid og tilstandsgrad</p></div></div>
+    <div className="head"><div className="grow"><h1>Vedlikeholdsplan<Hjelp id="side.vedlikehold" /></h1><p className="sub">Langsiktig utskiftingsplan basert på installasjonsår, levetid og tilstandsgrad</p></div><button className="btn" onClick={() => capexRapport(f.e || undefined, H)}>Capex-rapport</button></div>
     <div className="toolbar"><Sel value={f.e} onChange={e => setF({ e })} opts={eiendomOpts()} empty="Alle eiendommer" /><Sel value={f.h} onChange={h => setF({ h })} opts={[['10', '10 år'], ['20', '20 år'], ['30', '30 år']]} /><Sel value={f.pris} onChange={pris => setF({ pris })} opts={[['justert', 'Prisjustert (KPI)'], ['dagens', `Dagens kroner (${YEAR}-nivå)`]]} />
       <span className="small muted">{pj ? <>KPI: {kpi.modus === 'fast' ? kpi.fast.toLocaleString('nb-NO') + ' % per år' : 'egen sats per år'} · <a href="#/innstillinger">endre</a></> : `Alle beløp indeksregulert til ${YEAR}-kroner`}</span></div>
     <div className="kpis">
