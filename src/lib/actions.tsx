@@ -714,6 +714,9 @@ export function editAvvik(id?: string, preset: any = {}) {
     onChange: (k, v) => { if (k === 'frist') touchedFrist = true; if (k === 'komponentId' && v.komponentId) { const c = byId('komponenter', v.komponentId); if (c) return { anleggId: c.anleggId, eiendomId: c.eiendomId }; } if (!id && !touchedFrist && (k === 'alv' || k === 'oppdaget')) return { frist: addDays(v.oppdaget || today(), AV_FRIST[v.alv]) }; },
     bottom: () => <>
       {id && staff && <AoPanel id={id} lukk={() => lukkRef.c?.()} />}
+      {id && staff && a.frist && !AV_LUKKET.includes(a.status) && <p className="small" style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button type="button" className="btn sm" onClick={() => import('../views/Purring').then(m => m.purrNa(id))}>Send purring nå</button>
+        <span className="muted">{(byId('avvik', id) || a).purring?.sist ? `Sist purret ${fd(String((byId('avvik', id) || a).purring.sist).slice(0, 10))}${(byId('avvik', id) || a).purring.antall ? ` · ${(byId('avvik', id) || a).purring.antall} purring(er) etter frist` : ''}` : 'Ikke purret'} – går til tildelt bruker, leverandør med arbeidsordre-lenke eller leietaker</span></p>}
       {!id && <p className="small muted" style={{ marginTop: 12 }}>Etter lagring kan avviket tildeles en bruker eller sendes som arbeidsordre på e-post.</p>}
       {a.oppgaveId && byId('oppgaver', a.oppgaveId) && <p className="small muted" style={{ marginTop: 12 }}>Registrert fra kontroll: <a href="#" onClick={e => { e.preventDefault(); visOppgave(a.oppgaveId); }}>{byId('oppgaver', a.oppgaveId)!.navn}</a></p>}
       {((id && byId('avvik', id)) || a).vedlegg?.length > 0 && <><h3 style={{ marginTop: 14 }}>Registrerte bilder og vedlegg</h3><VedleggGalleri filer={((id && byId('avvik', id)) || a).vedlegg} /></>}

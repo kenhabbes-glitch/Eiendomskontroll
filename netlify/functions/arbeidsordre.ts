@@ -534,6 +534,103 @@ const handler = async (req: Request) => {
     return json(200, { ok: true, behandlet: ut.length, ut });
   }
 
+  // ---------- Purring på avvik (frist nær eller passert). Innstillinger per organisasjon: innstillinger.nokkel = 'avvikPurring'
+  const PURR_STD = { ansvarlig: false, ansvarligFor: 3, ansvarligGjenta: 7, ansvarligMaks: 3, eier: false, eierEtter: 14, eierEpost: '', ukentlig: false, ukentligEpost: '' };
+  const AV_LUKKET_S = ['Rettet', 'Avvist', 'Lukket'];
+  const dagerTil = (d: string) => { const t = new Date(); t.setUTCHours(0, 0, 0, 0); return Math.round((new Date(d + 'T00:00:00Z').getTime() - t.getTime()) / 864e5); };
+  const fdN = (d?: string) => d ? d.split('-').reverse().join('.') : '';
+  const epostListe = (s0: string) => String(s0 || '').split(/[,;\s]+/).map(x => x.trim().toLowerCase()).filter(x => /^\S+@\S+\.\S+$/.test(x));
+  /** Hvem som skal ha purringen: tildelt bruker → leverandør med åpen arbeidsordre-lenke → leietakers portalbrukere/kontakt */
+  const purreMottakere = async (a: any, base: string) => {
+    const d = a.data || {}; const ut: { epost: string; navn: string; lenke: string; hvem: string }[] = [];
+    if (a.tildelt_id) { const { data: t } = await admin.from('profiles').select('epost, navn').eq('id', a.tildelt_id).maybeSingle(); if (t?.epost) ut.push({ epost: t.epost.toLowerCase(), navn: t.navn || '', lenke: `${base}/#/arbeidsordre/${a.id}`, hvem: 'tildelt' }); }
+    if (!ut.length) { const { data: inv } = await admin.from('ao_invitasjon').select('token, epost, utloper, brukt').eq('avvik_id', a.id).order('opprettet', { ascending: false }).limit(1);
+      const i = inv?.[0]; if (i && !i.brukt && (!i.utloper || new Date(i.utloper).getTime() > Date.now())) ut.push({ epost: i.epost.toLowerCase(), navn: '', lenke: `${base}/#/ao/${i.token}`, hvem: 'leverandør' }); }
+    if (!ut.length && d.ansvar === 'Leietaker' && d.leietakerId) {
+      const { data: pb } = await admin.from('profiles').select('epost, navn').eq('leietaker_id', d.leietakerId).eq('rolle', 'leietaker');
+      for (const x of pb || []) if (x.epost) ut.push({ epost: x.epost.toLowerCase(), navn: x.navn || '', lenke: `${base}/#/portal`, hvem: 'leietaker' });
+      if (!ut.length) { const { data: l } = await admin.from('leietakere').select('data').eq('id', d.leietakerId).maybeSingle(); const e = String(l?.data?.epost || '').toLowerCase(); if (/^\S+@\S+\.\S+$/.test(e)) ut.push({ epost: e, navn: l?.data?.kontakt || '', lenke: '', hvem: 'leietaker' }); }
+    }
+    return ut;
+  };
+  const purreTekst = (a: any, m: { navn: string; lenke: string }, etter: boolean, nr: number) => {
+    const d = a.data || {}; const ao = d.ao || {}; const dg = d.frist ? dagerTil(d.frist) : 0;
+    const emne = `${etter ? (nr > 1 ? `${nr}. purring` : 'Purring') : 'Påminnelse'}: avvik #${a.nr} ${d.tittel || ''}${d.frist ? ` – frist ${fdN(d.frist)}` : ''}`.slice(0, 180);
+    const linje = etter ? `Fristen for å utbedre avviket gikk ut ${fdN(d.frist)} (${-dg} dager siden), og avviket er ikke meldt utført.` : `Fristen for å utbedre avviket er ${fdN(d.frist)} (om ${dg} dager).`;
+    const rader = [['Eiendom', [ao.eiendom, ao.adresse].filter(Boolean).join(', ')], ['System', ao.system], ['Komponent', ao.komponent], ['Plassering', d.plassering], ['Alvorlighet', d.alv], ['Status', d.status]].filter(x => x[1]);
+    const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:620px;color:#1d2521"><h2 style="margin:0 0 8px">${esc(emne)}</h2>${m.navn ? `<p>Hei ${esc(m.navn)},</p>` : ''}<p>${esc(linje)}</p>
+      <table style="border-collapse:collapse;font-size:14px">${rader.map(x => `<tr><td style="padding:3px 14px 3px 0;color:#6b736d">${x[0]}</td><td>${esc(x[1])}</td></tr>`).join('')}</table>
+      ${d.beskrivelse ? `<p style="margin-top:12px"><b>Beskrivelse</b><br>${esc(d.beskrivelse).replace(/\n/g, '<br>')}</p>` : ''}
+      ${m.lenke ? `<p style="margin:20px 0"><a href="${esc(m.lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Åpne avviket og kvitter ut</a></p>` : '<p>Gi beskjed til eier når avviket er utbedret.</p>'}
+      <p style="font-size:12px;color:#6b736d">Er avviket allerede utbedret, kvitter det ut via lenken, så stopper påminnelsene. Ta kontakt dersom fristen ikke kan holdes.</p></div>`;
+    return { emne, html, tekst: `${emne}\n\n${linje}\n${rader.map(x => x[0] + ': ' + x[1]).join('\n')}\n\n${m.lenke ? 'Åpne: ' + m.lenke : ''}` };
+  };
+  const SYS = { id: null, navn: 'Automatisk purring' };
+  async function purrEn(a: any, base: string, etter: boolean, manuelt?: any) {
+    const M = await purreMottakere(a, base); if (!M.length) return { sendt: 0, grunn: 'ingen mottaker (ikke tildelt, ingen åpen arbeidsordre-lenke eller leietakerkontakt)' };
+    const d = a.data || {}; const pu = d.purring || {}; const nr = etter ? (pu.antall || 0) + 1 : 0; const o = await oppsettFor(a.eiendom_id, null);
+    let sendt = 0; const til: string[] = [];
+    for (const m of M) { const t = purreTekst(a, m, etter, nr); const r = await sendEpost(m.epost, t.emne, t.html, t.tekst, undefined, undefined, o).catch(() => ({ sendt: false })); if ((r as any).sendt) { sendt++; til.push(m.epost); } }
+    if (sendt) { const tid = new Date().toISOString(); const k = `${manuelt ? 'Purring sendt manuelt' : etter ? `Purring ${nr} sendt automatisk` : 'Påminnelse før frist sendt automatisk'} til ${til.join(', ')}`;
+      const { data: fersk } = await admin.from('avvik').select('data').eq('id', a.id).single(); const fd0 = fersk?.data || d;
+      await admin.from('avvik').update({ data: { ...fd0, purring: { ...(fd0.purring || {}), sist: tid, ...(etter ? { antall: (fd0.purring?.antall || 0) + 1 } : { forFrist: d.frist }), til }, logg: [...(fd0.logg || []), { t: tid, s: fd0.status, k, av: manuelt?.navn || SYS.navn }] } }).eq('id', a.id);
+      await logg(manuelt || SYS, a, k); }
+    return { sendt, til };
+  }
+  // Manuell purring fra appen («Send purring nå»)
+  if (body.action === 'av_purr') {
+    const p = await hvem(); if (!p) return json(401, { error: 'Ikke innlogget' });
+    const a = await hentAvvik(body.avvik_id); if (!a) return json(404, { error: 'Fant ikke avviket' });
+    if (!(await harEiendom(p, a.eiendom_id))) return json(403, { error: 'Du har ikke tilgang til eiendommen' });
+    const base = typeof body.lenkeBase === 'string' && /^https?:\/\//.test(body.lenkeBase) ? body.lenkeBase.replace(/\/+$/, '') : (process.env.URL || '');
+    const r = await purrEn(a, base, !!a.data?.frist && dagerTil(a.data.frist) < 0, p);
+    return json(200, r);
+  }
+  // Daglig kjøring (fra den planlagte funksjonen ko-auto)
+  if (body.action === 'av_purring') {
+    const forventet = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('ko-auto:' + key)).then(b => Buffer.from(b).toString('hex'));
+    if (req.headers.get('x-ek-cron') !== forventet) return json(403, { error: 'Ikke tillatt' });
+    const base = (process.env.URL || '').replace(/\/+$/, ''); const rapport: any[] = [];
+    const { data: innst } = await admin.from('innstillinger').select('org_id, data').eq('nokkel', 'avvikPurring');
+    const mandag = new Date().getUTCDay() === 1;
+    for (const r0 of innst || []) {
+      const c = { ...PURR_STD, ...(r0.data || {}) }; if (!c.ansvarlig && !c.eier && !c.ukentlig) continue;
+      const { data: org } = await admin.from('organisasjoner').select('id, navn, aktiv').eq('id', r0.org_id).maybeSingle(); if (!org?.aktiv) continue;
+      const { data: E } = await admin.from('eiendommer').select('id, data').eq('eier_org_id', org.id); const eids = (E || []).map((e: any) => e.id); if (!eids.length) continue;
+      const { data: A } = await admin.from('avvik').select('*').in('eiendom_id', eids);
+      const apne = (A || []).filter((a: any) => !AV_LUKKET_S.includes(a.data?.status) && a.data?.frist);
+      const ventende = apne.filter((a: any) => a.data?.status !== 'Utført – til kontroll' && a.data?.status !== 'Utsatt');
+      let n = 0;
+      if (c.ansvarlig) for (const a of ventende) {
+        const d = a.data; const dg = dagerTil(d.frist); const pu = d.purring || {};
+        const forFrist = dg >= 0 && dg <= Math.max(0, +c.ansvarligFor || 0) && pu.forFrist !== d.frist;
+        const sidenSist = pu.sist ? (Date.now() - new Date(pu.sist).getTime()) / 864e5 : 1e9;
+        const etter = dg < 0 && (pu.antall || 0) < Math.max(0, +c.ansvarligMaks || 0) && sidenSist >= Math.max(1, +c.ansvarligGjenta || 7) - 0.1;
+        if (forFrist || etter) { const r = await purrEn(a, base, etter); if (r.sendt) n++; }
+      }
+      // Eskalering til eier (bare når bryteren er på): én samlet e-post med avvik som har passert fristen med X dager
+      const adminEpost = async () => { const { data: m } = await admin.from('org_medlem').select('rolle, profiles(epost)').eq('org_id', org.id).eq('rolle', 'admin').eq('aktiv', true); return (m || []).map((x: any) => x.profiles?.epost).filter(Boolean); };
+      const tabell = (L: any[]) => `<table style="border-collapse:collapse;font-size:13px;width:100%"><tr style="background:#f4f5f2"><th align="left" style="padding:4px">Avvik</th><th align="left">Eiendom</th><th align="left">Ansvar</th><th align="left">Frist</th><th align="left">Status</th></tr>${L.map((a: any) => `<tr><td style="padding:4px;border-top:1px solid #e3e6e1">#${a.nr} ${esc(a.data.tittel)}</td><td style="border-top:1px solid #e3e6e1">${esc(a.data.ao?.eiendom || (E || []).find((e: any) => e.id === a.eiendom_id)?.data?.navn || '')}</td><td style="border-top:1px solid #e3e6e1">${esc(a.data.ansvar || 'Eier')}</td><td style="border-top:1px solid #e3e6e1;color:${dagerTil(a.data.frist) < 0 ? '#c0392b' : '#1d2521'}">${fdN(a.data.frist)}${dagerTil(a.data.frist) < 0 ? ` (${-dagerTil(a.data.frist)} d over)` : ''}</td><td style="border-top:1px solid #e3e6e1">${esc(a.data.status)}</td></tr>`).join('')}</table>`;
+      if (c.eier) {
+        const L = ventende.filter((a: any) => dagerTil(a.data.frist) <= -Math.max(0, +c.eierEtter || 0) && !a.data.purring?.eierSendt);
+        const til = epostListe(c.eierEpost).length ? epostListe(c.eierEpost) : await adminEpost();
+        if (L.length && til.length) { const o = await oppsettFor(null, org.id); const emne = `${L.length} avvik har passert fristen med mer enn ${c.eierEtter} dager`;
+          for (const t of til) await sendEpost(t, emne, `<div style="font-family:system-ui,Arial,sans-serif;max-width:760px"><h2>${esc(emne)}</h2><p>Avvikene er ikke meldt utført, og ansvarlig er purret der det finnes en mottaker.</p>${tabell(L)}<p><a href="${base}/#/avvik">Åpne avvikslisten</a></p></div>`, `${emne}\n\n${L.map((a: any) => `#${a.nr} ${a.data.tittel} – frist ${fdN(a.data.frist)}`).join('\n')}`, undefined, undefined, o).catch(() => null);
+          for (const a of L) { const { data: fr } = await admin.from('avvik').select('data').eq('id', a.id).single(); await admin.from('avvik').update({ data: { ...fr!.data, purring: { ...(fr!.data.purring || {}), eierSendt: new Date().toISOString() } } }).eq('id', a.id); }
+          await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: SYS.navn, tabell: 'hendelse', rad_id: null, eiendom_id: null, org_id: org.id, handling: 'purring', tekst: `Eskalering til eier: ${L.length} avvik over frist sendt til ${til.join(', ')}` }); }
+      }
+      // Ukentlig oppsummering (mandager)
+      if (c.ukentlig && mandag) {
+        const L = apne.filter((a: any) => dagerTil(a.data.frist) <= 14).sort((x: any, y: any) => x.data.frist.localeCompare(y.data.frist));
+        const til = epostListe(c.ukentligEpost).length ? epostListe(c.ukentligEpost) : await adminEpost();
+        if (L.length && til.length) { const o = await oppsettFor(null, org.id); const over = L.filter((a: any) => dagerTil(a.data.frist) < 0).length; const emne = `Ukeoversikt avvik: ${over} over frist, ${L.length - over} med frist innen 14 dager`;
+          for (const t of til) await sendEpost(t, emne, `<div style="font-family:system-ui,Arial,sans-serif;max-width:760px"><h2>${esc(emne)}</h2>${tabell(L)}<p><a href="${base}/#/avvik">Åpne avvikslisten</a></p></div>`, emne, undefined, undefined, o).catch(() => null); }
+      }
+      rapport.push({ org: org.navn, purret: n });
+    }
+    return json(200, { ok: true, rapport });
+  }
+
   // Servicefirmaet åpner lenken (ingen innlogging)
   const hentKo = async (token: string) => { if (!/^[0-9a-f-]{36}$/i.test(String(token || ''))) return null; const { data } = await admin.from('ko_invitasjon').select('*').eq('token', token).maybeSingle(); return data; };
   if (body.action === 'ko_info') {

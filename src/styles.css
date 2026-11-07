@@ -329,3 +329,10 @@ h1 .hjelp-q{position:relative;top:-2px}
 .sha-q{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}.sha-q .seg button{min-width:56px}
 .sha-konk{border-radius:8px;padding:10px 12px;margin:10px 0;background:var(--surface2);border:1px solid var(--line)}.sha-konk div{margin:3px 0}
 .sha-rf{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 12px;margin:6px 0}.sha-rf label{display:flex;gap:6px;align-items:flex-start;font-size:13px;font-weight:400}.sha-rf input{width:auto;margin-top:3px}
+/* purring: brytere */
+.pu-rad{padding:10px 0;border-bottom:1px solid var(--line)}.pu-rad:last-of-type{border-bottom:0;margin-bottom:10px}
+.pu-bryter{display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-weight:400}.pu-bryter>input{position:absolute;opacity:0;width:1px;height:1px}
+.pu-sw{flex:none;width:36px;height:20px;border-radius:10px;background:var(--line2);position:relative;transition:.15s;margin-top:1px}
+.pu-sw::after{content:'';position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:.15s}
+.pu-bryter>input:checked+.pu-sw{background:var(--acc)}.pu-bryter>input:checked+.pu-sw::after{left:18px}.pu-bryter input:focus-visible+.pu-sw{outline:2px solid var(--acc);outline-offset:2px}
+.pu-bryter input:disabled+.pu-sw{opacity:.5}.pu-under{margin:8px 0 0 46px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}

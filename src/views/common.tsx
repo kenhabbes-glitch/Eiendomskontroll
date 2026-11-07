@@ -4,6 +4,8 @@ import { sortBy } from '../lib/utils';
 
 const mem: Record<string, any> = {};
 /** Filtre som huskes mens appen er åpen */
+/** Sett et filter fra en annen side før navigering (f.eks. «Gå til listen» fra purreoversikten) */
+export function settFilter(key: string, v: Record<string, any>) { mem[key] = { ...(mem[key] || {}), ...v }; }
 export function useFilter<T extends Record<string, any>>(key: string, init: T): [T, (p: Partial<T>) => void] {
   const [v, setV] = useState<T>(() => mem[key] || init);
   return [v, p => setV(prev => { const n = { ...prev, ...p }; mem[key] = n; return n; })];
