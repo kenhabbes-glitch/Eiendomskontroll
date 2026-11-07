@@ -2,7 +2,8 @@
 // 1) Teksten hentes ut linje for linje med pdf.js. 2) Linjene vurderes mot en ordliste (standard + egne ord)
 // og mot det appen har lært av tidligere rapporter fra samme leverandør og samme type anlegg.
 // 3) Når brukeren godtar eller forkaster forslag, oppdateres læringen (innstillinger → 'rapportlesing').
-import { S, saveInnst } from './store';
+import { S, saveInnst, sb } from './store';
+import { KOMP, TYPER } from './catalog';
 import type { Rec } from './utils';
 
 export type OrdType = 'avvik' | 'ok' | 'seksjon' | 'ignorer' | 'hoy' | 'lav';
@@ -26,8 +27,8 @@ export const STD_ORD: Ord[] = [
 
 type Laering = { m: Record<string, { g: number; a: number }>; ign: string[]; n: number };
 export type Mal = { type: 'status' | 'seksjon' | 'prefiks'; avvik: string[]; ok: string[]; start: string; slutt: string; prefiks: string; navn: string; laget: string; kilde?: 'egen' | 'felles' };
-type Innst = { ord: Ord[]; fjernet: string[]; laering: Record<string, Laering>; maler: Record<string, Mal> };
-export const lesInnst = (): Innst => ({ ord: [], fjernet: [], laering: {}, maler: {}, ...(S.innst.rapportlesing || {}) });
+type Innst = { ord: Ord[]; fjernet: string[]; laering: Record<string, Laering>; maler: Record<string, Mal>; felles: { del: boolean; bruk: boolean } };
+export const lesInnst = (): Innst => { const v = S.innst.rapportlesing || {}; return { ord: [], fjernet: [], laering: {}, maler: {}, ...v, felles: { del: false, bruk: false, ...(v.felles || {}) } }; };
 export const levNokkel = (lev: string) => lev ? 'lev:' + norm(lev).slice(0, 60) : '';
 export const alleOrd = (I = lesInnst()) => [...STD_ORD.filter(x => !I.fjernet.includes(x.t + ':' + x.o)), ...I.ord];
 export const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').replace(/[^\p{L}\p{N} %:.,/-]/gu, '').trim();
@@ -69,7 +70,10 @@ export function vurder(linjer: string[], ctx: string[], I = lesInnst()) {
   const AV = by('avvik'), OK = by('ok'), SEK = by('seksjon'), IGN = by('ignorer'), HOY = by('hoy'), LAV = by('lav');
   const L = ctx.map(c => I.laering[c]).filter(Boolean) as Laering[];
   const ignorert = new Set(L.flatMap(l => l.ign));
-  const vekt = (m: string) => { let g = 0, a = 0; for (const l of L) { const s = l.m[m]; if (s) { g += s.g; a += s.a; } } return (g + 1) / (g + a + 2); }; // 0..1, 0.5 = ukjent
+  const F = I.felles.bruk ? ctx.map(c => FELLES[c]).filter(Boolean) : [];
+  const vekt = (m: string) => { let g = 0, a = 0; for (const l of L) { const s = l.m[m]; if (s) { g += s.g; a += s.a; } }
+    for (const f of F) { const s = f[m]; if (s) { const k = Math.min(1, 40 / (s.g + s.a)) * 0.25; g += s.g * k; a += s.a * k; } } // felles læring teller mindre enn egen
+    return (g + 1) / (g + a + 2); }; // 0..1, 0.5 = ukjent
   const ut: Forslag[] = []; let iSeksjon = false; let okFunnet = ''; let seksjonNavn = ''; let liste = false; let forrigeVar = false;
   const punkt = (l: string) => /^\s*([-•*–]|\d{1,3}[.)]|[a-z][.)])\s+/.test(l);
   linjer.forEach((l0, i) => {
@@ -114,7 +118,35 @@ export async function laer(ctx: string[], forslag: Forslag[], valgt: Set<string>
   // Begrens størrelsen
   const keys = Object.keys(ny.laering); if (keys.length > 300) for (const k of keys.sort((a, b) => ny.laering[a].n - ny.laering[b].n).slice(0, keys.length - 300)) delete ny.laering[k];
   await saveInnst('rapportlesing', ny);
+  if (I.felles.del) delFelles(ctx, forslag, valgt).catch(() => null);
 }
+// ---------------- Felles, anonymisert læring (valgfritt). Bare anleggs-/kontrolltype + standardord – ingen tekst, eiendom eller person.
+const DELBAR_KTX = new Set([...Object.keys(KOMP), ...TYPER].map(k => 'type:' + k));
+const FELLES: Record<string, Record<string, { g: number; a: number }>> = {};
+export const delbarKontekst = (c: string) => DELBAR_KTX.has(c) && /^type:[A-Za-zÆØÅæøå0-9_-]{2,40}$/.test(c);
+const delbarMarkor = (m: string) => m === '§seksjon' || STD_ORD.some(x => x.o === m && /^[a-zæøå][a-zæøå .:/-]{1,38}[a-zæøå0-9:.]?$/.test(m));
+async function delFelles(ctx: string[], forslag: Forslag[], valgt: Set<string>) {
+  const rader: { k: string; m: string; g: number; a: number }[] = [];
+  for (const k of ctx.filter(delbarKontekst)) { const t: Record<string, { g: number; a: number }> = {};
+    for (const f of forslag) for (const m of f.treff) if (delbarMarkor(m)) { const s = t[m] ||= { g: 0, a: 0 }; valgt.has(f.id) ? s.g++ : s.a++; }
+    for (const [m, s] of Object.entries(t)) rader.push({ k, m, g: Math.min(s.g, 5), a: Math.min(s.a, 5) }); }
+  if (rader.length) await sb.rpc('felles_bidra', { p: rader.slice(0, 120) });
+}
+/** Henter felles læring for kontekstene (feiler stille om funksjonen ikke finnes) */
+export async function hentFelles(ctx: string[]) {
+  if (!lesInnst().felles.bruk) return; const k = ctx.filter(delbarKontekst); if (!k.length) return;
+  try { const { data, error } = await sb.rpc('felles_hent', { p_kontekster: k }); if (error || !Array.isArray(data)) return;
+    for (const c of k) FELLES[c] = {}; for (const r of data) (FELLES[r.kontekst] ||= {})[r.markor] = { g: r.g, a: r.a }; } catch { /* ikke tilgjengelig */ }
+}
+export const orgnrFraLev = (lev: string) => (lev.match(/^orgnr (\d{9})$/) || [])[1] || '';
+export async function hentFellesMal(lev: string): Promise<Mal | null> {
+  const nr = orgnrFraLev(lev); if (!nr || !lesInnst().felles.bruk) return null;
+  try { const { data, error } = await sb.rpc('felles_mal_hent', { p_orgnr: nr }); if (error || !data?.type) return null;
+    return { type: data.type, avvik: data.avvik || [], ok: data.ok || [], start: data.start || '', slutt: data.slutt || '', prefiks: data.prefiks || '', navn: lev + ' (felles mal' + (data.stemmer > 1 ? `, brukt av ${data.stemmer}` : '') + ')', laget: '', kilde: 'felles' }; } catch { return null; }
+}
+export async function delFellesMal(lev: string, m: Mal) { const nr = orgnrFraLev(lev); if (!nr) throw new Error('Malen kan bare deles når leverandøren er funnet med org.nr');
+  const { error } = await sb.rpc('felles_mal_del', { p_orgnr: nr, p_mal: { type: m.type, avvik: m.avvik, ok: m.ok, start: m.start, slutt: m.slutt, prefiks: m.prefiks } }); if (error) throw new Error(/function|schema/i.test(error.message) ? 'Deling er ikke aktivert på serveren ennå' : error.message); }
+export async function settFelles(f: Partial<Innst['felles']>) { const I = lesInnst(); await saveInnst('rapportlesing', { ...I, felles: { ...I.felles, ...f } }); }
 export async function lagreOrd(ord: Ord[], fjernet: string[]) { const I = lesInnst(); await saveInnst('rapportlesing', { ...I, ord, fjernet }); }
 export async function nullstillLaering() { const I = lesInnst(); await saveInnst('rapportlesing', { ...I, laering: {} }); }
 export function laeringsOversikt(I = lesInnst()) {

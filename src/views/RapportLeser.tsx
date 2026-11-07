@@ -5,7 +5,8 @@ import type { Rec } from '../lib/utils';
 import { AV_ALV } from '../lib/catalog';
 import { openModal, ModalFrame, Chip, confirmBox } from '../components/ui';
 import { Hjelp } from '../components/Hjelp';
-import { MALTYPER, ORD_TYPER, STD_ORD, alleOrd, brukMal, finnLeverandor, foreslaMal, kontekster, laer, laeringsOversikt, lagreMal, lagreOrd, lesInnst, levNokkel, nullstillLaering, ocrLinjer, pdfLinjer, vurder, type Forslag, type Mal, type Ord, type OrdType } from '../lib/rapportLesing';
+import { hentEnhet } from '../lib/oppslag';
+import { MALTYPER, ORD_TYPER, STD_ORD, alleOrd, brukMal, delFellesMal, hentFelles, hentFellesMal, orgnrFraLev, settFelles, finnLeverandor, foreslaMal, kontekster, laer, laeringsOversikt, lagreMal, lagreOrd, lesInnst, levNokkel, nullstillLaering, ocrLinjer, pdfLinjer, vurder, type Forslag, type Mal, type Ord, type OrdType } from '../lib/rapportLesing';
 
 type Kilde = { navn: string; pdf: boolean; hent: () => Promise<ArrayBuffer> };
 const erPdf = (n: string, t = '') => /pdf/i.test(t) || /\.pdf$/i.test(n); const erBilde = (n: string, t = '') => /^image\//i.test(t) || /\.(jpe?g|png|webp|bmp|tiff?)$/i.test(n);
@@ -25,8 +26,9 @@ function Leser({ o, kilder, close, onBruk }: { o: Rec; kilder: Kilde[]; close: (
   const [F, setF] = useState<Forslag[]>([]); const [ok, setOk] = useState(''); const [ign, setIgn] = useState<Set<string>>(new Set()); const [busy, setBusy] = useState(false);
   const [sek, setSek] = useState(''); const [malBrukt, setMalBrukt] = useState(''); const [ocr, setOcr] = useState<{ p: number; t: string } | null>(null); const [erOcr, setErOcr] = useState(false);
   const ctx = kontekster(o, lev);
-  const analyser = (L: string[], l: string) => {
-    const m = lesInnst().maler[levNokkel(l)]; const mf = m ? brukMal(L, m) : [];
+  const analyser = async (L: string[], l: string) => {
+    await hentFelles(kontekster(o, l));
+    const m = lesInnst().maler[levNokkel(l)] || await hentFellesMal(l); const mf = m ? brukMal(L, m) : [];
     const v = vurder(L, kontekster(o, l)); setOk(v.okFunnet); setSek(v.seksjonNavn);
     if (mf.length) { setF(mf); setMalBrukt(m!.navn || 'Mal for leverandøren'); } else { setF(v.forslag); setMalBrukt(m ? '' : ''); }
   };
@@ -89,9 +91,14 @@ function Leser({ o, kilder, close, onBruk }: { o: Rec; kilder: Kilde[]; close: (
 function MalPanel({ lev, linjer, valgte, sek, etter }: { lev: string; linjer: string[]; valgte: Forslag[]; sek: string; etter: () => void }) {
   useStore(); const k = levNokkel(lev); const eks = lesInnst().maler[k];
   const tom = (): Mal => ({ type: 'status', avvik: ['Avvik'], ok: ['OK'], start: '', slutt: '', prefiks: '', navn: lev, laget: new Date().toISOString().slice(0, 10), kilde: 'egen' });
-  const [apen, setApen] = useState(false); const [m, setM] = useState<Mal>(eks || tom());
+  const [apen, setApen] = useState(false); const [m, setM] = useState<Mal>(eks || tom()); const [del, setDel] = useState(false); const [kanDele, setKanDele] = useState<'' | 'ja' | 'enk' | 'nei'>('');
+  const nr = orgnrFraLev(lev);
+  useEffect(() => { if (!apen || !nr || !lesInnst().felles.del) return; let av = false; hentEnhet(nr).then(e => { if (av) return; const f = String((e as any)?.orgform || (e as any)?.organisasjonsform || '');
+    setKanDele(!e ? 'nei' : /ENK|enkeltperson/i.test(f) ? 'enk' : 'ja'); }).catch(() => !av && setKanDele('nei')); return () => { av = true; }; }, [apen, nr]);
   const set = (x: Partial<Mal>) => setM(v => ({ ...v, ...x })); const treff = brukMal(linjer, m);
-  const lagre = async () => { await lagreMal(k, { ...m, laget: new Date().toISOString().slice(0, 10) }); toast('Malen er lagret – den brukes neste gang en rapport fra leverandøren leses'); setApen(false); etter(); };
+  const lagre = async () => { const ny = { ...m, kilde: 'egen' as const, laget: new Date().toISOString().slice(0, 10) }; await lagreMal(k, ny);
+    if (del && kanDele === 'ja') { try { await delFellesMal(lev, ny); toast('Malen er lagret og delt anonymt'); } catch (e: any) { toast('Malen er lagret, men ble ikke delt: ' + (e?.message || e)); } }
+    else toast('Malen er lagret – den brukes neste gang en rapport fra leverandøren leses'); setApen(false); etter(); };
   const liste = (a: string[]) => a.join(', '); const fra = (t: string) => t.split(',').map(x => x.trim()).filter(Boolean);
   if (!apen) return <p className="small" style={{ margin: '10px 0 0' }}>{eks ? <>Fast mal for <b>{lev}</b>: {MALTYPER.find(t => t[0] === eks.type)?.[1]}. <a href="#" onClick={e => { e.preventDefault(); setM(eks); setApen(true); }}>Endre</a> · <a href="#" onClick={async e => { e.preventDefault(); await lagreMal(k, null); toast('Malen er slettet'); etter(); }}>Slett</a></>
     : <>Har rapportene fra <b>{lev}</b> alltid samme oppsett? <a href="#" onClick={e => { e.preventDefault(); const f = foreslaMal(linjer, valgte, sek); setM({ ...tom(), ...(f || {}) }); setApen(true); }}>Lag fast mal</a> – da blir treffsikkerheten nesten 100 %.</>}</p>;
@@ -107,6 +114,10 @@ function MalPanel({ lev, linjer, valgte, sek, etter }: { lev: string; linjer: st
       {m.type === 'prefiks' && <label className="pa-felt half"><span>Linjer som starter med</span><input value={m.prefiks} onChange={e => set({ prefiks: e.target.value })} placeholder="AV-" /></label>}
     </div>
     <p className="small" style={{ margin: '4px 0' }}>Malen finner <b>{treff.length}</b> avvik i denne rapporten{treff.length ? ': ' + treff.slice(0, 3).map(f => '«' + f.tekst.slice(0, 50) + '»').join(', ') + (treff.length > 3 ? ' …' : '') : ''}.</p>
+    {nr && lesInnst().felles.del && <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'flex-start', margin: '6px 0' }}>
+      <input type="checkbox" checked={del} disabled={kanDele !== 'ja'} onChange={e => setDel(e.target.checked)} style={{ marginTop: 2 }} />
+      <span>Del malen med andre brukere av appen. Det som deles er bare leverandørens org.nr og selve malen (type og overskrifter/statusord) – ingen rapporttekst, eiendom eller person.
+        {kanDele === '' && <span className="muted"> Sjekker leverandøren i Enhetsregisteret …</span>}{kanDele === 'enk' && <b> Kan ikke deles: leverandøren er et enkeltpersonforetak (personopplysning).</b>}{kanDele === 'nei' && <span className="muted"> Fant ikke leverandøren i Enhetsregisteret – malen deles ikke.</span>}</span></label>}
     <div style={{ display: 'flex', gap: 6 }}><button type="button" className="btn sm pri" disabled={!treff.length} onClick={lagre}>Lagre mal</button><button type="button" className="btn sm" onClick={() => setApen(false)}>Avbryt</button></div>
   </div>;
 }
@@ -134,6 +145,10 @@ export function RapportLesingKort() {
     {Object.keys(I.maler || {}).length > 0 && <div className="pu-rad"><b className="small">Faste maler per leverandør</b>
       {Object.entries(I.maler).map(([k, m]) => <div key={k} className="small" style={{ display: 'flex', gap: 8, padding: '3px 0' }}><span style={{ flex: 1 }}>{m.navn || k.slice(4)} – {MALTYPER.find(t => t[0] === m.type)?.[1]}: {m.type === 'status' ? m.avvik.join(', ') : m.type === 'prefiks' ? m.prefiks : `${m.start}${m.slutt ? ' → ' + m.slutt : ''}`}{m.kilde === 'felles' ? ' (felles)' : ''}</span>
         {!ro && <a href="#" onClick={async e => { e.preventDefault(); await lagreMal(k, null); }}>Slett</a>}</div>)}</div>}
+    <div className="pu-rad"><b className="small">Felles læring på tvers av brukere</b> <span className="small muted">– av som standard</span>
+      <p className="small muted" style={{ margin: '4px 0' }}>Det som deles: hvor ofte appens <i>standardord</i> ble godtatt eller forkastet per type anlegg/kontroll (f.eks. «ventilasjon: lekkasje 12/1»). Det som <b>aldri</b> deles: rapporttekst, egne ord, eiendom, adresse, leietaker, personer, leverandørnavn eller hvem som bidro. Faste maler deles bare når dere krysser av for det på malen.</p>
+      <label className="small" style={{ display: 'flex', gap: 6 }}><input type="checkbox" disabled={ro} checked={I.felles.del} onChange={e => settFelles({ del: e.target.checked })} /> Del anonymisert læring</label>
+      <label className="small" style={{ display: 'flex', gap: 6 }}><input type="checkbox" disabled={ro} checked={I.felles.bruk} onChange={e => settFelles({ bruk: e.target.checked })} /> Bruk felles læring og felles maler (teller mindre enn deres egen læring)</label></div>
     <p className="small muted">Standardord: {STD_ORD.length}. Egne ord vises i blått.</p>
   </div>;
 }
