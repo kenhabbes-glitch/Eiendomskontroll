@@ -7,6 +7,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { kompForKontroll, nyRunde, malIRunde, renKompSvar, sjekkMaler, punkterFor, sysSjekkFor, renSysSjekk, sysSjekkAvvik } from '../../src/lib/komponentsjekk';
 import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
+// Lagringen godtar bare ASCII i filbanen
+const asciiNavn = (n: any) => String(n || 'fil').replace(/[æÆ]/g, m => m === 'æ' ? 'ae' : 'Ae').replace(/[øØ]/g, m => m === 'ø' ? 'o' : 'O').replace(/[åÅ]/g, m => m === 'å' ? 'a' : 'A')
+  .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/_+/g, '_').slice(-80) || 'fil';
 
 const svakt = (pw: string) => pw.length < 10 || !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/\d/.test(pw);
 const aalFra = (t: string) => { try { return JSON.parse(Buffer.from(t.split('.')[1] || '', 'base64url').toString()).aal || ''; } catch { return ''; } };
@@ -267,7 +270,7 @@ const handler = async (req: Request) => {
     if (inv.kvittert) return json(409, { error: 'Arbeidsordren er allerede kvittert ut via denne lenken' });
     const a = await hentAvvik(inv.avvik_id); if (!a) return json(404, { error: 'Avviket finnes ikke lenger' });
     if (body.action === 'ao_opplasting') {
-      const navn = String(body.navn || 'fil').replace(/[^\w.\-æøåÆØÅ]+/g, '_').slice(-80);
+      const navn = asciiNavn(body.navn);
       const path = `${a.eiendom_id}/ao/${a.id}/${crypto.randomUUID()}-${navn}`;
       const { data, error } = await admin.storage.from('filer').createSignedUploadUrl(path);
       if (error) return json(500, { error: 'Kunne ikke klargjøre opplasting: ' + error.message });
@@ -653,7 +656,7 @@ const handler = async (req: Request) => {
   if (body.action === 'ko_opplasting') {
     const inv = await hentKo(body.token); if (!inv || inv.innsendt) return json(403, { error: 'Lenken er ugyldig eller allerede brukt' });
     if (utlopt(inv)) return json(410, { error: UTLOPT });
-    const navn = String(body.navn || 'fil').replace(/[^\w.\-æøåÆØÅ]+/g, '_').slice(-80);
+    const navn = asciiNavn(body.navn);
     const path = `${inv.eiendom_id}/ko/${inv.oppgave_id}/${crypto.randomUUID()}-${navn}`;
     const { data, error } = await admin.storage.from('filer').createSignedUploadUrl(path);
     if (error) return json(500, { error: 'Kunne ikke klargjøre opplasting: ' + error.message });

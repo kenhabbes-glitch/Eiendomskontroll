@@ -72,7 +72,7 @@ export async function lesTekst(navn: string, type: string, data: ArrayBuffer): P
 export function tolk(filnavn: string, linjer: string[], valgtEiendom = ''): Tolkning {
   const fn = norm(filnavn.replace(/\.[a-z0-9]+$/i, '').replace(/[_-]+/g, ' '));
   const tekst = norm(linjer.slice(0, 400).join(' \n ')); const topp = norm(linjer.slice(0, 15).join(' '));
-  const lev = finnLeverandor(linjer).replace(/^(leverand[oø]r|avsender|fra|utført av)\s*:\s*/i, ''); const laert = lev ? laerte()[norm(lev).slice(0, 60)] : undefined;
+  const lev = finnLeverandor(linjer).replace(/^(leverand[oø]r|avsender|fra|utført av|kontrollforetak|servicefirma|firma|foretak|installatør)\s*:\s*/i, ''); const laert = lev ? laerte()[norm(lev).slice(0, 60)] : undefined;
 
   // 1) Type
   const sc: Record<string, { s: number; g: string[] }> = {};

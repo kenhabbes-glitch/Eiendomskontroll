@@ -263,7 +263,9 @@ export type Fil = { path: string; navn: string; type?: string; str?: number };
 export async function uploadFile(file: Blob & { name?: string }, eiendomId: string, leietakerId?: string, navn?: string, mappe?: string): Promise<Fil | null> {
   const name = navn || file.name || 'fil';
   const ext = (name.split('.').pop() || '').toLowerCase();
-  const safe = name.replace(/[^\w.\-æøåÆØÅ]+/g, '_').slice(-80);
+  // Lagringen godtar bare ASCII i filbanen – æøå og aksenter gjøres om (originalnavnet beholdes i «navn»)
+  const safe = name.replace(/[æÆ]/g, m => m === 'æ' ? 'ae' : 'Ae').replace(/[øØ]/g, m => m === 'ø' ? 'o' : 'O').replace(/[åÅ]/g, m => m === 'å' ? 'a' : 'A')
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/_+/g, '_').slice(-80) || 'fil';
   const path = `${eiendomId}/${mappe ? mappe : leietakerId ? 'leietaker/' + leietakerId : 'felles'}/${crypto.randomUUID()}-${safe}`;
   const { error } = await sb.storage.from('filer').upload(path, file, { contentType: file.type || MIME[ext] || 'application/octet-stream', upsert: false });
   if (error) { toast('Opplasting feilet: ' + feiltekst(error)); return null; }
