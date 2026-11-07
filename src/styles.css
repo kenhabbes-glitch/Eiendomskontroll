@@ -336,3 +336,9 @@ h1 .hjelp-q{position:relative;top:-2px}
 .pu-sw::after{content:'';position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:.15s}
 .pu-bryter>input:checked+.pu-sw{background:var(--acc)}.pu-bryter>input:checked+.pu-sw::after{left:18px}.pu-bryter input:focus-visible+.pu-sw{outline:2px solid var(--acc);outline-offset:2px}
 .pu-bryter input:disabled+.pu-sw{opacity:.5}.pu-under{margin:8px 0 0 46px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+/* Dokumentinnboks */
+.ib-slipp{border:2px dashed var(--line2);text-align:center;padding:26px 16px;cursor:pointer;transition:background .15s,border-color .15s}
+.ib-slipp:hover,.ib-slipp.drag{border-color:var(--acc);background:var(--surface2)}
+.ib-slipp b{display:block;margin-bottom:4px}
+.ib-post{margin-top:10px}

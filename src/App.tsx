@@ -4,8 +4,9 @@ import { svaktPassord, PASSORDKRAV } from './lib/utils';
 import { MfaSkjerm } from './components/Tofaktor';
 import { visPurringVedPalogging } from './views/Purring';
 import { TilsynView, svarfristSnart } from './views/Tilsyn';
+import { Innboks, useInnboksAntall } from './views/Innboks';
 import React, { useEffect, useState } from 'react';
-import { mineOrg } from './lib/store';
+import { mineOrg, kanDrifteE } from './lib/store';
 import { autoKvitterIK } from './lib/actions';
 import { canEdit, configured, initAuth, isAdmin, isStaff, isTenant, isUtforer, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
 import { activeTasks, dUntil, openAvvik } from './lib/utils';
@@ -50,6 +51,7 @@ const I: Record<string, string> = {
   runde: 'M5 20a2 2 0 100-4 2 2 0 000 4zM19 8a2 2 0 100-4 2 2 0 000 4zM7 18h6a3 3 0 000-6h-2a3 3 0 010-6h6',
   prosjekter: 'M3 7h18v13H3zM8 7V4h8v3M3 12h18',
   arkiv: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
+  innboks: 'M22 12h-6l-2 3h-4l-2-3H2M5.5 5.1L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.5-6.9A2 2 0 0016.7 4H7.3a2 2 0 00-1.8 1.1z',
   tilsyn: 'M9 11l3 3 8-8M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9',
   avvik: 'M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z',
   leietakere: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8',
@@ -75,6 +77,7 @@ function navFor(): [string, string][] {
   if (canEdit()) n.splice(5, 0, ['tilsyn', 'Tilsynssaker']);
   if (canEdit()) n.push(['leietakere', 'Leietakere']);
   n.push(['maalere', 'Målere'], ['tfm', 'TFM-register'], ['arealer', 'Tegninger og arealer'], ['dokumenter', 'Dokumenter']);
+  if (S.eiendommer.some(e => kanDrifteE(e.id))) n.push(['innboks', 'Dokumentinnboks']);
   if (canEdit()) n.push(['vedlikehold', 'Vedlikeholdsplan'], ['prosjekter', 'Prosjekter']);
   n.push(['regelverk', 'Regelverk og plikter']);
   if (canEdit()) n.push(['innstillinger', 'Innstillinger']);
@@ -91,6 +94,7 @@ export default function App() {
   const [admApen, setAdmApen] = useState(() => { try { return localStorage.getItem('navAdmin') === '1'; } catch { return false; } });
   const settAdmApen = (b: boolean) => { setAdmApen(b); try { localStorage.setItem('navAdmin', b ? '1' : '0'); } catch { } };
   useStore();
+  const ibN = useInnboksAntall();
   const r = useRoute();
   // Kvitter ut eierkontroller automatisk når alle leietakere har dokumentert (sjekkes når data endres)
   useEffect(() => { if (state.ready && state.me && canEdit()) { const t = setTimeout(() => autoKvitterIK(), 800); return () => clearTimeout(t); } }, [state.version, state.ready]);
@@ -129,6 +133,7 @@ export default function App() {
     case 'kontroller': body = <Kontrollplan />; break;
     case 'avvik': body = <AvvikView />; break;
     case 'tilsyn': body = <TilsynView />; break;
+    case 'innboks': body = <Innboks />; break;
     case 'leietakere': body = <Leietakere />; break;
     case 'leietaker': body = <LeietakerView id={r.id!} />; break;
     case 'tfm': body = <TfmRegister />; break;
@@ -156,7 +161,7 @@ export default function App() {
       <nav id="nav">{(() => {
         const lenke = ([k, l]: [string, string], sub = false) => <a key={k} href={'#/' + k} className={(cur === k ? 'on' : '') + (sub ? ' navsub' : '')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={I[k]} /></svg>{l}
-          {k === 'kontroller' && forf > 0 && <span className="n">{forf}</span>}{k === 'avvik' && avv > 0 && <span className="n">{avv}</span>}{k === 'tilsyn' && svarfristSnart(14).length > 0 && <span className="n">{svarfristSnart(14).length}</span>}{k === 'arbeidsordre' && mineAo().length > 0 && <span className="n">{mineAo().length}</span>}
+          {k === 'kontroller' && forf > 0 && <span className="n">{forf}</span>}{k === 'avvik' && avv > 0 && <span className="n">{avv}</span>}{k === 'innboks' && ibN > 0 && <span className="n">{ibN}</span>}{k === 'tilsyn' && svarfristSnart(14).length > 0 && <span className="n">{svarfristSnart(14).length}</span>}{k === 'arbeidsordre' && mineAo().length > 0 && <span className="n">{mineAo().length}</span>}
         </a>;
         const adm = nav.filter(n => ADMIN_NAV.includes(n[0])); const vanlig = nav.filter(n => !ADMIN_NAV.includes(n[0]));
         const iAdm = adm.some(n => n[0] === cur); const apen = admApen || iAdm;
