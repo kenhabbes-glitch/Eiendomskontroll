@@ -837,7 +837,12 @@ export function editLeietaker(id?: string, preset: any = {}) {
         {leieAreal({ ...l, eiendomId: v.eiendomId, arealOverstyrt: '' }).adv.map((a, j) => <div key={j} style={{ color: 'var(--amber)', marginTop: 4 }}>⚠ {a}</div>)}</div>; } },
     { k: 'sec', label: 'Leieavtale', type: 'sec' },
     { k: 'start', label: 'Avtalestart', type: 'date', half: true }, { k: 'slutt', label: 'Avtaleutløp', type: 'date', half: true },
-    { k: 'leie', label: 'Årlig grunnleie (kr ekskl. mva)', type: 'number', half: true, hint: 'Brukes i verdivurderingen. Vises bare for administrator og forvalter.' },
+    { k: 'leieEnhet', label: 'Leie oppgis som', type: 'select', options: [['aar', 'Kr per år'], ['m2', 'Kr per m² per år']], half: true, hint: 'Ekskl. mva. Brukes i verdivurderingen og vises bare for administrator og forvalter.' },
+    { k: 'leie', label: 'Årlig grunnleie (kr)', type: 'number', half: true, show: (x: any) => x.leieEnhet !== 'm2' },
+    { k: 'leieM2', label: 'Leie per m² per år (kr)', type: 'number', half: true, show: (x: any) => x.leieEnhet === 'm2' },
+    { k: 'leieInfo', type: 'custom', show: (x: any) => !!(+x.leie || +x.leieM2), render: (x: any) => { const a = leieAreal({ ...l, ...x }).verdi || 0;
+      if (x.leieEnhet === 'm2') return <div className="note small" style={{ color: 'var(--ink)' }}>{a ? <>Årlig leie: <b>{Math.round(+x.leieM2 * a).toLocaleString('nb-NO')} kr</b> ({(+x.leieM2).toLocaleString('nb-NO')} kr × {m2(a)}). Følger leiearealet hvis det endres.</> : 'Leiearealet mangler – tegn inn arealet eller overstyr det over, så beregnes årlig leie.'}</div>;
+      return a ? <div className="note small" style={{ color: 'var(--ink)' }}>Tilsvarer <b>{Math.round(+x.leie / a).toLocaleString('nb-NO')} kr per m²</b> per år ({m2(a)}).</div> : null; } },
     { k: 'kpiAndel', label: 'KPI-regulering (%)', type: 'number', half: true, ph: '100' },
     { k: 'opsjon', label: 'Opsjon på forlengelse', half: true, ph: 'F.eks. 1 × 5 år' },
     { k: 'kontrakt', label: 'Kontraktstype', type: 'select', options: () => alleMaler().map(m => [m.key, m.n] as [string, string]), def: kontraktKey(l), help: 'kontrakt.type',

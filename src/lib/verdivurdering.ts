@@ -18,12 +18,14 @@ export type VerdiInn = {
 };
 export const STD_INN: VerdiInn = { yield: 6.5, markedsleie: 0, ledigAreal: 0, tilUtleie: 12, ledighet: 3, eierkost: 0, eierkostPst: 7, capex: 'etterslep', leieMarked: false, notat: '' };
 
+/** Årlig leie: oppgitt per år, eller kr/m² × gjeldende leieareal */
+export const aarsleie = (l: Rec, areal?: number) => l.leieEnhet === 'm2' ? Math.round((+l.leieM2 || 0) * (areal ?? (leieAreal(l).verdi || 0))) : (+l.leie || 0);
 export const innFor = (e: Rec): VerdiInn => ({ ...STD_INN, ...(e?.verdi?.inn || {}) });
 
 export function verdivurdering(e: Rec, inn: VerdiInn) {
   const nå = today();
   const L = S.leietakere.filter(l => l.eiendomId === e.id && (!l.slutt || l.slutt >= nå));
-  const rader = L.map(l => { const a = leieAreal(l).verdi || 0; const leie = +l.leie || 0; const rest = l.slutt ? Math.max(0, (dUntil(l.slutt) as number) / 365.25) : null;
+  const rader = L.map(l => { const a = leieAreal(l).verdi || 0; const leie = aarsleie(l, a); const rest = l.slutt ? Math.max(0, (dUntil(l.slutt) as number) / 365.25) : null;
     const brukMarked = inn.markedsleie > 0 && a > 0 && (!leie || (inn.leieMarked && rest !== null && rest < 1));
     return { l, navn: l.navn, areal: a, leie, m2: a ? leie / a : 0, slutt: l.slutt || '', rest, kpi: l.kpiAndel === '' || l.kpiAndel == null ? 100 : +l.kpiAndel, opsjon: l.opsjon || '', brukt: brukMarked ? inn.markedsleie * a : leie, marked: brukMarked }; });
   const kontraktsleie = rader.reduce((s, r) => s + r.leie, 0);
