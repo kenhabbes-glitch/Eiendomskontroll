@@ -86,11 +86,15 @@ export function tolk(filnavn: string, linjer: string[], valgtEiendom = ''): Tolk
   const typeScore = best.s ? Math.min(0.97, 0.35 + Math.min(best.s, 16) / 32 + (best.s - nest) / Math.max(best.s, 1) * 0.15) : 0;
 
   // 2) System via TFM-kode (=360.001) – sterkeste signal, gir også eiendom
-  const tfm = [...new Set([...(filnavn + ' ' + linjer.slice(0, 200).join(' ')).matchAll(/(?:\+\w+)?=?\b(\d{3})\.(\d{3})\b/g)].map(m => m[1] + '.' + m[2]))].slice(0, 6);
+  const kilde = filnavn.replace(/\.[a-z0-9]+$/i, '') + ' ' + linjer.slice(0, 200).join(' ');
+  const tfm = [...new Set([...kilde.matchAll(/(?:\+\w+)?=?\b(\d{3})\.(\d{3})\b/g)].map(m => m[1] + '.' + m[2]))].slice(0, 6);
+  // Kortform: «36.01» / «=36.1» / «360.1» = system 360, løpenr 001 (ikke datoer som 20.01.2025 eller beløp)
+  const kort = [...kilde.matchAll(/(^|[^\d.,])=?(\d{2,3})\.(\d{1,2})(?![\d.,])/g)].filter(m => !/\d[.\/-]$/.test(kilde.slice(0, m.index! + m[1].length)))
+    .map(m => (m[2].length === 2 ? m[2] + '0' : m[2]) + '.' + pad(m[3])).filter(k => !tfm.includes(k));
   let anleggId = '', aGrunn = '', eiendomId = '', eGrunn = '';
   const A = S.anlegg.filter(a => !a.arkivert);
-  for (const k of tfm) { const [sys, lop] = k.split('.'); const T = A.filter(a => a.tfmSys === sys && pad(a.tfmLop || 1) === lop);
-    const a = T.find(x => x.eiendomId === valgtEiendom) || (T.length === 1 ? T[0] : null); if (a) { anleggId = a.id; aGrunn = 'TFM-kode =' + k; eiendomId = a.eiendomId; eGrunn = 'fra systemet'; break; } }
+  for (const k of [...tfm, ...kort]) { const [sys, lop] = k.split('.'); const T = A.filter(a => a.tfmSys === sys && pad(a.tfmLop || 1) === lop);
+    const a = T.find(x => x.eiendomId === valgtEiendom) || (T.length === 1 ? T[0] : null); if (a) { anleggId = a.id; aGrunn = 'TFM-kode =' + k; eiendomId = a.eiendomId; eGrunn = 'fra systemet'; if (!tfm.includes(k)) { aGrunn = 'kode «' + (kilde.match(new RegExp('=?' + k.slice(0, 2) + '\\d?\\.0*' + +k.slice(4)))?.[0] || k) + '» = =' + k; tfm.push(k); } break; } }
 
   // 3) Eiendom: navn, adresse, gnr/bnr, eier – eller den eneste
   if (!eiendomId) { let bestE = 0;
@@ -129,10 +133,21 @@ export function tolk(filnavn: string, linjer: string[], valgtEiendom = ''): Tolk
   return { type: best.s ? type : 'Annet', typeScore, typeGrunn: best.g, alt: rang.slice(1, 4).map(([t, x]) => [t, x.s]), eiendomId, eGrunn, anleggId, aGrunn, leietakerId, lGrunn, dato, gyldigTil, tittel: tittel.slice(0, 140), leverandor: lev, tfm };
 }
 
-/** Kontroll som en servicerapport sannsynligvis hører til (aktiv kontroll på systemet, nærmeste frist) */
-export function kontrollFor(anleggId: string, type: string): Rec | null {
-  if (!anleggId) return null;
-  const K = S.oppgaver.filter(o => o.anleggId === anleggId && o.aktiv !== false && (type === 'Egenkontrollskjema' ? o.type === 'Egenkontroll' : o.type !== 'Egenkontroll'));
-  return K.sort((a, b) => String(a.nesteFrist || '9').localeCompare(String(b.nesteFrist || '9')))[0] || (type === 'Servicerapport' ? S.oppgaver.filter(o => o.anleggId === anleggId && o.aktiv !== false)[0] || null : null);
+/** Kontroller på systemet, rangert etter hvor godt de passer rapporten (ord i navnet som står i rapporten, type, frist) */
+export function kontrollerFor(anleggId: string, type: string, linjer: string[] = [], filnavn = '', dato = ''): { o: Rec; s: number; grunn: string }[] {
+  if (!anleggId) return [];
+  const tekst = norm(filnavn.replace(/[_-]+/g, ' ') + ' ' + linjer.slice(0, 300).join(' '));
+  const STOPP = new Set(['kontroll', 'årlig', 'service', 'etter', 'leverandørens', 'anbefaling', 'system', 'anlegg']);
+  const ut = S.oppgaver.filter(o => o.anleggId === anleggId && o.aktiv !== false).map(o => {
+    const ord = [...new Set(norm(o.navn + ' ' + (o.kategori || '')).split(/[^\p{L}0-9]+/u).filter(w => w.length >= 5 && !STOPP.has(w)))];
+    const treff = ord.filter(w => tekst.includes(w.slice(0, Math.max(5, w.length - 2)))); // tåler bøyning (ventilasjon/ventilasjonsanlegg)
+    let s = treff.length * 3 - (ord.length - treff.length) * 0.5;
+    if (type === 'Egenkontrollskjema') s += o.type === 'Egenkontroll' ? 4 : -2; else s += o.type === 'Egenkontroll' ? -3 : 1;
+    if (/service/.test(norm(o.navn)) && /service/.test(tekst)) s += 2;
+    if (o.nesteFrist && dato) s -= Math.min(2, Math.abs(+new Date(o.nesteFrist) - +new Date(dato)) / 3.15e10); // nær frist = litt bedre
+    return { o, s, grunn: treff.length ? 'rapporten nevner «' + treff.slice(0, 3).join('», «') + '»' : '' };
+  });
+  return ut.sort((a, b) => b.s - a.s);
 }
+export const kontrollFor = (anleggId: string, type: string, linjer: string[] = [], filnavn = '', dato = '') => kontrollerFor(anleggId, type, linjer, filnavn, dato)[0]?.o || null;
 export const KONFIDENSIELLE = ['Leieavtale', 'Forsikringspolise', 'Samordningsavtale', 'Leietakers IK-dokumentasjon'];

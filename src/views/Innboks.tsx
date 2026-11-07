@@ -5,12 +5,12 @@ import { S, canEdit, kanDrifteE, save, state, toast, uploadFile, useStore } from
 import { DOK_TYPER } from '../lib/catalog';
 import { aNavn, fd, sortBy, today } from '../lib/utils';
 import { Empty } from '../components/ui';
-import { KONFIDENSIELLE, kontrollFor, laerArkivering, lesTekst, tolk, type Tolkning } from '../lib/innboks';
+import { KONFIDENSIELLE, kontrollerFor, laerArkivering, lesTekst, tolk, type Tolkning } from '../lib/innboks';
 import { ocrLinjer } from '../lib/rapportLesing';
 import { utfor } from '../lib/actions';
 
 type Post = { id: string; navn: string; mime: string; str: number; blob: Blob; lagt: string; status: 'ny' | 'leser' | 'klar' | 'ocr' | 'feil';
-  linjer?: string[]; tom?: boolean; kanOcr?: boolean; ocrBrukt?: boolean; t?: Tolkning; v?: Partial<Tolkning> & { notat?: string }; feil?: string; ocrP?: number };
+  linjer?: string[]; tom?: boolean; kanOcr?: boolean; ocrBrukt?: boolean; t?: Tolkning; v?: Partial<Tolkning> & { notat?: string; kontrollId?: string }; feil?: string; ocrP?: number };
 
 // ---------- IndexedDB (per bruker, i denne nettleseren)
 const DB = 'ek-innboks';
@@ -62,7 +62,7 @@ export function Innboks() {
 
   const arkiver = async (p: Post, stille = false): Promise<boolean> => {
     const v = p.v || {}; if (!v.eiendomId) { toast('Velg eiendom'); return false; } if (!kanDrifteE(v.eiendomId)) { toast('Du har ikke skrivetilgang til eiendommen'); return false; }
-    const type = v.type || 'Annet'; const kontroll = ['Servicerapport', 'Egenkontrollskjema'].includes(type) ? kontrollFor(v.anleggId || '', type) : null;
+    const type = v.type || 'Annet'; const kontroll = ['Servicerapport', 'Egenkontrollskjema'].includes(type) ? valgtKontroll(p) : null;
     const fil = await uploadFile(new File([p.blob], p.navn, { type: p.mime }), v.eiendomId, KONFIDENSIELLE.includes(type) && v.leietakerId ? v.leietakerId : undefined); if (!fil) return false;
     laerArkivering(v.leverandor || p.t?.leverandor || '', type, v.anleggId || '');
     if (kontroll && !stille) { await fjern(p.id); utfor(kontroll.id, { filer: [fil], kilde: 'innboks', dato: v.dato && v.dato <= today() ? v.dato : today(), av: v.leverandor?.startsWith('orgnr') ? '' : v.leverandor || undefined }); return true; }
@@ -92,13 +92,16 @@ export function Innboks() {
   </>;
 }
 
-function PostKort({ p, oppd, arkiver, fjern, ocr }: { p: Post; oppd: (x: Partial<Tolkning> & { notat?: string }) => void; arkiver: () => Promise<boolean>; fjern: () => void; ocr: () => void }) {
+const kontrollListe = (p: Post) => ['Servicerapport', 'Egenkontrollskjema'].includes(p.v?.type || '') ? kontrollerFor(p.v?.anleggId || '', p.v!.type!, p.linjer, p.navn, p.v?.dato) : [];
+/** Valgt kontroll: brukerens valg (også «ingen»), ellers beste forslag */
+function valgtKontroll(p: Post) { const L = kontrollListe(p); const k = p.v?.kontrollId; if (k === '-') return null; return (k && L.find(x => x.o.id === k)?.o) || L[0]?.o || null; }
+function PostKort({ p, oppd, arkiver, fjern, ocr }: { p: Post; oppd: (x: Partial<Tolkning> & { notat?: string; kontrollId?: string }) => void; arkiver: () => Promise<boolean>; fjern: () => void; ocr: () => void }) {
   const [url, setUrl] = useState(''); const [vis, setVis] = useState(false); const [busy, setBusy] = useState(false);
   useEffect(() => { const u = URL.createObjectURL(p.blob); setUrl(u); return () => URL.revokeObjectURL(u); }, [p.blob]);
   const v = p.v || {}; const t = p.t;
   const sys = sortBy(S.anlegg.filter(a => !a.arkivert && a.eiendomId === v.eiendomId), a => aNavn(a.id));
   const lt = sortBy(S.leietakere.filter(l => l.eiendomId === v.eiendomId), l => l.navn);
-  const kontroll = ['Servicerapport', 'Egenkontrollskjema'].includes(v.type || '') ? kontrollFor(v.anleggId || '', v.type!) : null;
+  const KL = kontrollListe(p); const kontroll = valgtKontroll(p); const forslag = KL[0];
   const sikker = (s: number) => <span className={'chip ' + (s >= 0.75 ? 'green' : s >= 0.5 ? 'amber' : 'plain')} style={{ fontSize: 11 }}>{Math.round(s * 100)} %</span>;
   const g = (s?: string) => s ? <span className="small muted"> · {s}</span> : null;
   const visSys = TYPER_MED_SYSTEM.includes(v.type || '') || !!v.anleggId; const visLt = KONFIDENSIELLE.includes(v.type || '') && v.type !== 'Forsikringspolise';
@@ -121,7 +124,7 @@ function PostKort({ p, oppd, arkiver, fjern, ocr }: { p: Post; oppd: (x: Partial
         <label className="pa-felt half"><span>Eiendom{t.eiendomId === v.eiendomId && g(t.eGrunn)}</span>
           <select value={v.eiendomId || ''} onChange={e => oppd({ eiendomId: e.target.value, anleggId: '', leietakerId: '' })}><option value="">– velg –</option>{sortBy(S.eiendommer.filter(e => kanDrifteE(e.id)), e => e.navn).map(e => <option key={e.id} value={e.id}>{e.navn}</option>)}</select></label>
         {(visSys || sys.length > 0) && <label className="pa-felt half"><span>System{t.anleggId && t.anleggId === v.anleggId && g(t.aGrunn)}{t.tfm.length > 0 && !v.anleggId && g('fant kode ' + t.tfm.join(', ') + ' – finnes ikke i TFM-registeret')}</span>
-          <select value={v.anleggId || ''} onChange={e => oppd({ anleggId: e.target.value })}><option value="">– ingen –</option>{sys.map(a => <option key={a.id} value={a.id}>{aNavn(a.id)}</option>)}</select></label>}
+          <select value={v.anleggId || ''} onChange={e => oppd({ anleggId: e.target.value, kontrollId: '' })}><option value="">– ingen –</option>{sys.map(a => <option key={a.id} value={a.id}>{aNavn(a.id)}</option>)}</select></label>}
         {visLt && <label className="pa-felt half"><span>Leietaker{t.leietakerId === v.leietakerId && g(t.lGrunn)}</span>
           <select value={v.leietakerId || ''} onChange={e => oppd({ leietakerId: e.target.value })}><option value="">– felles for bygget –</option>{lt.map(l => <option key={l.id} value={l.id}>{l.navn}</option>)}</select></label>}
         <label className="pa-felt"><span>Tittel</span><input value={v.tittel || ''} onChange={e => oppd({ tittel: e.target.value })} /></label>
@@ -129,8 +132,13 @@ function PostKort({ p, oppd, arkiver, fjern, ocr }: { p: Post; oppd: (x: Partial
         <label className="pa-felt half"><span>Gyldig til / revideres{t.gyldigTil && t.gyldigTil === v.gyldigTil && g(v.type === 'Energiattest' ? '10 år' : '5 år')}</span><input type="date" value={v.gyldigTil || ''} onChange={e => oppd({ gyldigTil: e.target.value })} /></label>
       </div>
       {t.leverandor && <p className="small muted" style={{ margin: '2px 0' }}>Avsender/leverandør: {t.leverandor}</p>}
-      {kontroll && <div className="note small" style={{ color: 'var(--ink)' }}>Hører trolig til kontrollen <b>{kontroll.navn}</b>{kontroll.nesteFrist ? ` (frist ${fd(kontroll.nesteFrist)})` : ''}. «Arkiver» åpner utkvitteringen med rapporten vedlagt – der kan du trykke «Les avvik fra rapporten».</div>}
-      {['Servicerapport', 'Egenkontrollskjema'].includes(v.type || '') && !kontroll && <div className="note small">Velg systemet for å koble rapporten til kontrollen og lese avvik. Uten system arkiveres den som et vanlig dokument.</div>}
+      {KL.length > 0 && <div className="note small" style={{ color: 'var(--ink)' }}>
+        <label className="pa-felt" style={{ margin: 0 }}><span>Kontroll rapporten gjelder{kontroll && forslag && kontroll.id === forslag.o.id && !v.kontrollId && (forslag.grunn ? <span className="muted"> · forslag: {forslag.grunn}</span> : <span className="muted"> · usikkert forslag – kontroller</span>)}</span>
+          <select value={v.kontrollId || kontroll?.id || '-'} onChange={e => oppd({ kontrollId: e.target.value })}>
+            {KL.map(({ o }) => <option key={o.id} value={o.id}>{o.navn}{o.nesteFrist ? ` – frist ${fd(o.nesteFrist)}` : ''}</option>)}
+            <option value="-">Ingen av disse – arkiver bare som dokument</option></select></label>
+        {kontroll ? <span className="muted">«Arkiver» åpner utkvitteringen av kontrollen med rapporten vedlagt – der kan du trykke «Les avvik fra rapporten».</span> : <span className="muted">Rapporten arkiveres som dokument på systemet uten å kvittere ut en kontroll.</span>}</div>}
+      {['Servicerapport', 'Egenkontrollskjema'].includes(v.type || '') && !KL.length && <div className="note small">{v.anleggId ? 'Systemet har ingen aktive kontroller – rapporten arkiveres som dokument på systemet.' : 'Velg systemet for å koble rapporten til en kontroll og lese avvik. Uten system arkiveres den som et vanlig dokument.'}</div>}
       {v.type === 'Tegninger (plan/snitt/fasade)' && <p className="small muted">Plantegninger med målestokk kan i tillegg lastes inn under «Tegninger og arealer» for arealberegning og plassering av komponenter.</p>}
       {KONFIDENSIELLE.includes(v.type || '') && <p className="small muted">Fortrolig dokumenttype – vises ikke for teknikere og servicefirma.</p>}
       <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
