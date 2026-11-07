@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { PurringKort } from './Purring';
+import { RapportLesingKort } from './RapportLeser';
 import { S, aoApi, isAdmin, saveInnst, toast, useStore } from '../lib/store';
 import { confirmBox, showModal } from '../components/ui';
 import { byId, eNavn } from '../lib/utils';
@@ -69,6 +70,7 @@ export function Innstillinger() {
     </div>
     <RenteKort ro={ro} />
     <PurringKort />
+    <RapportLesingKort />
     {isAdmin() && <EpostKort />}
   </>;
 }

@@ -14,6 +14,7 @@ import { sysSjekkFor, sysSjekkAvvik } from './komponentsjekk';
 import { aktivtProsjektFor, opprettUtskifting } from './prosjekt';
 import { rapportFor, gjentatte, GJENTATT_MIN, GJENTATT_MND } from './avvikLenker';
 import { TILSYN_KILDER, TS_TYPER, MYND } from './tilsyn';
+import { lesRapport, pdfKilder } from '../views/RapportLeser';
 import { MEDIER, MAALER_KODER, sisteAvl, enhet as mEnhet, grenseTekst, tall as mTall, fmt as mFmt } from './maaler';
 import { SysSjekkVelger, SysSjekkKort } from '../components/SysSjekk';
 import { alleMaler, finnMal, kopi, kontraktKey, fordeling, pliktKeysFor, OMR, ANS_VALG } from './kontrakt';
@@ -548,6 +549,10 @@ export function utfor(id: string, pre?: UtforPreset) {
       {tgAvviker(x.tl, tgMaal) && <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={x.tlBruk !== false} onChange={e => set({ tlBruk: e.target.checked })} style={{ width: 'auto' }} />Oppdater tilstanden på {o.komponentId ? 'komponenten' : 'systemet'} til {tgTekst(x.tl)}</label>}</> } as Field] : []),
     ...(pre?.filer?.length ? [{ k: 'filerInfo', type: 'custom', label: 'Rapport og vedlegg fra servicefirmaet', render: () => <div className="small">{pre.filer!.map((f: any) => <div key={f.path}><FileLink fil={f} /></div>)}<div className="muted">Lagres som dokumenter på kontrollen.</div></div> } as Field] : []),
     { k: 'fil', label: pre?.filer?.length ? 'Ekstra rapport / sjekkliste (valgfritt)' : 'Rapport / sjekkliste', type: 'file' },
+    { k: 'les', type: 'custom', render: (v: any, set: any) => { const K = pdfKilder(v.fil, pre?.filer); if (!K.length) return null;
+      return <div className="note small" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', color: 'var(--ink)' }}><span style={{ flex: 1 }}>Appen kan lese PDF-rapporten og foreslå avvik. Rapporten leses her i nettleseren.</span>
+        <button type="button" className="btn sm pri" onClick={() => lesRapport(o, K, (avs, ok) => { const eks = (v.avs || []).filter((r: any) => r.t?.trim());
+          set(ok ? { res: 'OK – ingen avvik' } : { res: 'Avvik funnet', avs: [...eks, ...avs.map(x => ({ ...nyRad(), t: x.t, a: x.a }))] }); })}>Les avvik fra rapporten</button></div>; } } as Field,
   ];
   formModal({
     title: (pre?.kilde ? 'Godkjenn rapport: ' : 'Registrer utført: ') + o.navn, fields, saveTxt: pre?.kilde ? 'Godkjenn og registrer' : 'Registrer',
