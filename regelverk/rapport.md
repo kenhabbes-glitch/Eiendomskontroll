@@ -1,6 +1,6 @@
-# Regelverkssjekk 2026-11-06
+# Regelverkssjekk 2026-11-08
 
-Kontrollert mot grunnlinje fra 2026-11-06. Kilde: Lovdata, gjeldende lover og sentrale forskrifter (NLOD 2.0).
+Kontrollert mot grunnlinje fra 2026-11-08. Kilde: Lovdata, gjeldende lover og sentrale forskrifter (NLOD 2.0).
 
 ## Ingen endringer i regelverket appen viser til
 

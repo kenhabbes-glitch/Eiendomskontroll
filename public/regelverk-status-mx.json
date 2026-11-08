@@ -1,0 +1,157 @@
+{
+  "sjekket": "2026-11-08T14:23:05.615Z",
+  "kontrollertMot": "2026-11-08T14:23:05.615Z",
+  "antallKilder": 15,
+  "endringer": [],
+  "kilder": [
+    {
+      "navn": "Ley General de Protección Civil",
+      "lenke": "https://www.diputados.gob.mx/LeyesBiblio/index.htm",
+      "niva": "federal",
+      "status": "ikke funnet",
+      "sistEndret": ""
+    },
+    {
+      "navn": "Ley Federal del Trabajo",
+      "lenke": "https://www.diputados.gob.mx/LeyesBiblio/index.htm",
+      "niva": "federal",
+      "status": "vigente",
+      "sistEndret": ""
+    },
+    {
+      "navn": "NOM-002-STPS-2010 Prevención y protección contra incendios",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-002-stps-2010/",
+      "niva": "federal",
+      "status": "vigente",
+      "sistEndret": "28 de septiembre de 2026",
+      "antDatoer": 5,
+      "flagg": []
+    },
+    {
+      "navn": "NOM-001-SEDE-2012 Instalaciones eléctricas (utilización)",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-001-sede-2012/",
+      "niva": "federal",
+      "status": "vigente",
+      "sistEndret": "24 de julio de 2023",
+      "antDatoer": 4,
+      "flagg": [
+        "cancelación",
+        "proyecto"
+      ]
+    },
+    {
+      "navn": "NOM-029-STPS-2011 Mantenimiento de instalaciones eléctricas",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-029-stps-2011/",
+      "niva": "federal",
+      "status": "vigente",
+      "sistEndret": "29/3/2012",
+      "antDatoer": 2,
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    {
+      "navn": "NOM-022-STPS-2015 Electricidad estática",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-022-stps-2015/",
+      "niva": "federal",
+      "status": "vigente",
+      "sistEndret": "13 de mayo de 2026",
+      "antDatoer": 4,
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    {
+      "navn": "NOM-020-STPS-2011 Recipientes sujetos a presión y calderas",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-020-stps-2011/",
+      "niva": "federal",
+      "status": "vigente",
+      "sistEndret": "28 de septiembre de 2026",
+      "antDatoer": 4,
+      "flagg": [
+        "cancelación",
+        "modificación",
+        "proyecto"
+      ]
+    },
+    {
+      "navn": "NOM-154-SCFI-2005 Extintores – mantenimiento y recarga",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-154-scfi-2005/",
+      "niva": "federal",
+      "status": "vigente",
+      "sistEndret": "06 de octubre de 2025",
+      "antDatoer": 5,
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    {
+      "navn": "NOM-207-SCFI-2018 Mantenimiento de elevadores",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-207-scfi-2018/",
+      "niva": "federal",
+      "status": "vigente",
+      "sistEndret": "04 de enero de 2024",
+      "antDatoer": 10,
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    {
+      "navn": "NOM-053-SCFI-2000 Elevadores eléctricos de tracción",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-053-scfi-2000/",
+      "niva": "federal",
+      "status": "vigente",
+      "sistEndret": "2 de agosto de 1993",
+      "antDatoer": 8,
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    {
+      "navn": "NOM-004-SEDG-2004 Instalaciones de aprovechamiento de gas L.P.",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-004-sedg-2004/",
+      "niva": "federal",
+      "status": "vigente",
+      "sistEndret": "14 de marzo de 2025",
+      "antDatoer": 3,
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    {
+      "navn": "NOM-003-SEGOB-2011 Señales y avisos para protección civil",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-003-segob-2011/",
+      "niva": "federal",
+      "status": "vigente",
+      "sistEndret": "04 de enero de 2021",
+      "antDatoer": 4,
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    {
+      "navn": "NOM-026-STPS-2008 Colores y señales de seguridad",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-026-stps-2008/",
+      "niva": "federal",
+      "status": "vigente",
+      "sistEndret": "01 de marzo de 2024",
+      "antDatoer": 6,
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    {
+      "navn": "Ley de Gestión Integral de Riesgos y Protección Civil de la Ciudad de México",
+      "lenke": "https://www.proteccioncivil.cdmx.gob.mx",
+      "niva": "CDMX",
+      "status": "manuell kontroll"
+    },
+    {
+      "navn": "Reglamento de Construcciones para el Distrito Federal",
+      "lenke": "https://data.consejeria.cdmx.gob.mx",
+      "niva": "CDMX",
+      "status": "manuell kontroll"
+    }
+  ],
+  "feil": []
+}

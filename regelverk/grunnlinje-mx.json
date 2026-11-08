@@ -1,0 +1,93 @@
+{
+  "godkjent": "2026-11-08T14:23:05.615Z",
+  "kilder": {
+    "Ley General de Protección Civil": {
+      "status": "ikke funnet",
+      "sistEndret": "",
+      "flagg": []
+    },
+    "Ley Federal del Trabajo": {
+      "status": "vigente",
+      "sistEndret": "",
+      "flagg": []
+    },
+    "NOM-002-STPS-2010 Prevención y protección contra incendios": {
+      "status": "vigente",
+      "sistEndret": "28 de septiembre de 2026",
+      "flagg": []
+    },
+    "NOM-001-SEDE-2012 Instalaciones eléctricas (utilización)": {
+      "status": "vigente",
+      "sistEndret": "24 de julio de 2023",
+      "flagg": [
+        "cancelación",
+        "proyecto"
+      ]
+    },
+    "NOM-029-STPS-2011 Mantenimiento de instalaciones eléctricas": {
+      "status": "vigente",
+      "sistEndret": "29/3/2012",
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    "NOM-022-STPS-2015 Electricidad estática": {
+      "status": "vigente",
+      "sistEndret": "13 de mayo de 2026",
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    "NOM-020-STPS-2011 Recipientes sujetos a presión y calderas": {
+      "status": "vigente",
+      "sistEndret": "28 de septiembre de 2026",
+      "flagg": [
+        "cancelación",
+        "modificación",
+        "proyecto"
+      ]
+    },
+    "NOM-154-SCFI-2005 Extintores – mantenimiento y recarga": {
+      "status": "vigente",
+      "sistEndret": "06 de octubre de 2025",
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    "NOM-207-SCFI-2018 Mantenimiento de elevadores": {
+      "status": "vigente",
+      "sistEndret": "04 de enero de 2024",
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    "NOM-053-SCFI-2000 Elevadores eléctricos de tracción": {
+      "status": "vigente",
+      "sistEndret": "2 de agosto de 1993",
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    "NOM-004-SEDG-2004 Instalaciones de aprovechamiento de gas L.P.": {
+      "status": "vigente",
+      "sistEndret": "14 de marzo de 2025",
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    "NOM-003-SEGOB-2011 Señales y avisos para protección civil": {
+      "status": "vigente",
+      "sistEndret": "04 de enero de 2021",
+      "flagg": [
+        "proyecto"
+      ]
+    },
+    "NOM-026-STPS-2008 Colores y señales de seguridad": {
+      "status": "vigente",
+      "sistEndret": "01 de marzo de 2024",
+      "flagg": [
+        "proyecto"
+      ]
+    }
+  }
+}
