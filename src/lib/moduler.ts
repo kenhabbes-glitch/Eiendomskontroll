@@ -50,7 +50,8 @@ export const priser = () => PRISER;
 export const rabattFor = (P: Priser | null, n: number) => { let r = 0; for (const t of P?.trapp || STD_TRAPP) if (n >= t.fra) r = t.rabatt; return r; };
 /** Pris per bruker per måned for modulen ved n brukere: listepris minus rabatt, men aldri under minimumsprisen. null = på forespørsel */
 export function prisPerBruker(P: Priser | null, k: string, n: number): number | null {
-  const m = P?.moduler?.[k]; if (!m || m.pris === null || m.pris === undefined) return null;
+  const m = P?.moduler?.[k]; if (!m) return null;
+  if (m.pris === null || m.pris === undefined) return m.min === null || m.min === undefined ? null : m.min; // bare minimum satt = fast pris per bruker
   const r = Math.round(m.pris * (1 - rabattFor(P, n) / 100)); return Math.max(m.min ?? 0, r);
 }
 export const prisTotal = (P: Priser | null, moduler: string[], n: number) => moduler.reduce((s, k) => s + (prisPerBruker(P, k, n) || 0) * n, 0);
