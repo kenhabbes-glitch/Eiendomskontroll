@@ -45,9 +45,9 @@ export type Col = keyof typeof TABLES;
 export const COLS = Object.keys(TABLES) as Col[];
 
 export type Niva = 'skriv' | 'drift' | 'les' | 'service';
-export const S: Record<Col, any[]> & { profiles: any[]; tilganger: any[]; innst: Record<string, any>; innstMangler: boolean; orgs: any[]; medlemmer: any[]; portefoljer: any[]; oppdrag: any[]; niva: Record<string, Niva>; primarOrg: string } = {
+export const S: Record<Col, any[]> & { profiles: any[]; tilganger: any[]; innst: Record<string, any>; innstMangler: boolean; orgs: any[]; medlemmer: any[]; portefoljer: any[]; oppdrag: any[]; niva: Record<string, Niva>; primarOrg: string; fullTilgang: boolean } = {
   eiendommer: [], leietakere: [], anlegg: [], komponenter: [], oppgaver: [], avvik: [], dokumenter: [], tegninger: [], avlesninger: [], prosjekter: [], profiles: [], tilganger: [], innst: {}, innstMangler: false,
-  orgs: [], medlemmer: [], portefoljer: [], oppdrag: [], niva: {}, primarOrg: '',
+  orgs: [], medlemmer: [], portefoljer: [], oppdrag: [], niva: {}, primarOrg: '', fullTilgang: false,
 };
 
 export type Me = { id: string; epost: string; navn: string; rolle: Rolle; leietakerId?: string | null; aktiv: boolean; plattform?: boolean };
@@ -197,6 +197,7 @@ async function loadOrg() {
   S.orgs = orgs; S.medlemmer = med; S.portefoljer = port; S.oppdrag = opp;
   const { data: niv } = await sb.rpc('mine_tilganger'); S.niva = Object.fromEntries((niv || []).map((r: any) => [r.eiendom_id, r.niva]));
   const { data: po } = await sb.rpc('min_primar_org'); S.primarOrg = po || '';
+  if (state.me?.plattform) { try { const { data: ft } = await sb.rpc('full_tilgang', { p_uid: state.me.id }); S.fullTilgang = ft === true; } catch { S.fullTilgang = false; } } else S.fullTilgang = false;
   try { const { lastModuler } = await import('./moduler'); await lastModuler(); } catch { /* ikke tilgjengelig */ }
 }
 export async function oppdaterNiva() { const { data: niv } = await sb.rpc('mine_tilganger'); S.niva = Object.fromEntries((niv || []).map((r: any) => [r.eiendom_id, r.niva])); bump(); }
@@ -253,7 +254,9 @@ export const nivaE = (eid?: string): Niva | '' => (eid && S.niva[eid]) || '';
 export const kanRedigereE = (eid?: string) => nivaE(eid) === 'skriv';
 export const kanDrifteE = (eid?: string) => ['skriv', 'drift'].includes(nivaE(eid));
 // Mine organisasjoner (med min rolle)
-export const mineOrg = (roller?: string[]) => S.medlemmer.filter(m => m.user_id === state.me?.id && m.aktiv && (!roller || roller.includes(m.rolle))).map(m => ({ ...(S.orgs.find(o => o.id === m.org_id) || { id: m.org_id, navn: '?' }), minRolle: m.rolle, alleBygg: m.alle_bygg })).filter(o => o.aktiv !== false);
+export const mineOrg = (roller?: string[]): any[] => S.fullTilgang && state.me?.plattform
+  ? S.orgs.filter(o => o.aktiv !== false).map(o => { const m = S.medlemmer.find(x => x.org_id === o.id && x.user_id === state.me?.id && x.aktiv); return { ...o, minRolle: 'admin', alleBygg: true, ekteRolle: m?.rolle || '' }; })
+  : S.medlemmer.filter(m => m.user_id === state.me?.id && m.aktiv && (!roller || roller.includes(m.rolle))).map(m => ({ ...(S.orgs.find(o => o.id === m.org_id) || { id: m.org_id, navn: '?' }), minRolle: m.rolle, alleBygg: m.alle_bygg })).filter(o => o.aktiv !== false);
 export const orgNavn = (id?: string) => S.orgs.find(o => o.id === id)?.navn || '';
 export const isTenant = () => role() === 'leietaker';
 export const isUtforer = () => role() === 'utforer';

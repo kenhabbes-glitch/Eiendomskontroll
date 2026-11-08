@@ -31,8 +31,11 @@ const handler = async (req: Request) => {
   const { data: me } = await admin.from('profiles').select('id, rolle, aktiv, plattform_admin, navn, epost').eq('id', u.user.id).single();
   if (!me || !me.aktiv) return json(403, { error: 'Brukeren er ikke aktiv' });
   const plattform = !!me.plattform_admin;
+  // Full tilgang (utviklermodus): plattformadmin med tofaktor regnes som administrator i alle organisasjoner
+  const gud = plattform && aalFra(token) === 'aal2' && (await admin.rpc('full_tilgang', { p_uid: me.id })).data === true;
   const erOrgAdmin = async (org: string) => {
     if (!org) return false;
+    if (gud) { const { data: o } = await admin.from('organisasjoner').select('aktiv').eq('id', org).maybeSingle(); return !!o?.aktiv; }
     const { data } = await admin.from('org_medlem').select('rolle, aktiv, organisasjoner!inner(aktiv)').eq('org_id', org).eq('user_id', me.id).maybeSingle();
     return !!(data && data.aktiv && data.rolle === 'admin' && (data as any).organisasjoner?.aktiv);
   };
