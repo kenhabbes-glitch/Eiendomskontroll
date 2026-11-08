@@ -1,17 +1,18 @@
 // Moduler og abonnement. Kjernen er alltid med. Modulene til EIEREN av en eiendom gjelder for eiendommen.
 // Tåler at databasen ikke har modultabellen ennå (da er alt tilgjengelig).
 import { S, sb } from './store';
+import { tt, lokale } from './i18n';
 
 export type ModulKey = 'kjerne' | 'brannvern' | 'vedlikehold' | 'prosjekter' | 'tilsyn' | 'dokumentlesing' | 'rapporter' | 'befaring';
 export const MODULER: { k: ModulKey; navn: string; tekst: string; inneholder: string[] }[] = [
-  { k: 'kjerne', navn: 'Kjerne', tekst: 'Alltid med', inneholder: ['Eiendommer og porteføljer', 'Systemer og komponenter (TFM)', 'Dokumenter', 'Kontrollplan og kontrollrunder', 'Avvik og purring', 'Leietakere', 'Tegninger og arealer', 'Målere', 'Regelverk og plikter', 'Arbeidsordre til servicefirma'] },
-  { k: 'brannvern', navn: 'Brannvern og leietakeroppfølging', tekst: 'Brannkort, brannverninformasjon til leietakere, bekreftelser og redusert brannsikkerhet', inneholder: ['Brannvern på eiendommen', 'Brannvernpakke og bekreftelse i leietakerportalen', 'Varsel om redusert brannsikkerhet'] },
-  { k: 'vedlikehold', navn: 'Vedlikeholdsplan og capex', tekst: 'Langtidsplan for utskifting, nåverdi og capex-rapport', inneholder: ['Vedlikeholdsplan', 'Capex-rapport'] },
-  { k: 'prosjekter', navn: 'Prosjekter', tekst: 'Prosjektstyring fra idé til garanti med beslutningsnotat, SHA, Gantt og arkiv', inneholder: ['Prosjekter', 'Utskiftingsprosjekter fra systemer og avvik', 'Fase- og statusrapporter til eier'] },
-  { k: 'tilsyn', navn: 'Tilsynssaker', tekst: 'Registrering og oppfølging av tilsyn fra myndighetene med svarfrister og tilbakemelding', inneholder: ['Tilsynssaker', 'Tilbakemeldingsbrev til myndigheten'] },
-  { k: 'dokumentlesing', navn: 'Dokumentinnboks og rapportlesing', tekst: 'Appen leser rapporter og dokumenter lokalt og foreslår avvik, type, bygg og system', inneholder: ['Dokumentinnboks', 'Les avvik fra servicerapporter', 'Tekstgjenkjenning (OCR) og leverandørmaler'] },
-  { k: 'befaring', navn: 'Befaring', tekst: 'Befaringer på mobil og nettbrett – også uten nett – med funn på tegning, måling, ansvar og frist, arbeidsordre, rapport og elektronisk signering', inneholder: ['Leieforløp: forbefaring, overtakelse, tilpasning, vedlikeholdsplikt og tilbakelevering', 'Fang energityven, HMS-befaring, garantibefaring og systemregistrering', 'Funn, mål og tegning på etasjeplan', 'Rapport med signering av partene', 'Tilsynsanalyser'] },
-  { k: 'rapporter', navn: 'Eierrapporter og verdivurdering', tekst: 'Statusrapport til eier og internt verdianslag', inneholder: ['Statusrapport til eier', 'Verdivurdering'] },
+  { k: 'kjerne', navn: tt("Kjerne"), tekst: tt("Alltid med"), inneholder: ['Eiendommer og porteføljer', 'Systemer og komponenter (TFM)', 'Dokumenter', 'Kontrollplan og kontrollrunder', 'Avvik og purring', 'Leietakere', 'Tegninger og arealer', 'Målere', 'Regelverk og plikter', 'Arbeidsordre til servicefirma'] },
+  { k: 'brannvern', navn: tt("Brannvern og leietakeroppfølging"), tekst: tt("Brannkort, brannverninformasjon til leietakere, bekreftelser og redusert brannsikkerhet"), inneholder: ['Brannvern på eiendommen', 'Brannvernpakke og bekreftelse i leietakerportalen', 'Varsel om redusert brannsikkerhet'] },
+  { k: 'vedlikehold', navn: tt("Vedlikeholdsplan og capex"), tekst: tt("Langtidsplan for utskifting, nåverdi og capex-rapport"), inneholder: ['Vedlikeholdsplan', 'Capex-rapport'] },
+  { k: 'prosjekter', navn: tt("Prosjekter"), tekst: tt("Prosjektstyring fra idé til garanti med beslutningsnotat, SHA, Gantt og arkiv"), inneholder: ['Prosjekter', 'Utskiftingsprosjekter fra systemer og avvik', 'Fase- og statusrapporter til eier'] },
+  { k: 'tilsyn', navn: tt("Tilsynssaker"), tekst: tt("Registrering og oppfølging av tilsyn fra myndighetene med svarfrister og tilbakemelding"), inneholder: ['Tilsynssaker', 'Tilbakemeldingsbrev til myndigheten'] },
+  { k: 'dokumentlesing', navn: tt("Dokumentinnboks og rapportlesing"), tekst: tt("Appen leser rapporter og dokumenter lokalt og foreslår avvik, type, bygg og system"), inneholder: ['Dokumentinnboks', 'Les avvik fra servicerapporter', 'Tekstgjenkjenning (OCR) og leverandørmaler'] },
+  { k: 'befaring', navn: tt("Befaring"), tekst: tt("Befaringer på mobil og nettbrett – også uten nett – med funn på tegning, måling, ansvar og frist, arbeidsordre, rapport og elektronisk signering"), inneholder: ['Leieforløp: forbefaring, overtakelse, tilpasning, vedlikeholdsplikt og tilbakelevering', 'Fang energityven, HMS-befaring, garantibefaring og systemregistrering', 'Funn, mål og tegning på etasjeplan', 'Rapport med signering av partene', 'Tilsynsanalyser'] },
+  { k: 'rapporter', navn: tt("Eierrapporter og verdivurdering"), tekst: tt("Statusrapport til eier og internt verdianslag"), inneholder: ['Statusrapport til eier', 'Verdivurdering'] },
 ];
 export const modulNavn = (k: string) => MODULER.find(m => m.k === k)?.navn || k;
 
@@ -67,7 +68,7 @@ export const harPris = (P: Priser | null, k: string) => prisPer(P, k, 1, 'bruker
 /** Månedspris for modulen ved nU brukere og nB bygg */
 export const modulPris = (P: Priser | null, k: string, nU: number, nB: number) => (prisPer(P, k, nU, 'bruker') || 0) * nU + (prisPer(P, k, nB, 'bygg') || 0) * nB;
 export const prisTotal = (P: Priser | null, moduler: string[], nU: number, nB = 0) => moduler.reduce((s, k) => s + modulPris(P, k, nU, nB), 0);
-export const kr = (n: number | null | undefined) => n === null || n === undefined || isNaN(n as number) ? '' : Math.round(n).toLocaleString('nb-NO') + ' kr';
+export const kr = (n: number | null | undefined) => n === null || n === undefined || isNaN(n as number) ? '' : Math.round(n).toLocaleString(lokale()) + ' kr';
 /** Antall bygg en organisasjon eier i appen */
 export const byggFor = (org: string) => S.eiendommer.filter(e => e.eierOrgId === org).length;
 /** Månedspris for betalte moduler (ikke prøve) med gitt antall brukere og bygg */

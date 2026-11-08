@@ -7,6 +7,7 @@ import { byId, today, addDays, uid, sortBy, nextSysLop, type Rec } from './utils
 import { AV_FRIST, AV_LUKKET } from './catalog';
 import { OMR, fordeling, leietakerHar } from './kontrakt';
 import { alleUtkast, hentUtkast, lagreUtkast, paaNett, hentLokalFil, slettUtkast, merkOpplastet, opplastetSom, type LokalFil } from './offline';
+import { tt, lokale } from './i18n';
 
 export type BFil = Fil | LokalFil;
 export const erLokal = (f: any): f is LokalFil => !!f?.lokal;
@@ -36,33 +37,33 @@ const FELLES_LEIE = [
 type Ptpl = { gruppe: string; tekst: string; hjelp?: string };
 export type BType = { k: string; navn: string; kort: string; beskr: string; leie?: boolean; rom?: boolean; maalere?: boolean; nokler?: boolean; energi?: boolean; system?: boolean; garanti?: boolean; vplikt?: boolean; tilpasning?: boolean; punkter: () => Ptpl[] };
 export const BTYPER: BType[] = [
-  { k: 'forbefaring', navn: 'Forbefaring (før leieavtale)', kort: 'Forbefaring', leie: true, rom: true, beskr: 'Gjennomgang av lokalet med mulig leietaker før avtalen signeres: tilstand, behov og ønskede tilpasninger.',
+  { k: 'forbefaring', navn: tt("Forbefaring (før leieavtale)"), kort: tt("Forbefaring"), leie: true, rom: true, beskr: tt("Gjennomgang av lokalet med mulig leietaker før avtalen signeres: tilstand, behov og ønskede tilpasninger."),
     punkter: () => [...FELLES_LEIE, ...g('Behov og ønsker', 'Ønsket planløsning / antall arbeidsplasser', 'Behov for tilpasninger (vegger, el, IT, ventilasjon)', 'Krav til kjøling, sikring og adgangskontroll', 'Parkering, sykkel og varemottak'), ...rom('Lokalet')] },
-  { k: 'overtakelse', navn: 'Overtakelse / innflytting', kort: 'Overtakelse', leie: true, rom: true, maalere: true, nokler: true, beskr: 'Protokoll ved overlevering til leietaker: tilstand per rom, målerstander, nøkler og mangler som skal rettes.',
+  { k: 'overtakelse', navn: tt("Overtakelse / innflytting"), kort: tt("Overtakelse"), leie: true, rom: true, maalere: true, nokler: true, beskr: tt("Protokoll ved overlevering til leietaker: tilstand per rom, målerstander, nøkler og mangler som skal rettes."),
     punkter: () => [...FELLES_LEIE, ...g('Dokumentasjon', 'Brukerveiledning / FDV for leieobjektet overlevert', 'Brannverninformasjon og rømningsplan gjennomgått', 'Kontaktinformasjon drift og vakt'), ...rom('Lokalet')] },
-  { k: 'tilpasning', navn: 'Leietakertilpasning', kort: 'Tilpasning', leie: true, tilpasning: true, beskr: 'Registrering av tilpasninger for leietaker: hva som er utført, avvik fra avtale, og hvem som betaler.',
+  { k: 'tilpasning', navn: tt("Leietakertilpasning"), kort: tt("Tilpasning"), leie: true, tilpasning: true, beskr: tt("Registrering av tilpasninger for leietaker: hva som er utført, avvik fra avtale, og hvem som betaler."),
     punkter: () => [...g('Avtalte arbeider', 'Arbeidene er utført som avtalt / beskrevet', 'Materialvalg og utførelse som avtalt', 'Endringer i forhold til tegning er dokumentert', 'Kostnadsfordeling eier / leietaker er avklart'), ...g('Teknisk', 'El-arbeider samsvarserklært', 'Ventilasjon innregulert etter ny planløsning', 'Brannceller og gjennomføringer tettet', 'Sprinkler / brannalarm tilpasset ny planløsning'), ...g('Dokumentasjon', 'Som bygget-tegninger mottatt', 'FDV-dokumentasjon mottatt')] },
-  { k: 'vplikt', navn: 'Leietakers vedlikeholdsplikt', kort: 'Vedlikeholdsplikt', leie: true, vplikt: true, beskr: 'Kontroll av at leietaker ivaretar vedlikeholdet leieavtalen pålegger dem. Sjekkpunktene hentes fra ansvarsfordelingen i leieavtalen.',
+  { k: 'vplikt', navn: tt("Leietakers vedlikeholdsplikt"), kort: tt("Vedlikeholdsplikt"), leie: true, vplikt: true, beskr: tt("Kontroll av at leietaker ivaretar vedlikeholdet leieavtalen pålegger dem. Sjekkpunktene hentes fra ansvarsfordelingen i leieavtalen."),
     punkter: () => [] },
-  { k: 'tilbakelevering', navn: 'Tilbakelevering', kort: 'Tilbakelevering', leie: true, rom: true, maalere: true, nokler: true, beskr: 'Sluttbefaring når leieforholdet avsluttes. Sammenlignes med overtakelsen, og mangler leietaker må utbedre eller betale registreres.',
+  { k: 'tilbakelevering', navn: tt("Tilbakelevering"), kort: tt("Tilbakelevering"), leie: true, rom: true, maalere: true, nokler: true, beskr: tt("Sluttbefaring når leieforholdet avsluttes. Sammenlignes med overtakelsen, og mangler leietaker må utbedre eller betale registreres."),
     punkter: () => [...FELLES_LEIE, ...g('Tilbakeføring', 'Leietakers egne installasjoner er fjernet', 'Tilpasninger tilbakeført der avtalen krever det', 'Lokalet er ryddet og rengjort', 'Skilting og merking fjernet'), ...rom('Lokalet')] },
-  { k: 'energi', navn: 'Fang energityven', kort: 'Energityven', energi: true, beskr: 'Runde for å finne unødvendig energibruk: drift utenfor brukstid, samtidig varme og kjøling, lekkasjer og feilinnstillinger.',
+  { k: 'energi', navn: tt("Fang energityven"), kort: tt("Energityven"), energi: true, beskr: tt("Runde for å finne unødvendig energibruk: drift utenfor brukstid, samtidig varme og kjøling, lekkasjer og feilinnstillinger."),
     punkter: () => [...g('Ventilasjon', ['Ventilasjon går bare i brukstid', 'Sjekk driftstider i SD-anlegget mot faktisk bruk'], 'Varmegjenvinner fungerer (temperaturvirkningsgrad)', 'Filtre ikke tette (trykkfall)', 'Behovsstyring (CO₂ / tilstedeværelse) virker'),
       ...g('Varme og kjøling', ['Ikke samtidig varme og kjøling', 'Radiatorer/varmebatterier og kjøling motarbeider hverandre'], 'Settpunkter romtemperatur fornuftige', 'Nattsenking og helgesenking aktiv', 'Varmekabler/snøsmelting styrt av temperatur og fukt', 'Isolasjon på rør og ventiler'),
       ...g('Belysning og utstyr', 'Lys slukker automatisk i tomme rom', 'Utebelysning styrt av lys/klokke', 'Utstyr og maskiner av utenom brukstid', 'Varmtvannsbereder: temperatur og tidsstyring'),
       ...g('Bygningskropp', 'Dører og porter lukkes (dørpumper, porter)', 'Trekk / utette vinduer og dører', 'Lekkasjer vann (toaletter, kraner)'),
       ...g('Måling og oppfølging', 'Energimålere avleses og følges opp', 'Avvik i forbruk sammenlignet med i fjor')] },
-  { k: 'tilfeldig', navn: 'Tilfeldig befaring / runde', kort: 'Runde', beskr: 'Rundgang i bygget for å fange opp avvik. Ingen faste sjekkpunkter – registrer funn direkte på tegningen.', punkter: () => [] },
-  { k: 'system', navn: 'Systemregistrering (nytt bygg)', kort: 'Systemregistrering', system: true, beskr: 'Registrering av tekniske systemer og komponenter ved etablering av et bygg. Hvert registrert system legges i TFM-registeret med plassering på tegning.',
+  { k: 'tilfeldig', navn: tt("Tilfeldig befaring / runde"), kort: tt("Runde"), beskr: tt("Rundgang i bygget for å fange opp avvik. Ingen faste sjekkpunkter – registrer funn direkte på tegningen."), punkter: () => [] },
+  { k: 'system', navn: tt("Systemregistrering (nytt bygg)"), kort: tt("Systemregistrering"), system: true, beskr: tt("Registrering av tekniske systemer og komponenter ved etablering av et bygg. Hvert registrert system legges i TFM-registeret med plassering på tegning."),
     punkter: () => g('Dokumentasjon', 'FDV-dokumentasjon mottatt', 'Som bygget-tegninger mottatt', 'TFM-merking utført på anlegg', 'Opplæring av drift gjennomført') },
-  { k: 'hms', navn: 'HMS-befaring / vernerunde', kort: 'HMS-befaring', beskr: 'Vernerunde med fokus på helse, miljø og sikkerhet for brukere og ansatte.',
+  { k: 'hms', navn: tt("HMS-befaring / vernerunde"), kort: tt("HMS-befaring"), beskr: tt("Vernerunde med fokus på helse, miljø og sikkerhet for brukere og ansatte."),
     punkter: () => [...g('Brann og rømning', 'Rømningsveier frie og merket', 'Nødlys og ledelys virker', 'Brannslukkere og brannslanger kontrollert', 'Branndører lukker og er ikke blokkert'),
       ...g('Arbeidsmiljø', 'Orden og ryddighet', 'Inneklima (temperatur, trekk, luftkvalitet)', 'Belysning på arbeidsplasser', 'Støy', 'Ergonomi'),
       ...g('Sikkerhet', 'Fallsikring, rekkverk og trapper', 'Kjemikalier merket og lagret riktig (stoffkartotek)', 'El-tavler lukket og tilgjengelige', 'Førstehjelpsutstyr og hjertestarter'),
       ...g('Utomhus', 'Gangveier, belysning og glatt føre', 'Avfallshåndtering')] },
-  { k: 'garanti', navn: 'Garantibefaring', kort: 'Garantibefaring', garanti: true, beskr: 'Ettårsbefaring eller garantibefaring etter entreprise (NS 8407 / 8405). Mangler meldes entreprenøren med frist.',
+  { k: 'garanti', navn: tt("Garantibefaring"), kort: tt("Garantibefaring"), garanti: true, beskr: tt("Ettårsbefaring eller garantibefaring etter entreprise (NS 8407 / 8405). Mangler meldes entreprenøren med frist."),
     punkter: () => [...g('Generelt', 'Mangler fra overtakelsen er utbedret', 'Nye mangler oppstått i garantitiden', 'FDV-dokumentasjon komplett'), ...g('Bygg', 'Sprekker, setninger og fuktskader', 'Tak og fasader tette', 'Dører, vinduer og beslag'), ...g('Tekniske anlegg', 'Ventilasjon innregulert og fungerer', 'Varme og kjøling fungerer', 'El og belysning', 'Sanitær uten lekkasjer', 'SD-anlegg og alarmer')] },
-  { k: 'annen', navn: 'Annen befaring', kort: 'Befaring', beskr: 'Egendefinert befaring – legg til egne sjekkpunkter.', punkter: () => [] },
+  { k: 'annen', navn: tt("Annen befaring"), kort: tt("Befaring"), beskr: tt("Egendefinert befaring – legg til egne sjekkpunkter."), punkter: () => [] },
 ];
 export const btype = (k?: string) => BTYPER.find(t => t.k === k) || BTYPER[BTYPER.length - 1];
 /** Rekkefølgen i et leieforhold */
@@ -71,12 +72,12 @@ export const LEIEFORLOP = ['forbefaring', 'overtakelse', 'tilpasning', 'vplikt',
 const nyP = (p: Ptpl): Punkt => ({ id: uid(), gruppe: p.gruppe, tekst: p.tekst, hjelp: p.hjelp, svar: '' });
 /** Sjekkpunkter for vedlikeholdsplikten, ut fra ansvarsfordelingen i leieavtalen */
 export function vpliktPunkter(lid?: string): Punkt[] {
-  const l = lid ? byId('leietakere', lid) : null; if (!l) return [nyP({ gruppe: 'Vedlikeholdsplikt', tekst: 'Velg leietaker for å hente pliktene fra leieavtalen' })];
+  const l = lid ? byId('leietakere', lid) : null; if (!l) return [nyP({ gruppe: 'Vedlikeholdsplikt', tekst: tt("Velg leietaker for å hente pliktene fra leieavtalen") })];
   const f = fordeling(l); const L: Punkt[] = [];
   OMR.forEach(o => { const c = f[o.k]; if (!c || !leietakerHar(c.v)) return;
     L.push({ ...nyP({ gruppe: 'Vedlikeholdsplikt etter leieavtalen', tekst: o.n, hjelp: `Leietaker har ${c.v === 'Delt' ? 'delt ' : ''}ansvar for drift og vedlikehold${c.p ? ' – ' + c.p : ''}` }), omr: o.k });
-    if (o.tek) L.push({ ...nyP({ gruppe: 'Vedlikeholdsplikt etter leieavtalen', tekst: `${o.n}: service og kontroller dokumentert` }), omr: o.k }); });
-  if (!L.length) L.push(nyP({ gruppe: 'Vedlikeholdsplikt etter leieavtalen', tekst: 'Leieavtalen gir leietaker ingen vedlikeholdsplikter (eier har alt) – kontroller ansvarsfordelingen' }));
+    if (o.tek) L.push({ ...nyP({ gruppe: 'Vedlikeholdsplikt etter leieavtalen', tekst: tt("{0}: service og kontroller dokumentert", o.n) }), omr: o.k }); });
+  if (!L.length) L.push(nyP({ gruppe: 'Vedlikeholdsplikt etter leieavtalen', tekst: tt("Leieavtalen gir leietaker ingen vedlikeholdsplikter (eier har alt) – kontroller ansvarsfordelingen") }));
   L.push(...['Internkontroll (IK-bygg) dokumentert av leietaker', 'Avvik fra forrige befaring er utbedret'].map(t => nyP({ gruppe: 'Oppfølging', tekst: t })));
   return L;
 }
@@ -121,7 +122,7 @@ async function synkFunn(b: Rec, f: Funn): Promise<Funn> {
   const av = state.me?.navn || state.me?.epost; const T = btype(b.type);
   if ((f.art === 'avvik' || f.art === 'energi') && (!f.synket || (f.endret || 0) > f.synket || !f.avvikId || !byId('avvik', f.avvikId))) {
     const gml = f.avvikId ? byId('avvik', f.avvikId) : null;
-    const besk = [f.beskrivelse, f.art === 'energi' && f.besparelse ? `Anslått besparelse: ${(+f.besparelse).toLocaleString('nb-NO')} kWh/år` : ''].filter(Boolean).join('\n');
+    const besk = [f.beskrivelse, f.art === 'energi' && f.besparelse ? `Anslått besparelse: ${(+f.besparelse).toLocaleString(lokale())} kWh/år` : ''].filter(Boolean).join('\n');
     const o: Rec = { ...(gml || { status: 'Ny', kilde: 'Befaring', oppdaget: b.dato || today(), logg: [{ t: new Date().toISOString(), s: 'Ny', k: `Registrert under ${T.kort.toLowerCase()} ${b.dato ? b.dato.split('-').reverse().join('.') : ''}`, av }] }),
       id: f.avvikId || (f.avvikId = uid()), eiendomId: b.eiendomId, tittel: f.tittel, beskrivelse: besk, alv: f.alv || 'Middels', ansvar: f.ansvar || 'Eier', utbedresAv: f.utbedresAv || '', leietakerId: f.leietakerId || b.leietakerId || '',
       frist: f.frist || addDays(b.dato || today(), AV_FRIST[f.alv || 'Middels'] || 90), pos: f.pos || null, plassering: f.plassering || '', anleggId: f.anleggId || '', komponentId: f.komponentId || '', kost: f.kost || '',
@@ -193,7 +194,7 @@ export async function lagreBefaring(rec: Rec) {
 export async function synkAlle() {
   if (!paaNett() || !state.me) return; const L = await alleUtkast(); let n = 0;
   for (const { key, v } of L) if (v.usynket) { if (await synkBefaring(key)) n++; }
-  if (n) toast(`${n} befaring${n > 1 ? 'er' : ''} synket`);
+  if (n) toast(tt("{0} befaring{1} synket", n, n > 1 ? 'er' : ''));
 }
 export async function antallUsynket() { return (await alleUtkast()).filter(x => x.v.usynket).length; }
 export async function forkastUtkast(id: string) { await slettUtkast(id); delete synkStatus[id]; if (byId('befaringer', id)) await refetch('befaringer', id); bump(); }

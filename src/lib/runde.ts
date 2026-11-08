@@ -5,6 +5,7 @@ import { AV_LUKKET } from './catalog';
 import { kompForKontroll } from './komponentsjekk';
 import { alleMaalere, maalerStatus } from './maaler';
 import { alleSjekkmaler } from '../views/Sjekkmaler';
+import { tt } from './i18n';
 
 export type RStatus = 'forfalt' | 'idag' | 'snart' | 'ok';
 export type RItem = { key: string; type: 'kontroll' | 'komp' | 'maaler' | 'avvik'; o?: Rec; k?: Rec; a?: Rec; navn: string; under: string; frist: string; status: RStatus; pos?: { tegningId: string; x: number; y: number } | null; plassering?: string; anleggId?: string };
@@ -48,7 +49,7 @@ export function lagSteder(items: RItem[], visAlle: boolean): { steder: Sted[]; u
   const perT: Record<string, RItem[]> = {}; const uten: Record<string, Sted> = {};
   for (const it of items) {
     if (it.pos) (perT[it.pos.tegningId] ||= []).push(it);
-    else { const k = 'u:' + (it.anleggId || it.type); (uten[k] ||= { key: k, navn: it.anleggId ? aNavn(it.anleggId) : it.type === 'avvik' ? 'Avvik uten plassering' : 'Uten system', tegningId: '', x: 0, y: 0, items: [], nr: 0 }).items.push(it); }
+    else { const k = 'u:' + (it.anleggId || it.type); (uten[k] ||= { key: k, navn: it.anleggId ? aNavn(it.anleggId) : it.type === 'avvik' ? tt("Avvik uten plassering") : tt("Uten system"), tegningId: '', x: 0, y: 0, items: [], nr: 0 }).items.push(it); }
   }
   const steder: Sted[] = [];
   for (const T of sortBy(S.tegninger.filter(t => perT[t.id]), t => (+t.etasje || 0) * 1000 + (+t.side || 0))) {
@@ -56,7 +57,7 @@ export function lagSteder(items: RItem[], visAlle: boolean): { steder: Sted[]; u
     for (const it of L) {
       const z = (T.soner || []).find((z: Rec) => z.pts?.length > 2 && iPoly([it.pos!.x, it.pos!.y], z.pts));
       let s = z ? lok.find(x => x.key === T.id + ':' + z.id) : lok.find(x => !(x as any).sone && Math.hypot(x.x - it.pos!.x, x.y - it.pos!.y) < R);
-      if (!s) { s = { key: z ? T.id + ':' + z.id : T.id + ':c' + lok.length, navn: z ? `${T.navn} – ${z.navn}` : '', tegningId: T.id, x: it.pos!.x, y: it.pos!.y, items: [], nr: 0 }; (s as any).sone = !!z; lok.push(s); }
+      if (!s) { s = { key: z ? T.id + ':' + z.id : T.id + ':c' + lok.length, navn: z ? tt("{0} – {1}", T.navn, z.navn) : '', tegningId: T.id, x: it.pos!.x, y: it.pos!.y, items: [], nr: 0 }; (s as any).sone = !!z; lok.push(s); }
       s.items.push(it); s.x = s.items.reduce((a, i) => a + i.pos!.x, 0) / s.items.length; s.y = s.items.reduce((a, i) => a + i.pos!.y, 0) / s.items.length;
     }
     for (const s of lok) if (!s.navn) { const pl: Record<string, number> = {}; s.items.forEach(i => { if (i.plassering) pl[i.plassering] = (pl[i.plassering] || 0) + 1; });

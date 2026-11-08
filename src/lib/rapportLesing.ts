@@ -5,6 +5,7 @@
 import { S, saveInnst, sb } from './store';
 import { KOMP, TYPER } from './catalog';
 import type { Rec } from './utils';
+import { tt } from './i18n';
 
 export type OrdType = 'avvik' | 'ok' | 'seksjon' | 'ignorer' | 'hoy' | 'lav';
 export type Ord = { o: string; t: OrdType; kilde?: 'standard' | 'egen' };
@@ -142,7 +143,7 @@ export const orgnrFraLev = (lev: string) => (lev.match(/^orgnr (\d{9})$/) || [])
 export async function hentFellesMal(lev: string): Promise<Mal | null> {
   const nr = orgnrFraLev(lev); if (!nr || !lesInnst().felles.bruk) return null;
   try { const { data, error } = await sb.rpc('felles_mal_hent', { p_orgnr: nr }); if (error || !data?.type) return null;
-    return { type: data.type, avvik: data.avvik || [], ok: data.ok || [], start: data.start || '', slutt: data.slutt || '', prefiks: data.prefiks || '', navn: lev + ' (felles mal' + (data.stemmer > 1 ? `, brukt av ${data.stemmer}` : '') + ')', laget: '', kilde: 'felles' }; } catch { return null; }
+    return { type: data.type, avvik: data.avvik || [], ok: data.ok || [], start: data.start || '', slutt: data.slutt || '', prefiks: data.prefiks || '', navn: lev + tt(" (felles mal") + (data.stemmer > 1 ? tt(", brukt av {0}", data.stemmer) : '') + ')', laget: '', kilde: 'felles' }; } catch { return null; }
 }
 export async function delFellesMal(lev: string, m: Mal) { const nr = orgnrFraLev(lev); if (!nr) throw new Error('Malen kan bare deles når leverandøren er funnet med org.nr');
   const { error } = await sb.rpc('felles_mal_del', { p_orgnr: nr, p_mal: { type: m.type, avvik: m.avvik, ok: m.ok, start: m.start, slutt: m.slutt, prefiks: m.prefiks } }); if (error) throw new Error(/function|schema/i.test(error.message) ? 'Deling er ikke aktivert på serveren ennå' : error.message); }
@@ -150,7 +151,7 @@ export async function settFelles(f: Partial<Innst['felles']>) { const I = lesInn
 export async function lagreOrd(ord: Ord[], fjernet: string[]) { const I = lesInnst(); await saveInnst('rapportlesing', { ...I, ord, fjernet }); }
 export async function nullstillLaering() { const I = lesInnst(); await saveInnst('rapportlesing', { ...I, laering: {} }); }
 export function laeringsOversikt(I = lesInnst()) {
-  return Object.entries(I.laering).map(([k, l]) => ({ k, navn: k.startsWith('lev:') ? 'Leverandør: ' + k.slice(4) : 'Anleggstype: ' + k.slice(5), rapporter: l.n, ignorert: l.ign.length,
+  return Object.entries(I.laering).map(([k, l]) => ({ k, navn: k.startsWith('lev:') ? tt("Leverandør: ") + k.slice(4) : tt("Anleggstype: ") + k.slice(5), rapporter: l.n, ignorert: l.ign.length,
     beste: Object.entries(l.m).map(([m, s]) => ({ m: m === '§seksjon' ? '(linjer under avviksoverskrift)' : m, g: s.g, a: s.a })).sort((a, b) => (b.g + b.a) - (a.g + a.a)).slice(0, 6) })).sort((a, b) => b.rapporter - a.rapporter);
 }
 

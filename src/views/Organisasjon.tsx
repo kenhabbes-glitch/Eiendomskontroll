@@ -9,6 +9,7 @@ import { eNavn, fd, sortBy, today, aNavn } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, type Field } from '../components/ui';
 import { KOMP } from '../lib/catalog';
 import { PersonvernNotat } from './PersonvernNotat';
+import { tt } from '../lib/i18n';
 
 export const ORG_ROLLER: [string, string, string][] = [
   ['admin', 'Administrator', 'Styrer organisasjonen: brukere, tildeling av bygg, porteføljer og oppdrag. Ser alle bygg organisasjonen har.'],
@@ -44,10 +45,10 @@ const tildelingTekst = (uid: string, org: string) => {
 
 function TildelVelger({ org, val, set }: { org: string; val: { e: string[]; p: string[] }; set: (v: { e: string[]; p: string[] }) => void }) {
   const { L, P } = orgBygg(org);
-  if (!L.length && !P.length) return <p className="small muted">Organisasjonen har ingen bygg ennå.</p>;
+  if (!L.length && !P.length) return <p className="small muted">{tt("Organisasjonen har ingen bygg ennå.")}</p>;
   const tog = (k: 'e' | 'p', id: string) => set({ ...val, [k]: val[k].includes(id) ? val[k].filter(x => x !== id) : [...val[k], id] });
   return <div className="checks" style={{ maxHeight: 260 }}>
-    {P.map(p => <label key={p.id}><input type="checkbox" checked={val.p.includes(p.id)} onChange={() => tog('p', p.id)} /><span><span className="ct">Portefølje: {p.navn}</span><br /><span className="cs">Alle bygg i porteføljen, også nye som legges til · {S.eiendommer.filter(e => e.portefoljeId === p.id).length} bygg</span></span></label>)}
+    {P.map(p => <label key={p.id}><input type="checkbox" checked={val.p.includes(p.id)} onChange={() => tog('p', p.id)} /><span><span className="ct">{tt("Portefølje:")} {p.navn}</span><br /><span className="cs">{tt("Alle bygg i porteføljen, også nye som legges til ·")} {S.eiendommer.filter(e => e.portefoljeId === p.id).length} {tt("bygg")}</span></span></label>)}
     {L.map(e => <label key={e.id}><input type="checkbox" checked={val.e.includes(e.id) || (!!e.portefoljeId && val.p.includes(e.portefoljeId))} disabled={!!e.portefoljeId && val.p.includes(e.portefoljeId)} onChange={() => tog('e', e.id)} /><span><span className="ct">{e.navn}</span><br /><span className="cs">{[e.adresse, portNavn(e.portefoljeId), e.eierOrgId !== org ? 'via oppdrag fra ' + orgNavn(e.eierOrgId) : ''].filter(Boolean).join(' · ')}</span></span></label>)}
   </div>;
 }
@@ -62,31 +63,31 @@ async function lagreTildeling(uid: string, org: string, val: { e: string[]; p: s
 
 export function leggTilMedlem(org: string) {
   const fields: Field[] = [
-    { k: 'navn', label: 'Navn', req: true, half: true }, { k: 'epost', label: 'E-post', type: 'email', req: true, half: true },
-    { k: 'rolle', label: 'Rolle i organisasjonen', type: 'select', options: ORG_ROLLER.map(r => [r[0], r[1]] as [string, string]), def: 'forvalter' },
+    { k: 'navn', label: tt("Navn"), req: true, half: true }, { k: 'epost', label: tt("E-post"), type: 'email', req: true, half: true },
+    { k: 'rolle', label: tt("Rolle i organisasjonen"), type: 'select', options: ORG_ROLLER.map(r => [r[0], r[1]] as [string, string]), def: 'forvalter' },
     { k: 'info', type: 'custom', render: v => <p className="small muted" style={{ margin: 0 }}>{ORG_ROLLER.find(r => r[0] === v.rolle)?.[2]}</p> },
-    { k: 'alle_bygg', label: 'Tilgang til alle organisasjonens bygg (også nye)', type: 'checkbox', show: v => v.rolle !== 'admin' },
-    { k: 'tild', type: 'custom', label: 'Tildel bygg / porteføljer', def: { e: [], p: [] }, show: v => v.rolle !== 'admin' && !v.alle_bygg, render: (v, set) => <TildelVelger org={org} val={v.tild} set={x => set({ tild: x })} /> },
-    ...(isPlattform() ? [{ k: 'passord', label: 'Testbruker: sett passord i stedet for å sende invitasjon (valgfritt)', type: 'text', ph: 'Minst 10 tegn, store/små bokstaver og tall' } as Field] : []),
+    { k: 'alle_bygg', label: tt("Tilgang til alle organisasjonens bygg (også nye)"), type: 'checkbox', show: v => v.rolle !== 'admin' },
+    { k: 'tild', type: 'custom', label: tt("Tildel bygg / porteføljer"), def: { e: [], p: [] }, show: v => v.rolle !== 'admin' && !v.alle_bygg, render: (v, set) => <TildelVelger org={org} val={v.tild} set={x => set({ tild: x })} /> },
+    ...(isPlattform() ? [{ k: 'passord', label: tt("Testbruker: sett passord i stedet for å sende invitasjon (valgfritt)"), type: 'text', ph: tt("Minst 10 tegn, store/små bokstaver og tall") } as Field] : []),
   ];
   formModal({
-    title: 'Legg til bruker i ' + orgNavn(org), fields, saveTxt: 'Legg til',
-    top: <p className="small" style={{ marginTop: 0 }}>Nye brukere får e-post med lenke for å velge passord. Har personen allerede bruker (f.eks. i en annen organisasjon), legges hen til uten ny invitasjon.</p>,
+    title: tt("Legg til bruker i ") + orgNavn(org), fields, saveTxt: tt("Legg til"),
+    top: <p className="small" style={{ marginTop: 0 }}>{tt("Nye brukere får e-post med lenke for å velge passord. Har personen allerede bruker (f.eks. i en annen organisasjon), legges hen til uten ny invitasjon.")}</p>,
     onSave: async v => {
       const tildelinger = [...(v.tild?.e || []).map((e: string) => ({ eiendom_id: e })), ...(v.tild?.p || []).map((p: string) => ({ portefolje_id: p }))];
       const body = { action: v.passord ? 'testbruker' : 'inviter', org_id: org, epost: v.epost.trim(), navn: v.navn, rolle: v.rolle, alle_bygg: v.rolle === 'admin' || !!v.alle_bygg, tildelinger, passord: v.passord || undefined, redirectTo: location.origin };
-      const ferdig = (r: any) => toast(r.ny ? (v.passord ? 'Testbruker opprettet' : 'Invitasjon sendt til ' + v.epost) : 'Eksisterende bruker lagt til');
+      const ferdig = (r: any) => toast(r.ny ? (v.passord ? tt("Testbruker opprettet") : tt("Invitasjon sendt til ") + v.epost) : tt("Eksisterende bruker lagt til"));
       try { ferdig(await adminApi(body)); }
       catch (e: any) {
-        if (!e.kanOppgradere) { toast('Feilet: ' + e.message); return false; }
+        if (!e.kanOppgradere) { toast(tt("Feilet: ") + e.message); return false; }
         // Alle brukerlisenser er i bruk: tilby å øke abonnementet med én bruker
         const fra = +e.lisenser || 0, til = Math.max(fra, +e.aktive || 0) + 1; const gml = orgPris(org, fra), ny = orgPris(org, til);
         const pris = ny > 0 ? `\n\nNy månedspris for aktive moduler: ${kr(ny)} eks. mva.${gml > 0 ? ` (i dag ${kr(gml)}, +${kr(ny - gml)})` : ''}. Prisen beregnes ut fra antall bygg (${byggFor(org)}) og brukere.` : '';
-        if (!await confirmBox(`Abonnementet har ${fra} bruker${fra === 1 ? '' : 'e'}, og alle er i bruk.\n\nVil du øke til ${til} brukere og legge til ${v.epost.trim()}?${pris}\n\nAlle administratorer i organisasjonen får e-post om endringen.`, 'Øk og legg til')) return false;
+        if (!await confirmBox(tt("Abonnementet har {0} bruker{1}, og alle er i bruk.\n\nVil du øke til {2} brukere og legge til {3}?{4}\n\nAlle administratorer i organisasjonen får e-post om endringen.", fra, fra === 1 ? '' : 'e', til, v.epost.trim(), pris), tt("Øk og legg til"))) return false;
         try {
           const r = await adminApi({ ...body, oppgrader: true }); ferdig(r);
           if (r.oppgradert) aoApi({ action: 'abonnement_varsel', org_id: org, type: 'bruker', fra: r.oppgradert.fra, navn: v.navn || v.epost.trim(), gml, ny: orgPris(org, r.oppgradert.til) }).catch(() => {});
-        } catch (e2: any) { toast('Feilet: ' + e2.message); return false; }
+        } catch (e2: any) { toast(tt("Feilet: ") + e2.message); return false; }
       }
       await reloadAdmin();
     },
@@ -100,28 +101,28 @@ async function lastMfa(org: string) { const { data, error } = await sb.rpc('mfa_
 function redigerMedlem(m: any) {
   const p = profil(m.user_id); const T = S.tilganger.filter(t => t.user_id === m.user_id && t.org_id === m.org_id);
   formModal({
-    title: (p.navn || p.epost || 'Bruker') + ' – ' + orgNavn(m.org_id),
+    title: (p.navn || p.epost || tt("Bruker")) + ' – ' + orgNavn(m.org_id),
     values: { rolle: m.rolle, alle_bygg: m.alle_bygg, aktiv: m.aktiv, tild: { e: T.filter(t => t.eiendom_id).map(t => t.eiendom_id), p: T.filter(t => t.portefolje_id).map(t => t.portefolje_id) } },
     fields: [
-      { k: 'rolle', label: 'Rolle i organisasjonen', type: 'select', options: ORG_ROLLER.map(r => [r[0], r[1]] as [string, string]) },
+      { k: 'rolle', label: tt("Rolle i organisasjonen"), type: 'select', options: ORG_ROLLER.map(r => [r[0], r[1]] as [string, string]) },
       { k: 'info', type: 'custom', render: v => <p className="small muted" style={{ margin: 0 }}>{ORG_ROLLER.find(r => r[0] === v.rolle)?.[2]}</p> },
-      { k: 'alle_bygg', label: 'Tilgang til alle organisasjonens bygg (også nye)', type: 'checkbox', show: v => v.rolle !== 'admin' },
-      { k: 'tild', type: 'custom', label: 'Tildelte bygg / porteføljer', show: v => v.rolle !== 'admin' && !v.alle_bygg, render: (v, set) => <TildelVelger org={m.org_id} val={v.tild} set={x => set({ tild: x })} /> },
-      { k: 'aktiv', label: 'Aktiv i organisasjonen', type: 'checkbox' },
+      { k: 'alle_bygg', label: tt("Tilgang til alle organisasjonens bygg (også nye)"), type: 'checkbox', show: v => v.rolle !== 'admin' },
+      { k: 'tild', type: 'custom', label: tt("Tildelte bygg / porteføljer"), show: v => v.rolle !== 'admin' && !v.alle_bygg, render: (v, set) => <TildelVelger org={m.org_id} val={v.tild} set={x => set({ tild: x })} /> },
+      { k: 'aktiv', label: tt("Aktiv i organisasjonen"), type: 'checkbox' },
     ],
     extraFoot: close => <>{MFA[m.org_id]?.[m.user_id] && <button className="btn" onClick={async () => {
-      if (!(await confirmBox(`Nullstille tofaktor for ${p.navn || p.epost}? Bruk dette hvis brukeren har mistet eller byttet telefon. Brukeren må sette opp tofaktor på nytt ved neste innlogging${S.orgs.find(o => o.id === m.org_id)?.krev_mfa !== false && ['admin', 'forvalter'].includes(m.rolle) ? '' : ' (hvis hen ønsker det)'}.`, 'Nullstill'))) return;
-      try { await adminApi({ action: 'mfa_nullstill', user_id: m.user_id, org_id: m.org_id }); toast('Tofaktor er nullstilt'); await lastMfa(m.org_id); close(); } catch (e: any) { toast(e.message); }
-    }}>Nullstill tofaktor</button>}<button className="btn danger" onClick={async () => {
-      if (!(await confirmBox(`Fjerne ${p.navn || p.epost} fra ${orgNavn(m.org_id)}? Brukeren mister all tilgang via denne organisasjonen.`, 'Fjern'))) return;
+      if (!(await confirmBox(tt("Nullstille tofaktor for {0}? Bruk dette hvis brukeren har mistet eller byttet telefon. Brukeren må sette opp tofaktor på nytt ved neste innlogging{1}.", p.navn || p.epost, S.orgs.find(o => o.id === m.org_id)?.krev_mfa !== false && ['admin', 'forvalter'].includes(m.rolle) ? '' : ' (hvis hen ønsker det)'), tt("Nullstill")))) return;
+      try { await adminApi({ action: 'mfa_nullstill', user_id: m.user_id, org_id: m.org_id }); toast(tt("Tofaktor er nullstilt")); await lastMfa(m.org_id); close(); } catch (e: any) { toast(e.message); }
+    }}>{tt("Nullstill tofaktor")}</button>}<button className="btn danger" onClick={async () => {
+      if (!(await confirmBox(tt("Fjerne {0} fra {1}? Brukeren mister all tilgang via denne organisasjonen.", p.navn || p.epost, orgNavn(m.org_id)), tt("Fjern")))) return;
       const { error } = await sb.from('org_medlem').delete().eq('org_id', m.org_id).eq('user_id', m.user_id); if (error) { toast(feiltekst(error)); return; }
-      await sb.from('eiendom_tilgang').delete().eq('org_id', m.org_id).eq('user_id', m.user_id); close(); await reloadAdmin(); toast('Fjernet fra organisasjonen');
-    }}>Fjern fra organisasjonen</button></>,
+      await sb.from('eiendom_tilgang').delete().eq('org_id', m.org_id).eq('user_id', m.user_id); close(); await reloadAdmin(); toast(tt("Fjernet fra organisasjonen"));
+    }}>{tt("Fjern fra organisasjonen")}</button></>,
     onSave: async v => {
       const { error } = await sb.from('org_medlem').update({ rolle: v.rolle, alle_bygg: v.rolle === 'admin' || !!v.alle_bygg, aktiv: !!v.aktiv }).eq('org_id', m.org_id).eq('user_id', m.user_id);
       if (error) { toast(feiltekst(error)); return false; }
       try { if (v.rolle !== 'admin' && !v.alle_bygg) await lagreTildeling(m.user_id, m.org_id, v.tild); } catch (e: any) { toast(feiltekst(e)); return false; }
-      await reloadAdmin(); toast('Lagret');
+      await reloadAdmin(); toast(tt("Lagret"));
     },
   });
 }
@@ -130,15 +131,15 @@ function redigerMedlem(m: any) {
 function redigerPortefolje(org: string, p?: any) {
   const egne = sortBy(S.eiendommer.filter(e => e.eierOrgId === org), e => e.navn);
   formModal({
-    title: p ? 'Portefølje: ' + p.navn : 'Ny portefølje', values: { navn: p?.navn || '', bygg: egne.filter(e => p && e.portefoljeId === p.id).map(e => e.id) },
-    fields: [{ k: 'navn', label: 'Navn', req: true }, { k: 'bygg', type: 'custom', label: 'Bygg i porteføljen', render: (v, set) => <div className="checks" style={{ maxHeight: 320 }}>{egne.map(e => { const on = v.bygg.includes(e.id); return <label key={e.id}><input type="checkbox" checked={on} onChange={() => set({ bygg: on ? v.bygg.filter((x: string) => x !== e.id) : [...v.bygg, e.id] })} /><span><span className="ct">{e.navn}</span><br /><span className="cs">{e.portefoljeId && e.portefoljeId !== p?.id ? 'Flyttes fra ' + portNavn(e.portefoljeId) : e.adresse || ''}</span></span></label>; })}</div> }],
-    extraFoot: close => p ? <button className="btn danger" onClick={async () => { if (!(await confirmBox(`Slette porteføljen «${p.navn}»? Byggene beholdes, men tas ut av porteføljen, og oppdrag/tildelinger som gjelder porteføljen slettes.`))) return; const { error } = await sb.from('portefoljer').delete().eq('id', p.id); if (error) { toast(feiltekst(error)); return; } close(); await reloadAdmin(); }}>Slett</button> : null,
+    title: p ? tt("Portefølje: ") + p.navn : tt("Ny portefølje"), values: { navn: p?.navn || '', bygg: egne.filter(e => p && e.portefoljeId === p.id).map(e => e.id) },
+    fields: [{ k: 'navn', label: tt("Navn"), req: true }, { k: 'bygg', type: 'custom', label: tt("Bygg i porteføljen"), render: (v, set) => <div className="checks" style={{ maxHeight: 320 }}>{egne.map(e => { const on = v.bygg.includes(e.id); return <label key={e.id}><input type="checkbox" checked={on} onChange={() => set({ bygg: on ? v.bygg.filter((x: string) => x !== e.id) : [...v.bygg, e.id] })} /><span><span className="ct">{e.navn}</span><br /><span className="cs">{e.portefoljeId && e.portefoljeId !== p?.id ? tt("Flyttes fra ") + portNavn(e.portefoljeId) : e.adresse || ''}</span></span></label>; })}</div> }],
+    extraFoot: close => p ? <button className="btn danger" onClick={async () => { if (!(await confirmBox(tt("Slette porteføljen «{0}»? Byggene beholdes, men tas ut av porteføljen, og oppdrag/tildelinger som gjelder porteføljen slettes.", p.navn)))) return; const { error } = await sb.from('portefoljer').delete().eq('id', p.id); if (error) { toast(feiltekst(error)); return; } close(); await reloadAdmin(); }}>{tt("Slett")}</button> : null,
     onSave: async v => {
       let pid = p?.id;
       if (p) { const { error } = await sb.from('portefoljer').update({ navn: v.navn }).eq('id', p.id); if (error) { toast(feiltekst(error)); return false; } }
       else { const { data, error } = await sb.from('portefoljer').insert({ eier_org_id: org, navn: v.navn }).select().single(); if (error) { toast(feiltekst(error)); return false; } pid = data.id; S.portefoljer.push(data); }
       for (const e of egne) { const skal = v.bygg.includes(e.id); if (skal && e.portefoljeId !== pid) await save('eiendommer', { ...e, portefoljeId: pid }); if (!skal && e.portefoljeId === pid) await save('eiendommer', { ...e, portefoljeId: '' }); }
-      await reloadAdmin(); toast('Portefølje lagret');
+      await reloadAdmin(); toast(tt("Portefølje lagret"));
     },
   });
 }
@@ -148,35 +149,35 @@ function redigerOppdrag(eierOrg: string, o?: any) {
   const egne = sortBy(S.eiendommer.filter(e => e.eierOrgId === eierOrg), e => e.navn); const P = sortBy(S.portefoljer.filter(p => p.eier_org_id === eierOrg), p => p.navn);
   const kjente = sortBy(S.orgs.filter(x => x.id !== eierOrg && x.aktiv !== false), x => x.navn);
   formModal({
-    title: o ? 'Oppdrag: ' + orgNavn(o.org_id) : 'Gi et firma oppdrag', wide: true,
+    title: o ? tt("Oppdrag: ") + orgNavn(o.org_id) : tt("Gi et firma oppdrag"), wide: true,
     values: o ? { firma: o.org_id, omfang: o.portefolje_id ? 'p' : 'e', eiendom: o.eiendom_id || '', portefolje: o.portefolje_id || '', rolle: o.rolle, systemer: o.systemer || [], fra: o.fra || '', til: o.til || '', aktiv: o.aktiv, notat: o.data?.notat || '' }
       : { firma: '', omfang: 'e', eiendom: egne[0]?.id || '', portefolje: P[0]?.id || '', rolle: 'drift', systemer: [], fra: today(), til: '', aktiv: true },
     fields: [
-      ...(o ? [] : [{ k: 'orgnr', type: 'custom', label: 'Firma', render: (v: any, set: any) => <div>
-        <div style={{ display: 'flex', gap: 6 }}><select value={v.firma} onChange={e => set({ firma: e.target.value })} style={{ flex: 1, border: '1px solid var(--line2)', borderRadius: 8, padding: 7 }}><option value="">– velg firma –</option>{kjente.map(x => <option key={x.id} value={x.id}>{x.navn} ({typeNavn(x.type)})</option>)}{v._funnet && !kjente.some(x => x.id === v._funnet.id) && <option value={v._funnet.id}>{v._funnet.navn} ({typeNavn(v._funnet.type)})</option>}</select></div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}><input placeholder="…eller finn firma på org.nr." value={v._orgnr || ''} onChange={e => set({ _orgnr: e.target.value })} style={{ width: 200, border: '1px solid var(--line2)', borderRadius: 8, padding: 7 }} />
-          <button type="button" className="btn sm" onClick={async () => { const { data } = await sb.rpc('finn_org', { p_orgnr: v._orgnr || '' }); const f = (data || [])[0]; if (!f) { toast('Fant ingen kunde i Eiendomskontroll med dette org.nr.'); return; } set({ firma: f.id, _funnet: f }); }}>Finn</button>
-          <span className="small muted">Firmaet må være kunde i Eiendomskontroll. Kontakt leverandøren for å opprette nye.</span></div></div> } as Field]),
-      { k: 'omfang', label: 'Gjelder', type: 'select', options: [['e', 'Ett bygg'], ...(P.length ? [['p', 'En portefølje (alle bygg i den, også nye)']] : [])] as [string, string][], half: true },
-      { k: 'eiendom', label: 'Bygg', type: 'select', options: egne.map(e => [e.id, e.navn] as [string, string]), half: true, show: v => v.omfang === 'e' },
-      { k: 'portefolje', label: 'Portefølje', type: 'select', options: P.map(p => [p.id, p.navn] as [string, string]), half: true, show: v => v.omfang === 'p' },
-      { k: 'rolle', label: 'Rolle', type: 'select', options: OPPDRAG_ROLLER.map(r => [r[0], r[1]] as [string, string]), help: 'oppdrag' },
-      { k: 'rinfo', type: 'custom', render: v => <p className="small muted" style={{ margin: 0 }}>{OPPDRAG_ROLLER.find(r => r[0] === v.rolle)?.[2]}{v.rolle === 'service' && v.omfang === 'p' ? ' Service gjelder bestemte systemer og må gis per bygg.' : ''}</p> },
-      { k: 'systemer', type: 'custom', label: 'Systemer servicefirmaet skal se', show: v => v.rolle === 'service' && v.omfang === 'e', render: (v, set) => { const A = sortBy(S.anlegg.filter(a => a.eiendomId === v.eiendom), a => (a.tfmSys || '999') + a.tfmLop);
-        return A.length ? <div className="checks" style={{ maxHeight: 240 }}>{A.map(a => { const on = (v.systemer || []).includes(a.id); return <label key={a.id}><input type="checkbox" checked={on} onChange={() => set({ systemer: on ? v.systemer.filter((x: string) => x !== a.id) : [...(v.systemer || []), a.id] })} /><span><span className="ct">{aNavn(a.id)}</span><br /><span className="cs">{KOMP[a.type]?.n}{a.fabrikat ? ' · ' + a.fabrikat : ''}</span></span></label>; })}</div> : <p className="small muted">Bygget har ingen registrerte systemer.</p>; } },
-      { k: 'fra', label: 'Fra dato', type: 'date', half: true }, { k: 'til', label: 'Til dato (tom = løpende)', type: 'date', half: true },
-      { k: 'aktiv', label: 'Aktivt (firmaet har tilgang nå)', type: 'checkbox' },
-      { k: 'notat', label: 'Notat (avtale, kontaktperson …)', type: 'textarea' },
+      ...(o ? [] : [{ k: 'orgnr', type: 'custom', label: tt("Firma"), render: (v: any, set: any) => <div>
+        <div style={{ display: 'flex', gap: 6 }}><select value={v.firma} onChange={e => set({ firma: e.target.value })} style={{ flex: 1, border: '1px solid var(--line2)', borderRadius: 8, padding: 7 }}><option value="">{tt("– velg firma –")}</option>{kjente.map(x => <option key={x.id} value={x.id}>{x.navn} ({typeNavn(x.type)})</option>)}{v._funnet && !kjente.some(x => x.id === v._funnet.id) && <option value={v._funnet.id}>{v._funnet.navn} ({typeNavn(v._funnet.type)})</option>}</select></div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'center' }}><input placeholder={tt("…eller finn firma på org.nr.")} value={v._orgnr || ''} onChange={e => set({ _orgnr: e.target.value })} style={{ width: 200, border: '1px solid var(--line2)', borderRadius: 8, padding: 7 }} />
+          <button type="button" className="btn sm" onClick={async () => { const { data } = await sb.rpc('finn_org', { p_orgnr: v._orgnr || '' }); const f = (data || [])[0]; if (!f) { toast(tt("Fant ingen kunde i Eiendomskontroll med dette org.nr.")); return; } set({ firma: f.id, _funnet: f }); }}>{tt("Finn")}</button>
+          <span className="small muted">{tt("Firmaet må være kunde i Eiendomskontroll. Kontakt leverandøren for å opprette nye.")}</span></div></div> } as Field]),
+      { k: 'omfang', label: tt("Gjelder"), type: 'select', options: [['e', 'Ett bygg'], ...(P.length ? [['p', 'En portefølje (alle bygg i den, også nye)']] : [])] as [string, string][], half: true },
+      { k: 'eiendom', label: tt("Bygg"), type: 'select', options: egne.map(e => [e.id, e.navn] as [string, string]), half: true, show: v => v.omfang === 'e' },
+      { k: 'portefolje', label: tt("Portefølje"), type: 'select', options: P.map(p => [p.id, p.navn] as [string, string]), half: true, show: v => v.omfang === 'p' },
+      { k: 'rolle', label: tt("Rolle"), type: 'select', options: OPPDRAG_ROLLER.map(r => [r[0], r[1]] as [string, string]), help: tt("oppdrag") },
+      { k: 'rinfo', type: 'custom', render: v => <p className="small muted" style={{ margin: 0 }}>{OPPDRAG_ROLLER.find(r => r[0] === v.rolle)?.[2]}{v.rolle === 'service' && v.omfang === 'p' ? tt(" Service gjelder bestemte systemer og må gis per bygg.") : ''}</p> },
+      { k: 'systemer', type: 'custom', label: tt("Systemer servicefirmaet skal se"), show: v => v.rolle === 'service' && v.omfang === 'e', render: (v, set) => { const A = sortBy(S.anlegg.filter(a => a.eiendomId === v.eiendom), a => (a.tfmSys || '999') + a.tfmLop);
+        return A.length ? <div className="checks" style={{ maxHeight: 240 }}>{A.map(a => { const on = (v.systemer || []).includes(a.id); return <label key={a.id}><input type="checkbox" checked={on} onChange={() => set({ systemer: on ? v.systemer.filter((x: string) => x !== a.id) : [...(v.systemer || []), a.id] })} /><span><span className="ct">{aNavn(a.id)}</span><br /><span className="cs">{KOMP[a.type]?.n}{a.fabrikat ? ' · ' + a.fabrikat : ''}</span></span></label>; })}</div> : <p className="small muted">{tt("Bygget har ingen registrerte systemer.")}</p>; } },
+      { k: 'fra', label: tt("Fra dato"), type: 'date', half: true }, { k: 'til', label: tt("Til dato (tom = løpende)"), type: 'date', half: true },
+      { k: 'aktiv', label: tt("Aktivt (firmaet har tilgang nå)"), type: 'checkbox' },
+      { k: 'notat', label: tt("Notat (avtale, kontaktperson …)"), type: 'textarea' },
     ],
-    extraFoot: close => o ? <button className="btn danger" onClick={async () => { if (!(await confirmBox(`Avslutte og slette oppdraget til ${orgNavn(o.org_id)}? Firmaet mister tilgangen umiddelbart.`, 'Slett'))) return; const { error } = await sb.from('oppdrag').delete().eq('id', o.id); if (error) { toast(feiltekst(error)); return; } close(); await reloadAdmin(); }}>Slett oppdrag</button> : null,
+    extraFoot: close => o ? <button className="btn danger" onClick={async () => { if (!(await confirmBox(tt("Avslutte og slette oppdraget til {0}? Firmaet mister tilgangen umiddelbart.", orgNavn(o.org_id)), tt("Slett")))) return; const { error } = await sb.from('oppdrag').delete().eq('id', o.id); if (error) { toast(feiltekst(error)); return; } close(); await reloadAdmin(); }}>{tt("Slett oppdrag")}</button> : null,
     onSave: async v => {
-      if (!o && !v.firma) { toast('Velg firma'); return false; }
-      if (v.rolle === 'service' && v.omfang === 'p') { toast('Service må gis per bygg (med valgte systemer)'); return false; }
-      if (v.rolle === 'service' && !(v.systemer || []).length) { toast('Velg minst ett system for servicefirmaet'); return false; }
+      if (!o && !v.firma) { toast(tt("Velg firma")); return false; }
+      if (v.rolle === 'service' && v.omfang === 'p') { toast(tt("Service må gis per bygg (med valgte systemer)")); return false; }
+      if (v.rolle === 'service' && !(v.systemer || []).length) { toast(tt("Velg minst ett system for servicefirmaet")); return false; }
       const rad: any = { org_id: o ? o.org_id : v.firma, eiendom_id: v.omfang === 'e' ? v.eiendom : null, portefolje_id: v.omfang === 'p' ? v.portefolje : null, rolle: v.rolle, systemer: v.rolle === 'service' ? v.systemer : [], fra: v.fra || null, til: v.til || null, aktiv: !!v.aktiv, data: { ...(o?.data || {}), notat: v.notat || '' } };
       const res = o ? await sb.from('oppdrag').update(rad).eq('id', o.id) : await sb.from('oppdrag').insert({ ...rad, opprettet_av: state.me?.id });
       if (res.error) { toast(feiltekst(res.error)); return false; }
-      await reloadAdmin(); toast(o ? 'Oppdrag oppdatert' : 'Oppdrag opprettet – firmaets administrator kan nå tildele byggene til sine ansatte');
+      await reloadAdmin(); toast(o ? tt("Oppdrag oppdatert") : tt("Oppdrag opprettet – firmaets administrator kan nå tildele byggene til sine ansatte"));
     },
   });
 }
@@ -186,44 +187,44 @@ function FullTilgang() {
   const [v, setV] = useState<boolean | null>(null); const [busy, setBusy] = useState(false);
   useEffect(() => { sb.from('plattform_innstilling').select('verdi').eq('nokkel', 'full_tilgang').maybeSingle().then(({ data, error }) => setV(error ? null : data?.verdi === true)); }, []);
   if (v === null) return null;
-  const sett = async (ny: boolean) => { if (!ny || await confirmBox('Slå på full tilgang? Du får se og endre alle kunders eiendommer og data (krever innlogging med tofaktor). Databehandleravtalen sier i dag at leverandøren ikke ser kundedata – slå av før kommersiell drift.', 'Slå på')) {
+  const sett = async (ny: boolean) => { if (!ny || await confirmBox(tt("Slå på full tilgang? Du får se og endre alle kunders eiendommer og data (krever innlogging med tofaktor). Databehandleravtalen sier i dag at leverandøren ikke ser kundedata – slå av før kommersiell drift."), tt("Slå på"))) {
     setBusy(true); const { error } = await sb.from('plattform_innstilling').upsert({ nokkel: 'full_tilgang', verdi: ny, endret: new Date().toISOString() }); setBusy(false);
-    if (error) return toast(feiltekst(error)); setV(ny); toast(ny ? 'Full tilgang er på – laster data på nytt' : 'Full tilgang er av – laster data på nytt'); setTimeout(() => location.reload(), 600); } };
+    if (error) return toast(feiltekst(error)); setV(ny); toast(ny ? tt("Full tilgang er på – laster data på nytt") : tt("Full tilgang er av – laster data på nytt")); setTimeout(() => location.reload(), 600); } };
   return <div className="card" style={{ display: 'flex', gap: 12, alignItems: 'center', borderColor: v ? 'var(--amber)' : undefined, marginBottom: 12 }}>
-    <div style={{ flex: 1 }}><b>Full tilgang til alle kunder (utviklermodus)</b> {v ? <Chip c="amber">På</Chip> : <Chip c="grey">Av</Chip>}
-      <div className="small muted">Plattformadministratorer ser og kan endre alle eiendommer og organisasjoner når de er innlogget med tofaktor.{v && !S.fullTilgang ? ' Du er ikke innlogget med tofaktor nå – logg ut og inn igjen med kode.' : ''} Slå av før kommersiell drift.</div></div>
-    <button className={'btn' + (v ? '' : ' pri')} disabled={busy} onClick={() => sett(!v)}>{v ? 'Slå av' : 'Slå på'}</button></div>;
+    <div style={{ flex: 1 }}><b>{tt("Full tilgang til alle kunder (utviklermodus)")}</b> {v ? <Chip c="amber">{tt("På")}</Chip> : <Chip c="grey">{tt("Av")}</Chip>}
+      <div className="small muted">{tt("Plattformadministratorer ser og kan endre alle eiendommer og organisasjoner når de er innlogget med tofaktor.")}{v && !S.fullTilgang ? tt(" Du er ikke innlogget med tofaktor nå – logg ut og inn igjen med kode.") : ''} {tt("Slå av før kommersiell drift.")}</div></div>
+    <button className={'btn' + (v ? '' : ' pri')} disabled={busy} onClick={() => sett(!v)}>{v ? tt("Slå av") : tt("Slå på")}</button></div>;
 }
 function endreOrg(o: any) {
   formModal({
-    title: 'Endre kunde',
-    fields: [{ k: 'navn', label: 'Navn', req: true, half: true }, { k: 'orgnr', label: 'Org.nr.', half: true, mono: true },
-      { k: 'type', label: 'Type', type: 'select', options: ORG_TYPER, half: true }],
+    title: tt("Endre kunde"),
+    fields: [{ k: 'navn', label: tt("Navn"), req: true, half: true }, { k: 'orgnr', label: tt("Org.nr."), half: true, mono: true },
+      { k: 'type', label: tt("Type"), type: 'select', options: ORG_TYPER, half: true }],
     values: { navn: o.navn, orgnr: o.orgnr || '', type: o.type },
-    extraFoot: close => <button type="button" className="btn danger" style={{ marginRight: 'auto' }} onClick={() => { close(); slettOrg(o); }}>Slett kunde</button>,
+    extraFoot: close => <button type="button" className="btn danger" style={{ marginRight: 'auto' }} onClick={() => { close(); slettOrg(o); }}>{tt("Slett kunde")}</button>,
     onSave: async v => { const orgnr = String(v.orgnr || '').replace(/\D/g, '');
-      if (orgnr && orgnr.length !== 9) { toast('Org.nr. må ha 9 siffer'); return false; }
+      if (orgnr && orgnr.length !== 9) { toast(tt("Org.nr. må ha 9 siffer")); return false; }
       const { error } = await sb.from('organisasjoner').update({ navn: String(v.navn).trim(), orgnr: orgnr || null, type: v.type }).eq('id', o.id);
-      if (error) { toast(feiltekst(error)); return false; } toast('Kunden er oppdatert'); await reloadAdmin(); },
+      if (error) { toast(feiltekst(error)); return false; } toast(tt("Kunden er oppdatert")); await reloadAdmin(); },
   });
 }
 function slettOrg(o: any) {
   formModal({
-    title: `Slette «${o.navn}»?`, saveTxt: 'Slett for godt',
-    top: <div className="note" style={{ color: 'var(--ink)' }}>Organisasjonen, medlemskap, porteføljer, oppdrag, innstillinger og moduler slettes. Brukere som <b>bare</b> var med i denne organisasjonen, slettes også, slik at e-postadressen kan brukes på nytt. Eier organisasjonen eiendommer, stoppes slettingen – da må eiendommene slettes eller flyttes først. <b>Dette kan ikke angres.</b></div>,
-    fields: [{ k: 'bekreft', label: `Skriv «${o.navn}» for å bekrefte`, req: true }],
-    onSave: async v => { if (String(v.bekreft).trim() !== String(o.navn).trim()) { toast('Navnet stemte ikke'); return false; }
-      try { const r = await adminApi({ action: 'slett_org', org_id: o.id }); toast(`«${o.navn}» er slettet${r.brukere ? ` – ${r.brukere} bruker${r.brukere > 1 ? 'e' : ''} fjernet` : ''}`); await reloadAdmin(); } catch (e: any) { toast(e.message); return false; } },
+    title: tt("Slette «{0}»?", o.navn), saveTxt: tt("Slett for godt"),
+    top: <div className="note" style={{ color: 'var(--ink)' }}>{tt("Organisasjonen, medlemskap, porteføljer, oppdrag, innstillinger og moduler slettes. Brukere som")} <b>{tt("bare")}</b> {tt("var med i denne organisasjonen, slettes også, slik at e-postadressen kan brukes på nytt. Eier organisasjonen eiendommer, stoppes slettingen – da må eiendommene slettes eller flyttes først.")} <b>{tt("Dette kan ikke angres.")}</b></div>,
+    fields: [{ k: 'bekreft', label: tt("Skriv «{0}» for å bekrefte", o.navn), req: true }],
+    onSave: async v => { if (String(v.bekreft).trim() !== String(o.navn).trim()) { toast(tt("Navnet stemte ikke")); return false; }
+      try { const r = await adminApi({ action: 'slett_org', org_id: o.id }); toast(tt("«{0}» er slettet{1}", o.navn, r.brukere ? ` – ${r.brukere} bruker${r.brukere > 1 ? 'e' : ''} fjernet` : '')); await reloadAdmin(); } catch (e: any) { toast(e.message); return false; } },
   });
 }
 function nyOrg() {
   formModal({
-    title: 'Ny kunde / organisasjon',
-    fields: [{ k: 'navn', label: 'Navn', req: true, half: true }, { k: 'orgnr', label: 'Org.nr.', half: true, mono: true },
-      { k: 'type', label: 'Type', type: 'select', options: ORG_TYPER, def: 'eier', half: true }, { k: 's', label: 'Første administrator', type: 'sec' },
-      { k: 'admin_navn', label: 'Navn', req: true, half: true }, { k: 'admin_epost', label: 'E-post', type: 'email', req: true, half: true },
-      { k: 'passord', label: 'Testkunde: sett passord i stedet for invitasjon (valgfritt)', ph: 'Minst 10 tegn, store/små bokstaver og tall' }],
-    onSave: async v => { try { await adminApi({ action: 'ny_org', ...v, redirectTo: location.origin }); toast('Organisasjon opprettet'); await reloadAdmin(); } catch (e: any) { toast(e.message); return false; } },
+    title: tt("Ny kunde / organisasjon"),
+    fields: [{ k: 'navn', label: tt("Navn"), req: true, half: true }, { k: 'orgnr', label: tt("Org.nr."), half: true, mono: true },
+      { k: 'type', label: tt("Type"), type: 'select', options: ORG_TYPER, def: 'eier', half: true }, { k: 's', label: tt("Første administrator"), type: 'sec' },
+      { k: 'admin_navn', label: tt("Navn"), req: true, half: true }, { k: 'admin_epost', label: tt("E-post"), type: 'email', req: true, half: true },
+      { k: 'passord', label: tt("Testkunde: sett passord i stedet for invitasjon (valgfritt)"), ph: tt("Minst 10 tegn, store/små bokstaver og tall") }],
+    onSave: async v => { try { await adminApi({ action: 'ny_org', ...v, redirectTo: location.origin }); toast(tt("Organisasjon opprettet")); await reloadAdmin(); } catch (e: any) { toast(e.message); return false; } },
   });
 }
 
@@ -242,65 +243,65 @@ export function Organisasjon() {
     const M = sortBy(S.medlemmer.filter(m => m.org_id === org), m => (profil(m.user_id).navn || profil(m.user_id).epost || '').toLowerCase());
     const O = S.orgs.find(o => o.id === org); const krev = O?.krev_mfa !== false; const mf = MFA[org] || {};
     const settKrev = async (b: boolean) => {
-      if (!b && !(await confirmBox('Slå av kravet om tofaktor for administratorer og forvaltere? Kontoene blir da beskyttet bare av passord. De som allerede har slått på tofaktor, beholder den.', 'Slå av kravet'))) return;
+      if (!b && !(await confirmBox(tt("Slå av kravet om tofaktor for administratorer og forvaltere? Kontoene blir da beskyttet bare av passord. De som allerede har slått på tofaktor, beholder den."), tt("Slå av kravet")))) return;
       const { error } = await sb.from('organisasjoner').update({ krev_mfa: b }).eq('id', org); if (error) return toast(feiltekst(error));
-      if (O) O.krev_mfa = b; bump(); toast(b ? 'Tofaktor kreves nå for administratorer og forvaltere' : 'Kravet om tofaktor er slått av');
+      if (O) O.krev_mfa = b; bump(); toast(b ? tt("Tofaktor kreves nå for administratorer og forvaltere") : tt("Kravet om tofaktor er slått av"));
     };
     const mangler = M.filter(m => m.aktiv && ['admin', 'forvalter'].includes(m.rolle) && mf[m.user_id] === false);
-    c = <><div className="toolbar">{orgVelger(admin, org)}<span className="muted small">{M.length} brukere · {typeNavn(S.orgs.find(o => o.id === org)?.type)}</span><button className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => leggTilMedlem(org)}>+ Legg til bruker</button></div>
+    c = <><div className="toolbar">{orgVelger(admin, org)}<span className="muted small">{M.length} {tt("brukere ·")} {typeNavn(S.orgs.find(o => o.id === org)?.type)}</span><button className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => leggTilMedlem(org)}>{tt("+ Legg til bruker")}</button></div>
       <div className="card" style={{ marginBottom: 12, padding: '10px 14px' }}>
-        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 500 }}><input type="checkbox" checked={krev} onChange={e => settKrev(e.target.checked)} /> Krev tofaktorinnlogging for administratorer og forvaltere</label>
-        <p className="small muted" style={{ margin: '4px 0 0 24px' }}>{krev ? <>Administratorer og forvaltere må logge inn med passord og kode fra en autentiseringsapp. Uten tofaktor får de ikke tilgang til data – reglen håndheves i databasen.{mangler.length > 0 && <> <span style={{ color: 'var(--amber)' }}>{mangler.length} må sette det opp ved neste innlogging.</span></>}</> : 'Anbefalt å ha på. Andre brukere kan likevel slå på tofaktor selv under «Min profil».'}</p>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 500 }}><input type="checkbox" checked={krev} onChange={e => settKrev(e.target.checked)} /> {tt("Krev tofaktorinnlogging for administratorer og forvaltere")}</label>
+        <p className="small muted" style={{ margin: '4px 0 0 24px' }}>{krev ? <>{tt("Administratorer og forvaltere må logge inn med passord og kode fra en autentiseringsapp. Uten tofaktor får de ikke tilgang til data – reglen håndheves i databasen.")}{mangler.length > 0 && <> <span style={{ color: 'var(--amber)' }}>{mangler.length} {tt("må sette det opp ved neste innlogging.")}</span></>}</> : tt("Anbefalt å ha på. Andre brukere kan likevel slå på tofaktor selv under «Min profil».")}</p>
       </div>
-      <div className="tbl-wrap"><table><thead><tr><th>Navn</th><th>E-post</th><th>Rolle</th><th>Tilgang til bygg</th><th>Tofaktor</th><th>Status</th></tr></thead><tbody>
-        {M.map(m => { const p = profil(m.user_id); return <tr key={m.user_id} className="click" onClick={() => redigerMedlem(m)}><td><b style={{ fontWeight: 500 }}>{p.navn || '–'}</b>{m.user_id === state.me?.id && <span className="muted small"> (deg)</span>}</td><td className="small">{p.epost}</td>
+      <div className="tbl-wrap"><table><thead><tr><th>{tt("Navn")}</th><th>{tt("E-post")}</th><th>{tt("Rolle")}</th><th>{tt("Tilgang til bygg")}</th><th>{tt("Tofaktor")}</th><th>{tt("Status")}</th></tr></thead><tbody>
+        {M.map(m => { const p = profil(m.user_id); return <tr key={m.user_id} className="click" onClick={() => redigerMedlem(m)}><td><b style={{ fontWeight: 500 }}>{p.navn || '–'}</b>{m.user_id === state.me?.id && <span className="muted small"> {tt("(deg)")}</span>}</td><td className="small">{p.epost}</td>
           <td><Chip c={m.rolle === 'admin' ? 'blue' : m.rolle === 'leser' ? '' : 'green'}>{rolleNavn(m.rolle)}</Chip></td>
-          <td className="small">{m.rolle === 'admin' || m.alle_bygg ? 'Alle organisasjonens bygg' : tildelingTekst(m.user_id, org) || <span style={{ color: 'var(--amber)' }}>Ingen bygg tildelt</span>}</td>
-          <td>{mf[m.user_id] === undefined ? <span className="muted small">–</span> : mf[m.user_id] ? <Chip c="green">På</Chip> : krev && ['admin', 'forvalter'].includes(m.rolle) ? <Chip c="amber">Må settes opp</Chip> : <Chip>Av</Chip>}</td>
-          <td>{m.aktiv ? <Chip c="green">Aktiv</Chip> : <Chip>Deaktivert</Chip>}</td></tr>; })}
+          <td className="small">{m.rolle === 'admin' || m.alle_bygg ? tt("Alle organisasjonens bygg") : tildelingTekst(m.user_id, org) || <span style={{ color: 'var(--amber)' }}>{tt("Ingen bygg tildelt")}</span>}</td>
+          <td>{mf[m.user_id] === undefined ? <span className="muted small">–</span> : mf[m.user_id] ? <Chip c="green">{tt("På")}</Chip> : krev && ['admin', 'forvalter'].includes(m.rolle) ? <Chip c="amber">{tt("Må settes opp")}</Chip> : <Chip>{tt("Av")}</Chip>}</td>
+          <td>{m.aktiv ? <Chip c="green">{tt("Aktiv")}</Chip> : <Chip>{tt("Deaktivert")}</Chip>}</td></tr>; })}
       </tbody></table></div>
-      <div className="sec"><h2>Roller i organisasjonen</h2><div className="tbl-wrap"><table><tbody>{ORG_ROLLER.map(r => <tr key={r[0]}><td style={{ width: 160 }}><b style={{ fontWeight: 600 }}>{r[1]}</b></td><td className="small">{r[2]}</td></tr>)}</tbody></table></div>
-        <p className="small muted">Hva en bruker kan gjøre på et bygg avhenger både av rollen her og av organisasjonens forhold til bygget (eier, eller oppdrag som forvaltning, drift, service eller innsyn). Reglene håndheves i databasen.</p></div></>;
+      <div className="sec"><h2>{tt("Roller i organisasjonen")}</h2><div className="tbl-wrap"><table><tbody>{ORG_ROLLER.map(r => <tr key={r[0]}><td style={{ width: 160 }}><b style={{ fontWeight: 600 }}>{r[1]}</b></td><td className="small">{r[2]}</td></tr>)}</tbody></table></div>
+        <p className="small muted">{tt("Hva en bruker kan gjøre på et bygg avhenger både av rollen her og av organisasjonens forhold til bygget (eier, eller oppdrag som forvaltning, drift, service eller innsyn). Reglene håndheves i databasen.")}</p></div></>;
   }
   if (fane === 'portefoljer' && eierOrg) {
     const P = sortBy(S.portefoljer.filter(p => p.eier_org_id === eierOrg), p => p.navn); const uten = S.eiendommer.filter(e => e.eierOrgId === eierOrg && !e.portefoljeId);
-    c = <><div className="toolbar">{orgVelger(eierRoller, eierOrg)}<button className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => redigerPortefolje(eierOrg)}>+ Ny portefølje</button></div>
-      {P.length ? <div className="tbl-wrap"><table><thead><tr><th>Portefølje</th><th>Bygg</th><th className="num">Antall</th><th>Oppdrag</th></tr></thead><tbody>
+    c = <><div className="toolbar">{orgVelger(eierRoller, eierOrg)}<button className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => redigerPortefolje(eierOrg)}>{tt("+ Ny portefølje")}</button></div>
+      {P.length ? <div className="tbl-wrap"><table><thead><tr><th>{tt("Portefølje")}</th><th>{tt("Bygg")}</th><th className="num">{tt("Antall")}</th><th>{tt("Oppdrag")}</th></tr></thead><tbody>
         {P.map(p => { const B = S.eiendommer.filter(e => e.portefoljeId === p.id); const O = S.oppdrag.filter(o => o.portefolje_id === p.id);
           return <tr key={p.id} className="click" onClick={() => redigerPortefolje(eierOrg, p)}><td><b style={{ fontWeight: 600 }}>{p.navn}</b></td><td className="small">{B.map(e => e.navn).join(', ') || '–'}</td><td className="num">{B.length}</td><td className="small">{O.map(o => `${orgNavn(o.org_id)} (${oppdragNavn(o.rolle)})`).join(', ') || '–'}</td></tr>; })}
-      </tbody></table></div> : <div className="card"><Empty t="Ingen porteføljer">Grupper byggene i porteføljer, f.eks. per selskap, område eller forvalter. Da kan du gi en forvalter hele porteføljen og se statistikk per portefølje.</Empty></div>}
-      {uten.length > 0 && <p className="small muted">Bygg uten portefølje: {uten.map(e => e.navn).join(', ')}</p>}</>;
+      </tbody></table></div> : <div className="card"><Empty t="Ingen porteføljer">{tt("Grupper byggene i porteføljer, f.eks. per selskap, område eller forvalter. Da kan du gi en forvalter hele porteføljen og se statistikk per portefølje.")}</Empty></div>}
+      {uten.length > 0 && <p className="small muted">{tt("Bygg uten portefølje:")} {uten.map(e => e.navn).join(', ')}</p>}</>;
   }
   if (fane === 'oppdrag') {
     const mine = mineOrg().map(o => o.id);
     const gitt = S.oppdrag.filter(o => eierRoller.some(x => x.id === oppdragEier(o)));
     const fatt = S.oppdrag.filter(o => mine.includes(o.org_id));
     const rad = (o: any, kanEndre: boolean) => <tr key={o.id} className={kanEndre ? 'click' : ''} onClick={() => kanEndre && redigerOppdrag(oppdragEier(o), o)}>
-      <td><b style={{ fontWeight: 600 }}>{kanEndre ? orgNavn(o.org_id) : orgNavn(oppdragEier(o))}</b></td><td>{o.eiendom_id ? eNavn(o.eiendom_id) : 'Portefølje: ' + portNavn(o.portefolje_id)}</td>
+      <td><b style={{ fontWeight: 600 }}>{kanEndre ? orgNavn(o.org_id) : orgNavn(oppdragEier(o))}</b></td><td>{o.eiendom_id ? eNavn(o.eiendom_id) : tt("Portefølje: ") + portNavn(o.portefolje_id)}</td>
       <td><Chip c={o.rolle === 'forvalter' ? 'blue' : o.rolle === 'service' ? 'amber' : 'green'}>{oppdragNavn(o.rolle)}</Chip>{o.rolle === 'service' && <div className="small muted">{(o.systemer || []).map((s: string) => aNavn(s)).join(', ')}</div>}</td>
-      <td className="small">{o.fra ? fd(o.fra) : '–'} – {o.til ? fd(o.til) : 'løpende'}</td>
-      <td>{!o.aktiv ? <Chip>Avsluttet</Chip> : o.til && o.til < today() ? <Chip c="red">Utløpt</Chip> : <Chip c="green">Aktivt</Chip>}</td></tr>;
-    c = <><div className="toolbar"><h2 style={{ margin: 0 }}>Oppdrag dere har gitt</h2><Hjelp id="oppdrag" />{eierOrg && <><span style={{ marginLeft: 'auto' }}>{orgVelger(eierRoller, eierOrg)}</span><button className="btn pri" onClick={() => redigerOppdrag(eierOrg)}>+ Gi et firma oppdrag</button></>}</div>
-      {gitt.length ? <div className="tbl-wrap"><table><thead><tr><th>Firma</th><th>Gjelder</th><th>Rolle</th><th>Periode</th><th>Status</th></tr></thead><tbody>{sortBy(gitt, o => orgNavn(o.org_id)).map(o => rad(o, true))}</tbody></table></div>
-        : <div className="card"><Empty t="Ingen oppdrag gitt">Gi et forvalterselskap, en byggdrifter eller et servicefirma tilgang til bygg eller porteføljer. Firmaet ser bare det dere gir dem, og tilgangen opphører når oppdraget avsluttes.</Empty></div>}
-      {fatt.length > 0 && <div className="sec"><h2>Oppdrag dere har fått</h2><div className="tbl-wrap"><table><thead><tr><th>Oppdragsgiver</th><th>Gjelder</th><th>Rolle</th><th>Periode</th><th>Status</th></tr></thead><tbody>{fatt.map(o => rad(o, false))}</tbody></table></div><p className="small muted">Fordel byggene på deres ansatte under «Brukere og tildeling».</p></div>}</>;
+      <td className="small">{o.fra ? fd(o.fra) : '–'} – {o.til ? fd(o.til) : tt("løpende")}</td>
+      <td>{!o.aktiv ? <Chip>{tt("Avsluttet")}</Chip> : o.til && o.til < today() ? <Chip c="red">{tt("Utløpt")}</Chip> : <Chip c="green">{tt("Aktivt")}</Chip>}</td></tr>;
+    c = <><div className="toolbar"><h2 style={{ margin: 0 }}>{tt("Oppdrag dere har gitt")}</h2><Hjelp id="oppdrag" />{eierOrg && <><span style={{ marginLeft: 'auto' }}>{orgVelger(eierRoller, eierOrg)}</span><button className="btn pri" onClick={() => redigerOppdrag(eierOrg)}>{tt("+ Gi et firma oppdrag")}</button></>}</div>
+      {gitt.length ? <div className="tbl-wrap"><table><thead><tr><th>{tt("Firma")}</th><th>{tt("Gjelder")}</th><th>{tt("Rolle")}</th><th>{tt("Periode")}</th><th>{tt("Status")}</th></tr></thead><tbody>{sortBy(gitt, o => orgNavn(o.org_id)).map(o => rad(o, true))}</tbody></table></div>
+        : <div className="card"><Empty t="Ingen oppdrag gitt">{tt("Gi et forvalterselskap, en byggdrifter eller et servicefirma tilgang til bygg eller porteføljer. Firmaet ser bare det dere gir dem, og tilgangen opphører når oppdraget avsluttes.")}</Empty></div>}
+      {fatt.length > 0 && <div className="sec"><h2>{tt("Oppdrag dere har fått")}</h2><div className="tbl-wrap"><table><thead><tr><th>{tt("Oppdragsgiver")}</th><th>{tt("Gjelder")}</th><th>{tt("Rolle")}</th><th>{tt("Periode")}</th><th>{tt("Status")}</th></tr></thead><tbody>{fatt.map(o => rad(o, false))}</tbody></table></div><p className="small muted">{tt("Fordel byggene på deres ansatte under «Brukere og tildeling».")}</p></div>}</>;
   }
   if (fane === 'personvern' && org) {
-    c = <><div className="toolbar">{orgVelger(admin, org)}<span className="muted small">Notat til advokat om hvordan appen behandler personopplysninger. Skriv ut eller lagre som PDF og send til advokaten; noter tilbakemeldingen her.</span></div>
+    c = <><div className="toolbar">{orgVelger(admin, org)}<span className="muted small">{tt("Notat til advokat om hvordan appen behandler personopplysninger. Skriv ut eller lagre som PDF og send til advokaten; noter tilbakemeldingen her.")}</span></div>
       <PersonvernNotat key={org} org={org} /></>;
   }
   if (fane === 'abonnement' && admin.length) c = <AbonnementOversikt orgId={org} velger={admin.length > 1 ? orgVelger(admin, org) : undefined} />;
   if (fane === 'kunder' && isPlattform()) {
     const O = sortBy(S.orgs, o => o.navn);
-    c = <><FullTilgang /><Bestillinger /><div className="toolbar"><span className="muted small">{O.length} organisasjoner.{S.fullTilgang ? ' Full tilgang er på: du ser og kan endre alle kunders data.' : ' Som plattformadministrator administrerer du kunder, men ser ikke deres data med mindre du er medlem.'}</span><button className="btn" style={{ marginLeft: 'auto' }} onClick={prisEditor}>Prisliste</button><button className="btn pri" onClick={nyOrg}>+ Ny kunde</button></div>
-      <div className="tbl-wrap"><table><thead><tr><th>Organisasjon</th><th>Type</th><th>Org.nr.</th><th>Opprettet</th><th>Status</th><th /></tr></thead><tbody>
-        {O.map(o => <tr key={o.id}><td><b style={{ fontWeight: 600 }}>{o.navn}</b>{o.lisenser && <span className="small muted"> · {o.lisenser} brukere</span>}{o.data?.selvregistrert && <div className="small muted">Selvregistrert {fd(String(o.data.registrert || '').slice(0, 10))} av {o.data.registrertAv?.navn} · {o.data.registrertAv?.epost}</div>}</td><td className="small">{typeNavn(o.type)}</td><td className="mono small">{o.orgnr || '–'}</td><td className="small">{fd(String(o.opprettet || '').slice(0, 10))}</td><td>{o.aktiv ? <Chip c="green">Aktiv</Chip> : <Chip c="red">Sperret</Chip>}</td>
-          <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" style={{ marginRight: 6 }} onClick={() => modulAdmin(o)}>Moduler</button><button className="btn sm" style={{ marginRight: 6 }} onClick={() => endreOrg(o)}>Endre</button><button className="btn sm" onClick={async () => { if (!(await confirmBox(o.aktiv ? `Sperre «${o.navn}»? Alle brukere i organisasjonen mister tilgangen umiddelbart.` : `Gjenåpne «${o.navn}»?`, o.aktiv ? 'Sperr' : 'Gjenåpne'))) return; const { error } = await sb.from('organisasjoner').update({ aktiv: !o.aktiv }).eq('id', o.id); if (error) toast(feiltekst(error)); else { o.aktiv = !o.aktiv; bump(); } }}>{o.aktiv ? 'Sperr' : 'Gjenåpne'}</button></td></tr>)}
+    c = <><FullTilgang /><Bestillinger /><div className="toolbar"><span className="muted small">{O.length} {tt("organisasjoner.")}{S.fullTilgang ? tt(" Full tilgang er på: du ser og kan endre alle kunders data.") : tt(" Som plattformadministrator administrerer du kunder, men ser ikke deres data med mindre du er medlem.")}</span><button className="btn" style={{ marginLeft: 'auto' }} onClick={prisEditor}>{tt("Prisliste")}</button><button className="btn pri" onClick={nyOrg}>{tt("+ Ny kunde")}</button></div>
+      <div className="tbl-wrap"><table><thead><tr><th>{tt("Organisasjon")}</th><th>{tt("Type")}</th><th>{tt("Org.nr.")}</th><th>{tt("Opprettet")}</th><th>{tt("Status")}</th><th /></tr></thead><tbody>
+        {O.map(o => <tr key={o.id}><td><b style={{ fontWeight: 600 }}>{o.navn}</b>{o.lisenser && <span className="small muted"> · {o.lisenser} {tt("brukere")}</span>}{o.data?.selvregistrert && <div className="small muted">{tt("Selvregistrert")} {fd(String(o.data.registrert || '').slice(0, 10))} {tt("av")} {o.data.registrertAv?.navn} · {o.data.registrertAv?.epost}</div>}</td><td className="small">{typeNavn(o.type)}</td><td className="mono small">{o.orgnr || '–'}</td><td className="small">{fd(String(o.opprettet || '').slice(0, 10))}</td><td>{o.aktiv ? <Chip c="green">{tt("Aktiv")}</Chip> : <Chip c="red">{tt("Sperret")}</Chip>}</td>
+          <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" style={{ marginRight: 6 }} onClick={() => modulAdmin(o)}>{tt("Moduler")}</button><button className="btn sm" style={{ marginRight: 6 }} onClick={() => endreOrg(o)}>{tt("Endre")}</button><button className="btn sm" onClick={async () => { if (!(await confirmBox(o.aktiv ? tt("Sperre «{0}»? Alle brukere i organisasjonen mister tilgangen umiddelbart.", o.navn) : tt("Gjenåpne «{0}»?", o.navn), o.aktiv ? tt("Sperr") : tt("Gjenåpne")))) return; const { error } = await sb.from('organisasjoner').update({ aktiv: !o.aktiv }).eq('id', o.id); if (error) toast(feiltekst(error)); else { o.aktiv = !o.aktiv; bump(); } }}>{o.aktiv ? tt("Sperr") : tt("Gjenåpne")}</button></td></tr>)}
       </tbody></table></div></>;
   }
   return <>
-    <div className="head"><div className="grow"><h1>Organisasjon og tilgang<Hjelp id="side.brukere" /></h1><p className="sub">{mineOrg().map(o => `${o.navn} (${rolleNavn(o.minRolle)})`).join(' · ') || 'Ingen organisasjon'}</p></div></div>
-    {tabs.length > 1 && <div className="tabs">{tabs.map(([k, l]) => <a key={k} className={fane === k ? 'on' : ''} onClick={() => setFane(k)}>{l}</a>)}</div>}
-    {c || <div className="card"><Empty t="Ingenting å administrere">Du er ikke administrator i noen organisasjon.</Empty></div>}
+    <div className="head"><div className="grow"><h1>{tt("Organisasjon og tilgang")}<Hjelp id="side.brukere" /></h1><p className="sub">{mineOrg().map(o => `${o.navn} (${rolleNavn(o.minRolle)})`).join(' · ') || tt("Ingen organisasjon")}</p></div></div>
+    {tabs.length > 1 && <div className="tabs">{tabs.map(([k, l]) => <a key={k} className={fane === k ? 'on' : ''} onClick={() => setFane(k)}>{tt(l)}</a>)}</div>}
+    {c || <div className="card"><Empty t="Ingenting å administrere">{tt("Du er ikke administrator i noen organisasjon.")}</Empty></div>}
   </>;
 }

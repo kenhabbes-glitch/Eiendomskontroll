@@ -3,26 +3,27 @@ import { Hjelp } from './Hjelp';
 import { HJELP } from '../lib/hjelpTekster';
 import { bump, feiltekst, fileUrl, toast, toasts, useStore, type Fil } from '../lib/store';
 import { dUntil, fd } from '../lib/utils';
+import { tt } from '../lib/i18n';
 
 // ---------------- små komponenter
 export function Chip({ c = '', plain, children, title }: { c?: string; plain?: boolean; children: ReactNode; title?: string }) {
-  return <span className={`chip ${c} ${plain ? 'plain' : ''}`} title={title}>{children}</span>;
+  return <span className={`chip ${c} ${plain ? 'plain' : ''}`} title={title}>{typeof children === 'string' ? tt(children) : children}</span>;
 }
 export function DueChip({ s }: { s?: string }) {
   const d = dUntil(s);
-  if (d === null) return <Chip>Ingen frist</Chip>;
-  if (d < 0) return <Chip c="red">Forfalt {-d} d</Chip>;
-  if (d === 0) return <Chip c="red">I dag</Chip>;
-  if (d <= 30) return <Chip c="amber">Om {d} d · {fd(s)}</Chip>;
+  if (d === null) return <Chip>{tt("Ingen frist")}</Chip>;
+  if (d < 0) return <Chip c="red">{tt("Forfalt")} {-d} d</Chip>;
+  if (d === 0) return <Chip c="red">{tt("I dag")}</Chip>;
+  if (d <= 30) return <Chip c="amber">{tt("Om")} {d} d · {fd(s)}</Chip>;
   return <Chip plain>{fd(s)}</Chip>;
 }
 export const AlvChip = ({ a }: { a?: string }) => <Chip c={({ Kritisk: 'red', 'Høy': 'orange', Middels: 'amber', Lav: 'blue' } as any)[a || ''] || ''}>{a || '–'}</Chip>;
-export const StChip = ({ s }: { s?: string }) => <Chip c={({ Ny: 'blue', 'Under vurdering': 'blue', Planlagt: 'amber', 'Under utbedring': 'amber', 'Utført – til kontroll': 'green', Utsatt: 'orange', Rettet: 'green', Avvist: '', Lukket: 'green' } as any)[s || 'Ny'] || ''}>{s || 'Ny'}</Chip>;
+export const StChip = ({ s }: { s?: string }) => <Chip c={({ Ny: 'blue', 'Under vurdering': 'blue', Planlagt: 'amber', 'Under utbedring': 'amber', 'Utført – til kontroll': 'green', Utsatt: 'orange', Rettet: 'green', Avvist: '', Lukket: 'green' } as any)[s || 'Ny'] || ''}>{s || tt("Ny")}</Chip>;
 export const TgChip = ({ t }: { t?: string }) => t ? <Chip c={({ TG0: 'green', TG1: 'green', TG2: 'amber', TG3: 'red', TGIU: 'blue' } as any)[t] || ''}>{t}</Chip> : <span className="muted">–</span>;
 export function RestChip({ r }: { r: number | null }) {
   if (r === null) return <span className="muted small">–</span>;
-  if (r <= 0) return <Chip c="red">{r === 0 ? 'Utløper i år' : `Overskredet ${-r} år`}</Chip>;
-  return <Chip c={r <= 3 ? 'amber' : 'green'}>{r} år</Chip>;
+  if (r <= 0) return <Chip c="red">{r === 0 ? tt("Utløper i år") : tt("Overskredet {0} år", -r)}</Chip>;
+  return <Chip c={r <= 3 ? 'amber' : 'green'}>{r} {tt("år")}</Chip>;
 }
 export function Empty({ t, children }: { t: string; children?: ReactNode }) { return <div className="empty"><b>{t}</b>{children}</div>; }
 
@@ -30,7 +31,7 @@ export function FileLink({ fil, children }: { fil?: Fil; children?: ReactNode })
   const [u, setU] = useState('');
   useEffect(() => { let on = true; if (fil?.path) fileUrl(fil.path).then(x => on && setU(x)); return () => { on = false; }; }, [fil?.path]);
   if (!fil?.path) return null;
-  return <a href={u || '#'} target="_blank" rel="noopener noreferrer" onClick={e => { e.stopPropagation(); if (!u) e.preventDefault(); }}>{children || fil.navn || 'Åpne fil'}</a>;
+  return <a href={u || '#'} target="_blank" rel="noopener noreferrer" onClick={e => { e.stopPropagation(); if (!u) e.preventDefault(); }}>{children || fil.navn || tt("Åpne fil")}</a>;
 }
 export function useFileUrl(path?: string) {
   const [u, setU] = useState('');
@@ -63,9 +64,9 @@ export function ModalHost() {
 }
 export function ModalFrame({ title, close, children, foot }: { title: ReactNode; close: () => void; children: ReactNode; foot?: ReactNode }) {
   return <>
-    <div className="mh"><h2>{title}</h2><button className="btn ghost sm" onClick={close} aria-label="Lukk">✕</button></div>
+    <div className="mh"><h2>{title}</h2><button className="btn ghost sm" onClick={close} aria-label={tt("Lukk")}>✕</button></div>
     <div className="mb">{children}</div>
-    <div className="mf">{foot ?? <button className="btn" onClick={close}>Lukk</button>}</div>
+    <div className="mf">{foot ?? <button className="btn" onClick={close}>{tt("Lukk")}</button>}</div>
   </>;
 }
 export function showModal(title: ReactNode, body: (close: () => void) => ReactNode, opts: { wide?: boolean; foot?: (close: () => void) => ReactNode } = {}) {
@@ -74,13 +75,13 @@ export function showModal(title: ReactNode, body: (close: () => void) => ReactNo
 export function confirmBox(text: string, okTxt = 'Slett'): Promise<boolean> {
   return new Promise(res => {
     let done = false;
-    openModal({ onClose: () => { if (!done) res(false); }, render: close => <ModalFrame title="Bekreft" close={close} foot={<><button className="btn" onClick={close}>Avbryt</button><button className="btn pri" autoFocus onClick={() => { done = true; res(true); close(); }}>{okTxt}</button></>}><p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{text}</p></ModalFrame> });
+    openModal({ onClose: () => { if (!done) res(false); }, render: close => <ModalFrame title={tt("Bekreft")} close={close} foot={<><button className="btn" onClick={close}>{tt("Avbryt")}</button><button className="btn pri" autoFocus onClick={() => { done = true; res(true); close(); }}>{okTxt}</button></>}><p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{text}</p></ModalFrame> });
   });
 }
-export function copyText(t: string) { navigator.clipboard.writeText(t).then(() => toast('Kopiert'), () => toast('Kunne ikke kopiere – merk teksten og kopier manuelt')); }
+export function copyText(t: string) { navigator.clipboard.writeText(t).then(() => toast(tt("Kopiert")), () => toast(tt("Kunne ikke kopiere – merk teksten og kopier manuelt"))); }
 export function textModal(title: string, text: string, note?: string) {
   showModal(title, () => <>{note && <p className="small muted" style={{ marginTop: 0 }}>{note}</p>}<textarea readOnly className="codebox" value={text} onFocus={e => e.currentTarget.select()} /></>,
-    { wide: true, foot: close => <><button className="btn" onClick={close}>Lukk</button><button className="btn pri" onClick={() => copyText(text)}>Kopier</button></> });
+    { wide: true, foot: close => <><button className="btn" onClick={close}>{tt("Lukk")}</button><button className="btn pri" onClick={() => copyText(text)}>{tt("Kopier")}</button></> });
 }
 
 // ---------------- generisk skjema
@@ -107,12 +108,12 @@ function FormBody({ o, close }: { o: FormOpts; close: () => void }) {
   const set = (patch: any) => setV((prev: any) => { let n = { ...prev, ...patch }; if (o.onChange) for (const k of Object.keys(patch)) { const p = o.onChange(k, n, prev); if (p) n = { ...n, ...p }; } return n; });
   const submit = async () => {
     const miss = o.fields.filter(f => f.req && (!f.show || f.show(v)) && (v[f.k] === '' || v[f.k] == null));
-    if (miss.length) { toast('Fyll ut: ' + miss.map(f => f.label).join(', ')); return; }
+    if (miss.length) { toast(tt("Fyll ut: ") + miss.map(f => f.label).join(', ')); return; }
     setBusy(true); setFeil('');
     try { const r = await o.onSave(vRef.current, close); if (r !== false) close(); } catch (e: any) { console.error(e); setFeil(feiltekst(e)); } finally { setBusy(false); }
   };
   return <>
-    <div className="mh"><h2>{o.title}</h2><button className="btn ghost sm" onClick={close} aria-label="Lukk">✕</button></div>
+    <div className="mh"><h2>{o.title}</h2><button className="btn ghost sm" onClick={close} aria-label={tt("Lukk")}>✕</button></div>
     <div className="mb">{o.top}
       <form className="form" onSubmit={e => { e.preventDefault(); }} noValidate>
         {o.fields.map(f => {
@@ -124,10 +125,10 @@ function FormBody({ o, close }: { o: FormOpts; close: () => void }) {
           let inp: ReactNode;
           if (f.type === 'select') {
             const op = typeof f.options === 'function' ? f.options(v) : f.options || [];
-            const optEl = (x: Opt) => { const [a, b] = Array.isArray(x) ? x : [x, x]; return <option key={a} value={a}>{b}</option>; };
+            const optEl = (x: Opt) => { const [a, b] = Array.isArray(x) ? x : [x, x]; return <option key={a} value={a}>{tt(b)}</option>; };
             inp = <select id={id} value={v[f.k] ?? ''} disabled={o.readOnly} onChange={e => set({ [f.k]: e.target.value })}>
               {f.empty !== undefined && <option value="">{f.empty}</option>}
-              {f.groups ? f.groups().map(([g, l]) => <optgroup key={g} label={g}>{l.map(optEl)}</optgroup>) : op.map(optEl)}
+              {f.groups ? f.groups().map(([g, l]) => <optgroup key={g} label={tt(g)}>{l.map(optEl)}</optgroup>) : op.map(optEl)}
             </select>;
           } else if (f.type === 'textarea') inp = <textarea id={id} value={v[f.k] ?? ''} placeholder={f.ph} readOnly={o.readOnly} onChange={e => set({ [f.k]: e.target.value })} />;
           else if (f.type === 'file') inp = <input id={id} type="file" accept={f.accept || '.pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.csv,.docx,.xlsx,.doc,.xls,.msg,.eml'} onChange={e => set({ [f.k]: e.target.files?.[0] || null })} />;
@@ -142,10 +143,10 @@ function FormBody({ o, close }: { o: FormOpts; close: () => void }) {
       </form>
       {o.bottom?.(v)}
     </div>
-    {feil && <div className="banner" style={{ margin: '0 20px 10px', background: 'var(--redbg)', color: 'var(--red)', borderColor: '#f3c1bb' }}>Noe gikk galt, og ingenting eller bare deler ble lagret: {feil}</div>}
+    {feil && <div className="banner" style={{ margin: '0 20px 10px', background: 'var(--redbg)', color: 'var(--red)', borderColor: '#f3c1bb' }}>{tt("Noe gikk galt, og ingenting eller bare deler ble lagret:")} {feil}</div>}
     <div className="mf">{o.extraFoot?.(close, v)}<span className="grow" />
-      <button className="btn" onClick={close}>{o.readOnly ? 'Lukk' : 'Avbryt'}</button>
-      {!o.readOnly && <button className="btn pri" disabled={busy} onClick={submit}>{busy ? 'Lagrer …' : (o.saveTxt || 'Lagre')}</button>}
+      <button className="btn" onClick={close}>{o.readOnly ? tt("Lukk") : tt("Avbryt")}</button>
+      {!o.readOnly && <button className="btn pri" disabled={busy} onClick={submit}>{busy ? tt("Lagrer …") : (o.saveTxt || tt("Lagre"))}</button>}
     </div>
   </>;
 }
@@ -175,10 +176,10 @@ export function TaggVelger({ value, onChange, disabled }: { value: string[]; onC
   const alle = [...TAGGER.map(x => x[0]), ...value.filter(v => !TAGGER.some(x => x[0] === v))];
   return <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
     {alle.map(x => { const on = value.includes(x); return <button type="button" key={x} disabled={disabled} onClick={() => onChange(on ? value.filter(v => v !== x) : [...value, x])} style={{ border: '1px solid ' + taggFarge(x), background: on ? taggFarge(x) : '#fff', color: on ? '#fff' : taggFarge(x), borderRadius: 12, padding: '2px 10px', fontSize: 12.5, cursor: disabled ? 'default' : 'pointer' }}>{on ? '✓ ' : ''}{x}</button>; })}
-    {!disabled && <input value={ny} onChange={e => setNy(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const v = ny.trim(); if (v && !value.includes(v)) onChange([...value, v]); setNy(''); } }} placeholder="+ egen tagg" style={{ width: 110, border: '1px dashed var(--line2)', borderRadius: 12, padding: '2px 8px', fontSize: 12.5 }} />}
+    {!disabled && <input value={ny} onChange={e => setNy(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); const v = ny.trim(); if (v && !value.includes(v)) onChange([...value, v]); setNy(''); } }} placeholder={tt("+ egen tagg")} style={{ width: 110, border: '1px dashed var(--line2)', borderRadius: 12, padding: '2px 8px', fontSize: 12.5 }} />}
   </div>;
 }
 
 export function ForslagMerke({ tip }: { tip?: string }) {
-  return <span data-tip={tip || 'Kostnaden er et forslag fra nettsøk – kontroller mot tilbud'} style={{ background: '#fff4e5', color: '#9a5b00', borderRadius: 9, padding: '0 6px', fontSize: 10.5, fontWeight: 600, marginLeft: 4, whiteSpace: 'nowrap' }}>FORSLAG</span>;
+  return <span data-tip={tip || 'Kostnaden er et forslag fra nettsøk – kontroller mot tilbud'} style={{ background: '#fff4e5', color: '#9a5b00', borderRadius: 9, padding: '0 6px', fontSize: 10.5, fontWeight: 600, marginLeft: 4, whiteSpace: 'nowrap' }}>{tt("FORSLAG")}</span>;
 }

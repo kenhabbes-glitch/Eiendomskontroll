@@ -9,6 +9,7 @@ import { Empty } from '../components/ui';
 import { KONFIDENSIELLE, kontrollerFor, laerArkivering, lesTekst, tolk, type Tolkning } from '../lib/innboks';
 import { ocrLinjer } from '../lib/rapportLesing';
 import { utfor } from '../lib/actions';
+import { tt } from '../lib/i18n';
 
 type Post = { id: string; navn: string; mime: string; str: number; blob: Blob; lagt: string; status: 'ny' | 'leser' | 'klar' | 'ocr' | 'feil';
   linjer?: string[]; tom?: boolean; kanOcr?: boolean; ocrBrukt?: boolean; t?: Tolkning; v?: Partial<Tolkning> & { notat?: string; kontrollId?: string }; feil?: string; ocrP?: number };
@@ -49,7 +50,7 @@ export function Innboks() {
 
   const leggTil = async (files: FileList | File[]) => {
     const nye: Post[] = [...files].filter(f => f.size > 0).map(f => ({ id: crypto.randomUUID(), navn: f.name, mime: f.type, str: f.size, blob: f, lagt: new Date().toISOString(), status: 'ny' }));
-    const store = nye.filter(p => p.str > 50e6); if (store.length) toast(`${store.length} fil(er) er over 50 MB og ble hoppet over`);
+    const store = nye.filter(p => p.str > 50e6); if (store.length) toast(tt("{0} fil(er) er over 50 MB og ble hoppet over", store.length));
     const ok = nye.filter(p => p.str <= 50e6); setP(L => [...L, ...ok]); for (const p of ok) { await lagre(p); }
     for (const p of ok) await analyser(p); // én og én – skånsomt for nettleseren
   };
@@ -57,12 +58,12 @@ export function Innboks() {
     oppd(p.id, { status: 'ocr', ocrP: 0 }, false);
     try { const L = await ocrLinjer(await p.blob.arrayBuffer(), /pdf/i.test(p.mime) || /\.pdf$/i.test(p.navn), (x) => { if (x >= 0) oppd(p.id, { ocrP: x }, false); }, 6);
       const t = tolk(p.navn, L, valgtE); oppd(p.id, { status: 'klar', linjer: L, tom: L.join('').length < 30, ocrBrukt: true, t, v: { ...t } }); }
-    catch (e: any) { toast('Tekstgjenkjenning feilet: ' + (e?.message || e)); oppd(p.id, { status: 'klar' }, false); }
+    catch (e: any) { toast(tt("Tekstgjenkjenning feilet: ") + (e?.message || e)); oppd(p.id, { status: 'klar' }, false); }
   };
   const fjern = async (id: string) => { await slett(id); setP(L => L.filter(p => p.id !== id)); };
 
   const arkiver = async (p: Post, stille = false): Promise<boolean> => {
-    const v = p.v || {}; if (!v.eiendomId) { toast('Velg eiendom'); return false; } if (!kanDrifteE(v.eiendomId)) { toast('Du har ikke skrivetilgang til eiendommen'); return false; }
+    const v = p.v || {}; if (!v.eiendomId) { toast(tt("Velg eiendom")); return false; } if (!kanDrifteE(v.eiendomId)) { toast(tt("Du har ikke skrivetilgang til eiendommen")); return false; }
     const type = v.type || 'Annet'; const kontroll = ['Servicerapport', 'Egenkontrollskjema'].includes(type) ? valgtKontroll(p) : null;
     const fil = await uploadFile(new File([p.blob], p.navn, { type: p.mime }), v.eiendomId, KONFIDENSIELLE.includes(type) && v.leietakerId ? v.leietakerId : undefined); if (!fil) return false;
     laerArkivering(v.leverandor || p.t?.leverandor || '', type, v.anleggId || '');
@@ -70,25 +71,25 @@ export function Innboks() {
     const id = await save('dokumenter', { eiendomId: v.eiendomId, leietakerId: KONFIDENSIELLE.includes(type) ? v.leietakerId || '' : '', type, tittel: v.tittel || type, dato: v.dato || today(), gyldigTil: v.gyldigTil || '',
       anleggId: v.anleggId || '', anleggIds: v.anleggId ? [v.anleggId] : [], fil, notat: v.notat || '', kilde: 'innboks' });
     await fjern(p.id);
-    if (!stille) { toast('Arkivert: ' + (v.tittel || type)); if (type === 'Brannkonsept/brannteknisk dokumentasjon' && /\.pdf$/i.test(p.navn)) setTimeout(() => import('../lib/brannkonseptLes').then(m => m.tilbyLesing(v.eiendomId!, id)), 300);
+    if (!stille) { toast(tt("Arkivert: ") + (v.tittel || type)); if (type === 'Brannkonsept/brannteknisk dokumentasjon' && /\.pdf$/i.test(p.navn)) setTimeout(() => import('../lib/brannkonseptLes').then(m => m.tilbyLesing(v.eiendomId!, id)), 300);
       if (type === 'Tilsynsrapport' && harModul('tilsyn', v.eiendomId)) setTimeout(() => import('./Tilsyn').then(m => m.registrerTilsyn()), 300); }
     return true;
   };
   const klare = P.filter(p => p.status === 'klar' && p.v?.eiendomId && p.v?.type && p.v.type !== 'Annet' && (p.t?.typeScore || 0) >= 0.7 && !['Servicerapport', 'Egenkontrollskjema', 'Tilsynsrapport'].includes(p.v.type) && !(KONFIDENSIELLE.includes(p.v.type) && !p.v.leietakerId && p.v.type !== 'Forsikringspolise'));
-  const arkiverKlare = async () => { let n = 0; for (const p of klare) if (await arkiver(p, true)) n++; toast(`${n} dokumenter arkivert`); };
+  const arkiverKlare = async () => { let n = 0; for (const p of klare) if (await arkiver(p, true)) n++; toast(tt("{0} dokumenter arkivert", n)); };
 
-  if (!canEdit() && !S.eiendommer.some(e => kanDrifteE(e.id))) return <><h1>Dokumentinnboks</h1><div className="card"><Empty t="Du har ikke tilgang til å arkivere dokumenter" /></div></>;
+  if (!canEdit() && !S.eiendommer.some(e => kanDrifteE(e.id))) return <><h1>{tt("Dokumentinnboks")}</h1><div className="card"><Empty t="Du har ikke tilgang til å arkivere dokumenter" /></div></>;
   return <>
-    <div className="head"><div className="grow"><h1>Dokumentinnboks</h1><p className="sub">Slipp inn dokumenter – appen leser dem og foreslår type, bygg og system. Du godkjenner før noe arkiveres.</p></div>
-      {S.eiendommer.length > 1 && <select value={valgtE} onChange={e => setValgtE(e.target.value)} title="Brukes når dokumentet ikke sier hvilket bygg det gjelder"><option value="">Eiendom: finn automatisk</option>{sortBy(S.eiendommer, e => e.navn).map(e => <option key={e.id} value={e.id}>{e.navn}</option>)}</select>}</div>
+    <div className="head"><div className="grow"><h1>{tt("Dokumentinnboks")}</h1><p className="sub">{tt("Slipp inn dokumenter – appen leser dem og foreslår type, bygg og system. Du godkjenner før noe arkiveres.")}</p></div>
+      {S.eiendommer.length > 1 && <select value={valgtE} onChange={e => setValgtE(e.target.value)} title={tt("Brukes når dokumentet ikke sier hvilket bygg det gjelder")}><option value="">{tt("Eiendom: finn automatisk")}</option>{sortBy(S.eiendommer, e => e.navn).map(e => <option key={e.id} value={e.id}>{e.navn}</option>)}</select>}</div>
     <div className={'card ib-slipp' + (drag ? ' drag' : '')} onDragOver={e => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={e => { e.preventDefault(); setDrag(false); if (e.dataTransfer.files?.length) leggTil(e.dataTransfer.files); }} onClick={() => filInput.current?.click()}>
       <input ref={filInput} type="file" multiple hidden onChange={e => { if (e.target.files?.length) leggTil(e.target.files); e.target.value = ''; }} />
-      <b>Slipp filer her eller klikk for å velge</b>
-      <div className="small muted">PDF, bilder (skannet/fotografert), Word, tekst og tegninger. Dokumentene leses her i nettleseren og sendes ikke til noen AI-tjeneste. Filen lastes opp til appens lagring først når du arkiverer.</div>
+      <b>{tt("Slipp filer her eller klikk for å velge")}</b>
+      <div className="small muted">{tt("PDF, bilder (skannet/fotografert), Word, tekst og tegninger. Dokumentene leses her i nettleseren og sendes ikke til noen AI-tjeneste. Filen lastes opp til appens lagring først når du arkiverer.")}</div>
     </div>
     {lastet && !P.length && <div className="card"><Empty t="Innboksen er tom" /></div>}
-    {P.length > 0 && <div className="toolbar" style={{ margin: '14px 0 8px' }}><h2 style={{ margin: 0, flex: 1 }}>{P.length} dokument{P.length === 1 ? '' : 'er'} venter</h2>
-      {klare.length > 1 && <button className="btn pri" onClick={arkiverKlare} title="Dokumenter der appen er sikker på type og eiendom (ikke servicerapporter og tilsyn, som åpner egne skjema)">Arkiver {klare.length} sikre forslag</button>}</div>}
+    {P.length > 0 && <div className="toolbar" style={{ margin: '14px 0 8px' }}><h2 style={{ margin: 0, flex: 1 }}>{P.length} {tt("dokument")}{P.length === 1 ? '' : tt("er")} {tt("venter")}</h2>
+      {klare.length > 1 && <button className="btn pri" onClick={arkiverKlare} title={tt("Dokumenter der appen er sikker på type og eiendom (ikke servicerapporter og tilsyn, som åpner egne skjema)")}>{tt("Arkiver")} {klare.length} {tt("sikre forslag")}</button>}</div>}
     {P.map(p => <PostKort key={p.id} p={p} oppd={x => oppd(p.id, { v: { ...p.v, ...x } })} arkiver={() => arkiver(p)} fjern={() => fjern(p.id)} ocr={() => kjorOcr(p)} />)}
   </>;
 }
@@ -110,41 +111,41 @@ function PostKort({ p, oppd, arkiver, fjern, ocr }: { p: Post; oppd: (x: Partial
   return <div className="card ib-post">
     <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
       <b style={{ flex: 1, wordBreak: 'break-all' }}>{p.navn}</b><span className="small muted">{kb(p.str)}</span>
-      {url && <a className="small" href={url} target="_blank" rel="noreferrer">Åpne</a>}
-      <button className="btn ghost sm" onClick={fjern} title="Fjern fra innboksen uten å arkivere">✕</button></div>
-    {(p.status === 'ny' || p.status === 'leser') && <p className="small muted">Leser dokumentet …</p>}
-    {p.status === 'ocr' && <div className="small" style={{ margin: '6px 0' }}>Tekstgjenkjenning … {Math.round((p.ocrP || 0) * 100)} %<div style={{ height: 5, background: 'var(--line)', borderRadius: 3, marginTop: 4 }}><div style={{ width: `${Math.round((p.ocrP || 0) * 100)}%`, height: 5, background: 'var(--acc)', borderRadius: 3 }} /></div></div>}
+      {url && <a className="small" href={url} target="_blank" rel="noreferrer">{tt("Åpne")}</a>}
+      <button className="btn ghost sm" onClick={fjern} title={tt("Fjern fra innboksen uten å arkivere")}>✕</button></div>
+    {(p.status === 'ny' || p.status === 'leser') && <p className="small muted">{tt("Leser dokumentet …")}</p>}
+    {p.status === 'ocr' && <div className="small" style={{ margin: '6px 0' }}>{tt("Tekstgjenkjenning …")} {Math.round((p.ocrP || 0) * 100)} %<div style={{ height: 5, background: 'var(--line)', borderRadius: 3, marginTop: 4 }}><div style={{ width: `${Math.round((p.ocrP || 0) * 100)}%`, height: 5, background: 'var(--acc)', borderRadius: 3 }} /></div></div>}
     {p.status === 'klar' && t && <>
       {p.feil && <div className="note small">{p.feil}</div>}
-      {p.tom && p.kanOcr && !p.ocrBrukt && <div className="note small" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><span style={{ flex: 1 }}>Dokumentet er et bilde/skann uten tekst. Forslagene bygger bare på filnavnet.</span><button className="btn sm pri" onClick={ocr}>Les med tekstgjenkjenning</button></div>}
-      {p.tom && !p.kanOcr && <div className="note small">Appen kan ikke lese innholdet i denne filtypen – fyll inn feltene selv.</div>}
+      {p.tom && p.kanOcr && !p.ocrBrukt && <div className="note small" style={{ display: 'flex', gap: 8, alignItems: 'center' }}><span style={{ flex: 1 }}>{tt("Dokumentet er et bilde/skann uten tekst. Forslagene bygger bare på filnavnet.")}</span><button className="btn sm pri" onClick={ocr}>{tt("Les med tekstgjenkjenning")}</button></div>}
+      {p.tom && !p.kanOcr && <div className="note small">{tt("Appen kan ikke lese innholdet i denne filtypen – fyll inn feltene selv.")}</div>}
       <div className="pa-grid" style={{ marginTop: 6 }}>
-        <label className="pa-felt half"><span>Dokumenttype {t.type === v.type && t.typeScore > 0 && sikker(t.typeScore)}{t.type === v.type && t.typeGrunn.length > 0 && g('fant «' + t.typeGrunn.slice(0, 3).join('», «') + '»')}</span>
+        <label className="pa-felt half"><span>{tt("Dokumenttype")} {t.type === v.type && t.typeScore > 0 && sikker(t.typeScore)}{t.type === v.type && t.typeGrunn.length > 0 && g('fant «' + t.typeGrunn.slice(0, 3).join('», «') + '»')}</span>
           <select value={v.type} onChange={e => oppd({ type: e.target.value })}>{DOK_TYPER.map(x => <option key={x}>{x}</option>)}</select>
-          {t.alt.length > 0 && t.type === v.type && t.typeScore < 0.75 && <span className="small">Eller: {t.alt.map(([a]) => <a key={a} href="#" onClick={e => { e.preventDefault(); oppd({ type: a }); }} style={{ marginRight: 8 }}>{a}</a>)}</span>}</label>
-        <label className="pa-felt half"><span>Eiendom{t.eiendomId === v.eiendomId && g(t.eGrunn)}</span>
-          <select value={v.eiendomId || ''} onChange={e => oppd({ eiendomId: e.target.value, anleggId: '', leietakerId: '' })}><option value="">– velg –</option>{sortBy(S.eiendommer.filter(e => kanDrifteE(e.id)), e => e.navn).map(e => <option key={e.id} value={e.id}>{e.navn}</option>)}</select></label>
-        {(visSys || sys.length > 0) && <label className="pa-felt half"><span>System{t.anleggId && t.anleggId === v.anleggId && g(t.aGrunn)}{t.tfm.length > 0 && !v.anleggId && g('fant kode ' + t.tfm.join(', ') + ' – finnes ikke i TFM-registeret')}</span>
-          <select value={v.anleggId || ''} onChange={e => oppd({ anleggId: e.target.value, kontrollId: '' })}><option value="">– ingen –</option>{sys.map(a => <option key={a.id} value={a.id}>{aNavn(a.id)}</option>)}</select></label>}
-        {visLt && <label className="pa-felt half"><span>Leietaker{t.leietakerId === v.leietakerId && g(t.lGrunn)}</span>
-          <select value={v.leietakerId || ''} onChange={e => oppd({ leietakerId: e.target.value })}><option value="">– felles for bygget –</option>{lt.map(l => <option key={l.id} value={l.id}>{l.navn}</option>)}</select></label>}
-        <label className="pa-felt"><span>Tittel</span><input value={v.tittel || ''} onChange={e => oppd({ tittel: e.target.value })} /></label>
-        <label className="pa-felt half"><span>Dokumentdato{t.dato && t.dato === v.dato && g('lest fra dokumentet')}</span><input type="date" value={v.dato || ''} onChange={e => oppd({ dato: e.target.value })} /></label>
-        <label className="pa-felt half"><span>Gyldig til / revideres{t.gyldigTil && t.gyldigTil === v.gyldigTil && g(v.type === 'Energiattest' ? '10 år' : '5 år')}</span><input type="date" value={v.gyldigTil || ''} onChange={e => oppd({ gyldigTil: e.target.value })} /></label>
+          {t.alt.length > 0 && t.type === v.type && t.typeScore < 0.75 && <span className="small">{tt("Eller:")} {t.alt.map(([a]) => <a key={a} href="#" onClick={e => { e.preventDefault(); oppd({ type: a }); }} style={{ marginRight: 8 }}>{a}</a>)}</span>}</label>
+        <label className="pa-felt half"><span>{tt("Eiendom")}{t.eiendomId === v.eiendomId && g(t.eGrunn)}</span>
+          <select value={v.eiendomId || ''} onChange={e => oppd({ eiendomId: e.target.value, anleggId: '', leietakerId: '' })}><option value="">{tt("– velg –")}</option>{sortBy(S.eiendommer.filter(e => kanDrifteE(e.id)), e => e.navn).map(e => <option key={e.id} value={e.id}>{e.navn}</option>)}</select></label>
+        {(visSys || sys.length > 0) && <label className="pa-felt half"><span>{tt("System")}{t.anleggId && t.anleggId === v.anleggId && g(t.aGrunn)}{t.tfm.length > 0 && !v.anleggId && g('fant kode ' + t.tfm.join(', ') + ' – finnes ikke i TFM-registeret')}</span>
+          <select value={v.anleggId || ''} onChange={e => oppd({ anleggId: e.target.value, kontrollId: '' })}><option value="">{tt("– ingen –")}</option>{sys.map(a => <option key={a.id} value={a.id}>{aNavn(a.id)}</option>)}</select></label>}
+        {visLt && <label className="pa-felt half"><span>{tt("Leietaker")}{t.leietakerId === v.leietakerId && g(t.lGrunn)}</span>
+          <select value={v.leietakerId || ''} onChange={e => oppd({ leietakerId: e.target.value })}><option value="">{tt("– felles for bygget –")}</option>{lt.map(l => <option key={l.id} value={l.id}>{l.navn}</option>)}</select></label>}
+        <label className="pa-felt"><span>{tt("Tittel")}</span><input value={v.tittel || ''} onChange={e => oppd({ tittel: e.target.value })} /></label>
+        <label className="pa-felt half"><span>{tt("Dokumentdato")}{t.dato && t.dato === v.dato && g('lest fra dokumentet')}</span><input type="date" value={v.dato || ''} onChange={e => oppd({ dato: e.target.value })} /></label>
+        <label className="pa-felt half"><span>{tt("Gyldig til / revideres")}{t.gyldigTil && t.gyldigTil === v.gyldigTil && g(v.type === 'Energiattest' ? '10 år' : '5 år')}</span><input type="date" value={v.gyldigTil || ''} onChange={e => oppd({ gyldigTil: e.target.value })} /></label>
       </div>
-      {t.leverandor && <p className="small muted" style={{ margin: '2px 0' }}>Avsender/leverandør: {t.leverandor}</p>}
+      {t.leverandor && <p className="small muted" style={{ margin: '2px 0' }}>{tt("Avsender/leverandør:")} {t.leverandor}</p>}
       {KL.length > 0 && <div className="note small" style={{ color: 'var(--ink)' }}>
-        <label className="pa-felt" style={{ margin: 0 }}><span>Kontroll rapporten gjelder{kontroll && forslag && kontroll.id === forslag.o.id && !v.kontrollId && (forslag.grunn ? <span className="muted"> · forslag: {forslag.grunn}</span> : <span className="muted"> · usikkert forslag – kontroller</span>)}</span>
+        <label className="pa-felt" style={{ margin: 0 }}><span>{tt("Kontroll rapporten gjelder")}{kontroll && forslag && kontroll.id === forslag.o.id && !v.kontrollId && (forslag.grunn ? <span className="muted"> {tt("· forslag:")} {forslag.grunn}</span> : <span className="muted"> {tt("· usikkert forslag – kontroller")}</span>)}</span>
           <select value={v.kontrollId || kontroll?.id || '-'} onChange={e => oppd({ kontrollId: e.target.value })}>
-            {KL.map(({ o }) => <option key={o.id} value={o.id}>{o.navn}{o.nesteFrist ? ` – frist ${fd(o.nesteFrist)}` : ''}</option>)}
-            <option value="-">Ingen av disse – arkiver bare som dokument</option></select></label>
-        {kontroll ? <span className="muted">«Arkiver» åpner utkvitteringen av kontrollen med rapporten vedlagt – der kan du trykke «Les avvik fra rapporten».</span> : <span className="muted">Rapporten arkiveres som dokument på systemet uten å kvittere ut en kontroll.</span>}</div>}
-      {['Servicerapport', 'Egenkontrollskjema'].includes(v.type || '') && !KL.length && <div className="note small">{v.anleggId ? 'Systemet har ingen aktive kontroller – rapporten arkiveres som dokument på systemet.' : 'Velg systemet for å koble rapporten til en kontroll og lese avvik. Uten system arkiveres den som et vanlig dokument.'}</div>}
-      {v.type === 'Tegninger (plan/snitt/fasade)' && <p className="small muted">Plantegninger med målestokk kan i tillegg lastes inn under «Tegninger og arealer» for arealberegning og plassering av komponenter.</p>}
-      {KONFIDENSIELLE.includes(v.type || '') && <p className="small muted">Fortrolig dokumenttype – vises ikke for teknikere og servicefirma.</p>}
+            {KL.map(({ o }) => <option key={o.id} value={o.id}>{o.navn}{o.nesteFrist ? tt(" – frist {0}", fd(o.nesteFrist)) : ''}</option>)}
+            <option value="-">{tt("Ingen av disse – arkiver bare som dokument")}</option></select></label>
+        {kontroll ? <span className="muted">{tt("«Arkiver» åpner utkvitteringen av kontrollen med rapporten vedlagt – der kan du trykke «Les avvik fra rapporten».")}</span> : <span className="muted">{tt("Rapporten arkiveres som dokument på systemet uten å kvittere ut en kontroll.")}</span>}</div>}
+      {['Servicerapport', 'Egenkontrollskjema'].includes(v.type || '') && !KL.length && <div className="note small">{v.anleggId ? tt("Systemet har ingen aktive kontroller – rapporten arkiveres som dokument på systemet.") : tt("Velg systemet for å koble rapporten til en kontroll og lese avvik. Uten system arkiveres den som et vanlig dokument.")}</div>}
+      {v.type === 'Tegninger (plan/snitt/fasade)' && <p className="small muted">{tt("Plantegninger med målestokk kan i tillegg lastes inn under «Tegninger og arealer» for arealberegning og plassering av komponenter.")}</p>}
+      {KONFIDENSIELLE.includes(v.type || '') && <p className="small muted">{tt("Fortrolig dokumenttype – vises ikke for teknikere og servicefirma.")}</p>}
       <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
-        <button className="btn pri sm" disabled={busy || !v.eiendomId} onClick={async () => { setBusy(true); await arkiver(); setBusy(false); }}>{busy ? 'Arkiverer …' : knapp}</button>
-        {p.linjer && p.linjer.length > 0 && <a href="#" className="small" onClick={e => { e.preventDefault(); setVis(!vis); }}>{vis ? 'Skjul' : 'Vis'} tekst ({p.linjer.length} linjer{p.ocrBrukt ? ', tekstgjenkjent' : ''})</a>}</div>
+        <button className="btn pri sm" disabled={busy || !v.eiendomId} onClick={async () => { setBusy(true); await arkiver(); setBusy(false); }}>{busy ? tt("Arkiverer …") : knapp}</button>
+        {p.linjer && p.linjer.length > 0 && <a href="#" className="small" onClick={e => { e.preventDefault(); setVis(!vis); }}>{vis ? tt("Skjul") : tt("Vis")} {tt("tekst (")}{p.linjer.length} {tt("linjer")}{p.ocrBrukt ? tt(", tekstgjenkjent") : ''})</a>}</div>
       {vis && <pre className="small" style={{ whiteSpace: 'pre-wrap', maxHeight: 220, overflow: 'auto', background: 'var(--surface2)', padding: 8, borderRadius: 6 }}>{p.linjer!.slice(0, 200).join('\n')}</pre>}
     </>}
   </div>;

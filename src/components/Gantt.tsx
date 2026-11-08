@@ -2,6 +2,7 @@
 // Interaktivt: dra stolpen for å flytte, dra i endene for å endre start/slutt, klikk for å åpne. Statisk i rapporter/utskrift.
 import React, { useEffect, useRef, useState } from 'react';
 import type { GRad } from '../lib/prosjektArbeid';
+import { tt } from '../lib/i18n';
 
 const DAG = 864e5;
 const d2n = (s: string) => Math.floor(Date.parse(s + 'T00:00:00Z') / DAG);
@@ -24,7 +25,7 @@ export function Gantt({ rader, statisk, bredde = 900, idag = new Date().toISOStr
   const svgRef = useRef<SVGSVGElement>(null); const boks = useRef<HTMLDivElement>(null); const [bw0, setBw] = useState(0);
   useEffect(() => { if (statisk || !boks.current) return; const el = boks.current; const ro = new ResizeObserver(() => setBw(el.clientWidth)); ro.observe(el); setBw(el.clientWidth); return () => ro.disconnect(); }, [statisk, R.length > 0]);
   if (!statisk && bw0) bredde = bw0 - 2;
-  if (!R.length) return <p className="small muted">Ingen datoer ennå. Sett start og slutt på fasene, eller start og frist på oppgavene, så vises fremdriftsplanen her.</p>;
+  if (!R.length) return <p className="small muted">{tt("Ingen datoer ennå. Sett start og slutt på fasene, eller start og frist på oppgavene, så vises fremdriftsplanen her.")}</p>;
   const tn = d2n(idag);
   let min = Math.min(...R.map(r => d2n(r.start)), tn), max = Math.max(...R.map(r => d2n(r.slutt || r.start)), tn);
   min -= 7; max += 14;
@@ -56,7 +57,7 @@ export function Gantt({ rader, statisk, bredde = 900, idag = new Date().toISOStr
     {uker.map(u => <g key={u}><line x1={x(u)} x2={x(u)} y1={HH - 10} y2={H} style={{ stroke: C.line, opacity: .5 }} />{ppd >= 10 && <text x={x(u) + 2} y={HH - 4} fontSize={9} style={{ fill: C.muted }}>{fdk(n2d(u)).slice(0, 5)}</text>}</g>)}
     {R.map((r, i) => { const y = HH + i * RH; const z = i % 2 ? <rect key={'z' + i} x={0} y={y} width={W} height={RH} style={{ fill: C.bg2, opacity: .45 }} /> : null; return z; })}
     <line x1={x(tn) + ppd / 2} x2={x(tn) + ppd / 2} y1={HH - 8} y2={H} style={{ stroke: C.red, strokeDasharray: '4 3', strokeWidth: 1.5 }} />
-    {!statisk && <text x={x(tn) + ppd / 2 + 3} y={HH - 22 + 10} fontSize={9} style={{ fill: C.red }}>i dag</text>}
+    {!statisk && <text x={x(tn) + ppd / 2 + 3} y={HH - 22 + 10} fontSize={9} style={{ fill: C.red }}>{tt("i dag")}</text>}
     {R.map((r, i) => {
       const y = HH + i * RH; const d = dd(r.id); const m = drag?.id === r.id ? drag.mode : 'flytt';
       let s = d2n(r.start), e = d2n(r.slutt || r.start); if (m === 'flytt') { s += d; e += d; } else if (m === 'start') s = Math.min(e, s + d); else e = Math.max(s, e + d);
@@ -67,7 +68,7 @@ export function Gantt({ rader, statisk, bredde = 900, idag = new Date().toISOStr
         return <g key={r.id} style={{ cursor: kursor }} onPointerDown={ev => ned(ev, r, 'flytt')}><title>{tittel}</title><polygon points={`${cx},${cy - rr} ${cx + rr},${cy} ${cx},${cy + rr} ${cx - rr},${cy}`} style={{ fill: f, stroke: '#fff', strokeWidth: 1.5 }} /></g>; }
       const bx = x(s), bw = Math.max(ppd, (e - s + 1) * ppd);
       if (r.nivaa === 0) { const h = statisk ? 6 : 8, by = y + (RH - h) / 2;
-        return <g key={r.id} style={{ cursor: kursor }} onPointerDown={ev => ned(ev, r, 'flytt')}><title>{tittel}{r.avledet ? '\n(beregnet fra oppgavene)' : ''}</title>
+        return <g key={r.id} style={{ cursor: kursor }} onPointerDown={ev => ned(ev, r, 'flytt')}><title>{tittel}{r.avledet ? tt("\n(beregnet fra oppgavene)") : ''}</title>
           <rect x={bx} y={by} width={bw} height={h} rx={2} style={{ fill: r.status === 'Ferdig' ? C.green : C.ink2, opacity: r.avledet ? .45 : .9 }} />
           <polygon points={`${bx},${by + h} ${bx + 6},${by + h} ${bx},${by + h + 5}`} style={{ fill: C.ink2, opacity: r.avledet ? .45 : .9 }} />
           <polygon points={`${bx + bw},${by + h} ${bx + bw - 6},${by + h} ${bx + bw},${by + h + 5}`} style={{ fill: C.ink2, opacity: r.avledet ? .45 : .9 }} />
@@ -80,7 +81,7 @@ export function Gantt({ rader, statisk, bredde = 900, idag = new Date().toISOStr
     })}
   </svg>;
   const labels = (w: number) => <svg width={w} height={H} style={{ display: 'block', flex: 'none' }}>
-    <rect x={0} y={0} width={w} height={HH} style={{ fill: C.bg2 }} /><text x={6} y={HH - 10} fontSize={11} fontWeight={600} style={{ fill: C.ink2 }}>Fase / oppgave</text>
+    <rect x={0} y={0} width={w} height={HH} style={{ fill: C.bg2 }} /><text x={6} y={HH - 10} fontSize={11} fontWeight={600} style={{ fill: C.ink2 }}>{tt("Fase / oppgave")}</text>
     {R.map((r, i) => { const y = HH + i * RH; return <g key={r.id} style={{ cursor: statisk ? undefined : 'pointer' }} onClick={() => !statisk && onKlikk?.(r.id)}>
       {i % 2 ? <rect x={0} y={y} width={w} height={RH} style={{ fill: C.bg2, opacity: .45 }} /> : null}
       <text x={r.nivaa ? 16 : 6} y={y + RH / 2 + 4} fontSize={statisk ? 9.5 : 12} fontWeight={r.nivaa ? 400 : 700} style={{ fill: r.id.startsWith('bp:') ? C.ink2 : C.ink, fontStyle: r.id.startsWith('bp:') ? 'italic' : undefined, textDecoration: r.status === 'Ferdig' && r.nivaa ? 'line-through' : undefined }}>

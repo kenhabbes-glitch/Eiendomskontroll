@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { tt } from '../lib/i18n';
 import { S } from '../lib/store';
 import { sortBy } from '../lib/utils';
 
@@ -14,9 +15,9 @@ export const eiendomOpts = () => sortBy(S.eiendommer, e => e.navn).map(e => [e.i
 export function Sel({ value, onChange, opts, empty, style }: { value: any; onChange: (v: string) => void; opts: (string | [string, string])[]; empty?: string; style?: any }) {
   return <select value={value ?? ''} onChange={e => onChange(e.target.value)} style={style}>
     {empty !== undefined && <option value="">{empty}</option>}
-    {opts.map(o => { const [a, b] = Array.isArray(o) ? o : [o, o]; return <option key={a} value={a}>{b}</option>; })}
+    {opts.map(o => { const [a, b] = Array.isArray(o) ? o : [o, o]; return <option key={a} value={a}>{tt(b)}</option>; })}
   </select>;
 }
 export function Search({ value, onChange, ph = 'Søk …', w }: { value: string; onChange: (v: string) => void; ph?: string; w?: number }) {
-  return <input type="search" placeholder={ph} value={value || ''} onChange={e => onChange(e.target.value)} style={w ? { width: w } : undefined} />;
+  return <input type="search" placeholder={tt(ph)} value={value || ''} onChange={e => onChange(e.target.value)} style={w ? { width: w } : undefined} />;
 }

@@ -42,6 +42,8 @@ import { Befaringer, BefaringSide } from './views/Befaring';
 import { Tilsynsanalyser } from './views/Tilsynsanalyser';
 import { SignerLenke } from './views/SignerLenke';
 import { synkAlle, lastLokale } from './lib/befaring';
+import { tt, lokale, sprak } from './lib/i18n';
+import { SprakVelger } from './components/SprakVelger';
 
 export function go(path: string) { if (location.hash === '#/' + path) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = '#/' + path; }
 function useRoute() {
@@ -115,7 +117,7 @@ export default function App() {
   // Purreoversikt ved pålogging (én gang per dag, styres i Innstillinger → Purring på avvik)
   useEffect(() => { if (state.ready && state.me && !state.mfa && !state.loading && !['ao', 'lt', 'ko', 'pr', 'personvern', 'portal'].includes(r.v)) { const t = setTimeout(() => visPurringVedPalogging(), 1200); return () => clearTimeout(t); } }, [state.ready, state.loading, state.mfa]);
   if (!configured) return <Setup />;
-  if (!state.ready) return <div className="login"><div className="card"><p>Laster …</p></div></div>;
+  if (!state.ready) return <div className="login"><div className="card"><p>{tt("Laster …")}</p></div></div>;
   if (state.mfa && !['ao', 'lt', 'ko', 'pr', 'personvern'].includes(r.v)) return <><MfaSkjerm /><Toast /></>;
   if (state.recovery && state.me) return <SetPassword />;
   if (r.v === 'ao' && r.id) return <><AoLenke token={r.id} /><Toast /></>;
@@ -123,9 +125,9 @@ export default function App() {
   if (r.v === 'ko' && r.id) return <><KoLenke token={r.id} /><Toast /></>;
   if (r.v === 'pr' && r.id) return <><PrLenke token={r.id} /><ModalHost /><Toast /></>;
   if (r.v === 'sg' && r.id) return <><SignerLenke token={r.id} /><Toast /></>;
-  if (r.v === 'personvern') return <div className="login"><div className="card" style={{ maxWidth: 640 }}><PersonvernTekst /><p className="small"><a href="#/">Tilbake</a></p></div></div>;
+  if (r.v === 'personvern') return <div className="login"><div className="card" style={{ maxWidth: 640 }}><PersonvernTekst /><p className="small"><a href="#/">{tt("Tilbake")}</a></p></div></div>;
   if (!state.me && r.v === 'registrer') return <><Registrer /><Toast /></>;
-  if (r.v === 'vilkar') return <div className="login"><div className="card" style={{ maxWidth: 760 }}><VilkarTekst /><p className="small"><a href="#/">Tilbake</a></p></div></div>;
+  if (r.v === 'vilkar') return <div className="login"><div className="card" style={{ maxWidth: 760 }}><VilkarTekst /><p className="small"><a href="#/">{tt("Tilbake")}</a></p></div></div>;
   if (!state.me) return <Login />;
   if (state.me.rolle === 'ingen' && !state.me.plattform) return <NoAccess />;
 
@@ -180,10 +182,10 @@ export default function App() {
   }
   return <div id="app">
     <aside id="side">
-      <div className="brand"><b>Eiendomskontroll</b><span>Drift · kontroll · dokumentasjon</span></div>
+      <div className="brand"><b>{tt("Eiendomskontroll")}</b><span>{tt("Drift · kontroll · dokumentasjon")}</span></div>
       <nav id="nav">{(() => {
         const lenke = ([k, l]: [string, string], sub = false) => <a key={k} href={'#/' + k} className={(cur === k ? 'on' : '') + (sub ? ' navsub' : '')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={I[k]} /></svg>{l}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={I[k]} /></svg>{tt(l)}
           {k === 'kontroller' && forf > 0 && <span className="n">{forf}</span>}{k === 'avvik' && avv > 0 && <span className="n">{avv}</span>}{k === 'innboks' && ibN > 0 && <span className="n">{ibN}</span>}{k === 'tilsyn' && svarfristSnart(14).length > 0 && <span className="n">{svarfristSnart(14).length}</span>}{k === 'arbeidsordre' && mineAo().length > 0 && <span className="n">{mineAo().length}</span>}
         </a>;
         const adm = nav.filter(n => ADMIN_NAV.includes(n[0])); const vanlig = nav.filter(n => !ADMIN_NAV.includes(n[0]));
@@ -191,7 +193,7 @@ export default function App() {
         const hjelp = vanlig.filter(n => n[0] === 'hjelp'), ovr = vanlig.filter(n => n[0] !== 'hjelp');
         return <>{ovr.map(n => lenke(n))}
           {adm.length > 0 && <><a href="#" className={'grp' + (iAdm && !apen ? ' on' : '')} onClick={e => { e.preventDefault(); if (!iAdm) settAdmApen(!admApen); }} aria-expanded={apen}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={I.admin} /></svg>Administrasjon
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={I.admin} /></svg>{tt("Administrasjon")}
             <svg className="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginLeft: 'auto', transform: apen ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}><path d="M9 6l6 6-6 6" /></svg></a>
             {apen && adm.map(n => lenke(n, true))}</>}
           {hjelp.map(n => lenke(n))}</>;
@@ -199,13 +201,13 @@ export default function App() {
       <div className="sidefoot">
         <a className="userbox" href="#/profil" style={{ textDecoration: 'none' }}><span className="av">{ini}</span><span><div style={{ color: '#fff' }}>{me.navn || me.epost}</div><div className="r">{rolleNavn(me.rolle)}</div></span></a>
         <AppVersjon />
-        <button onClick={() => signOut()}>Logg ut</button>
+        <button onClick={() => signOut()}>{tt("Logg ut")}</button>
       </div>
     </aside>
     <main id="main">
       {state.error && <div className="banner">{state.error}</div>}
-      {(state.offline || !navigator.onLine) && <div className="offline-band" role="status">Uten nett{(state as any).kopiTid ? ` – viser data fra ${new Date((state as any).kopiTid).toLocaleString('nb-NO', { dateStyle: 'short', timeStyle: 'short' })}` : ''}. Befaringer kan gjennomføres og lagres på enheten; andre endringer krever nett.</div>}
-      {state.loading && !S.eiendommer.length ? <div className="empty"><b>Laster data …</b></div> : body}
+      {(state.offline || !navigator.onLine) && <div className="offline-band" role="status">{tt("Uten nett")}{(state as any).kopiTid ? tt(" – viser data fra {0}", new Date((state as any).kopiTid).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' })) : ''}{tt(". Befaringer kan gjennomføres og lagres på enheten; andre endringer krever nett.")}</div>}
+      {state.loading && !S.eiendommer.length ? <div className="empty"><b>{tt("Laster data …")}</b></div> : body}
     </main>
     <ModalHost /><Toast /><Tip />
   </div>;
@@ -215,11 +217,11 @@ export default function App() {
 export const APP_LAGET_AV = 'Kenneth A Habbestad';
 function AppVersjon() {
   const t = new Date(__BYGGET__); const ok = !isNaN(t.getTime());
-  const dato = ok ? t.toLocaleString('nb-NO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo' }) : '';
-  return <div className="appversjon" title={__COMMIT__ ? 'Commit ' + __COMMIT__ : undefined}>
-    <div>Versjon {__APP_VERSJON__}{__COMMIT__ ? ' · ' + __COMMIT__ : ''}</div>
-    {dato && <div>Oppdatert {dato.replace(',', ' kl.')}</div>}
-    <div>App laget av {APP_LAGET_AV}</div>
+  const dato = ok ? t.toLocaleString(lokale(), { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo' }) : '';
+  return <div className="appversjon" title={__COMMIT__ ? tt("Commit ") + __COMMIT__ : undefined}>
+    <div>{tt("Versjon")} {__APP_VERSJON__}{__COMMIT__ ? ' · ' + __COMMIT__ : ''}</div>
+    {dato && <div>{tt("Oppdatert")} {sprak() === 'nb' ? dato.replace(',', ' kl.') : dato}</div>}
+    <div>{tt("App laget av")} {APP_LAGET_AV}</div>
   </div>;
 }
 
@@ -229,39 +231,39 @@ function Login() {
     e.preventDefault(); setErr(''); setBusy(true);
     if (glemt) {
       const { error } = await sb.auth.resetPasswordForEmail(ep, { redirectTo: location.origin });
-      setBusy(false); if (error) setErr(error.message); else { toast('Sjekk e-posten din for lenke til nytt passord'); setGlemt(false); }
+      setBusy(false); if (error) setErr(error.message); else { toast(tt("Sjekk e-posten din for lenke til nytt passord")); setGlemt(false); }
       return;
     }
     const { error } = await sb.auth.signInWithPassword({ email: ep, password: pw });
-    setBusy(false); if (error) setErr(error.message === 'Invalid login credentials' ? 'Feil e-post eller passord' : error.message);
+    setBusy(false); if (error) setErr(error.message === 'Invalid login credentials' ? tt("Feil e-post eller passord") : error.message);
   };
   return <div className="login"><form className="card" onSubmit={submit}>
-    <h1>Eiendomskontroll</h1><p className="muted" style={{ marginTop: 0 }}>{glemt ? 'Få tilsendt lenke for å sette nytt passord.' : 'Logg inn for å fortsette.'}</p>
-    <div className="fld"><label>E-post</label><input type="email" value={ep} onChange={e => setEp(e.target.value)} autoFocus required /></div>
-    {!glemt && <div className="fld"><label>Passord</label><input type="password" value={pw} onChange={e => setPw(e.target.value)} required /></div>}
+    <h1>{tt("Eiendomskontroll")}</h1><p className="muted" style={{ marginTop: 0 }}>{glemt ? tt("Få tilsendt lenke for å sette nytt passord.") : tt("Logg inn for å fortsette.")}</p>
+    <div className="fld"><label>{tt("E-post")}</label><input type="email" value={ep} onChange={e => setEp(e.target.value)} autoFocus required /></div>
+    {!glemt && <div className="fld"><label>{tt("Passord")}</label><input type="password" value={pw} onChange={e => setPw(e.target.value)} required /></div>}
     {err && <div className="err">{err}</div>}
-    <button className="btn pri" style={{ width: '100%', justifyContent: 'center' }} disabled={busy}>{busy ? 'Vent …' : glemt ? 'Send lenke' : 'Logg inn'}</button>
-    <p className="small" style={{ marginBottom: 0 }}><a href="#" onClick={e => { e.preventDefault(); setGlemt(!glemt); setErr(''); }}>{glemt ? 'Tilbake til innlogging' : 'Glemt passord?'}</a></p>
-    <p className="small muted" style={{ marginBottom: 0 }}>Har du ikke bruker? Be administratoren i organisasjonen din om en invitasjon{(import.meta as any).env?.VITE_SELVREGISTRERING ? <> – eller <a href="#/registrer">registrer bedriften din og prøv gratis i 30 dager</a></> : null}.</p>
+    <button className="btn pri" style={{ width: '100%', justifyContent: 'center' }} disabled={busy}>{busy ? tt("Vent …") : glemt ? tt("Send lenke") : tt("Logg inn")}</button>
+    <p className="small" style={{ marginBottom: 0 }}><a href="#" onClick={e => { e.preventDefault(); setGlemt(!glemt); setErr(''); }}>{glemt ? tt("Tilbake til innlogging") : tt("Glemt passord?")}</a></p>
+    <p className="small muted" style={{ marginBottom: 0 }}>{tt("Har du ikke bruker? Be administratoren i organisasjonen din om en invitasjon")}{(import.meta as any).env?.VITE_SELVREGISTRERING ? <> {tt("– eller")} <a href="#/registrer">{tt("registrer bedriften din og prøv gratis i 30 dager")}</a></> : null}.</p>
     <Toast />
-  </form></div>;
+  <SprakVelger kompakt /></form></div>;
 }
 function SetPassword() {
   const [pw, setPw] = useState(''); const [pw2, setPw2] = useState(''); const [err, setErr] = useState('');
   const submit = async (e: React.FormEvent) => {
-    e.preventDefault(); if (svaktPassord(pw)) return setErr(PASSORDKRAV); if (pw !== pw2) return setErr('Passordene er ikke like');
+    e.preventDefault(); if (svaktPassord(pw)) return setErr(PASSORDKRAV); if (pw !== pw2) return setErr(tt("Passordene er ikke like"));
     const { error } = await sb.auth.updateUser({ password: pw });
     if (error) return setErr(error.message);
-    state.recovery = false; history.replaceState(null, '', location.pathname); toast('Passordet er lagret'); location.hash = '';
+    state.recovery = false; history.replaceState(null, '', location.pathname); toast(tt("Passordet er lagret")); location.hash = '';
   };
-  return <div className="login"><form className="card" onSubmit={submit}><h1>Velg passord</h1><p className="muted" style={{ marginTop: 0 }}>Velkommen{state.me?.navn ? ', ' + state.me.navn : ''}! Velg et passord du bruker for å logge inn.</p>
-    <div className="fld"><label>Nytt passord</label><input type="password" value={pw} onChange={e => setPw(e.target.value)} autoFocus /></div>
-    <div className="fld"><label>Gjenta passord</label><input type="password" value={pw2} onChange={e => setPw2(e.target.value)} /></div>
-    {err && <div className="err">{err}</div>}<button className="btn pri" style={{ width: '100%', justifyContent: 'center' }}>Lagre passord</button><Toast /></form></div>;
+  return <div className="login"><form className="card" onSubmit={submit}><h1>{tt("Velg passord")}</h1><p className="muted" style={{ marginTop: 0 }}>{tt("Velkommen")}{state.me?.navn ? ', ' + state.me.navn : ''}{tt("! Velg et passord du bruker for å logge inn.")}</p>
+    <div className="fld"><label>{tt("Nytt passord")}</label><input type="password" value={pw} onChange={e => setPw(e.target.value)} autoFocus /></div>
+    <div className="fld"><label>{tt("Gjenta passord")}</label><input type="password" value={pw2} onChange={e => setPw2(e.target.value)} /></div>
+    {err && <div className="err">{err}</div>}<button className="btn pri" style={{ width: '100%', justifyContent: 'center' }}>{tt("Lagre passord")}</button><Toast /></form></div>;
 }
 function NoAccess() {
-  return <div className="login"><div className="card"><h1>Venter på tilgang</h1><p>Du er logget inn som <b>{state.me?.epost}</b>, men har ikke fått tildelt en rolle ennå. Be administratoren om å gi deg tilgang.</p><button className="btn" onClick={() => signOut()}>Logg ut</button></div></div>;
+  return <div className="login"><div className="card"><h1>{tt("Venter på tilgang")}</h1><p>{tt("Du er logget inn som")} <b>{state.me?.epost}</b>{tt(", men har ikke fått tildelt en rolle ennå. Be administratoren om å gi deg tilgang.")}</p><button className="btn" onClick={() => signOut()}>{tt("Logg ut")}</button></div></div>;
 }
 function Setup() {
-  return <div className="login"><div className="card" style={{ maxWidth: 560 }}><h1>Oppsett mangler</h1><p>Appen finner ikke tilkoblingen til Supabase. Legg inn miljøvariablene <code>VITE_SUPABASE_URL</code> og <code>VITE_SUPABASE_ANON_KEY</code> i Netlify (Site configuration → Environment variables) og publiser på nytt. Se README.md i repoet.</p></div></div>;
+  return <div className="login"><div className="card" style={{ maxWidth: 560 }}><h1>{tt("Oppsett mangler")}</h1><p>{tt("Appen finner ikke tilkoblingen til Supabase. Legg inn miljøvariablene")} <code>{tt("VITE_SUPABASE_URL")}</code> {tt("og")} <code>{tt("VITE_SUPABASE_ANON_KEY")}</code> {tt("i Netlify (Site configuration → Environment variables) og publiser på nytt. Se README.md i repoet.")}</p></div></div>;
 }

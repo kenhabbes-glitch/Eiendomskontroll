@@ -1,6 +1,7 @@
 // Søk og velg bygningsdel i NS 3451. Bygningsdeler som hører til valgt fag vises først.
 import React, { useState } from 'react';
 import { NS3451_LEVETID } from '../lib/ns3451';
+import { tt } from '../lib/i18n';
 
 /** Hvilke deler av NS 3451 som normalt hører til et fag (prefikser) */
 export const FAG_NS: Record<string, string[]> = {
@@ -23,15 +24,15 @@ export function NsVelger({ value, set, fag }: { value?: string; set: (k: string)
     style={{ paddingLeft: 8 + (r.kode.length - 2) * 12 }}><b className="mono">{r.kode}</b> {r.navn}</button>;
   return <div className="ns-velger">
     <div style={{ display: 'flex', gap: 6 }}>
-      <input value={apen ? q : value ? `${value} ${nsNavn(value)}` : ''} placeholder={fag && pref.length ? `Søk – forslag for ${fag}` : 'Søk på kode eller navn, f.eks. 442 eller belysning'}
+      <input value={apen ? q : value ? `${value} ${nsNavn(value)}` : ''} placeholder={fag && pref.length ? tt("Søk – forslag for {0}", fag) : tt("Søk på kode eller navn, f.eks. 442 eller belysning")}
         onFocus={() => { setApen(true); setQ(''); }} onChange={e => { setQ(e.target.value); setApen(true); }} style={{ flex: 1 }} />
-      {value && <button type="button" className="btn ghost sm" title="Fjern" onClick={() => set('')}>✕</button>}
+      {value && <button type="button" className="btn ghost sm" title={tt("Fjern")} onClick={() => set('')}>✕</button>}
     </div>
     {apen && <div className="ns-liste">
-      {forslag.length > 0 && <><div className="ns-hode">Forslag for {fag}</div>{forslag.slice(0, 60).map(rad)}</>}
-      {(ovrige.length > 0 || (!forslag.length && treff.length > 0)) && <><div className="ns-hode">{s ? 'Andre treff' : 'Alle bygningsdeler'}</div>{(forslag.length || s ? ovrige : treff).slice(0, 80).map(rad)}</>}
-      {!treff.length && <div className="small muted" style={{ padding: 8 }}>Ingen treff</div>}
-      <div style={{ textAlign: 'right', padding: 4 }}><button type="button" className="btn ghost sm" onClick={() => setApen(false)}>Lukk</button></div>
+      {forslag.length > 0 && <><div className="ns-hode">{tt("Forslag for")} {fag}</div>{forslag.slice(0, 60).map(rad)}</>}
+      {(ovrige.length > 0 || (!forslag.length && treff.length > 0)) && <><div className="ns-hode">{s ? tt("Andre treff") : tt("Alle bygningsdeler")}</div>{(forslag.length || s ? ovrige : treff).slice(0, 80).map(rad)}</>}
+      {!treff.length && <div className="small muted" style={{ padding: 8 }}>{tt("Ingen treff")}</div>}
+      <div style={{ textAlign: 'right', padding: 4 }}><button type="button" className="btn ghost sm" onClick={() => setApen(false)}>{tt("Lukk")}</button></div>
     </div>}
   </div>;
 }

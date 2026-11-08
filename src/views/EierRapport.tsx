@@ -6,6 +6,7 @@ import { fd, sortBy, today } from '../lib/utils';
 import { eierStatus, LYS_TEKST, type EierStatus, type Lys } from '../lib/eierRapport';
 import { RAP_CSS, skrivUt } from './ProsjektRapport';
 import { harModul } from '../lib/moduler';
+import { tt } from '../lib/i18n';
 
 const FARGE: Record<Lys, string> = { green: '#2f7d4f', amber: '#b7791f', red: '#b42318', grey: '#9aa39d' };
 const Dot = ({ l }: { l: Lys }) => <span className="dot" style={{ background: FARGE[l] }} />;
@@ -21,32 +22,32 @@ const STD: Valg = { kontroller: true, dok: true, avvik: true, tilsyn: true, leie
 function EnEiendom({ s, v, kommentar, ny }: { s: EierStatus; v: Valg; kommentar: string; ny?: boolean }) {
   const e = s.e; const K = v.kun ? s.kontroller.filter(k => k.lys !== 'green') : s.kontroller;
   return <div className={ny ? 'sk' : ''}>
-    <div className="meta">{[e.adresse, e.poststed].filter(Boolean).join(', ')}{e.gnrbnr ? ' · gnr/bnr ' + e.gnrbnr : ''}{e.bta ? ` · BTA ${e.bta} m²` : ''}{e.kategori ? ' · ' + e.kategori : ''}</div>
+    <div className="meta">{[e.adresse, e.poststed].filter(Boolean).join(', ')}{e.gnrbnr ? tt(" · gnr/bnr ") + e.gnrbnr : ''}{e.bta ? tt(" · BTA {0} m²", e.bta) : ''}{e.kategori ? ' · ' + e.kategori : ''}</div>
     <h1>{e.navn}</h1>
-    <div className="lys" style={{ borderColor: FARGE[s.lys] }}><Dot l={s.lys} /><div><b>Samlet status: {LYS_TEKST[s.lys]}</b><div className="muted">{s.tiltak.filter(t => t.pri === 1).length} tiltak med høy prioritet · status per {fd(s.dato)}</div></div></div>
+    <div className="lys" style={{ borderColor: FARGE[s.lys] }}><Dot l={s.lys} /><div><b>{tt("Samlet status:")} {LYS_TEKST[s.lys]}</b><div className="muted">{s.tiltak.filter(t => t.pri === 1).length} {tt("tiltak med høy prioritet · status per")} {fd(s.dato)}</div></div></div>
     <div className="omr">{s.omrader.map(o => <div key={o.navn} style={{ borderLeftColor: FARGE[o.lys] }}><b>{o.navn}</b><St l={o.lys} /><br /><span>{o.tekst}</span></div>)}</div>
-    {kommentar.trim() && <><h2>Kommentar fra forvalter</h2><p className="pre">{kommentar}</p></>}
-    {v.tiltak && s.tiltak.length > 0 && <><h2>Prioriterte tiltak</h2><ol className="tiltak">{s.tiltak.map((t, i) => <li key={i} className={t.pri === 1 ? 'p1' : ''}>{t.tekst} <span className="muted">({t.omr}{t.pri === 1 ? ', høy prioritet' : t.pri === 2 ? ', middels' : ''})</span></li>)}</ol></>}
-    {v.kontroller && <><h2>Eiers lovpålagte kontroller</h2>
-      {K.length ? <table><thead><tr><th>Kontroll</th><th>System</th><th>Intervall</th><th>Sist utført</th><th>Neste frist</th><th>Status</th></tr></thead><tbody>
+    {kommentar.trim() && <><h2>{tt("Kommentar fra forvalter")}</h2><p className="pre">{kommentar}</p></>}
+    {v.tiltak && s.tiltak.length > 0 && <><h2>{tt("Prioriterte tiltak")}</h2><ol className="tiltak">{s.tiltak.map((t, i) => <li key={i} className={t.pri === 1 ? 'p1' : ''}>{t.tekst} <span className="muted">({t.omr}{t.pri === 1 ? tt(", høy prioritet") : t.pri === 2 ? tt(", middels") : ''})</span></li>)}</ol></>}
+    {v.kontroller && <><h2>{tt("Eiers lovpålagte kontroller")}</h2>
+      {K.length ? <table><thead><tr><th>{tt("Kontroll")}</th><th>{tt("System")}</th><th>{tt("Intervall")}</th><th>{tt("Sist utført")}</th><th>{tt("Neste frist")}</th><th>{tt("Status")}</th></tr></thead><tbody>
         {K.map((k, i) => <tr key={i}><td>{k.navn}{k.hjemmel && <div className="hj">{k.hjemmel}</div>}</td><td>{k.system}</td><td>{k.intervall}</td><td>{fd(k.sist)}</td><td>{fd(k.frist)}</td><td><St l={k.lys} t={k.status} /></td></tr>)}</tbody></table>
-        : <p className="muted">{v.kun ? 'Alle lovpålagte kontroller er i rute.' : 'Ingen lovpålagte kontroller registrert.'}</p>}
-      <p className="hj">Omfatter kontroller av typen lovpålagt og forsikringskrav der eier har ansvaret. «Ikke i kontrollplanen» betyr at appen forventer kontrollen ut fra eiendommen og registrerte systemer, men at den ikke er lagt inn.</p></>}
-    {v.dok && <><h2>Dokumenter eier skal ha</h2><table><thead><tr><th>Dokument</th><th>Krav</th><th>Dato</th><th>Gyldig til</th><th>Status</th></tr></thead><tbody>
+        : <p className="muted">{v.kun ? tt("Alle lovpålagte kontroller er i rute.") : tt("Ingen lovpålagte kontroller registrert.")}</p>}
+      <p className="hj">{tt("Omfatter kontroller av typen lovpålagt og forsikringskrav der eier har ansvaret. «Ikke i kontrollplanen» betyr at appen forventer kontrollen ut fra eiendommen og registrerte systemer, men at den ikke er lagt inn.")}</p></>}
+    {v.dok && <><h2>{tt("Dokumenter eier skal ha")}</h2><table><thead><tr><th>{tt("Dokument")}</th><th>{tt("Krav")}</th><th>{tt("Dato")}</th><th>{tt("Gyldig til")}</th><th>{tt("Status")}</th></tr></thead><tbody>
       {(v.kun ? s.dok.filter(d => d.lys !== 'green' && d.lys !== 'grey') : s.dok).map(d => <tr key={d.type}><td>{d.type}{d.tittel && d.tittel !== d.type && <div className="hj">{d.tittel}</div>}<div className="hj">{d.h}</div></td><td>{d.krav}</td><td>{fd(d.dato)}</td><td>{fd(d.gyldigTil)}</td><td><St l={d.lys} t={d.status} /></td></tr>)}</tbody></table></>}
-    {v.avvik && <><h2>Åpne avvik</h2>{s.avvik.apne ? <><p>{s.avvik.apne} åpne avvik, hvorav {s.avvik.krit} kritiske/høye og {s.avvik.over} over utbedringsfristen.</p>
-      <table><thead><tr><th>Nr</th><th>Avvik</th><th>Alvorlighet</th><th>Status</th><th>Frist</th></tr></thead><tbody>
+    {v.avvik && <><h2>{tt("Åpne avvik")}</h2>{s.avvik.apne ? <><p>{s.avvik.apne} {tt("åpne avvik, hvorav")} {s.avvik.krit} {tt("kritiske/høye og")} {s.avvik.over} {tt("over utbedringsfristen.")}</p>
+      <table><thead><tr><th>{tt("Nr")}</th><th>{tt("Avvik")}</th><th>{tt("Alvorlighet")}</th><th>{tt("Status")}</th><th>{tt("Frist")}</th></tr></thead><tbody>
         {s.avvik.liste.filter(a => !v.kun || a.alv === 'Kritisk' || a.alv === 'Høy' || (a.frist && a.frist < today())).slice(0, 40).map(a => <tr key={a.id}><td>{a.nr ? '#' + a.nr : ''}</td><td>{a.tittel}</td><td>{a.alv}</td><td>{a.status}</td><td style={{ color: a.frist && a.frist < today() ? FARGE.red : undefined }}>{fd(a.frist)}</td></tr>)}</tbody></table>
-      {s.avvik.liste.length > 40 && <p className="hj">Viser 40 av {s.avvik.liste.length}.</p>}</> : <p className="muted">Ingen åpne avvik.</p>}</>}
-    {v.tilsyn && s.tilsyn.length > 0 && <><h2>Tilsynssaker fra myndighetene</h2><table><thead><tr><th>Myndighet</th><th>Referanse</th><th>Åpne punkter</th><th>Svarfrist</th><th>Status</th></tr></thead><tbody>
+      {s.avvik.liste.length > 40 && <p className="hj">{tt("Viser 40 av")} {s.avvik.liste.length}.</p>}</> : <p className="muted">{tt("Ingen åpne avvik.")}</p>}</>}
+    {v.tilsyn && s.tilsyn.length > 0 && <><h2>{tt("Tilsynssaker fra myndighetene")}</h2><table><thead><tr><th>{tt("Myndighet")}</th><th>{tt("Referanse")}</th><th>{tt("Åpne punkter")}</th><th>{tt("Svarfrist")}</th><th>{tt("Status")}</th></tr></thead><tbody>
       {s.tilsyn.map((t, i) => <tr key={i}><td>{t.navn}</td><td>{t.ref}</td><td>{t.apne}</td><td>{fd(t.svarfrist)}</td><td><St l={t.lys} t={t.status} /></td></tr>)}</tbody></table></>}
-    {v.leietakere && <><h2>{s.harBv ? 'Brannvern og leietakernes internkontroll' : 'Leietakernes internkontroll'}</h2>
+    {v.leietakere && <><h2>{s.harBv ? tt("Brannvern og leietakernes internkontroll") : tt("Leietakernes internkontroll")}</h2>
       {s.harBv && <p><St l={s.brannvern.lys} t={s.brannvern.tekst} /></p>}
-      {s.leietakere.length ? <table><thead><tr><th>Leietaker</th><th>Internkontroll og plikter</th>{s.harBv && <><th>Brannverninformasjon</th><th>Brannansvarlig</th></>}<th>Avtale til</th></tr></thead><tbody>
-        {s.leietakere.map((l, i) => <tr key={i}><td>{l.navn}</td><td><St l={l.ik} t={l.plikter} /></td>{s.harBv && <><td><St l={l.bvLys} t={l.bv} /></td><td>{l.ansvarlig ? 'Oppgitt' : <span style={{ color: FARGE.amber }}>Mangler</span>}</td></>}<td>{fd(l.slutt)}</td></tr>)}</tbody></table>
-        : <p className="muted">Ingen aktive leietakere.</p>}
-      <p className="hj">Eier skal samordne brann- og HMS-arbeidet med leietakerne (internkontrollforskriften § 6) og informere om brannsikkerheten i bygget (forskrift om brannforebygging). Leietakerne bekrefter sine plikter i leietakerportalen.</p></>}
-    {v.kommende && s.kommende.length > 0 && <><h2>Neste 90 dager</h2><table><thead><tr><th>Dato</th><th>Hva</th><th>Type</th></tr></thead><tbody>
+      {s.leietakere.length ? <table><thead><tr><th>{tt("Leietaker")}</th><th>{tt("Internkontroll og plikter")}</th>{s.harBv && <><th>{tt("Brannverninformasjon")}</th><th>{tt("Brannansvarlig")}</th></>}<th>{tt("Avtale til")}</th></tr></thead><tbody>
+        {s.leietakere.map((l, i) => <tr key={i}><td>{l.navn}</td><td><St l={l.ik} t={l.plikter} /></td>{s.harBv && <><td><St l={l.bvLys} t={l.bv} /></td><td>{l.ansvarlig ? tt("Oppgitt") : <span style={{ color: FARGE.amber }}>{tt("Mangler")}</span>}</td></>}<td>{fd(l.slutt)}</td></tr>)}</tbody></table>
+        : <p className="muted">{tt("Ingen aktive leietakere.")}</p>}
+      <p className="hj">{tt("Eier skal samordne brann- og HMS-arbeidet med leietakerne (internkontrollforskriften § 6) og informere om brannsikkerheten i bygget (forskrift om brannforebygging). Leietakerne bekrefter sine plikter i leietakerportalen.")}</p></>}
+    {v.kommende && s.kommende.length > 0 && <><h2>{tt("Neste 90 dager")}</h2><table><thead><tr><th>{tt("Dato")}</th><th>{tt("Hva")}</th><th>{tt("Type")}</th></tr></thead><tbody>
       {s.kommende.map((k, i) => <tr key={i}><td>{fd(k.d)}</td><td>{k.t}</td><td>{k.type}</td></tr>)}</tbody></table></>}
   </div>;
 }
@@ -54,13 +55,13 @@ function EnEiendom({ s, v, kommentar, ny }: { s: EierStatus; v: Valg; kommentar:
 function Rapport({ S2, v, kommentar }: { S2: EierStatus[]; v: Valg; kommentar: string }) {
   const flere = S2.length > 1;
   return <div className="rap"><style>{RAP_CSS + EXTRA_CSS}</style>
-    <div className="meta">Statusrapport til eier · {fd(today())} · utarbeidet av {state.me?.navn || state.me?.epost || ''}</div>
-    {flere && <><h1>Statusrapport – {S2.length} eiendommer</h1>
-      <table><thead><tr><th>Eiendom</th>{[...new Set(S2.flatMap(x => x.omrader.map(o => o.navn)))].map(n => <th key={n}>{n}</th>)}<th>Samlet</th></tr></thead><tbody>
+    <div className="meta">{tt("Statusrapport til eier ·")} {fd(today())} {tt("· utarbeidet av")} {state.me?.navn || state.me?.epost || ''}</div>
+    {flere && <><h1>{tt("Statusrapport –")} {S2.length} {tt("eiendommer")}</h1>
+      <table><thead><tr><th>{tt("Eiendom")}</th>{[...new Set(S2.flatMap(x => x.omrader.map(o => o.navn)))].map(n => <th key={n}>{n}</th>)}<th>{tt("Samlet")}</th></tr></thead><tbody>
         {S2.map(s => <tr key={s.e.id}><td><b>{s.e.navn}</b></td>{[...new Set(S2.flatMap(x => x.omrader.map(o => o.navn)))].map(n => { const o = s.omrader.find(x => x.navn === n); return <td key={n}>{o ? <Dot l={o.lys} /> : ''}</td>; })}<td><St l={s.lys} /></td></tr>)}</tbody></table>
-      {kommentar.trim() && <><h2>Kommentar fra forvalter</h2><p className="pre">{kommentar}</p></>}</>}
+      {kommentar.trim() && <><h2>{tt("Kommentar fra forvalter")}</h2><p className="pre">{kommentar}</p></>}</>}
     {S2.map((s, i) => <EnEiendom key={s.e.id} s={s} v={v} kommentar={flere ? '' : kommentar} ny={flere || i > 0} />)}
-    <p className="hj" style={{ marginTop: 20 }}>Rapporten bygger på registreringene i Eiendomskontroll per {fd(today())}. Hjemmelshenvisningene er korte sammendrag – se «Regelverk og plikter» i appen for forklaring.</p>
+    <p className="hj" style={{ marginTop: 20 }}>{tt("Rapporten bygger på registreringene i Eiendomskontroll per")} {fd(today())}{tt(". Hjemmelshenvisningene er korte sammendrag – se «Regelverk og plikter» i appen for forklaring.")}</p>
   </div>;
 }
 
@@ -98,23 +99,23 @@ function Body({ eid, close }: { eid?: string; close: () => void }) {
       for (const s of S2) { if (!kanDrifteE(s.e.id)) continue; const navn = `Statusrapport til eier – ${s.e.navn} – ${today()}.pdf`.replace(/[\/\\]/g, '-');
         const fil = await uploadFile(new Blob([bytes as any], { type: 'application/pdf' }) as any, s.e.id, undefined, navn, 'rapporter'); if (!fil) continue;
         await save('dokumenter', { eiendomId: s.e.id, leietakerId: '', type: 'Statusrapport til eier', tittel: `Statusrapport til eier ${fd(today())}`, dato: today(), fil, notat: kommentar.slice(0, 500) }); n++; if (S2.length > 1) break; }
-      toast(n ? 'Rapporten er lagret under Dokumenter' + (S2.length > 1 ? ` (på ${S2[0].e.navn})` : '') : 'Kunne ikke lagre'); } catch (e: any) { toast('Feil: ' + (e?.message || e)); } finally { setBusy(false); } };
+      toast(n ? tt("Rapporten er lagret under Dokumenter") + (S2.length > 1 ? tt(" (på {0})", S2[0].e.navn) : '') : tt("Kunne ikke lagre")); } catch (e: any) { toast(tt("Feil: ") + (e?.message || e)); } finally { setBusy(false); } };
   const last = async () => { setBusy(true); try { const bytes = await lagPdf(S2, v, kommentar); const u = URL.createObjectURL(new Blob([bytes as any], { type: 'application/pdf' })); const a = document.createElement('a'); a.href = u; a.download = tittel + '.pdf'; a.click(); setTimeout(() => URL.revokeObjectURL(u), 5000); } finally { setBusy(false); } };
   const bryter = (k: keyof Valg, l: string) => <label className="small" style={{ display: 'inline-flex', gap: 4, marginRight: 12 }}><input type="checkbox" checked={v[k]} onChange={e => setV({ ...v, [k]: e.target.checked })} />{l}</label>;
   return <>
-    <div className="mh"><h2>Statusrapport til eier</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
+    <div className="mh"><h2>{tt("Statusrapport til eier")}</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
     <div className="mb">
       <div className="pa-grid">
-        <label className="pa-felt half"><span>Eiendom</span><select value={valgt} onChange={e => setValgt(e.target.value)}>{E.length > 1 && <option value="*">Alle eiendommer ({E.length})</option>}{E.map(e => <option key={e.id} value={e.id}>{e.navn}</option>)}</select></label>
-        <div className="pa-felt half"><span>Innhold</span><div>{bryter('tiltak', 'Tiltak')}{bryter('kontroller', 'Kontroller')}{bryter('dok', 'Dokumenter')}{bryter('avvik', 'Avvik')}{harModul('tilsyn') && bryter('tilsyn', 'Tilsyn')}{bryter('leietakere', harModul('brannvern') ? 'Leietakere/brannvern' : 'Leietakere')}{bryter('kommende', 'Neste 90 dager')}<br />{bryter('kun', 'Vis bare punkter som må følges opp')}</div></div>
-        <label className="pa-felt"><span>Kommentar til eier (valgfritt)</span><textarea rows={3} value={kommentar} onChange={e => setKommentar(e.target.value)} placeholder="F.eks. status på pågående arbeid, budsjettbehov eller beslutninger eier må ta" /></label>
+        <label className="pa-felt half"><span>{tt("Eiendom")}</span><select value={valgt} onChange={e => setValgt(e.target.value)}>{E.length > 1 && <option value="*">{tt("Alle eiendommer (")}{E.length})</option>}{E.map(e => <option key={e.id} value={e.id}>{e.navn}</option>)}</select></label>
+        <div className="pa-felt half"><span>{tt("Innhold")}</span><div>{bryter('tiltak', 'Tiltak')}{bryter('kontroller', 'Kontroller')}{bryter('dok', 'Dokumenter')}{bryter('avvik', 'Avvik')}{harModul('tilsyn') && bryter('tilsyn', 'Tilsyn')}{bryter('leietakere', harModul('brannvern') ? 'Leietakere/brannvern' : 'Leietakere')}{bryter('kommende', 'Neste 90 dager')}<br />{bryter('kun', 'Vis bare punkter som må følges opp')}</div></div>
+        <label className="pa-felt"><span>{tt("Kommentar til eier (valgfritt)")}</span><textarea rows={3} value={kommentar} onChange={e => setKommentar(e.target.value)} placeholder={tt("F.eks. status på pågående arbeid, budsjettbehov eller beslutninger eier må ta")} /></label>
       </div>
       <div className="card" style={{ marginTop: 10, maxHeight: '58vh', overflow: 'auto', background: '#fff' }} ref={ref}><Rapport S2={S2} v={v} kommentar={kommentar} /></div>
     </div>
-    <div className="mf"><button className="btn" onClick={close}>Lukk</button>
-      <button className="btn" disabled={busy} onClick={() => skrivUt(ref.current, tittel)}>Skriv ut</button>
-      <button className="btn" disabled={busy} onClick={last}>Last ned PDF</button>
-      {canEdit() && <button className="btn pri" disabled={busy || !S2.length} onClick={lagre} title="Lagres som PDF under Dokumenter på eiendommen, så du har historikk over hva eier har fått">{busy ? 'Lager …' : 'Lagre i Dokumenter'}</button>}</div>
+    <div className="mf"><button className="btn" onClick={close}>{tt("Lukk")}</button>
+      <button className="btn" disabled={busy} onClick={() => skrivUt(ref.current, tittel)}>{tt("Skriv ut")}</button>
+      <button className="btn" disabled={busy} onClick={last}>{tt("Last ned PDF")}</button>
+      {canEdit() && <button className="btn pri" disabled={busy || !S2.length} onClick={lagre} title={tt("Lagres som PDF under Dokumenter på eiendommen, så du har historikk over hva eier har fått")}>{busy ? tt("Lager …") : tt("Lagre i Dokumenter")}</button>}</div>
   </>;
 }
-export function eierRapport(eid?: string) { if (!S.eiendommer.length) return toast('Ingen eiendommer'); openModal({ wide: true, render: close => <Body eid={eid} close={close} /> }); }
+export function eierRapport(eid?: string) { if (!S.eiendommer.length) return toast(tt("Ingen eiendommer")); openModal({ wide: true, render: close => <Body eid={eid} close={close} /> }); }

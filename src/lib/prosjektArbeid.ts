@@ -3,6 +3,7 @@
 import { S, save, state } from './store';
 import { byId, today, eNavn, aNavn, lNavn, addDays, type Rec } from './utils';
 import { FASER, okonomi, fremdrift, delFor, delNavn, KLASSER, uid } from './prosjekt';
+import { lokale } from './i18n';
 
 export const n = (v: any) => +String(v ?? '').replace(/\s/g, '').replace(',', '.') || 0;
 
@@ -78,7 +79,7 @@ export const BESLUTNING_TEKST: Record<string, (p: Rec, s: Rec) => string> = {
   over: () => 'Arbeidene overtas, og prosjektet avsluttes og går over i garantiperioden.',
   garanti: () => 'Garantiperioden avsluttes, og eventuelle sikkerhetsstillelser frigis.',
 };
-const kr0 = (v: number) => new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(Math.round(v)) + ' kr';
+const kr0 = (v: number) => new Intl.NumberFormat(lokale(), { maximumFractionDigits: 0 }).format(Math.round(v)) + ' kr';
 
 // ---------------- Gantt-data
 export type GRad = { id: string; navn: string; nivaa: 0 | 1; start: string; slutt: string; status?: string; fase: string; milepael?: boolean; avledet?: boolean; ansvarlig?: string };

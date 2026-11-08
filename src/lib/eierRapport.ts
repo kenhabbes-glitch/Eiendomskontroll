@@ -6,6 +6,7 @@ import { aNavn, addDays, dUntil, docCoverage, fd, intTxt, pliktStatus, sortBy, t
 import { bvStatus, bvVersjon, aktiveMidl, mangelAnsvarlig } from './brannvern';
 import { tilsynssaker } from '../views/Tilsyn';
 import { harModul } from './moduler';
+import { tt } from './i18n';
 
 export type Lys = 'green' | 'amber' | 'red' | 'grey';
 export const LYS_TEKST: Record<Lys, string> = { green: 'I orden', amber: 'Følg opp', red: 'Krever tiltak', grey: 'Ikke vurdert' };
@@ -65,8 +66,8 @@ export function eierStatus(eid: string): EierStatus {
   for (const [k, a] of forventet) if (!har(k, a)) { const m = MALER[k];
     kontroller.push({ navn: m.n, system: a ? aNavn(a) : 'Eiendommen', hjemmel: m.h, intervall: intTxt({ n: m.i[0], enhet: m.i[1] }), sist: '', frist: '', lys: 'red', status: 'Ikke i kontrollplanen', type: m.t, mangler: true }); }
   const kForf = kontroller.filter(k => k.lys === 'red' && !k.mangler); const kMangl = kontroller.filter(k => k.mangler); const kSnart = kontroller.filter(k => k.lys === 'amber');
-  kForf.forEach(k => tiltak.push({ pri: 1, omr: 'Kontroller', tekst: `Gjennomfør «${k.navn}»${k.system !== 'Eiendommen' ? ` (${k.system})` : ''} – frist var ${fd(k.frist)}` }));
-  if (kMangl.length) tiltak.push({ pri: 1, omr: 'Kontroller', tekst: `Legg inn ${kMangl.length} lovpålagt${kMangl.length > 1 ? 'e' : ''} kontroll${kMangl.length > 1 ? 'er' : ''} som mangler i kontrollplanen: ${kMangl.slice(0, 3).map(k => '«' + k.navn + '»').join(', ')}${kMangl.length > 3 ? ' …' : ''}` });
+  kForf.forEach(k => tiltak.push({ pri: 1, omr: 'Kontroller', tekst: tt("Gjennomfør «{0}»{1} – frist var {2}", k.navn, k.system !== 'Eiendommen' ? ` (${k.system})` : '', fd(k.frist)) }));
+  if (kMangl.length) tiltak.push({ pri: 1, omr: 'Kontroller', tekst: tt("Legg inn {0} lovpålagt{1} kontroll{2} som mangler i kontrollplanen: {3}{4}", kMangl.length, kMangl.length > 1 ? 'e' : '', kMangl.length > 1 ? 'er' : '', kMangl.slice(0, 3).map(k => '«' + k.navn + '»').join(', '), kMangl.length > 3 ? ' …' : '') });
   const kLys = verst(kForf.length || kMangl.length ? 'red' : 'green', kSnart.length ? 'amber' : 'green');
 
   // ---- Dokumenter eier skal ha
@@ -76,25 +77,25 @@ export function eierStatus(eid: string): EierStatus {
     return { type: c.t, h: g.h, krav, lys, status, dato: d?.dato || '', gyldigTil: d?.gyldigTil || '', tittel: d?.tittel || '' }; });
   const liste = (L: DokRad[]) => L.map(d => d.type).join(', ');
   const mangl = dok.filter(d => d.lys === 'red' && d.status === 'Mangler'); const utl = dok.filter(d => d.lys === 'red' && d.status === 'Utløpt');
-  if (mangl.length) tiltak.push({ pri: 1, omr: 'Dokumenter', tekst: `Skaff ${mangl.length === 1 ? 'lovpålagt dokument' : mangl.length + ' lovpålagte dokumenter'}: ${liste(mangl)}` });
-  if (utl.length) tiltak.push({ pri: 1, omr: 'Dokumenter', tekst: `Forny utløpt${utl.length > 1 ? 'e' : ''}: ${liste(utl)}` });
-  dok.filter(d => d.status === 'Utløper snart').forEach(d => tiltak.push({ pri: 2, omr: 'Dokumenter', tekst: `Forny ${d.type} før ${fd(d.gyldigTil)}` }));
+  if (mangl.length) tiltak.push({ pri: 1, omr: 'Dokumenter', tekst: tt("Skaff {0}: {1}", mangl.length === 1 ? 'lovpålagt dokument' : mangl.length + ' lovpålagte dokumenter', liste(mangl)) });
+  if (utl.length) tiltak.push({ pri: 1, omr: 'Dokumenter', tekst: tt("Forny utløpt{0}: {1}", utl.length > 1 ? 'e' : '', liste(utl)) });
+  dok.filter(d => d.status === 'Utløper snart').forEach(d => tiltak.push({ pri: 2, omr: 'Dokumenter', tekst: tt("Forny {0} før {1}", d.type, fd(d.gyldigTil)) }));
   const vurd = dok.filter(d => d.lys === 'amber' && d.status !== 'Utløper snart');
-  if (vurd.length) tiltak.push({ pri: 3, omr: 'Dokumenter', tekst: `Vurder behovet for: ${vurd.map(d => `${d.type} (${d.krav.toLowerCase()})`).join(', ')}` });
+  if (vurd.length) tiltak.push({ pri: 3, omr: 'Dokumenter', tekst: tt("Vurder behovet for: {0}", vurd.map(d => `${d.type} (${d.krav.toLowerCase()})`).join(', ')) });
   const dLys = verst(...dok.filter(d => d.lys !== 'grey').map(d => d.lys));
 
   // ---- Avvik
   const A = S.avvik.filter(a => a.eiendomId === eid && !AV_LUKKET.includes(a.status));
   const krit = A.filter(a => a.alv === 'Kritisk' || a.alv === 'Høy'); const over = A.filter(a => a.frist && (dUntil(a.frist) as number) < 0);
-  if (A.filter(a => a.alv === 'Kritisk').length) tiltak.push({ pri: 1, omr: 'Avvik', tekst: `Lukk ${A.filter(a => a.alv === 'Kritisk').length} kritiske avvik` });
-  if (over.length) tiltak.push({ pri: over.some(a => a.alv === 'Kritisk' || a.alv === 'Høy') ? 1 : 2, omr: 'Avvik', tekst: `${over.length} avvik har passert utbedringsfristen` });
+  if (A.filter(a => a.alv === 'Kritisk').length) tiltak.push({ pri: 1, omr: 'Avvik', tekst: tt("Lukk {0} kritiske avvik", A.filter(a => a.alv === 'Kritisk').length) });
+  if (over.length) tiltak.push({ pri: over.some(a => a.alv === 'Kritisk' || a.alv === 'Høy') ? 1 : 2, omr: 'Avvik', tekst: tt("{0} avvik har passert utbedringsfristen", over.length) });
   const aLys: Lys = A.some(a => a.alv === 'Kritisk') || over.some(a => a.alv === 'Høy') ? 'red' : krit.length || over.length ? 'amber' : 'green';
 
   // ---- Tilsyn
   const harTs = harModul('tilsyn', eid); const harBv = harModul('brannvern', eid);
   const tilsyn = tilsynssaker().filter(s => harTs && s.eiendomId === eid && !s.lukket).map(s => {
     const d = dUntil(s.svarfrist); const [lys, status]: [Lys, string] = s.svarSendt ? ['amber', 'Svar sendt ' + fd(s.svarSendt) + ' – venter på lukking'] : d !== null && d < 0 ? ['red', 'Svarfristen er passert'] : d !== null && d <= 14 ? ['amber', `Svarfrist om ${d} d`] : ['amber', 'Under oppfølging'];
-    if (lys === 'red') tiltak.push({ pri: 1, omr: 'Tilsyn', tekst: `Svar ${s.myndighet}${s.ref ? ' (' + s.ref + ')' : ''} – svarfristen ${fd(s.svarfrist)} er passert` });
+    if (lys === 'red') tiltak.push({ pri: 1, omr: 'Tilsyn', tekst: tt("Svar {0}{1} – svarfristen {2} er passert", s.myndighet, s.ref ? ' (' + s.ref + ')' : '', fd(s.svarfrist)) });
     return { navn: s.myndighet, ref: s.ref, svarfrist: s.svarfrist, apne: s.apne, lys, status }; });
   const tLys = tilsyn.length ? verst(...tilsyn.map(t => t.lys)) : 'green';
 
@@ -104,17 +105,17 @@ export function eierStatus(eid: string): EierStatus {
     const ps = (l.plikter || []).map(pliktStatus).filter((s: Rec) => s.t !== 'Ikke relevant'); const ok = ps.filter((s: Rec) => s.o === 0).length; const forf = ps.filter((s: Rec) => s.o >= 2).length;
     const ik: Lys = !ps.length ? 'grey' : forf ? (forf >= Math.ceil(ps.length / 2) ? 'red' : 'amber') : ps.some((s: Rec) => s.o === 1) ? 'amber' : 'green';
     const b = bvStatus(l); const bvLys: Lys = b.o === 0 ? 'green' : b.o === 1 ? 'amber' : 'red';
-    if (forf) tiltak.push({ pri: 2, omr: 'Leietakere', tekst: `Følg opp ${l.navn}: ${forf} plikt${forf > 1 ? 'er' : ''} ikke bekreftet/forfalt` });
-    if (harBv && b.o >= 2 && bvVersjon(e)) tiltak.push({ pri: 2, omr: 'Brannvern', tekst: `Send brannverninformasjon til ${l.navn}` });
-    if (harBv && mangelAnsvarlig(l)) tiltak.push({ pri: 2, omr: 'Brannvern', tekst: `Få oppgitt brannansvarlig hos ${l.navn}` });
+    if (forf) tiltak.push({ pri: 2, omr: 'Leietakere', tekst: tt("Følg opp {0}: {1} plikt{2} ikke bekreftet/forfalt", l.navn, forf, forf > 1 ? 'er' : '') });
+    if (harBv && b.o >= 2 && bvVersjon(e)) tiltak.push({ pri: 2, omr: 'Brannvern', tekst: tt("Send brannverninformasjon til {0}", l.navn) });
+    if (harBv && mangelAnsvarlig(l)) tiltak.push({ pri: 2, omr: 'Brannvern', tekst: tt("Få oppgitt brannansvarlig hos {0}", l.navn) });
     return { navn: l.navn, plikter: ps.length ? `${ok} av ${ps.length} i orden` : 'Ingen plikter registrert', ik, bv: b.t, bvLys, ansvarlig: !mangelAnsvarlig(l), slutt: l.slutt || '' }; });
   const lLys = leietakere.length ? verst(...leietakere.map(l => l.ik === 'grey' ? 'amber' : l.ik), ...(harBv ? leietakere.map(l => l.bvLys) : []), ...(harBv ? leietakere.map(l => l.ansvarlig ? 'green' : 'amber' as Lys) : [])) : 'grey';
 
   // ---- Brannvern (eiers brannkort / informasjon)
   const v = bvVersjon(e); const midl = aktiveMidl(e).length;
-  const brannvern = { versjon: v, midl, lys: (!v ? 'red' : midl ? 'amber' : 'green') as Lys, tekst: !v ? 'Brannkort/brannvernpakke for eiendommen er ikke publisert' : `Brannkort versjon ${v} publisert${midl ? ` · ${midl} aktivt varsel om redusert brannsikkerhet` : ''}` };
-  if (harBv && !v) tiltak.push({ pri: 1, omr: 'Brannvern', tekst: 'Fyll ut og publiser brannkortet for eiendommen, og send det til leietakerne' });
-  if (harBv && midl) tiltak.push({ pri: 1, omr: 'Brannvern', tekst: `${midl} varsel om redusert brannsikkerhet er aktivt – sørg for kompenserende tiltak og avslutning` });
+  const brannvern = { versjon: v, midl, lys: (!v ? 'red' : midl ? 'amber' : 'green') as Lys, tekst: !v ? tt("Brannkort/brannvernpakke for eiendommen er ikke publisert") : tt("Brannkort versjon {0} publisert{1}", v, midl ? ` · ${midl} aktivt varsel om redusert brannsikkerhet` : '') };
+  if (harBv && !v) tiltak.push({ pri: 1, omr: 'Brannvern', tekst: tt("Fyll ut og publiser brannkortet for eiendommen, og send det til leietakerne") });
+  if (harBv && midl) tiltak.push({ pri: 1, omr: 'Brannvern', tekst: tt("{0} varsel om redusert brannsikkerhet er aktivt – sørg for kompenserende tiltak og avslutning", midl) });
 
   // ---- Neste 90 dager
   const grense = addDays(nå, 90);
@@ -126,12 +127,12 @@ export function eierStatus(eid: string): EierStatus {
   ], x => x.d);
 
   const omrader = [
-    { navn: 'Lovpålagte kontroller', lys: kLys, tekst: `${kontroller.filter(k => !k.mangler).length} registrert · ${kForf.length} forfalt · ${kMangl.length} mangler i planen` },
-    { navn: 'Påkrevde dokumenter', lys: dLys, tekst: `${dok.filter(d => d.lys === 'green').length} av ${dok.filter(d => d.lys !== 'grey').length} foreligger` },
-    { navn: 'Avvik', lys: aLys, tekst: `${A.length} åpne · ${krit.length} kritiske/høye · ${over.length} over frist` },
-    ...(harTs ? [{ navn: 'Tilsynssaker', lys: tLys, tekst: tilsyn.length ? `${tilsyn.length} åpne saker` : 'Ingen åpne saker' }] : []),
-    ...(harBv ? [{ navn: 'Brannvern', lys: brannvern.lys, tekst: brannvern.tekst }] : []),
-    { navn: 'Leietakers internkontroll', lys: lLys, tekst: leietakere.length ? `${leietakere.filter(l => l.ik === 'green').length} av ${leietakere.length} leietakere i orden` : 'Ingen aktive leietakere' },
+    { navn: tt("Lovpålagte kontroller"), lys: kLys, tekst: tt("{0} registrert · {1} forfalt · {2} mangler i planen", kontroller.filter(k => !k.mangler).length, kForf.length, kMangl.length) },
+    { navn: tt("Påkrevde dokumenter"), lys: dLys, tekst: tt("{0} av {1} foreligger", dok.filter(d => d.lys === 'green').length, dok.filter(d => d.lys !== 'grey').length) },
+    { navn: tt("Avvik"), lys: aLys, tekst: tt("{0} åpne · {1} kritiske/høye · {2} over frist", A.length, krit.length, over.length) },
+    ...(harTs ? [{ navn: tt("Tilsynssaker"), lys: tLys, tekst: tilsyn.length ? tt("{0} åpne saker", tilsyn.length) : tt("Ingen åpne saker") }] : []),
+    ...(harBv ? [{ navn: tt("Brannvern"), lys: brannvern.lys, tekst: brannvern.tekst }] : []),
+    { navn: tt("Leietakers internkontroll"), lys: lLys, tekst: leietakere.length ? tt("{0} av {1} leietakere i orden", leietakere.filter(l => l.ik === 'green').length, leietakere.length) : tt("Ingen aktive leietakere") },
   ];
   return { harBv, harTs, e, dato: nå, lys: verst(...omrader.map(o => o.lys)), omrader, kontroller, dok, avvik: { apne: A.length, krit: krit.length, over: over.length, liste: sortBy(A, a => ['Kritisk', 'Høy', 'Middels', 'Lav'].indexOf(a.alv) * 1e4 + (a.nr || 0)) },
     tilsyn, leietakere, brannvern, kommende, tiltak: sortBy(tiltak, t => t.pri) };

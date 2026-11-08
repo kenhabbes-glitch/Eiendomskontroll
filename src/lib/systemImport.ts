@@ -4,6 +4,7 @@ import JSZip from 'jszip';
 import { KOMP, TFM_DEF } from './catalog';
 import { S } from './store';
 import { pad, type Rec } from './utils';
+import { lokale } from './i18n';
 
 // ---------- minimal xlsx-leser (delte strenger, tall, boolske, datoer som serienummer)
 export async function lesXlsx(fil: Blob): Promise<Record<string, any[][]>> {
@@ -93,7 +94,7 @@ export function tolkData(ark: Record<string, any[][]>, eid: string): { rader: Im
 /** Gjør en importrad om til systemdata */
 export function tilSystem(r: ImportRad, eid: string, eks?: Rec | null): Rec {
   const m2 = /^m(2|²)$/i.test(r.enhet) && r.antall && r.enhetskost;
-  const notat = [r.antall && !m2 ? `Antall: ${r.antall.toLocaleString('nb-NO')} ${r.enhet || 'stk'}${r.enhetskost ? ` à ${r.enhetskost.toLocaleString('nb-NO')} kr` : ''}` : '', r.service ? `Siste servicerapport: ${r.service.split('-').reverse().join('.')}` : '', r.komm].filter(Boolean).join('\n');
+  const notat = [r.antall && !m2 ? `Antall: ${r.antall.toLocaleString(lokale())} ${r.enhet || 'stk'}${r.enhetskost ? ` à ${r.enhetskost.toLocaleString(lokale())} kr` : ''}` : '', r.service ? `Siste servicerapport: ${r.service.split('-').reverse().join('.')}` : '', r.komm].filter(Boolean).join('\n');
   const ny: Rec = { ...(eks || {}), eiendomId: eid, type: r.type || eks?.type || '', tfmSys: r.kode, tfmLop: r.lop, navn: r.navn || eks?.navn || '',
     ...(r.aar ? { aar: r.aar } : {}), ...(r.levetid ? { levetid: r.levetid } : {}), ...(r.planAar ? { planAar: r.planAar } : {}),
     ...(r.tg ? { tg: r.tg, tgdato: eks?.tg === r.tg ? eks.tgdato : new Date().toISOString().slice(0, 10), tgKomm: r.komm || eks?.tgKomm || '' } : {}),

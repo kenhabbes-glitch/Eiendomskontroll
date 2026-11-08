@@ -1,5 +1,6 @@
 import { KOMP, TFM_KODER, AV_LUKKET, TYPE_TAGGER, NS_TAGG } from './catalog';
 import { S, ARKIV } from './store';
+import { lokale, sprak } from './i18n';
 
 export type Rec = { id: string; [k: string]: any };
 
@@ -14,21 +15,21 @@ export function addInt(s: string, i?: { n?: number; enhet?: string }) {
 }
 export function addDays(s: string, n: number) { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return iso(d); }
 export function dUntil(s?: string): number | null { if (!s) return null; return Math.round((new Date(s + 'T12:00:00').getTime() - new Date(today() + 'T12:00:00').getTime()) / 864e5); }
-export function fd(s?: string) { if (!s) return '–'; const [y, m, d] = s.slice(0, 10).split('-'); return `${d}.${m}.${y}`; }
-export function fdt(s?: string) { if (!s) return '–'; return new Date(s).toLocaleString('nb-NO', { dateStyle: 'short', timeStyle: 'short' }); }
+export function fd(s?: string) { if (!s) return '–'; const [y, m, d] = s.slice(0, 10).split('-'); return sprak() === 'nb' ? `${d}.${m}.${y}` : `${d}/${m}/${y}`; }
+export function fdt(s?: string) { if (!s) return '–'; return new Date(s).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' }); }
 export function intTxt(i?: { n?: number; enhet?: string }) {
   if (!i) return '–'; const n = +(i.n || 1);
   if (i.enhet === 'uke') return n === 1 ? 'Ukentlig' : `Hver ${n}. uke`;
   if (i.enhet === 'mnd') return n === 1 ? 'Månedlig' : n === 12 ? 'Årlig' : `Hver ${n}. mnd`;
   return n === 1 ? 'Årlig' : `Hvert ${n}. år`;
 }
-export const nok = (n: any) => (n || n === 0) && n !== '' ? new Intl.NumberFormat('nb-NO').format(Math.round(+n)) + ' kr' : '–';
-export const knok = (v: any) => { const n = +v || 0; if (n >= 1e6) return (n / 1e6).toLocaleString('nb-NO', { maximumFractionDigits: 1 }) + ' mill'; if (n >= 1e3) return Math.round(n / 1e3) + ' k'; return String(Math.round(n)); };
+export const nok = (n: any) => (n || n === 0) && n !== '' ? new Intl.NumberFormat(lokale()).format(Math.round(+n)) + ' kr' : '–';
+export const knok = (v: any) => { const n = +v || 0; if (n >= 1e6) return (n / 1e6).toLocaleString(lokale(), { maximumFractionDigits: 1 }) + ' mill'; if (n >= 1e3) return Math.round(n / 1e3) + ' k'; return String(Math.round(n)); };
 export const uid = () => crypto.randomUUID();
 export const clone = <T,>(o: T): T => JSON.parse(JSON.stringify(o ?? null));
 export const pad = (n: any, l = 3) => (n === '' || n == null ? '' : String(n).padStart(l, '0'));
 export const sortBy = <T,>(arr: T[], f: (x: T) => any) => arr.slice().sort((a, b) => { const x = f(a), y = f(b); return x < y ? -1 : x > y ? 1 : 0; });
-export const m2 = (v: any) => v == null || isNaN(v) ? '–' : (+v).toLocaleString('nb-NO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' m²';
+export const m2 = (v: any) => v == null || isNaN(v) ? '–' : (+v).toLocaleString(lokale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' m²';
 
 // ---- oppslag
 export const byId = (col: keyof typeof S, id?: string): Rec | undefined => id ? ((S[col] as Rec[]).find(x => x.id === id) || ((ARKIV as any)[col] as Rec[] | undefined)?.find(x => x.id === id)) : undefined;
@@ -62,7 +63,7 @@ export const kostAarFor = (a: Rec) => +a.kostAar || YEAR;
 export function kostJustert(a: Rec, aar?: number | null) { const k = +a.kost || 0; if (!k) return 0; const y = Math.max(aar ?? compYear(a) ?? YEAR, YEAR); return k * kpiFaktor(kostAarFor(a), y); }
 /** Kostnad indeksregulert fra prisnivååret til inneværende år */
 export function kostNaa(a: Rec) { const k = +a.kost || 0; if (!k) return 0; const f = kostAarFor(a); return f < YEAR ? k * kpiFaktor(f, YEAR) : k; }
-export function kostTip(a: Rec) { const f = kostAarFor(a); const m = a.kostMetode === 'm2' && a.mengde && a.m2pris ? `${(+a.mengde).toLocaleString('nb-NO')} m² × ${nok(a.m2pris)}/m²${+a.faktor && +a.faktor !== 1 ? ' × ' + String(a.faktor).replace('.', ',') : ''} = ${nok(a.kost)}. ` : ''; return m + (f < YEAR ? `Anslått ${nok(a.kost)} i ${f}-kroner, indeksregulert til ${YEAR}` : `Anslått i ${f}-kroner`); }
+export function kostTip(a: Rec) { const f = kostAarFor(a); const m = a.kostMetode === 'm2' && a.mengde && a.m2pris ? `${(+a.mengde).toLocaleString(lokale())} m² × ${nok(a.m2pris)}/m²${+a.faktor && +a.faktor !== 1 ? ' × ' + String(a.faktor).replace('.', ',') : ''} = ${nok(a.kost)}. ` : ''; return m + (f < YEAR ? `Anslått ${nok(a.kost)} i ${f}-kroner, indeksregulert til ${YEAR}` : `Anslått i ${f}-kroner`); }
 // ---- System = sentralkost (på systemet) + sum av komponentenes kostnader
 export const sysKomp = (a: Rec) => S.komponenter.filter(k => k.anleggId === a.id);
 /** Komponenten har egen levetid/utskiftingsår (ellers følger den systemet) */
@@ -78,7 +79,7 @@ export function renteInnst() { const r = S.innst?.rente || {}; return r.sats ===
 export function naaverdi(belop: number, aar: number | null) { if (!belop || !aar) return 0; return belop / Math.pow(1 + renteInnst() / 100, Math.max(aar - YEAR, 0)); }
 export function sysNaaverdi(a: Rec) { const y = compYear(a); return y ? naaverdi(sysKostUtskift(a, y), Math.max(y, YEAR)) : 0; }
 export function kompNaaverdi(k: Rec) { const y = kompAar(k); return y && +k.kost ? naaverdi(kostJustert(k, y), Math.max(y, YEAR)) : 0; }
-export const nvTip = (y: number | null) => `Nåverdi: kostnaden i ${Math.max(y || YEAR, YEAR)} diskontert til ${YEAR} med ${renteInnst().toLocaleString('nb-NO')} % kalkulasjonsrente`;
+export const nvTip = (y: number | null) => `Nåverdi: kostnaden i ${Math.max(y || YEAR, YEAR)} diskontert til ${YEAR} med ${renteInnst().toLocaleString(lokale())} % kalkulasjonsrente`;
 export function sysKostTip(a: Rec) { const c = sysKostNaa(a); return c.n ? `Sentralkost ${nok(c.sentral)} + ${c.n} komponenter ${nok(c.komp)} (${YEAR}-kroner)` : kostTip(a); }
 export function beregnetAar(a: Rec) { const b = +a.aar || 0; const l = +a.levetid || KOMP[a.type]?.l || 0; return b && l ? b + l : null; }
 export function compRest(a: Rec) { const y = compYear(a); return y === null ? null : y - YEAR; }

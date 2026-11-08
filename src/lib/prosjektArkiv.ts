@@ -7,8 +7,9 @@ import { aNavn, addDays, byId, eNavn, fd, today, type Rec } from './utils';
 import { Doc, A4, M, INK, MUTED, LINE, SOFT, safe } from './arealRapport';
 import { FASER, okonomi, fremdrift, delFor, delNavn, KLASSER, BETALER } from './prosjekt';
 import { GODKJENT, kalkSum, linjeSum, n, tilbudScore } from './prosjektArbeid';
+import { lokale } from './i18n';
 
-const kr = (v: any) => new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(Math.round(+v || 0)) + ' kr';
+const kr = (v: any) => new Intl.NumberFormat(lokale(), { maximumFractionDigits: 0 }).format(Math.round(+v || 0)) + ' kr';
 const RED = rgb(0.71, 0.14, 0.09), AMBER = rgb(0.72, 0.47, 0.12), GREEN = rgb(0.18, 0.49, 0.31);
 
 // ---------------- Oppbevaring

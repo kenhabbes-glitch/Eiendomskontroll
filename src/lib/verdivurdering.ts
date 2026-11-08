@@ -3,6 +3,7 @@
 import { S } from './store';
 import { YEAR, dUntil, leieAreal, today, type Rec } from './utils';
 import { capex } from './capexRapport';
+import { lokale } from './i18n';
 
 export type VerdiInn = {
   yield: number;            // markedsyield, %
@@ -58,5 +59,5 @@ export function verdivurdering(e: Rec, inn: VerdiInn) {
     wault, bta, m2: bta ? verdi / bta : 0, sens, utlop, mangler, utlopSnart, ledighetPst: utleid + inn.ledigAreal ? inn.ledigAreal / (utleid + inn.ledigAreal) * 100 : 0 };
 }
 export type Verdi = ReturnType<typeof verdivurdering>;
-export const kr = (n: number) => Math.round(n).toLocaleString('nb-NO') + ' kr';
-export const mkr = (n: number) => (n / 1e6).toLocaleString('nb-NO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' MNOK';
+export const kr = (n: number) => Math.round(n).toLocaleString(lokale()) + ' kr';
+export const mkr = (n: number) => (n / 1e6).toLocaleString(lokale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' MNOK';

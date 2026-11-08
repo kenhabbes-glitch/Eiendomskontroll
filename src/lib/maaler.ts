@@ -2,6 +2,7 @@
 // En måler er en komponent med mType satt. Avlesningene ligger i S.avlesninger (egen tabell).
 import { S } from './store';
 import { addInt, byId, type Rec } from './utils';
+import { lokale } from './i18n';
 
 export const MEDIER: [string, string, string][] = [
   ['vann', 'Vann', 'm³'], ['el', 'Elektrisitet', 'kWh'], ['fjernvarme', 'Fjernvarme', 'kWh'], ['fjernkjoling', 'Fjernkjøling', 'kWh'],
@@ -19,7 +20,7 @@ export const erMaaler = (k?: Rec | null) => !!k?.mType;
 export const alleMaalere = (eid?: string) => S.komponenter.filter(k => erMaaler(k) && (!eid || k.eiendomId === eid));
 export const enhet = (k: Rec) => k.mEnhet || stdEnhet(k.mMedium);
 export const tall = (v: any): number | null => { if (v === '' || v == null) return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? n : null; };
-export const fmt = (v: number | null | undefined, des?: number) => v == null ? '–' : v.toLocaleString('nb-NO', { maximumFractionDigits: des ?? (Math.abs(v) < 100 ? 2 : 0) });
+export const fmt = (v: number | null | undefined, des?: number) => v == null ? '–' : v.toLocaleString(lokale(), { maximumFractionDigits: des ?? (Math.abs(v) < 100 ? 2 : 0) });
 
 /** Avlesninger for en måler, eldste først */
 export function avlFor(kid: string): Rec[] {

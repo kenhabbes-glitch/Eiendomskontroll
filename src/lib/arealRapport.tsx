@@ -4,6 +4,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf
 import { S, fileUrl, toast } from './store';
 import { AREAL_KAT, KAT_FARGE, arealCalc, avtaleTekst, byId, centroid, lNavn, ltColor, mpp, sortBy, zoneArea, type Rec } from './utils';
 import { openModal } from '../components/ui';
+import { tt, lokale } from './i18n';
 
 // ---------- dialog
 export function arealRapport(eid: string) { openModal({ wide: true, render: close => <RapportValg eid={eid} close={close} /> }); }
@@ -19,33 +20,33 @@ function RapportValg({ eid, close }: { eid: string; close: () => void }) {
   const alle = (o: Record<string, boolean>, v: boolean) => Object.fromEntries(Object.keys(o).map(k => [k, v]));
   const lag = async () => {
     const tids = T.filter(t => tv[t.id]).map(t => t.id); const lids = keys.filter(k => lv[k]);
-    if (!tids.length && !lids.length) { toast('Velg minst én etasje eller leietaker'); return; }
+    if (!tids.length && !lids.length) { toast(tt("Velg minst én etasje eller leietaker")); return; }
     setBusy('Lager rapport …');
     try {
       const bytes = await byggPdf(eid, { tids, lids, medTegn, medDek, kost: +kost.replace(',', '.') || 0 }, setBusy);
       const blob = new Blob([bytes as any], { type: 'application/pdf' }); const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = `Arealrapport ${e.navn} ${new Date().toISOString().slice(0, 10)}.pdf`; document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 20000); toast('Arealrapport lastet ned'); close();
-    } catch (err: any) { console.error(err); toast('Kunne ikke lage rapporten: ' + (err?.message || err)); }
+      setTimeout(() => URL.revokeObjectURL(url), 20000); toast(tt("Arealrapport lastet ned")); close();
+    } catch (err: any) { console.error(err); toast(tt("Kunne ikke lage rapporten: ") + (err?.message || err)); }
     setBusy('');
   };
   const box = { display: 'flex', gap: 8, alignItems: 'center', padding: '3px 0' } as any;
   return <>
-    <div className="mh"><h2>Arealrapport (PDF) – {e.navn}</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
+    <div className="mh"><h2>{tt("Arealrapport (PDF) –")} {e.navn}</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
     <div className="mb">
       <div className="grid g2" style={{ gap: 16 }}>
-        <div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><b style={{ flex: 1 }}>Etasjer / tegninger</b><a href="#" className="small" onClick={ev => { ev.preventDefault(); setTv(alle(tv, true)); }}>alle</a><a href="#" className="small" onClick={ev => { ev.preventDefault(); setTv(alle(tv, false)); }}>ingen</a></div>
-          {T.length ? T.map(t => <label key={t.id} className="small" style={box}><input type="checkbox" checked={!!tv[t.id]} onChange={ev => setTv({ ...tv, [t.id]: ev.target.checked })} />{t.navn}{!mpp(t) && <span style={{ color: 'var(--amber)' }}> (mangler målestokk)</span>}</label>) : <p className="small muted">Ingen tegninger.</p>}</div>
-        <div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><b style={{ flex: 1 }}>Leietakere</b><a href="#" className="small" onClick={ev => { ev.preventDefault(); setLv(alle(lv, true)); }}>alle</a><a href="#" className="small" onClick={ev => { ev.preventDefault(); setLv(alle(lv, false)); }}>ingen</a></div>
-          {keys.length ? keys.map(k => { const l = byId('leietakere', k); return <label key={k} className="small" style={box}><input type="checkbox" checked={!!lv[k]} onChange={ev => setLv({ ...lv, [k]: ev.target.checked })} /><span className="sw" style={{ background: k === '_ledig' ? KAT_FARGE.ledig : ltColor(eid, k) }} />{navn(k)}{l?.fellesAvtale && <span className="muted"> · {avtaleTekst(l)}</span>}</label>; }) : <p className="small muted">Ingen oppmålte leiearealer.</p>}</div>
+        <div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><b style={{ flex: 1 }}>{tt("Etasjer / tegninger")}</b><a href="#" className="small" onClick={ev => { ev.preventDefault(); setTv(alle(tv, true)); }}>{tt("alle")}</a><a href="#" className="small" onClick={ev => { ev.preventDefault(); setTv(alle(tv, false)); }}>{tt("ingen")}</a></div>
+          {T.length ? T.map(t => <label key={t.id} className="small" style={box}><input type="checkbox" checked={!!tv[t.id]} onChange={ev => setTv({ ...tv, [t.id]: ev.target.checked })} />{t.navn}{!mpp(t) && <span style={{ color: 'var(--amber)' }}> {tt("(mangler målestokk)")}</span>}</label>) : <p className="small muted">{tt("Ingen tegninger.")}</p>}</div>
+        <div><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><b style={{ flex: 1 }}>{tt("Leietakere")}</b><a href="#" className="small" onClick={ev => { ev.preventDefault(); setLv(alle(lv, true)); }}>{tt("alle")}</a><a href="#" className="small" onClick={ev => { ev.preventDefault(); setLv(alle(lv, false)); }}>{tt("ingen")}</a></div>
+          {keys.length ? keys.map(k => { const l = byId('leietakere', k); return <label key={k} className="small" style={box}><input type="checkbox" checked={!!lv[k]} onChange={ev => setLv({ ...lv, [k]: ev.target.checked })} /><span className="sw" style={{ background: k === '_ledig' ? KAT_FARGE.ledig : ltColor(eid, k) }} />{navn(k)}{l?.fellesAvtale && <span className="muted"> · {avtaleTekst(l)}</span>}</label>; }) : <p className="small muted">{tt("Ingen oppmålte leiearealer.")}</p>}</div>
       </div>
       <hr />
-      <label className="small" style={box}><input type="checkbox" checked={medTegn} onChange={ev => setMedTegn(ev.target.checked)} />Ta med plantegninger med arealene tegnet inn (én side per etasje)</label>
-      <label className="small" style={box}><input type="checkbox" checked={medDek} onChange={ev => setMedDek(ev.target.checked)} />Ta med dekning av fellesareal (over-/underdekning mot kontraktfestet fellesareal)</label>
-      {medDek && <div className="form" style={{ maxWidth: 420, marginTop: 6 }}><div className="fld"><label>Felleskostnad per m² per år (kr, valgfritt)</label><input value={kost} onChange={ev => setKost(ev.target.value)} inputMode="decimal" placeholder="F.eks. 350" style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px' }} /><div className="hint">Fylles ut for å vise over-/underdekning i kroner.</div></div></div>}
-      <p className="small muted">Fellesarealet fordeles alltid ut fra hele bygget. Valgene bestemmer bare hva som vises i rapporten. Leietakere som ikke er valgt, vises grått og uten navn på tegningene.</p>
+      <label className="small" style={box}><input type="checkbox" checked={medTegn} onChange={ev => setMedTegn(ev.target.checked)} />{tt("Ta med plantegninger med arealene tegnet inn (én side per etasje)")}</label>
+      <label className="small" style={box}><input type="checkbox" checked={medDek} onChange={ev => setMedDek(ev.target.checked)} />{tt("Ta med dekning av fellesareal (over-/underdekning mot kontraktfestet fellesareal)")}</label>
+      {medDek && <div className="form" style={{ maxWidth: 420, marginTop: 6 }}><div className="fld"><label>{tt("Felleskostnad per m² per år (kr, valgfritt)")}</label><input value={kost} onChange={ev => setKost(ev.target.value)} inputMode="decimal" placeholder={tt("F.eks. 350")} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px' }} /><div className="hint">{tt("Fylles ut for å vise over-/underdekning i kroner.")}</div></div></div>}
+      <p className="small muted">{tt("Fellesarealet fordeles alltid ut fra hele bygget. Valgene bestemmer bare hva som vises i rapporten. Leietakere som ikke er valgt, vises grått og uten navn på tegningene.")}</p>
     </div>
-    <div className="mf"><button className="btn" onClick={close}>Avbryt</button><button className="btn pri" disabled={!!busy} onClick={lag}>{busy || 'Last ned PDF'}</button></div>
+    <div className="mf"><button className="btn" onClick={close}>{tt("Avbryt")}</button><button className="btn pri" disabled={!!busy} onClick={lag}>{busy || tt("Last ned PDF")}</button></div>
   </>;
 }
 const navn = (k: string) => k === '_ledig' ? 'Ledig areal' : k === '_ukjent' ? 'Leieareal uten leietaker' : lNavn(k) || 'Ukjent leietaker';
@@ -57,10 +58,10 @@ export const INK = rgb(0.11, 0.14, 0.13), MUTED = rgb(0.42, 0.45, 0.43), LINE = 
 export const hex = (h: string) => { const n = parseInt(h.replace('#', ''), 16); return rgb((n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255); };
 /** Bare tegn som standardfontene (WinAnsi) kan vise */
 export const safe = (s: any) => String(s ?? '').replace(/−/g, '-').replace(/[   ]/g, ' ').replace(/[^\x20-\x7E -ÿ–—‘’“”•…€]/g, '');
-const nm2 = (v: number) => (Math.round(v * 10) / 10).toLocaleString('nb-NO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' m²';
+const nm2 = (v: number) => (Math.round(v * 10) / 10).toLocaleString(lokale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' m²';
 const sgn = (v: number) => (v >= 0.05 ? '+' : v <= -0.05 ? '-' : '') + nm2(Math.abs(v));
-const kr = (v: number) => Math.round(v).toLocaleString('nb-NO') + ' kr';
-const pst = (v: number) => (v * 100).toLocaleString('nb-NO', { maximumFractionDigits: 1 }) + ' %';
+const kr = (v: number) => Math.round(v).toLocaleString(lokale()) + ' kr';
+const pst = (v: number) => (v * 100).toLocaleString(lokale(), { maximumFractionDigits: 1 }) + ' %';
 
 export class Doc {
   pdf!: PDFDocument; f!: PDFFont; b!: PDFFont; page!: PDFPage; y = 0; side = 0; tittel = '';
@@ -97,7 +98,7 @@ export class Doc {
 
 async function byggPdf(eid: string, o: Opt, status: (s: string) => void) {
   const e = byId('eiendommer', eid)!; const C: any = arealCalc(eid); const d = C.dekning;
-  const dato = new Date().toLocaleDateString('nb-NO', { day: 'numeric', month: 'long', year: 'numeric' });
+  const dato = new Date().toLocaleDateString(lokale(), { day: 'numeric', month: 'long', year: 'numeric' });
   const D = await Doc.ny('Arealrapport – ' + e.navn + ' – ' + dato);
   const T = sortBy(S.tegninger.filter(t => o.tids.includes(t.id)), t => +t.etasje || 0);
   const L = o.lids.filter(k => C.per[k]);

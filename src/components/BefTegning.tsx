@@ -6,13 +6,14 @@ import { S, fileUrl } from '../lib/store';
 import { byId, mpp, polyArea, sortBy, type Rec } from '../lib/utils';
 import { tegningUrl } from '../lib/offline';
 import type { Funn, Shape } from '../lib/befaring';
+import { tt, lokale } from '../lib/i18n';
 
 type Verktoy = 'flytt' | 'avvik' | 'maal' | 'areal' | 'fri' | 'pil' | 'tekst' | 'kalibrer' | 'slett';
 const VERKTOY: [Verktoy, string, string][] = [['flytt', '✋', 'Flytt / zoom'], ['avvik', '⚠', 'Nytt funn'], ['maal', '↔', 'Mål avstand'], ['areal', '▱', 'Mål areal'], ['fri', '✎', 'Tegn'], ['pil', '➚', 'Pil'], ['tekst', 'T', 'Tekst'], ['slett', '⌫', 'Slett tegning']];
 const FARGER = ['#b42318', '#1f6f5c', '#2457a6', '#b07a00', '#1d2521'];
 export type Skala = { a: number[]; b: number[]; m: number };
-const fmtM = (v: number) => v.toLocaleString('nb-NO', { maximumFractionDigits: v < 10 ? 2 : 1 }) + ' m';
-const fmtM2 = (v: number) => v.toLocaleString('nb-NO', { maximumFractionDigits: 1 }) + ' m²';
+const fmtM = (v: number) => v.toLocaleString(lokale(), { maximumFractionDigits: v < 10 ? 2 : 1 }) + ' m';
+const fmtM2 = (v: number) => v.toLocaleString(lokale(), { maximumFractionDigits: 1 }) + ' m²';
 
 export function useTegningUrl(t?: Rec) {
   const [u, setU] = useState('');
@@ -95,43 +96,43 @@ export function BefTegning({ eiendomId, tegningId, setTegningId, shapes, setShap
     return <g key={s.id} {...ev}><line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={c} strokeWidth={sw * 1.8} strokeDasharray={s.t === 'kalibrer' as any ? `${sw * 4} ${sw * 3}` : undefined} />
       {s.t === 'pil' && <path d={`M${b[0]} ${b[1]} L${b[0] - hd * Math.cos(ang - .45)} ${b[1] - hd * Math.sin(ang - .45)} L${b[0] - hd * Math.cos(ang + .45)} ${b[1] - hd * Math.sin(ang + .45)} Z`} fill={c} />}
       {s.t === 'maal' && <>{[a, b].map((p, i) => <line key={i} x1={p[0] - hd * .5 * Math.sin(ang)} y1={p[1] + hd * .5 * Math.cos(ang)} x2={p[0] + hd * .5 * Math.sin(ang)} y2={p[1] - hd * .5 * Math.cos(ang)} stroke={c} strokeWidth={sw * 1.8} />)}
-        <text x={(a[0] + b[0]) / 2} y={(a[1] + b[1]) / 2 - R * .4} fontSize={R * 1.05} textAnchor="middle" fill={c} fontWeight={700} stroke="#fff" strokeWidth={sw * 2} paintOrder="stroke">{L !== null ? fmtM(L) : 'mangler målestokk'}</text></>}</g>;
+        <text x={(a[0] + b[0]) / 2} y={(a[1] + b[1]) / 2 - R * .4} fontSize={R * 1.05} textAnchor="middle" fill={c} fontWeight={700} stroke="#fff" strokeWidth={sw * 2} paintOrder="stroke">{L !== null ? fmtM(L) : tt("mangler målestokk")}</text></>}</g>;
   };
   const egne = shapes || [];
   const fh = funn.filter(f => f.pos?.tegningId === tegningId);
   const nr = useMemo(() => new Map(funn.map((f, i) => [f.id, i + 1])), [funn]);
   const fFarge = (f: Funn) => f.art === 'system' ? '#2457a6' : f.art === 'merknad' ? '#6b736d' : f.art === 'tilpasning' ? '#b07a00' : f.art === 'energi' ? '#1f6f5c' : '#b42318';
 
-  if (!T.length) return <div className="note small">Eiendommen har ingen etasjeplaner ennå. Last opp under «Tegninger og arealer» for å registrere funn på tegning. Funn kan registreres uten tegning.</div>;
+  if (!T.length) return <div className="note small">{tt("Eiendommen har ingen etasjeplaner ennå. Last opp under «Tegninger og arealer» for å registrere funn på tegning. Funn kan registreres uten tegning.")}</div>;
   const utkastShape: Shape | null = utkast.length ? (v === 'areal' ? { id: '_u', t: 'areal', pts: hover ? [...utkast, hover] : utkast, farge } : v === 'fri' ? { id: '_u', t: 'fri', pts: utkast, farge } : (v === 'maal' || v === 'pil' || v === 'kalibrer') && (hover || utkast.length > 1) ? { id: '_u', t: v === 'kalibrer' ? 'maal' : v, pts: utkast.length > 1 ? utkast : [utkast[0], hover!], farge: v === 'maal' || v === 'kalibrer' ? '#2457a6' : farge } : null) : null;
   return <div className="bt">
     <div className="bt-bar">
       {T.length > 1 && <select value={tegningId} onChange={e => setTegningId(e.target.value)} className="bt-sel">{T.map(x => <option key={x.id} value={x.id}>{x.navn}{funn.some(f => f.pos?.tegningId === x.id) ? ' ●' : ''}</option>)}</select>}
       {!ro && VERKTOY.map(([k, ic, l]) => <button key={k} type="button" className={'btn sm' + (v === k ? ' pri' : '')} title={l} aria-label={l} onClick={() => setV(k)}><span aria-hidden>{ic}</span><span className="bt-l">{l}</span></button>)}
-      {ro && <span className="small muted">Bare visning</span>}
+      {ro && <span className="small muted">{tt("Bare visning")}</span>}
       <span style={{ flex: 1 }} />
-      {!ro && ['fri', 'pil', 'tekst', 'areal'].includes(v) && <span className="bt-farger">{FARGER.map(c => <button key={c} type="button" aria-label={'Farge ' + c} onClick={() => setFarge(c)} style={{ background: c, outline: farge === c ? '2px solid var(--ink)' : 'none' }} />)}</span>}
-      <button type="button" className="btn sm" onClick={() => zoom(1 / 1.4)} aria-label="Zoom inn">＋</button><button type="button" className="btn sm" onClick={() => zoom(1.4)} aria-label="Zoom ut">－</button>
-      <button type="button" className="btn sm ghost" onClick={() => setVb({ x: 0, y: 0, w: W, h: H })}>Hele</button>
-      {!ro && egne.length > 0 && <button type="button" className="btn sm ghost" onClick={() => setShapes(egne.slice(0, -1))}>Angre</button>}
+      {!ro && ['fri', 'pil', 'tekst', 'areal'].includes(v) && <span className="bt-farger">{FARGER.map(c => <button key={c} type="button" aria-label={tt("Farge ") + c} onClick={() => setFarge(c)} style={{ background: c, outline: farge === c ? '2px solid var(--ink)' : 'none' }} />)}</span>}
+      <button type="button" className="btn sm" onClick={() => zoom(1 / 1.4)} aria-label={tt("Zoom inn")}>＋</button><button type="button" className="btn sm" onClick={() => zoom(1.4)} aria-label={tt("Zoom ut")}>－</button>
+      <button type="button" className="btn sm ghost" onClick={() => setVb({ x: 0, y: 0, w: W, h: H })}>{tt("Hele")}</button>
+      {!ro && egne.length > 0 && <button type="button" className="btn sm ghost" onClick={() => setShapes(egne.slice(0, -1))}>{tt("Angre")}</button>}
     </div>
     {!ro && <div className="bt-hint small">
-      {v === 'avvik' && 'Trykk på tegningen der funnet er.'}
-      {v === 'flytt' && 'Dra for å flytte. Zoom med to fingre, musehjul eller knappene.'}
-      {v === 'maal' && (r ? 'Trykk på startpunkt og sluttpunkt.' : <>Tegningen mangler målestokk. <a href="#" onClick={e => { e.preventDefault(); setV('kalibrer'); }}>Sett målestokk</a> først.</>)}
-      {v === 'areal' && (utkast.length >= 3 ? <>Trykk på første punkt eller <button type="button" className="btn sm" onClick={ferdig}>Ferdig</button> <button type="button" className="btn sm ghost" onClick={() => setUtkast([])}>Avbryt</button></> : r ? 'Trykk på hjørnene i arealet.' : 'Arealet tegnes, men m² vises først når målestokk er satt.')}
-      {v === 'fri' && 'Tegn med fingeren eller musen.'}
-      {v === 'pil' && 'Trykk på start og spiss.'}
-      {v === 'slett' && 'Trykk på en tegning, et mål eller en tekst for å slette den. Funn slettes i listen.'}
-      {v === 'tekst' && <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>Tekst: <input value={tekst} onChange={e => setTekst(e.target.value)} placeholder="Skriv, og trykk på tegningen" style={{ border: '1px solid var(--line2)', borderRadius: 7, padding: '4px 7px' }} />
-        {utkast.length > 0 && tekst.trim() && <button type="button" className="btn sm pri" onClick={() => { legg({ t: 'tekst', pts: [utkast[0]], tekst: tekst.trim(), farge }); setTekst(''); setUtkast([]); }}>Sett inn</button>}</span>}
-      {v === 'kalibrer' && (utkast.length < 2 ? 'Trykk på to punkter med kjent avstand (f.eks. en dør eller en målsatt vegg).' : <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>Avstand i meter: <input inputMode="decimal" value={lengde} onChange={e => setLengde(e.target.value)} style={{ width: 90, border: '1px solid var(--line2)', borderRadius: 7, padding: '4px 7px' }} autoFocus />
-        <button type="button" className="btn sm pri" onClick={() => { const m = +lengde.replace(',', '.'); if (m > 0) { setSkala({ a: utkast[0], b: utkast[1], m }); setUtkast([]); setLengde(''); setV('maal'); } }}>Bruk målestokk</button>
-        <button type="button" className="btn sm ghost" onClick={() => setUtkast([])}>Avbryt</button></span>)}
-      {!['kalibrer'].includes(v) && <span className="muted"> {r ? `Målestokk ${skala ? 'satt i befaringen' : 'fra tegningen'}.` : ''} {!ro && <a href="#" onClick={e => { e.preventDefault(); setV('kalibrer'); }}>{r ? 'Juster målestokk' : 'Sett målestokk'}</a>}{skala && !ro && <> · <a href="#" onClick={e => { e.preventDefault(); setSkala(null); }}>bruk tegningens</a></>}</span>}
+      {v === 'avvik' && tt("Trykk på tegningen der funnet er.")}
+      {v === 'flytt' && tt("Dra for å flytte. Zoom med to fingre, musehjul eller knappene.")}
+      {v === 'maal' && (r ? tt("Trykk på startpunkt og sluttpunkt.") : <>{tt("Tegningen mangler målestokk.")} <a href="#" onClick={e => { e.preventDefault(); setV('kalibrer'); }}>{tt("Sett målestokk")}</a> {tt("først.")}</>)}
+      {v === 'areal' && (utkast.length >= 3 ? <>{tt("Trykk på første punkt eller")} <button type="button" className="btn sm" onClick={ferdig}>{tt("Ferdig")}</button> <button type="button" className="btn sm ghost" onClick={() => setUtkast([])}>{tt("Avbryt")}</button></> : r ? tt("Trykk på hjørnene i arealet.") : tt("Arealet tegnes, men m² vises først når målestokk er satt."))}
+      {v === 'fri' && tt("Tegn med fingeren eller musen.")}
+      {v === 'pil' && tt("Trykk på start og spiss.")}
+      {v === 'slett' && tt("Trykk på en tegning, et mål eller en tekst for å slette den. Funn slettes i listen.")}
+      {v === 'tekst' && <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>{tt("Tekst:")} <input value={tekst} onChange={e => setTekst(e.target.value)} placeholder={tt("Skriv, og trykk på tegningen")} style={{ border: '1px solid var(--line2)', borderRadius: 7, padding: '4px 7px' }} />
+        {utkast.length > 0 && tekst.trim() && <button type="button" className="btn sm pri" onClick={() => { legg({ t: 'tekst', pts: [utkast[0]], tekst: tekst.trim(), farge }); setTekst(''); setUtkast([]); }}>{tt("Sett inn")}</button>}</span>}
+      {v === 'kalibrer' && (utkast.length < 2 ? tt("Trykk på to punkter med kjent avstand (f.eks. en dør eller en målsatt vegg).") : <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>{tt("Avstand i meter:")} <input inputMode="decimal" value={lengde} onChange={e => setLengde(e.target.value)} style={{ width: 90, border: '1px solid var(--line2)', borderRadius: 7, padding: '4px 7px' }} autoFocus />
+        <button type="button" className="btn sm pri" onClick={() => { const m = +lengde.replace(',', '.'); if (m > 0) { setSkala({ a: utkast[0], b: utkast[1], m }); setUtkast([]); setLengde(''); setV('maal'); } }}>{tt("Bruk målestokk")}</button>
+        <button type="button" className="btn sm ghost" onClick={() => setUtkast([])}>{tt("Avbryt")}</button></span>)}
+      {!['kalibrer'].includes(v) && <span className="muted"> {r ? tt("Målestokk {0}.", skala ? 'satt i befaringen' : 'fra tegningen') : ''} {!ro && <a href="#" onClick={e => { e.preventDefault(); setV('kalibrer'); }}>{r ? tt("Juster målestokk") : tt("Sett målestokk")}</a>}{skala && !ro && <> · <a href="#" onClick={e => { e.preventDefault(); setSkala(null); }}>{tt("bruk tegningens")}</a></>}</span>}
     </div>}
     <div className="bt-flate" style={{ height: `min(${hoyde}px, 68vh)` }}>
-      {!url && <div className="muted small" style={{ padding: 30, textAlign: 'center' }}>Laster tegning …</div>}
+      {!url && <div className="muted small" style={{ padding: 30, textAlign: 'center' }}>{tt("Laster tegning …")}</div>}
       <svg ref={svg} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} preserveAspectRatio="xMidYMid meet" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={e => { peker.current.delete(e.pointerId); drag.current = null; }}
         style={{ width: '100%', height: '100%', touchAction: 'none', cursor: ro || v === 'flytt' ? 'grab' : 'crosshair', display: url ? 'block' : 'none' }}>
         {url && <image href={url} x={0} y={0} width={W} height={H} />}

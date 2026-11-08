@@ -7,6 +7,7 @@ import { S, fileUrl, loggHendelse, save, toast } from './store';
 import { byId, fd, sortBy, type Rec } from './utils';
 import { bv, etasjeSett, editBrannkort, RISIKOKLASSER, BRANNKLASSER, type Sone } from './brannvern';
 import { confirmBox, openModal } from '../components/ui';
+import { tt } from './i18n';
 
 export const BRANNKONSEPT = 'Brannkonsept/brannteknisk dokumentasjon';
 export const brannkonsepter = (eid: string) => sortBy(S.dokumenter.filter(d => d.eiendomId === eid && !d.leietakerId && d.type === BRANNKONSEPT && /\.pdf$/i.test(d.fil?.navn || d.fil?.path || '')), d => d.dato || '').reverse();
@@ -110,12 +111,12 @@ const flest = (f: Funn[]) => { const n: Record<string, number> = {}; f.forEach(x
 // ---------------- dialog
 export function lesBrannkonsept(eid: string, dokId?: string) {
   const D = brannkonsepter(eid);
-  if (!D.length) { toast('Last opp brannkonseptet som PDF under Dokumenter (type «Brannkonsept/brannteknisk dokumentasjon») først'); return; }
+  if (!D.length) { toast(tt("Last opp brannkonseptet som PDF under Dokumenter (type «Brannkonsept/brannteknisk dokumentasjon») først")); return; }
   openModal({ wide: true, render: close => <Les eid={eid} start={dokId || D[0].id} close={close} /> });
 }
 /** Etter opplasting av et brannkonsept: tilby å hente opplysningene */
 export async function tilbyLesing(eid: string, dokId: string) {
-  if (await confirmBox('Brannkonseptet er lastet opp. Vil du at appen leser det og foreslår opplysninger til brannkortet (risikoklasse, brannklasse, alarm, forutsetninger …)?', 'Les brannkonseptet')) lesBrannkonsept(eid, dokId);
+  if (await confirmBox(tt("Brannkonseptet er lastet opp. Vil du at appen leser det og foreslår opplysninger til brannkortet (risikoklasse, brannklasse, alarm, forutsetninger …)?"), tt("Les brannkonseptet"))) lesBrannkonsept(eid, dokId);
 }
 
 type Valg = { on: boolean; verdi: any };
@@ -124,7 +125,7 @@ function Les({ eid, start, close }: { eid: string; start: string; close: () => v
   const [dok, setDok] = useState(start); const [status, setStatus] = useState(''); const [T, setT] = useState<Tolkning | null>(null); const [feil, setFeil] = useState('');
   const [v, setV] = useState<Record<string, Valg>>({}); const [busy, setBusy] = useState(false);
   useEffect(() => {
-    let on = true; setT(null); setFeil(''); const d = byId('dokumenter', dok); if (!d?.fil?.path) { setFeil('Dokumentet har ingen fil'); return; }
+    let on = true; setT(null); setFeil(''); const d = byId('dokumenter', dok); if (!d?.fil?.path) { setFeil(tt("Dokumentet har ingen fil")); return; }
     pdfTekst(d.fil.path, s => on && setStatus(s)).then(sider => {
       if (!on) return; const t = tolk(sider); setT(t); setStatus('');
       const tom = (k: string) => !String(b[k] ?? '').trim();
@@ -139,7 +140,7 @@ function Les({ eid, start, close }: { eid: string; start: string; close: () => v
       sett('oppstilling', t.oppstilling[0]?.verdi || '', tom('oppstilling'));
       sett('forutsetninger', t.forutsetninger.map(f => f.verdi).join('\n'), tom('forutsetninger'));
       setV(ny);
-    }).catch(err => { console.error(err); if (on) { setFeil('Kunne ikke lese PDF-en: ' + (err?.message || err)); setStatus(''); } });
+    }).catch(err => { console.error(err); if (on) { setFeil(tt("Kunne ikke lese PDF-en: ") + (err?.message || err)); setStatus(''); } });
     return () => { on = false; };
   }, [dok]);
   const upd = (k: string, p: Partial<Valg>) => setV(o => ({ ...o, [k]: { ...o[k], ...p } }));
@@ -153,7 +154,7 @@ function Les({ eid, start, close }: { eid: string; start: string; close: () => v
       const d = byId('dokumenter', dok);
       ny.kilde = { dokId: dok, tittel: d?.tittel, tid: new Date().toISOString(), felt: Object.keys(v).filter(k => v[k].on) };
       await save('eiendommer', { ...e, brannvern: ny }); loggHendelse(`Brannkort fylt ut fra brannkonsept «${d?.tittel || ''}» (${antall} felt)`, eid, eid);
-      close(); toast('Forslagene er lagt inn – kontroller brannkortet før du publiserer'); editBrannkort(eid);
+      close(); toast(tt("Forslagene er lagt inn – kontroller brannkortet før du publiserer")); editBrannkort(eid);
     } finally { setBusy(false); }
   };
   const navn: Record<string, string> = { risikoklasse: 'Risikoklasse', brannklasse: 'Brannklasse', saerskilt: 'Særskilt brannobjekt', maksPersoner: 'Maks antall personer', alarm: 'Alarmorganisering', brannsentral: 'Brannsentral / nøkkelboks', oppstilling: 'Oppstillingsplass', forutsetninger: 'Forutsetninger for bruk', soner: 'Klasser per etasje / bygningsdel' };
@@ -163,9 +164,9 @@ function Les({ eid, start, close }: { eid: string; start: string; close: () => v
   const felt = (k: string) => {
     const x = v[k]; if (!x) return null;
     if (k === 'risikoklasse' || k === 'brannklasse') return <select style={inp} value={x.verdi} onChange={ev => upd(k, { verdi: ev.target.value, on: true })}>{(k === 'risikoklasse' ? RISIKOKLASSER : BRANNKLASSER).map(([a, l]) => <option key={a} value={a}>{l}</option>)}</select>;
-    if (k === 'saerskilt') return <select style={inp} value={x.verdi ? '1' : ''} onChange={ev => upd(k, { verdi: !!ev.target.value, on: true })}><option value="1">Ja – registrert som særskilt brannobjekt</option><option value="">Nei</option></select>;
+    if (k === 'saerskilt') return <select style={inp} value={x.verdi ? '1' : ''} onChange={ev => upd(k, { verdi: !!ev.target.value, on: true })}><option value="1">{tt("Ja – registrert som særskilt brannobjekt")}</option><option value="">{tt("Nei")}</option></select>;
     if (k === 'maksPersoner') return <input style={inp} value={x.verdi} inputMode="numeric" onChange={ev => upd(k, { verdi: ev.target.value.replace(/\D/g, ''), on: true })} />;
-    if (k === 'soner') return <table className="small" style={{ width: '100%' }}><thead><tr><th style={{ textAlign: 'left' }}>Del</th><th style={{ textAlign: 'left' }}>Etasjer</th><th style={{ textAlign: 'left' }}>RK</th><th style={{ textAlign: 'left' }}>BKL</th></tr></thead><tbody>{(x.verdi as any[]).map((z, i) => {
+    if (k === 'soner') return <table className="small" style={{ width: '100%' }}><thead><tr><th style={{ textAlign: 'left' }}>{tt("Del")}</th><th style={{ textAlign: 'left' }}>{tt("Etasjer")}</th><th style={{ textAlign: 'left' }}>{tt("RK")}</th><th style={{ textAlign: 'left' }}>{tt("BKL")}</th></tr></thead><tbody>{(x.verdi as any[]).map((z, i) => {
       const s = (p: any) => upd('soner', { verdi: x.verdi.map((y: any, j: number) => j === i ? { ...y, ...p } : y), on: true });
       return <tr key={z.id}><td><input style={inp} value={z.navn} onChange={ev => s({ navn: ev.target.value })} /></td><td style={{ width: 80 }}><input style={inp} value={z.etasjer} onChange={ev => s({ etasjer: ev.target.value })} /></td>
         <td style={{ width: 70 }}><select style={inp} value={z.risikoklasse} onChange={ev => s({ risikoklasse: ev.target.value })}><option value="">–</option>{RISIKOKLASSER.map(([a]) => <option key={a} value={a}>{a}</option>)}</select></td>
@@ -175,25 +176,25 @@ function Les({ eid, start, close }: { eid: string; start: string; close: () => v
   const rekkefolge = ['soner', 'risikoklasse', 'brannklasse', 'saerskilt', 'maksPersoner', 'alarm', 'brannsentral', 'oppstilling', 'forutsetninger'];
   const ikkeFunnet = T ? rekkefolge.filter(k => !v[k] && !(k === 'soner' || ((k === 'risikoklasse' || k === 'brannklasse' || k === 'maksPersoner') && T.soner.length))) : [];
   return <>
-    <div className="mh"><h2>Hent opplysninger fra brannkonseptet</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
+    <div className="mh"><h2>{tt("Hent opplysninger fra brannkonseptet")}</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
     <div className="mb">
-      {D.length > 1 && <div className="fld" style={{ marginBottom: 10 }}><label className="small">Dokument</label><select style={inp} value={dok} onChange={ev => setDok(ev.target.value)}>{D.map(d => <option key={d.id} value={d.id}>{d.tittel} ({fd(d.dato)})</option>)}</select></div>}
-      <p className="small muted" style={{ marginTop: 0 }}>Teksten leses i nettleseren din og sendes ikke noe sted. Appen leter etter faste begreper fra TEK17 kap. 11 og foreslår verdier med side og utdrag. Kontroller hvert forslag mot brannkonseptet – rediger eller fjern haken der forslaget ikke stemmer. Felt som allerede er fylt ut, er ikke huket av.</p>
+      {D.length > 1 && <div className="fld" style={{ marginBottom: 10 }}><label className="small">{tt("Dokument")}</label><select style={inp} value={dok} onChange={ev => setDok(ev.target.value)}>{D.map(d => <option key={d.id} value={d.id}>{d.tittel} ({fd(d.dato)})</option>)}</select></div>}
+      <p className="small muted" style={{ marginTop: 0 }}>{tt("Teksten leses i nettleseren din og sendes ikke noe sted. Appen leter etter faste begreper fra TEK17 kap. 11 og foreslår verdier med side og utdrag. Kontroller hvert forslag mot brannkonseptet – rediger eller fjern haken der forslaget ikke stemmer. Felt som allerede er fylt ut, er ikke huket av.")}</p>
       {status && <p><b>{status}</b></p>}
       {feil && <div className="banner" style={{ background: 'var(--redbg)', color: 'var(--red)', borderColor: '#f3c1bb' }}>{feil}</div>}
-      {T && T.tegn < 300 && <div className="banner">Fant nesten ingen tekst i PDF-en. Den er trolig skannet som bilde – da kan opplysningene ikke leses automatisk. Fyll ut brannkortet manuelt, eller last opp en tekstbasert PDF fra brannrådgiveren.</div>}
+      {T && T.tegn < 300 && <div className="banner">{tt("Fant nesten ingen tekst i PDF-en. Den er trolig skannet som bilde – da kan opplysningene ikke leses automatisk. Fyll ut brannkortet manuelt, eller last opp en tekstbasert PDF fra brannrådgiveren.")}</div>}
       {T && T.tegn >= 300 && <>
-        {!Object.keys(v).length && <p className="muted">Fant ingen opplysninger appen kjenner igjen.</p>}
+        {!Object.keys(v).length && <p className="muted">{tt("Fant ingen opplysninger appen kjenner igjen.")}</p>}
         {rekkefolge.filter(k => v[k]).map(k => <div key={k} className="card" style={{ padding: 12, marginBottom: 10, borderColor: v[k].on ? 'var(--acc, #1f6f5c)' : undefined }}>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600, cursor: 'pointer' }}><input type="checkbox" checked={v[k].on} onChange={ev => upd(k, { on: ev.target.checked })} />{navn[k]}{naa(k) && <span className="small muted" style={{ fontWeight: 400 }}>· nå: {kutt(naa(k), 60)}</span>}</label>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600, cursor: 'pointer' }}><input type="checkbox" checked={v[k].on} onChange={ev => upd(k, { on: ev.target.checked })} />{navn[k]}{naa(k) && <span className="small muted" style={{ fontWeight: 400 }}>{tt("· nå:")} {kutt(naa(k), 60)}</span>}</label>
           <div style={{ marginTop: 6 }}>{felt(k)}</div>
-          {k === 'soner' && <div className="small muted" style={{ marginTop: 4 }}>Brannkonseptet ser ut til å ha ulike klasser i ulike deler. Kontroller etasjene – de kobles mot tegningene.</div>}
-          {(k === 'risikoklasse' || k === 'brannklasse' || k === 'maksPersoner') && new Set(kilder(k).map(f => f.verdi)).size > 1 && <div className="small" style={{ color: 'var(--amber)', marginTop: 4 }}>Fant flere verdier: {[...new Set(kilder(k).map(f => f.verdi))].join(', ')} – foreslått er den som nevnes oftest.</div>}
-          <details className="small" style={{ marginTop: 6 }}><summary className="muted">Kilde ({kilder(k).length} treff)</summary>{kilder(k).slice(0, 8).map((f, i) => <div key={i} style={{ margin: '4px 0' }}><b>s. {f.side}</b> <span className="muted">«{f.utdrag}»</span></div>)}</details>
+          {k === 'soner' && <div className="small muted" style={{ marginTop: 4 }}>{tt("Brannkonseptet ser ut til å ha ulike klasser i ulike deler. Kontroller etasjene – de kobles mot tegningene.")}</div>}
+          {(k === 'risikoklasse' || k === 'brannklasse' || k === 'maksPersoner') && new Set(kilder(k).map(f => f.verdi)).size > 1 && <div className="small" style={{ color: 'var(--amber)', marginTop: 4 }}>{tt("Fant flere verdier:")} {[...new Set(kilder(k).map(f => f.verdi))].join(', ')} {tt("– foreslått er den som nevnes oftest.")}</div>}
+          <details className="small" style={{ marginTop: 6 }}><summary className="muted">{tt("Kilde (")}{kilder(k).length} {tt("treff)")}</summary>{kilder(k).slice(0, 8).map((f, i) => <div key={i} style={{ margin: '4px 0' }}><b>s. {f.side}</b> <span className="muted">«{f.utdrag}»</span></div>)}</details>
         </div>)}
-        {ikkeFunnet.length > 0 && <p className="small muted">Ikke funnet: {ikkeFunnet.map(k => navn[k].toLowerCase()).join(', ')}. Fyll inn manuelt i brannkortet.</p>}
+        {ikkeFunnet.length > 0 && <p className="small muted">{tt("Ikke funnet:")} {ikkeFunnet.map(k => navn[k].toLowerCase()).join(', ')}{tt(". Fyll inn manuelt i brannkortet.")}</p>}
       </>}
     </div>
-    <div className="mf"><button className="btn" onClick={close}>Avbryt</button><span className="grow" /><button className="btn pri" disabled={!antall || busy} onClick={bruk}>{busy ? 'Lagrer …' : `Bruk ${antall} forslag og åpne brannkortet`}</button></div>
+    <div className="mf"><button className="btn" onClick={close}>{tt("Avbryt")}</button><span className="grow" /><button className="btn pri" disabled={!antall || busy} onClick={bruk}>{busy ? tt("Lagrer …") : tt("Bruk {0} forslag og åpne brannkortet", antall)}</button></div>
   </>;
 }

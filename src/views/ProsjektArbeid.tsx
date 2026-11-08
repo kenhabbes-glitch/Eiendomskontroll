@@ -9,6 +9,7 @@ import { OTYPER, PASLAG, kalkSum, linjeSum, n, oppgaveType, oppdaterP, rettSjekk
 import { Hjelp } from '../components/LovHjelp';
 import { hjelpFor, verktoyFor } from '../lib/lovhjelp';
 import { Sha, shaAvkrysning, type ShaFane } from './ShaVerktoy';
+import { tt } from '../lib/i18n';
 
 const kr = (v: number) => nok(Math.round(v));
 type Kol = { k: string; l: string; w?: number | string; type?: 'text' | 'number' | 'date' | 'select' | 'check' | 'area'; opts?: string[]; ph?: string; dl?: string[] };
@@ -25,9 +26,9 @@ export function Rader({ v, set, kol, ny, tom, sum, sumL = 'Sum' }: { v: Rec[]; s
           : <input type={c.type || 'text'} value={r[c.k] ?? ''} placeholder={c.ph} list={c.dl ? 'dl-' + c.k : undefined} className={c.type === 'number' ? 'num' : undefined} onChange={e => endre(i, { [c.k]: e.target.value })} />}
         {c.dl && i === 0 && <datalist id={'dl-' + c.k}>{c.dl.map(x => <option key={x} value={x} />)}</datalist>}</td>)}
         {sum && <td className="num mono">{sum(r)}</td>}
-        <td><button type="button" className="btn ghost sm" title="Fjern rad" onClick={() => set(v.filter((_, j) => j !== i))}>✕</button></td></tr>)}
-    </tbody></table></div> : <p className="small muted">{tom || 'Ingen rader ennå.'}</p>}
-    <button type="button" className="btn sm" onClick={() => set([...v, { id: uid(), ...ny() }])}>+ Legg til</button>
+        <td><button type="button" className="btn ghost sm" title={tt("Fjern rad")} onClick={() => set(v.filter((_, j) => j !== i))}>✕</button></td></tr>)}
+    </tbody></table></div> : <p className="small muted">{tom || tt("Ingen rader ennå.")}</p>}
+    <button type="button" className="btn sm" onClick={() => set([...v, { id: uid(), ...ny() }])}>{tt("+ Legg til")}</button>
   </div>;
 }
 const Felt = ({ l, children, half, hint }: { l: React.ReactNode; children: React.ReactNode; half?: boolean; hint?: string }) => <label className={'pa-felt' + (half ? ' half' : '')}><span>{l}</span>{children}{hint && <small className="muted">{hint}</small>}</label>;
@@ -47,7 +48,7 @@ function Arbeidsflate({ pid, oid, close }: { pid: string; oid: string; close: ()
   const [A, setA0] = useState<Rec>({}); // bare endrede deler; resten leses fra prosjektet
   const [shaFane, setShaFane] = useState<ShaFane>('vurdering');
   const [busy, setBusy] = useState(false);
-  if (!p || !o0) return <ModalFrame title="Oppgave" close={close}><p>Fant ikke oppgaven.</p></ModalFrame>;
+  if (!p || !o0) return <ModalFrame title={tt("Oppgave")} close={close}><p>{tt("Fant ikke oppgaven.")}</p></ModalFrame>;
   const setF = (x: Rec) => setF0(v => ({ ...v, ...x }));
   const PA: Rec = p.arbeid || {}; const get = (k: string) => A[k] ?? PA[k];
   const a: Rec = get(type) || {}; const setA = (x: Rec) => setA0(v => ({ ...v, [type]: { ...((v[type] ?? PA[type]) || {}), ...x } }));
@@ -57,30 +58,30 @@ function Arbeidsflate({ pid, oid, close }: { pid: string; oid: string; close: ()
     const sjekk = type === 'sha' && sha ? (f.sjekk || []).map((x: Rec) => x.ok || !shaAvkrysning(x.t, sha, P) ? x : { ...x, ok: true }) : f.sjekk;
     const ny = { ...f, sjekk, ...(ferdig ? { status: 'Ferdig', ferdig: today() } : f.status === 'Ferdig' && !f.ferdig ? { ferdig: today() } : {}) };
     await oppdaterP(pid, { oppgaver: (P.oppgaver || []).map((x: Rec) => x.id === oid ? ny : x), arbeid: { ...(P.arbeid || {}), ...A } }, ferdig || (ny.status === 'Ferdig' && o0.status !== 'Ferdig') ? `Ferdig: ${ny.tittel}` : undefined);
-    setBusy(false); toast('Lagret'); close();
+    setBusy(false); toast(tt("Lagret")); close();
   };
-  const slett = async () => { if (!(await confirmBox(`Slette oppgaven «${f.tittel}»?`))) return; const P = byId('prosjekter', pid)!; await oppdaterP(pid, { oppgaver: (P.oppgaver || []).filter((x: Rec) => x.id !== oid) }, `Oppgave slettet: ${f.tittel}`); close(); };
+  const slett = async () => { if (!(await confirmBox(tt("Slette oppgaven «{0}»?", f.tittel)))) return; const P = byId('prosjekter', pid)!; await oppdaterP(pid, { oppgaver: (P.oppgaver || []).filter((x: Rec) => x.id !== oid) }, `Oppgave slettet: ${f.tittel}`); close(); };
   const D = S.dokumenter.filter(d => d.prosjektId === pid && d.oppgaveId === oid);
-  const lastOpp = async (fil: File) => { const r = await uploadFile(fil, p.eiendomId); if (!r) return; await save('dokumenter', { eiendomId: p.eiendomId, leietakerId: '', prosjektId: pid, oppgaveId: oid, anleggId: '', type: 'Annet', tittel: `${fil.name} – ${f.tittel}`, dato: today(), fil: r }); toast('Lastet opp'); };
+  const lastOpp = async (fil: File) => { const r = await uploadFile(fil, p.eiendomId); if (!r) return; await save('dokumenter', { eiendomId: p.eiendomId, leietakerId: '', prosjektId: pid, oppgaveId: oid, anleggId: '', type: 'Annet', tittel: `${fil.name} – ${f.tittel}`, dato: today(), fil: r }); toast(tt("Lastet opp")); };
   const fagL = [...new Set([...(p.fag || []).map((x: Rec) => x.fag), ...FAG])];
   // Etter ferdigstilling er arbeidsdokumentene låst – bare oppgaver i garantiperioden kan endres
   const laast = p.status === 'Ferdigstilt' && o0.fase !== 'garanti';
 
   return <ModalFrame title={<span>{f.tittel}<Hjelp k={hjelpFor(f.tittel || '')} /> <span className="small muted" style={{ fontWeight: 400 }}>· {FASER.find(x => x[0] === f.fase)?.[1]}</span></span>} close={close}
-    foot={laast ? <><span className="small muted" style={{ flex: 1 }}>Prosjektet er ferdigstilt – arbeidsdokumentene er låst. Låste PDF-er ligger under Dokumenter.</span><button className="btn" onClick={close}>Lukk</button></> : <><button className="btn danger" onClick={slett}>Slett</button><span style={{ flex: 1 }} /><button className="btn" onClick={close}>Avbryt</button>
-      <button className="btn" disabled={busy} onClick={() => lagre()}>Lagre</button>{f.status !== 'Ferdig' && <button className="btn pri" disabled={busy} onClick={() => lagre(true)}>Lagre og marker ferdig</button>}</>}>
-    {laast && <div className="note small" style={{ marginBottom: 10 }}>🔒 Låst etter ferdigstilling {fd(p.fullfort)}. Endringer lagres ikke. Tillegg i garantiperioden registreres på oppgaver i garantifasen.</div>}
+    foot={laast ? <><span className="small muted" style={{ flex: 1 }}>{tt("Prosjektet er ferdigstilt – arbeidsdokumentene er låst. Låste PDF-er ligger under Dokumenter.")}</span><button className="btn" onClick={close}>{tt("Lukk")}</button></> : <><button className="btn danger" onClick={slett}>{tt("Slett")}</button><span style={{ flex: 1 }} /><button className="btn" onClick={close}>{tt("Avbryt")}</button>
+      <button className="btn" disabled={busy} onClick={() => lagre()}>{tt("Lagre")}</button>{f.status !== 'Ferdig' && <button className="btn pri" disabled={busy} onClick={() => lagre(true)}>{tt("Lagre og marker ferdig")}</button>}</>}>
+    {laast && <div className="note small" style={{ marginBottom: 10 }}>{tt("🔒 Låst etter ferdigstilling")} {fd(p.fullfort)}{tt(". Endringer lagres ikke. Tillegg i garantiperioden registreres på oppgaver i garantifasen.")}</div>}
     <fieldset disabled={laast} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
     <div className="pa-grid">
       <Felt l="Oppgave"><input value={f.tittel || ''} onChange={e => setF({ tittel: e.target.value })} /></Felt>
       <Felt l="Status" half><select value={f.status} onChange={e => setF({ status: e.target.value })}>{['Ikke startet', 'Pågår', 'Ferdig', 'Ikke relevant'].map(s => <option key={s}>{s}</option>)}</select></Felt>
-      <Felt l="Fase" half><select value={f.fase} onChange={e => setF({ fase: e.target.value })}>{FASER.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Felt>
+      <Felt l="Fase" half><select value={f.fase} onChange={e => setF({ fase: e.target.value })}>{FASER.map(([k, l]) => <option key={k} value={k}>{tt(l)}</option>)}</select></Felt>
       <Felt l="Ansvarlig" half><input value={f.ansvarlig || ''} onChange={e => setF({ ansvarlig: e.target.value })} /></Felt>
-      <Felt l="Fag" half><select value={f.fag || ''} onChange={e => setF({ fag: e.target.value })}><option value="">– felles –</option>{fagL.map(x => <option key={x}>{x}</option>)}</select></Felt>
+      <Felt l="Fag" half><select value={f.fag || ''} onChange={e => setF({ fag: e.target.value })}><option value="">{tt("– felles –")}</option>{fagL.map(x => <option key={x}>{x}</option>)}</select></Felt>
       <Felt l="Start" half><input type="date" value={f.start || ''} onChange={e => setF({ start: e.target.value })} /></Felt>
       <Felt l="Frist / slutt" half><input type="date" value={f.frist || ''} onChange={e => setF({ frist: e.target.value })} /></Felt>
-      <Felt l="Arbeidsflate" half><select value={f.type || 'auto'} onChange={e => setF({ type: e.target.value })}><option value="auto">Automatisk ({OTYPER.find(x => x[0] === oppgaveType({ ...f, type: '' }))?.[1].split(' (')[0]})</option>{OTYPER.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Felt>
-      <label className="pa-felt half" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" style={{ width: 'auto' }} checked={!!f.milepael} onChange={e => setF({ milepael: e.target.checked })} /> Vis som milepæl i fremdriftsplanen</label>
+      <Felt l="Arbeidsflate" half><select value={f.type || 'auto'} onChange={e => setF({ type: e.target.value })}><option value="auto">{tt("Automatisk (")}{OTYPER.find(x => x[0] === oppgaveType({ ...f, type: '' }))?.[1].split(' (')[0]})</option>{OTYPER.map(([k, l]) => <option key={k} value={k}>{tt(l)}</option>)}</select></Felt>
+      <label className="pa-felt half" style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><input type="checkbox" style={{ width: 'auto' }} checked={!!f.milepael} onChange={e => setF({ milepael: e.target.checked })} /> {tt("Vis som milepæl i fremdriftsplanen")}</label>
     </div>
 
     <div className="pa-seksjon">
@@ -93,14 +94,14 @@ function Arbeidsflate({ pid, oid, close }: { pid: string; oid: string; close: ()
       {type === 'endringer' && <Endringer v={a} set={setA} fagL={fagL} p={p} />}
       {type === 'mangler' && <Mangler v={a} set={setA} fagL={fagL} />}
       {(type === 'sjekk' || type === 'generell' || type === 'sha' || (f.sjekk || []).length > 0) && <Sjekk v={f.sjekk || []} set={s => setF({ sjekk: s })} tittel={type === 'sjekk' || type === 'sha' ? 'Sjekkliste' : 'Sjekkpunkter'}
-        verktoy={type === 'sha' ? (t: string) => { const vk = verktoyFor(t); return vk ? { tekst: vk === 'risiko' ? 'Lag risikovurdering' : vk === 'vurdering' ? 'Vurder' : vk === 'org' ? 'Registrer' : 'Lag SHA-plan', apne: () => { setShaFane(vk); setTimeout(() => document.getElementById('sha-verktoy')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }, ferdig: shaAvkrysning(t, get('sha') || {}, p) } : null; } : undefined} />}
+        verktoy={type === 'sha' ? (t: string) => { const vk = verktoyFor(t); return vk ? { tekst: vk === 'risiko' ? tt("Lag risikovurdering") : vk === 'vurdering' ? tt("Vurder") : vk === 'org' ? tt("Registrer") : tt("Lag SHA-plan"), apne: () => { setShaFane(vk); setTimeout(() => document.getElementById('sha-verktoy')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }, ferdig: shaAvkrysning(t, get('sha') || {}, p) } : null; } : undefined} />}
       {type === 'sha' && <div id="sha-verktoy" className="pa-seksjon"><Sha v={get('sha') || {}} set={x => setA0(v => ({ ...v, sha: { ...((v.sha ?? PA.sha) || {}), ...x } }))} p={p} fane={shaFane} setFane={setShaFane} /></div>}
     </div>
-    <Felt l="Notat"><textarea rows={3} value={f.notat || ''} onChange={e => setF({ notat: e.target.value })} placeholder="Vurderinger, avklaringer, hvem som er kontaktet …" /></Felt>
-    <div className="pa-seksjon"><b>Vedlegg</b> <label className="btn sm" style={{ marginLeft: 8 }}>+ Last opp<input type="file" multiple style={{ display: 'none' }} onChange={async e => { for (const x of Array.from(e.target.files || [])) await lastOpp(x); e.target.value = ''; }} /></label>
-      {D.length ? D.map(d => <div key={d.id} className="small" style={{ padding: '3px 0' }}><FileLink fil={d.fil}>{d.tittel}</FileLink> <span className="muted">· {fd(d.dato)}</span></div>) : <p className="small muted" style={{ margin: '4px 0 0' }}>Tilbud, tegninger, referater, bilder … Lagres også under prosjektets dokumenter.</p>}</div>
+    <Felt l="Notat"><textarea rows={3} value={f.notat || ''} onChange={e => setF({ notat: e.target.value })} placeholder={tt("Vurderinger, avklaringer, hvem som er kontaktet …")} /></Felt>
+    <div className="pa-seksjon"><b>{tt("Vedlegg")}</b> <label className="btn sm" style={{ marginLeft: 8 }}>{tt("+ Last opp")}<input type="file" multiple style={{ display: 'none' }} onChange={async e => { for (const x of Array.from(e.target.files || [])) await lastOpp(x); e.target.value = ''; }} /></label>
+      {D.length ? D.map(d => <div key={d.id} className="small" style={{ padding: '3px 0' }}><FileLink fil={d.fil}>{d.tittel}</FileLink> <span className="muted">· {fd(d.dato)}</span></div>) : <p className="small muted" style={{ margin: '4px 0 0' }}>{tt("Tilbud, tegninger, referater, bilder … Lagres også under prosjektets dokumenter.")}</p>}</div>
     </fieldset>
-    {['beskrivelse', 'overslag', 'ramme', 'kalkyle', 'tilbud'].includes(type) && <p className="small muted">Innholdet tas med i beslutningsnotatet for fasen. Lag notatet med «Beslutningsnotat» på fasen når oppgavene er klare.</p>}
+    {['beskrivelse', 'overslag', 'ramme', 'kalkyle', 'tilbud'].includes(type) && <p className="small muted">{tt("Innholdet tas med i beslutningsnotatet for fasen. Lag notatet med «Beslutningsnotat» på fasen når oppgavene er klare.")}</p>}
   </ModalFrame>;
 }
 
@@ -108,25 +109,25 @@ function Sjekk({ v, set, tittel, verktoy }: { v: Rec[]; set: (x: Rec[]) => void;
   const [ny, setNy] = useState('');
   return <div><b>{tittel}</b> <span className="small muted">{v.filter(x => x.ok).length}/{v.length}</span>
     {v.map((x, i) => { const vk = verktoy?.(x.t); return <div key={x.id} className="rk-rad"><input type="checkbox" style={{ width: 'auto' }} checked={!!x.ok} onChange={e => set(v.map((y, j) => j === i ? { ...y, ok: e.target.checked } : y))} />
-      <span style={{ flex: 1 }}><span style={{ textDecoration: x.ok ? 'line-through' : undefined }}>{x.t}</span><Hjelp k={hjelpFor(x.t)} />{vk?.ferdig && !x.ok && <span className="small" style={{ color: 'var(--green)', marginLeft: 8 }}>✓ utfylt – krysses av når du lagrer</span>}</span>
+      <span style={{ flex: 1 }}><span style={{ textDecoration: x.ok ? 'line-through' : undefined }}>{x.t}</span><Hjelp k={hjelpFor(x.t)} />{vk?.ferdig && !x.ok && <span className="small" style={{ color: 'var(--green)', marginLeft: 8 }}>{tt("✓ utfylt – krysses av når du lagrer")}</span>}</span>
       {vk && <button type="button" className="btn sm" onClick={vk.apne}>{vk.tekst} ›</button>}
       <button type="button" className="btn ghost sm" onClick={() => set(v.filter((_, j) => j !== i))}>✕</button></div>; })}
-    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}><input value={ny} placeholder="Nytt sjekkpunkt" onChange={e => setNy(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && ny.trim()) { e.preventDefault(); set([...v, { id: uid(), t: ny.trim(), ok: false }]); setNy(''); } }} />
-      <button type="button" className="btn sm" onClick={() => { if (ny.trim()) { set([...v, { id: uid(), t: ny.trim(), ok: false }]); setNy(''); } }}>Legg til</button></div></div>;
+    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}><input value={ny} placeholder={tt("Nytt sjekkpunkt")} onChange={e => setNy(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && ny.trim()) { e.preventDefault(); set([...v, { id: uid(), t: ny.trim(), ok: false }]); setNy(''); } }} />
+      <button type="button" className="btn sm" onClick={() => { if (ny.trim()) { set([...v, { id: uid(), t: ny.trim(), ok: false }]); setNy(''); } }}>{tt("Legg til")}</button></div></div>;
 }
 
 const SANNS = ['Lav', 'Middels', 'Høy'];
 export const risikoNivaa = (r: Rec) => (SANNS.indexOf(r.sannsynlighet) + 1) * (SANNS.indexOf(r.konsekvens) + 1);
 function Beskrivelse({ v, set, risiko, setRisiko, p }: { v: Rec; set: (x: Rec) => void; risiko: Rec[]; setRisiko: (r: Rec[]) => void; p: Rec }) {
   return <>
-    <h3 className="pa-h">Prosjektbeskrivelse</h3>
-    <Tekst v={v} set={set} k="bakgrunn" l="Bakgrunn og behov" ph={p.beskrivelse || 'Hvorfor skal prosjektet gjennomføres? Tilstand, krav, leietakerbehov …'} />
-    <Tekst v={v} set={set} k="mal" l="Mål og ønsket resultat" ph="Hva skal være oppnådd når prosjektet er ferdig? Målbare mål der det er mulig." />
+    <h3 className="pa-h">{tt("Prosjektbeskrivelse")}</h3>
+    <Tekst v={v} set={set} k="bakgrunn" l="Bakgrunn og behov" ph={p.beskrivelse || tt("Hvorfor skal prosjektet gjennomføres? Tilstand, krav, leietakerbehov …")} />
+    <Tekst v={v} set={set} k="mal" l="Mål og ønsket resultat" ph={tt("Hva skal være oppnådd når prosjektet er ferdig? Målbare mål der det er mulig.")} />
     <div className="pa-grid"><div className="half"><Tekst v={v} set={set} k="omfang" l="Omfang – hva inngår" /></div><div className="half"><Tekst v={v} set={set} k="avgrensning" l="Avgrensning – hva inngår ikke" /></div></div>
-    <Tekst v={v} set={set} k="alternativer" l="Alternativer som er vurdert" rows={2} ph="F.eks. reparere / skifte / utsette – med kort begrunnelse for valgt løsning" />
+    <Tekst v={v} set={set} k="alternativer" l="Alternativer som er vurdert" rows={2} ph={tt("F.eks. reparere / skifte / utsette – med kort begrunnelse for valgt løsning")} />
     <div className="pa-grid"><div className="half"><Tekst v={v} set={set} k="konsekvens" l="Konsekvens hvis prosjektet ikke gjennomføres" rows={2} /></div><div className="half"><Tekst v={v} set={set} k="gevinst" l="Gevinster (energi, leieinntekt, risiko, verdi)" rows={2} /></div></div>
     <Tekst v={v} set={set} k="berorte" l="Berørte leietakere og drift" rows={2} />
-    <h3 className="pa-h">Risiko</h3>
+    <h3 className="pa-h">{tt("Risiko")}</h3>
     <Rader v={risiko} set={setRisiko} tom="Ingen risikoer registrert." ny={() => ({ risiko: '', sannsynlighet: 'Middels', konsekvens: 'Middels', tiltak: '', ansvar: '', status: 'Åpen' })}
       kol={[{ k: 'risiko', l: 'Risiko / usikkerhet', w: '28%' }, { k: 'sannsynlighet', l: 'Sannsynlighet', type: 'select', opts: SANNS }, { k: 'konsekvens', l: 'Konsekvens', type: 'select', opts: SANNS }, { k: 'tiltak', l: 'Tiltak', w: '28%' }, { k: 'ansvar', l: 'Ansvar' }, { k: 'status', l: 'Status', type: 'select', opts: ['Åpen', 'Lukket'] }]}
       sum={r => { const x = risikoNivaa(r); return <Chip c={x >= 6 ? 'red' : x >= 3 ? 'amber' : 'green'}>{x || '–'}</Chip>; }} />
@@ -137,34 +138,34 @@ function Kalkyle({ v, set, p, type, fraOverslag }: { v: Rec; set: (x: Rec) => vo
   const k = kalkSum(v); const L: Linje[] = v.linjer || [];
   const setL = (i: number, x: Rec) => set({ linjer: L.map((l, j) => j === i ? { ...l, ...x } : l) });
   const overfor = async () => {
-    if (!k.tot) return toast('Ingen beløp å overføre');
+    if (!k.tot) return toast(tt("Ingen beløp å overføre"));
     const P = byId('prosjekter', p.id)!; const B: Rec[] = P.budsjett || [];
     const fjernes = B.filter(b => ['overslag', 'kalkyle'].includes(b.kilde) || (b.post === 'Budsjettramme' && !(P.kostnader || []).some((c: Rec) => c.post === b.id)));
-    if (!(await confirmBox(`Overføre ${type === 'kalkyle' ? 'kalkylen' : 'overslaget'} (${kr(k.tot)}) til budsjettet?${fjernes.length ? ` ${fjernes.length} budsjettposter fra tidligere overslag/ramme erstattes.` : ''} Poster med registrerte kostnader beholdes.`, 'Overfør'))) return;
+    if (!(await confirmBox(tt("Overføre {0} ({1}) til budsjettet?{2} Poster med registrerte kostnader beholdes.", type === 'kalkyle' ? 'kalkylen' : 'overslaget', kr(k.tot), fjernes.length ? ` ${fjernes.length} budsjettposter fra tidligere overslag/ramme erstattes.` : ''), tt("Overfør")))) return;
     const klasse = p.type === 'Vedlikehold' ? 'vedl' : /leietaker/i.test(p.type) ? 'lt' : 'pak'; const konto = p.type === 'Vedlikehold' ? '6600' : '1100';
     const nye = [...L.filter(l => linjeSum(l)).map(l => ({ id: uid(), kilde: type, post: l.post || 'Post', bygningsdel: l.bygningsdel || '', fag: l.fag || '', klasse, konto: String(l.bygningsdel || '')[0] && '3456'.includes(String(l.bygningsdel)[0]) && konto === '1100' ? '1120' : konto, belop: Math.round(linjeSum(l)), prognose: '', betaler: 'eier' })),
       ...k.pa.filter(x => x.belop).map(x => ({ id: uid(), kilde: type, post: x.navn, bygningsdel: '', fag: x.id === 'prosj' ? 'Prosjektledelse / byggherre' : '', klasse: x.id === 'prosj' && klasse === 'vedl' ? 'rad' : klasse, konto: x.id === 'prosj' && klasse === 'vedl' ? '6700' : konto, belop: Math.round(x.belop), prognose: '', betaler: 'eier' }))];
     await oppdaterP(p.id, { budsjett: [...B.filter(b => !fjernes.includes(b)), ...nye] }, `${type === 'kalkyle' ? 'Kalkyle' : 'Grovt overslag'} overført til budsjett: ${kr(k.tot)}`);
-    toast('Overført til budsjettet');
+    toast(tt("Overført til budsjettet"));
   };
   return <>
-    <h3 className="pa-h">{type === 'kalkyle' ? 'Detaljert kostnadskalkyle' : 'Grovt kostnadsoverslag'} <span className="small muted" style={{ fontWeight: 400 }}>kr eks. mva</span></h3>
-    {type === 'kalkyle' && !L.length && fraOverslag?.linjer?.length > 0 && <p><button type="button" className="btn sm" onClick={() => set({ linjer: fraOverslag.linjer.map((l: Linje) => ({ ...l, id: uid() })), paslag: fraOverslag.paslag })}>Start med linjene fra grovt overslag</button></p>}
-    <div className="tbl-wrap"><table className="pa-tbl"><thead><tr><th style={{ width: '26%' }}>Post</th><th style={{ width: '24%' }}>Bygningsdel (NS 3451)</th><th className="num">Mengde</th><th>Enhet</th><th className="num">Enhetspris</th><th className="num">Sum</th><th /></tr></thead><tbody>
+    <h3 className="pa-h">{type === 'kalkyle' ? tt("Detaljert kostnadskalkyle") : tt("Grovt kostnadsoverslag")} <span className="small muted" style={{ fontWeight: 400 }}>{tt("kr eks. mva")}</span></h3>
+    {type === 'kalkyle' && !L.length && fraOverslag?.linjer?.length > 0 && <p><button type="button" className="btn sm" onClick={() => set({ linjer: fraOverslag.linjer.map((l: Linje) => ({ ...l, id: uid() })), paslag: fraOverslag.paslag })}>{tt("Start med linjene fra grovt overslag")}</button></p>}
+    <div className="tbl-wrap"><table className="pa-tbl"><thead><tr><th style={{ width: '26%' }}>{tt("Post")}</th><th style={{ width: '24%' }}>{tt("Bygningsdel (NS 3451)")}</th><th className="num">{tt("Mengde")}</th><th>{tt("Enhet")}</th><th className="num">{tt("Enhetspris")}</th><th className="num">{tt("Sum")}</th><th /></tr></thead><tbody>
       {L.map((l, i) => <tr key={l.id}>
-        <td><input value={l.post || ''} onChange={e => setL(i, { post: e.target.value })} placeholder="F.eks. Nytt aggregat" /></td>
+        <td><input value={l.post || ''} onChange={e => setL(i, { post: e.target.value })} placeholder={tt("F.eks. Nytt aggregat")} /></td>
         <td><NsVelger value={l.bygningsdel} set={x => setL(i, { bygningsdel: x })} fag={l.fag} /></td>
         <td><input className="num" value={l.mengde ?? ''} onChange={e => setL(i, { mengde: e.target.value })} style={{ width: 70 }} /></td>
         <td><input value={l.enhet || ''} list="dl-enh" onChange={e => setL(i, { enhet: e.target.value })} style={{ width: 60 }} /></td>
-        <td>{l.mengde !== '' && l.mengde != null && n(l.mengde) ? <input className="num" value={l.pris ?? ''} onChange={e => setL(i, { pris: e.target.value })} style={{ width: 100 }} /> : <input className="num" value={l.belop ?? ''} placeholder="sum" onChange={e => setL(i, { belop: e.target.value })} style={{ width: 100 }} title="Uten mengde: skriv sum direkte" />}</td>
+        <td>{l.mengde !== '' && l.mengde != null && n(l.mengde) ? <input className="num" value={l.pris ?? ''} onChange={e => setL(i, { pris: e.target.value })} style={{ width: 100 }} /> : <input className="num" value={l.belop ?? ''} placeholder={tt("sum")} onChange={e => setL(i, { belop: e.target.value })} style={{ width: 100 }} title={tt("Uten mengde: skriv sum direkte")} />}</td>
         <td className="num mono">{kr(linjeSum(l))}</td><td><button type="button" className="btn ghost sm" onClick={() => set({ linjer: L.filter((_, j) => j !== i) })}>✕</button></td></tr>)}
-      <tr><td colSpan={5}><button type="button" className="btn sm" onClick={() => set({ linjer: [...L, { id: uid(), post: '', mengde: '', enhet: 'stk', pris: '', belop: '' }] })}>+ Linje</button></td><td className="num mono"><b>{kr(k.sum)}</b></td><td /></tr>
+      <tr><td colSpan={5}><button type="button" className="btn sm" onClick={() => set({ linjer: [...L, { id: uid(), post: '', mengde: '', enhet: 'stk', pris: '', belop: '' }] })}>{tt("+ Linje")}</button></td><td className="num mono"><b>{kr(k.sum)}</b></td><td /></tr>
       {k.pa.map(x => <tr key={x.id}><td colSpan={4} className="small">{x.navn}</td><td><input className="num" value={v.paslag?.[x.id] ?? PASLAG.find(z => z[0] === x.id)![2]} onChange={e => set({ paslag: { ...(v.paslag || {}), [x.id]: e.target.value } })} style={{ width: 60 }} /> %</td><td className="num mono">{kr(x.belop)}</td><td /></tr>)}
-      <tr style={{ fontWeight: 700 }}><td colSpan={5}>Totalt eks. mva</td><td className="num mono">{kr(k.tot)}</td><td /></tr>
+      <tr style={{ fontWeight: 700 }}><td colSpan={5}>{tt("Totalt eks. mva")}</td><td className="num mono">{kr(k.tot)}</td><td /></tr>
     </tbody></table></div>
     <datalist id="dl-enh">{['stk', 'm²', 'm', 'lm', 'm³', 'timer', 'RS', 'kg'].map(x => <option key={x} value={x} />)}</datalist>
-    <Tekst v={v} set={set} k="notat" l="Forutsetninger og usikkerhet" rows={2} ph="Grunnlag (erfaringstall, tilbud, rådgiver), nøyaktighet (f.eks. ±30 %), hva som ikke er med" />
-    <p><button type="button" className="btn" onClick={overfor}>Overfør til budsjett</button> <span className="small muted">Lager budsjettposter med bygningsdel, slik at fordelingen bygg/teknisk følger med.</span></p>
+    <Tekst v={v} set={set} k="notat" l="Forutsetninger og usikkerhet" rows={2} ph={tt("Grunnlag (erfaringstall, tilbud, rådgiver), nøyaktighet (f.eks. ±30 %), hva som ikke er med")} />
+    <p><button type="button" className="btn" onClick={overfor}>{tt("Overfør til budsjett")}</button> <span className="small muted">{tt("Lager budsjettposter med bygningsdel, slik at fordelingen bygg/teknisk følger med.")}</span></p>
   </>;
 }
 
@@ -172,28 +173,28 @@ const KILDER = ['Egenkapital / drift', 'Vedlikeholdsfond / avsetning', 'Lån', '
 function Ramme({ v, set, overslag, kalkyle }: { v: Rec; set: (x: Rec) => void; overslag?: Rec; kalkyle?: Rec }) {
   const ov = kalkSum(overslag).tot, ka = kalkSum(kalkyle).tot; const F: Rec[] = v.finansiering || []; const fs = F.reduce((s, x) => s + n(x.belop), 0); const r = n(v.ramme);
   return <>
-    <h3 className="pa-h">Finansiering og budsjettramme</h3>
+    <h3 className="pa-h">{tt("Finansiering og budsjettramme")}</h3>
     <div className="pa-grid">
-      <Felt l="Foreslått budsjettramme (kr eks. mva)" half hint={ov || ka ? `${ka ? 'Kalkyle' : 'Grovt overslag'}: ${kr(ka || ov)}` : 'Lag gjerne grovt overslag først'}><input className="num" value={v.ramme ?? ''} onChange={e => set({ ramme: e.target.value })} /></Felt>
+      <Felt l="Foreslått budsjettramme (kr eks. mva)" half hint={ov || ka ? tt("{0}: {1}", ka ? 'Kalkyle' : 'Grovt overslag', kr(ka || ov)) : tt("Lag gjerne grovt overslag først")}><input className="num" value={v.ramme ?? ''} onChange={e => set({ ramme: e.target.value })} /></Felt>
       <Felt l="Herav reserve / uforutsett (kr)" half><input className="num" value={v.reserve ?? ''} onChange={e => set({ reserve: e.target.value })} /></Felt>
-      {(ov || ka) > 0 && !v.ramme && <p className="small" style={{ gridColumn: '1/-1', margin: 0 }}><button type="button" className="btn sm" onClick={() => set({ ramme: Math.round(ka || ov) })}>Bruk {ka ? 'kalkylen' : 'overslaget'} som ramme</button></p>}
+      {(ov || ka) > 0 && !v.ramme && <p className="small" style={{ gridColumn: '1/-1', margin: 0 }}><button type="button" className="btn sm" onClick={() => set({ ramme: Math.round(ka || ov) })}>{tt("Bruk")} {ka ? tt("kalkylen") : tt("overslaget")} {tt("som ramme")}</button></p>}
     </div>
-    <b className="small">Finansiering</b>
+    <b className="small">{tt("Finansiering")}</b>
     <Rader v={F} set={x => set({ finansiering: x })} tom="Hvordan skal prosjektet finansieres?" ny={() => ({ kilde: '', belop: '' })} kol={[{ k: 'kilde', l: 'Kilde', dl: KILDER, w: '45%' }, { k: 'belop', l: 'Beløp (kr)', type: 'number' }, { k: 'merknad', l: 'Merknad' }]} />
-    {F.length > 0 && <p className="small" style={{ color: r && Math.abs(fs - r) > 1 ? 'var(--red)' : undefined }}>Sum finansiering {kr(fs)}{r ? ` – ramme ${kr(r)}${Math.abs(fs - r) > 1 ? ` (differanse ${kr(fs - r)})` : ' ✓'}` : ''}</p>}
-    <Tekst v={v} set={set} k="notat" l="Kommentar" rows={2} ph="F.eks. forutsetninger for leietakers bidrag, budsjettår, behov for styrevedtak" />
+    {F.length > 0 && <p className="small" style={{ color: r && Math.abs(fs - r) > 1 ? 'var(--red)' : undefined }}>{tt("Sum finansiering")} {kr(fs)}{r ? tt(" – ramme {0}{1}", kr(r), Math.abs(fs - r) > 1 ? ` (differanse ${kr(fs - r)})` : ' ✓') : ''}</p>}
+    <Tekst v={v} set={set} k="notat" l="Kommentar" rows={2} ph={tt("F.eks. forutsetninger for leietakers bidrag, budsjettår, behov for styrevedtak")} />
   </>;
 }
 
 function Tilbud({ v, set, fagL }: { v: Rec; set: (x: Rec) => void; fagL: string[] }) {
   const T: Rec[] = v.liste || []; const vekt = v.vekt || { pris: 60, kvalitet: 30, fremdrift: 10 }; const sc = tilbudScore(T, vekt); const best = sc.length ? Math.max(...sc.map(x => x.tot)) : 0;
   return <>
-    <h3 className="pa-h">Tilbud og evaluering</h3>
+    <h3 className="pa-h">{tt("Tilbud og evaluering")}</h3>
     <div className="pa-grid">{(['pris', 'kvalitet', 'fremdrift'] as const).map(k => <Felt key={k} l={`Vekt ${k} (%)`} half><input className="num" value={vekt[k]} onChange={e => set({ vekt: { ...vekt, [k]: e.target.value } })} /></Felt>)}</div>
     <Rader v={T} set={x => set({ liste: x })} tom="Registrer mottatte tilbud." ny={() => ({ leverandor: '', fag: '', pris: '', kvalitet: '', fremdrift: '', forbehold: '', valgt: false })}
       kol={[{ k: 'leverandor', l: 'Leverandør', w: '20%' }, { k: 'fag', l: 'Fag', dl: fagL }, { k: 'pris', l: 'Pris eks. mva', type: 'number' }, { k: 'kvalitet', l: 'Kvalitet 0–10', type: 'number', w: 70 }, { k: 'fremdrift', l: 'Fremdrift 0–10', type: 'number', w: 70 }, { k: 'forbehold', l: 'Forbehold / merknad', w: '22%' }, { k: 'valgt', l: 'Anbefalt', type: 'check', w: 60 }]}
       sum={r => { const s = sc.find(x => x.id === r.id); return s ? <span style={{ fontWeight: s.tot === best && best > 0 ? 700 : 400 }}>{s.tot}</span> : '–'; }} />
-    <p className="small muted">Prispoeng: laveste pris får 10, de øvrige forholdsmessig. Sum er vektet poengsum. Kryss av for anbefalt leverandør – den tas med i beslutningsnotatet og som grunnlag for kontrakten.</p>
+    <p className="small muted">{tt("Prispoeng: laveste pris får 10, de øvrige forholdsmessig. Sum er vektet poengsum. Kryss av for anbefalt leverandør – den tas med i beslutningsnotatet og som grunnlag for kontrakten.")}</p>
     <Tekst v={v} set={set} k="begrunnelse" l="Begrunnelse for anbefaling" rows={2} />
   </>;
 }
@@ -201,28 +202,28 @@ function Tilbud({ v, set, fagL }: { v: Rec; set: (x: Rec) => void; fagL: string[
 function Kontrakt({ v, set, tilbud, p }: { v: Rec; set: (x: Rec) => void; tilbud?: Rec; p: Rec }) {
   const valgt = (tilbud?.liste || []).find((t: Rec) => t.valgt);
   const reg = async () => {
-    if (!n(v.sum)) return toast('Fyll inn kontraktssum');
-    const P = byId('prosjekter', p.id)!; if (v.kostId && (P.kostnader || []).some((c: Rec) => c.id === v.kostId)) return toast('Kontrakten er allerede registrert som forpliktet kostnad');
+    if (!n(v.sum)) return toast(tt("Fyll inn kontraktssum"));
+    const P = byId('prosjekter', p.id)!; if (v.kostId && (P.kostnader || []).some((c: Rec) => c.id === v.kostId)) return toast(tt("Kontrakten er allerede registrert som forpliktet kostnad"));
     const id = uid(); const post = (P.budsjett || []).find((b: Rec) => b.fag && b.fag === v.fag)?.id || '';
     await oppdaterP(p.id, { kostnader: [...(P.kostnader || []), { id, dato: v.signert || today(), status: 'Bestilt', leverandor: v.part, beskrivelse: `Kontrakt ${v.form || ''}`.trim(), post, fag: v.fag || '', belop: n(v.sum) }], entreprenor: P.entreprenor || v.part, kontrakt: P.kontrakt || v.form,
       arbeid: { ...(P.arbeid || {}), kontrakt: { ...v, kostId: id } } }, `Kontrakt med ${v.part} registrert som forpliktet: ${kr(n(v.sum))}`);
-    set({ kostId: id }); toast('Registrert som forpliktet kostnad');
+    set({ kostId: id }); toast(tt("Registrert som forpliktet kostnad"));
   };
   return <>
-    <h3 className="pa-h">Kontrakt</h3>
-    {valgt && !v.part && <p><button type="button" className="btn sm" onClick={() => set({ part: valgt.leverandor, sum: valgt.pris, fag: valgt.fag })}>Hent fra anbefalt tilbud ({valgt.leverandor}, {kr(n(valgt.pris))})</button></p>}
+    <h3 className="pa-h">{tt("Kontrakt")}</h3>
+    {valgt && !v.part && <p><button type="button" className="btn sm" onClick={() => set({ part: valgt.leverandor, sum: valgt.pris, fag: valgt.fag })}>{tt("Hent fra anbefalt tilbud (")}{valgt.leverandor}, {kr(n(valgt.pris))})</button></p>}
     <div className="pa-grid">
       <Felt l="Kontraktspart" half><input value={v.part || ''} onChange={e => set({ part: e.target.value })} /></Felt>
-      <Felt l={<>Kontraktsform <Hjelp k="ns84" /></>} half><input value={v.form || ''} list="dl-ns84" onChange={e => set({ form: e.target.value })} /></Felt>
+      <Felt l={<>{tt("Kontraktsform")} <Hjelp k="ns84" /></>} half><input value={v.form || ''} list="dl-ns84" onChange={e => set({ form: e.target.value })} /></Felt>
       <Felt l="Kontraktssum (kr eks. mva)" half><input className="num" value={v.sum ?? ''} onChange={e => set({ sum: e.target.value })} /></Felt>
       <Felt l="Fag" half><input value={v.fag || ''} onChange={e => set({ fag: e.target.value })} /></Felt>
       <Felt l="Signert dato" half><input type="date" value={v.signert || ''} onChange={e => set({ signert: e.target.value })} /></Felt>
       <Felt l="Avtalt ferdigstillelse" half><input type="date" value={v.ferdig || ''} onChange={e => set({ ferdig: e.target.value })} /></Felt>
-      <Felt l="Dagmulkt" half><input value={v.dagmulkt || ''} placeholder="F.eks. 1 promille per dag" onChange={e => set({ dagmulkt: e.target.value })} /></Felt>
-      <Felt l="Sikkerhetsstillelse" half><input value={v.sikkerhet || ''} placeholder="F.eks. 10 % i utførelsen, 3 % i reklamasjonstiden" onChange={e => set({ sikkerhet: e.target.value })} /></Felt>
+      <Felt l="Dagmulkt" half><input value={v.dagmulkt || ''} placeholder={tt("F.eks. 1 promille per dag")} onChange={e => set({ dagmulkt: e.target.value })} /></Felt>
+      <Felt l="Sikkerhetsstillelse" half><input value={v.sikkerhet || ''} placeholder={tt("F.eks. 10 % i utførelsen, 3 % i reklamasjonstiden")} onChange={e => set({ sikkerhet: e.target.value })} /></Felt>
     </div>
     <datalist id="dl-ns84">{['NS 8405 Utførelsesentreprise', 'NS 8406 Forenklet utførelsesentreprise', 'NS 8407 Totalentreprise', 'NS 8402 Rådgivning', 'NS 8403 Byggeledelse', 'Bestilling / ordrebekreftelse'].map(x => <option key={x} value={x} />)}</datalist>
-    <p>{v.kostId ? <Chip c="green">Registrert som forpliktet kostnad</Chip> : <button type="button" className="btn" onClick={reg}>Registrer som forpliktet kostnad</button>}</p>
+    <p>{v.kostId ? <Chip c="green">{tt("Registrert som forpliktet kostnad")}</Chip> : <button type="button" className="btn" onClick={reg}>{tt("Registrer som forpliktet kostnad")}</button>}</p>
   </>;
 }
 
@@ -231,21 +232,21 @@ function Moter({ v, set }: { v: Rec; set: (x: Rec) => void }) {
   const setM = (i: number, x: Rec) => set({ liste: M.map((m, j) => j === i ? { ...m, ...x } : m) });
   const apneSaker = M.flatMap(m => (m.saker || []).filter((s: Rec) => s.status !== 'Lukket').map((s: Rec) => ({ ...s, mote: m })));
   return <>
-    <h3 className="pa-h">Møter og referater</h3>
-    {apneSaker.length > 0 && <p className="small"><b>{apneSaker.length} åpne saker</b> fra tidligere møter.</p>}
+    <h3 className="pa-h">{tt("Møter og referater")}</h3>
+    {apneSaker.length > 0 && <p className="small"><b>{apneSaker.length} {tt("åpne saker")}</b> {tt("fra tidligere møter.")}</p>}
     {M.map((m, i) => <details key={m.id} open={apen === m.id} className="pa-mote" onToggle={e => (e.target as HTMLDetailsElement).open && setApen(m.id)}>
-      <summary><b>{m.type || 'Møte'}</b> {fd(m.dato)} <span className="small muted">· {(m.saker || []).filter((s: Rec) => s.status !== 'Lukket').length} åpne saker</span></summary>
+      <summary><b>{m.type || tt("Møte")}</b> {fd(m.dato)} <span className="small muted">· {(m.saker || []).filter((s: Rec) => s.status !== 'Lukket').length} {tt("åpne saker")}</span></summary>
       <div className="pa-grid">
         <Felt l="Dato" half><input type="date" value={m.dato || ''} onChange={e => setM(i, { dato: e.target.value })} /></Felt>
         <Felt l="Type" half><select value={m.type || ''} onChange={e => setM(i, { type: e.target.value })}>{['Oppstartsmøte', 'Byggemøte', 'Befaring', 'Prosjekteringsmøte', 'Ettårsbefaring', 'Annet'].map(x => <option key={x}>{x}</option>)}</select></Felt>
         <Felt l="Deltakere"><input value={m.deltakere || ''} onChange={e => setM(i, { deltakere: e.target.value })} /></Felt>
       </div>
       <Tekst v={m} set={x => setM(i, x)} k="referat" l="Referat" rows={4} />
-      <b className="small">Saker / aksjoner</b>
+      <b className="small">{tt("Saker / aksjoner")}</b>
       <Rader v={m.saker || []} set={x => setM(i, { saker: x })} ny={() => ({ tekst: '', ansvar: '', frist: '', status: 'Åpen' })} kol={[{ k: 'tekst', l: 'Sak', w: '45%' }, { k: 'ansvar', l: 'Ansvar' }, { k: 'frist', l: 'Frist', type: 'date' }, { k: 'status', l: 'Status', type: 'select', opts: ['Åpen', 'Lukket'] }]} />
-      <p style={{ textAlign: 'right', margin: '4px 0' }}><button type="button" className="btn ghost sm" onClick={() => set({ liste: M.filter((_, j) => j !== i) })}>Slett møtet</button></p>
+      <p style={{ textAlign: 'right', margin: '4px 0' }}><button type="button" className="btn ghost sm" onClick={() => set({ liste: M.filter((_, j) => j !== i) })}>{tt("Slett møtet")}</button></p>
     </details>)}
-    <button type="button" className="btn sm" onClick={() => { const id = uid(); set({ liste: [...M, { id, dato: today(), type: M.length ? 'Byggemøte' : 'Oppstartsmøte', deltakere: M[M.length - 1]?.deltakere || '', referat: '', saker: apneSaker.map(s => ({ id: uid(), tekst: s.tekst, ansvar: s.ansvar, frist: s.frist, status: 'Åpen' })) }] }); setApen(id); }}>+ Nytt møte{apneSaker.length ? ' (tar med åpne saker)' : ''}</button>
+    <button type="button" className="btn sm" onClick={() => { const id = uid(); set({ liste: [...M, { id, dato: today(), type: M.length ? 'Byggemøte' : 'Oppstartsmøte', deltakere: M[M.length - 1]?.deltakere || '', referat: '', saker: apneSaker.map(s => ({ id: uid(), tekst: s.tekst, ansvar: s.ansvar, frist: s.frist, status: 'Åpen' })) }] }); setApen(id); }}>{tt("+ Nytt møte")}{apneSaker.length ? tt(" (tar med åpne saker)") : ''}</button>
   </>;
 }
 
@@ -254,27 +255,27 @@ function Endringer({ v, set, fagL, p }: { v: Rec; set: (x: Rec) => void; fagL: s
   const tilKost = async (i: number) => { const x = E[i]; const P = byId('prosjekter', p.id)!; const id = uid(); const post = (P.budsjett || []).find((b: Rec) => b.fag && b.fag === x.fag)?.id || '';
     await oppdaterP(p.id, { kostnader: [...(P.kostnader || []), { id, dato: x.dato || today(), status: 'Bestilt', leverandor: x.leverandor || '', beskrivelse: `EM ${x.nr}: ${x.tittel}`, post, fag: x.fag || '', endring: true, belop: n(x.belop) }],
       arbeid: { ...(P.arbeid || {}), endringer: { ...v, liste: E.map((y, j) => j === i ? { ...y, kostId: id } : y) } } }, `Endring ${x.nr} godkjent og registrert som forpliktet: ${kr(n(x.belop))}`);
-    set({ liste: E.map((y, j) => j === i ? { ...y, kostId: id } : y) }); toast('Registrert som forpliktet kostnad'); };
+    set({ liste: E.map((y, j) => j === i ? { ...y, kostId: id } : y) }); toast(tt("Registrert som forpliktet kostnad")); };
   return <>
-    <h3 className="pa-h">Endringsmeldinger og tillegg</h3>
+    <h3 className="pa-h">{tt("Endringsmeldinger og tillegg")}</h3>
     <Rader v={E} set={x => set({ liste: x })} tom="Ingen endringer registrert." ny={() => ({ nr: String(E.length + 1), dato: today(), tittel: '', fag: '', leverandor: '', belop: '', dager: '', status: 'Varslet' })}
       kol={[{ k: 'nr', l: 'Nr', w: 44 }, { k: 'dato', l: 'Dato', type: 'date' }, { k: 'tittel', l: 'Endring', w: '25%' }, { k: 'fag', l: 'Fag', dl: fagL }, { k: 'leverandor', l: 'Fra' }, { k: 'belop', l: 'Beløp', type: 'number' }, { k: 'dager', l: 'Dager +/-', type: 'number', w: 60 }, { k: 'status', l: 'Status', type: 'select', opts: ['Varslet', 'Under behandling', 'Godkjent', 'Avvist'] }]}
-      sum={r => { const i = E.findIndex(x => x.id === r.id); return r.status === 'Godkjent' ? (r.kostId ? <Chip c="green">Kostnad</Chip> : <button type="button" className="btn sm" onClick={() => tilKost(i)}>→ kostnad</button>) : '–'; }} />
-    <p className="small">Godkjent {kr(sum(['Godkjent']))} · til behandling {kr(sum(['Varslet', 'Under behandling']))} · avvist {kr(sum(['Avvist']))}</p>
+      sum={r => { const i = E.findIndex(x => x.id === r.id); return r.status === 'Godkjent' ? (r.kostId ? <Chip c="green">{tt("Kostnad")}</Chip> : <button type="button" className="btn sm" onClick={() => tilKost(i)}>{tt("→ kostnad")}</button>) : '–'; }} />
+    <p className="small">{tt("Godkjent")} {kr(sum(['Godkjent']))} {tt("· til behandling")} {kr(sum(['Varslet', 'Under behandling']))} {tt("· avvist")} {kr(sum(['Avvist']))}</p>
   </>;
 }
 
 function Mangler({ v, set, fagL }: { v: Rec; set: (x: Rec) => void; fagL: string[] }) {
   const M: Rec[] = v.liste || [];
   return <>
-    <h3 className="pa-h">Overtakelse og mangler</h3>
+    <h3 className="pa-h">{tt("Overtakelse og mangler")}</h3>
     <div className="pa-grid">
       <Felt l="Overtakelsesforretning dato" half><input type="date" value={v.dato || ''} onChange={e => set({ dato: e.target.value })} /></Felt>
       <Felt l="Deltakere" half><input value={v.deltakere || ''} onChange={e => set({ deltakere: e.target.value })} /></Felt>
     </div>
     <Rader v={M} set={x => set({ liste: x })} tom="Ingen mangler registrert." ny={() => ({ nr: String(M.length + 1), beskrivelse: '', fag: '', ansvar: '', frist: '', status: 'Åpen' })}
       kol={[{ k: 'nr', l: 'Nr', w: 44 }, { k: 'beskrivelse', l: 'Mangel', w: '38%' }, { k: 'fag', l: 'Fag', dl: fagL }, { k: 'ansvar', l: 'Ansvar' }, { k: 'frist', l: 'Frist', type: 'date' }, { k: 'status', l: 'Status', type: 'select', opts: ['Åpen', 'Utbedret', 'Lukket'] }]} />
-    <p className="small">{M.filter(x => x.status !== 'Lukket').length} åpne av {M.length} mangler.</p>
+    <p className="small">{M.filter(x => x.status !== 'Lukket').length} {tt("åpne av")} {M.length} {tt("mangler.")}</p>
     <Tekst v={v} set={set} k="merknad" l="Merknader i protokollen" rows={2} />
   </>;
 }

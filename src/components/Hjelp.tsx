@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { HJELP, hjelpFor, type HjelpEmne } from '../lib/hjelpTekster';
+import { tt } from '../lib/i18n';
 
 // Viser tekst med avsnitt (tom linje) og punkter («- »)
 export function HjelpTekst({ tekst }: { tekst: string }) {
@@ -33,15 +34,15 @@ export function Hjelp({ id, tittel, tekst, size = 16, kilde }: { id?: string; ti
     setPos({ x, y: opp ? window.innerHeight - r.top + 6 : r.bottom + 6, opp }); setIModal(!!knapp.current!.closest('.ov, .modal')); setApen(a => !a);
   };
   return <>
-    <button ref={knapp} type="button" className="hjelp-q" aria-label={'Hjelp: ' + emne.tittel} title="Hjelp" onClick={vis} onMouseDown={e => e.stopPropagation()}
+    <button ref={knapp} type="button" className="hjelp-q" aria-label={tt("Hjelp: ") + emne.tittel} title={tt("Hjelp")} onClick={vis} onMouseDown={e => e.stopPropagation()}
       style={{ width: size, height: size, fontSize: size * 0.68 }}>?</button>
     {apen && createPortal(<div ref={boks} className="hjelp-pop" role="dialog" onClick={e => e.stopPropagation()}
       style={{ left: pos.x, ...(pos.opp ? { bottom: pos.y } : { top: pos.y }) }}>
       <div style={{ display: 'flex', alignItems: 'start', gap: 8, marginBottom: 6 }}><b style={{ flex: 1 }}>{emne.tittel}</b>
-        <button type="button" className="hjelp-x" aria-label="Lukk" onClick={() => setApen(false)}>×</button></div>
+        <button type="button" className="hjelp-x" aria-label={tt("Lukk")} onClick={() => setApen(false)}>×</button></div>
       <HjelpTekst tekst={emne.tekst} />
-      {kilde && kilde.length > 0 && <p className="small" style={{ margin: '0 0 6px' }}>Kilde: {kilde.map(([n, u], i) => <React.Fragment key={u}>{i ? ' · ' : ''}<a href={u} target="_blank" rel="noopener noreferrer">{n}</a></React.Fragment>)}</p>}
-      {id && HJELP[id] && !iModal && <a href={'#/hjelp/' + encodeURIComponent(id)} className="small" onClick={() => setApen(false)}>Mer hjelp →</a>}
+      {kilde && kilde.length > 0 && <p className="small" style={{ margin: '0 0 6px' }}>{tt("Kilde:")} {kilde.map(([n, u], i) => <React.Fragment key={u}>{i ? ' · ' : ''}<a href={u} target="_blank" rel="noopener noreferrer">{n}</a></React.Fragment>)}</p>}
+      {id && HJELP[id] && !iModal && <a href={'#/hjelp/' + encodeURIComponent(id)} className="small" onClick={() => setApen(false)}>{tt("Mer hjelp →")}</a>}
     </div>, document.body)}
   </>;
 }

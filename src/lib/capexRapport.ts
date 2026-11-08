@@ -4,6 +4,7 @@
 import { S } from './store';
 import { AV_LUKKET, KOMP, TYPE_TAGGER } from './catalog';
 import { YEAR, aNavn, byId, compYear, egetAar, kNavn, kostJustert, kostNaa, kpiInnst, naaverdi, renteInnst, sysKomp, type Rec } from './utils';
+import { lokale } from './i18n';
 
 export const KATEGORI: [string, string, string][] = [
   ['2', 'Bygning', '#1f4e79'], ['3', 'VVS', '#5aa0d6'], ['4', 'Elektro', '#c9792a'], ['5', 'Tele og automatisering', '#7b5ea7'],
@@ -72,8 +73,8 @@ export function hovedfunn(c: Capex): string[] {
   if (c.ute.foer) f.push(`${m(c.ute.foer)} i etterslep og tiltak før ${c.v.fra} er ikke med i perioden.`);
   return f;
 }
-export const mnok = (n: number) => (n / 1e6).toLocaleString('nb-NO', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-export const knok = (n: number) => Math.round(n / 1e3).toLocaleString('nb-NO');
+export const mnok = (n: number) => (n / 1e6).toLocaleString(lokale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+export const knok = (n: number) => Math.round(n / 1e3).toLocaleString(lokale());
 
 // Øyeblikksbilde for «endringer siden forrige rapport»
 export const snapshot = (c: Capex) => ({ v: c.v, tot: c.tot, kort: c.kortSum, poster: c.P.slice(0, 600).map(p => [p.id, p.y, p.kost, p.tg]) });
