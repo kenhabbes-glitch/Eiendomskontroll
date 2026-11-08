@@ -26,9 +26,9 @@ grant select, insert, update, delete on public.befaringer to authenticated;
 drop policy if exists bef_select on public.befaringer;
 create policy bef_select on public.befaringer for select using (public.har_eiendom(eiendom_id));
 drop policy if exists bef_insert on public.befaringer;
-create policy bef_insert on public.befaringer for insert with check (public.niva_for(auth.uid(), eiendom_id) in ('skriv', 'drift'));
+create policy bef_insert on public.befaringer for insert with check (public.kan_drifte(eiendom_id));
 drop policy if exists bef_update on public.befaringer;
-create policy bef_update on public.befaringer for update using (public.niva_for(auth.uid(), eiendom_id) in ('skriv', 'drift')) with check (public.niva_for(auth.uid(), eiendom_id) in ('skriv', 'drift'));
+create policy bef_update on public.befaringer for update using (public.kan_drifte(eiendom_id)) with check (public.kan_drifte(eiendom_id));
 drop policy if exists bef_delete on public.befaringer;
 create policy bef_delete on public.befaringer for delete using (public.kan_redigere(eiendom_id));
 
