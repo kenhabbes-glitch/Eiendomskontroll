@@ -31,6 +31,7 @@ begin
   select lisenser into gml from organisasjoner where id = p_org;
   perform set_config('ek.lisens_ok', '1', true);
   update organisasjoner set lisenser = p_antall where id = p_org;
+  perform set_config('ek.lisens_ok', '', true);
   select coalesce(p.navn, p.epost) into navn from profiles p where p.id = auth.uid();
   insert into hendelseslogg (bruker_id, bruker, tabell, handling, org_id, tekst)
   values (auth.uid(), navn, 'hendelse', 'abonnement', p_org, format('Antall brukerlisenser endret fra %s til %s', coalesce(gml::text, 'ikke satt'), p_antall));
