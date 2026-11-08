@@ -2,11 +2,11 @@
 import React, { useEffect, useState } from 'react';
 import { KOMP } from './catalog';
 import { S, aoApi, canEdit, fileUrl, isStaff, loggHendelse, save, sb, state, toast, uploadFile, useStore, type Fil } from './store';
-import { byId, fd, sortBy, tfmKomp, tfmSys, today, type Rec } from './utils';
+import { byId, fd, fdU, sortBy, tfmKomp, tfmSys, today, type Rec } from './utils';
 import { openModal, useFileUrl } from '../components/ui';
 import { Doc, INK, MUTED, RED, LINE } from './arealRapport';
 import { openPlan } from '../views/Arealer';
-import { tt, lokale } from './i18n';
+import { tt, tu, lokale, medUtSprak } from './i18n';
 import { MottakerSprak, sprakForEiendom } from '../components/MottakerSprak';
 
 const navnPaa = (id?: string) => { if (!id) return ''; if (id === state.me?.id) return state.me?.navn || state.me?.epost || ''; const p = S.profiles.find(x => x.id === id); return p ? p.navn || p.epost : ''; };
@@ -77,19 +77,20 @@ async function tegnUtsnitt(t: Rec, pos: { x: number; y: number }, zoom: boolean)
 
 // ---------------- Arbeidsordre som PDF
 export async function aoPdf(id: string) {
+  // Tekstene går gjennom tu()/safe(), så PDF-en følger mottakerens språk når den lages i medUtSprak()
   const a = byId('avvik', id)!; const ao = aoSnapshot(a); const t = a.pos ? byId('tegninger', a.pos.tegningId) : null;
-  const D = await Doc.ny(`Arbeidsordre – avvik #${a.nr}`); D.nyside(); const W = D.page.getWidth(); const M = 44;
+  const D = await Doc.ny(tu('Arbeidsordre – avvik #{0}', a.nr)); D.nyside(); const W = D.page.getWidth(); const M = 44;
   D.t('ARBEIDSORDRE', M, D.y - 10, 8.5, RED, true); D.y -= 18;
-  D.t(D.fit(`Avvik #${a.nr}: ${a.tittel || ''}`, W - 2 * M, 17, true), M, D.y - 17, 17, INK, true); D.y -= 30;
+  D.t(D.fit(tu('Avvik #{0}: {1}', a.nr, a.tittel || ''), W - 2 * M, 17, true), M, D.y - 17, 17, INK, true); D.y -= 30;
   const rader: [string, string][] = [['Eiendom', [ao.eiendom, ao.adresse].filter(Boolean).join(', ')], ['System', ao.system], ['Komponent', ao.komponent], ['Plassering', [ao.tegning, ao.plassering].filter(Boolean).join(' – ')],
-    ['Alvorlighet', a.alv || ''], ['Status', a.status || ''], ['Frist', a.frist ? fd(a.frist) : ''], ['Utbedres av', a.ansvar === 'Leverandør/entreprenør' ? a.utbedresAv || 'Leverandør' : a.ansvar === 'Leietaker' ? 'Leietaker' : a.ansvar === 'Felles' ? 'Felles (eier og leietaker)' : 'Eier / drift'],
-    ['Tildelt', navnPaa(a.tildeltId)], ['Oppdaget', a.oppdaget ? fd(a.oppdaget) : ''], ['Meldt av / kilde', [a.meldtAv, a.kilde].filter(Boolean).join(' · ')]];
-  D.tabell([['Detaljer', 1.3], ['', 4]], rader.filter(r => r[1]).map(r => ({ c: [r[0], r[1]] })));
+    ['Alvorlighet', tu(a.alv || '')], ['Status', tu(a.status || '')], ['Frist', a.frist ? fdU(a.frist) : ''], ['Utbedres av', tu(a.ansvar === 'Leverandør/entreprenør' ? a.utbedresAv || 'Leverandør' : a.ansvar === 'Leietaker' ? 'Leietaker' : a.ansvar === 'Felles' ? 'Felles (eier og leietaker)' : 'Eier / drift')],
+    ['Tildelt', navnPaa(a.tildeltId)], ['Oppdaget', a.oppdaget ? fdU(a.oppdaget) : ''], ['Meldt av / kilde', [a.meldtAv, tu(a.kilde || '')].filter(Boolean).join(' · ')]];
+  D.tabell([[tu('Detaljer'), 1.3], ['', 4]], rader.filter(r => r[1]).map(r => ({ c: [tu(r[0]), r[1]] })));
   if (a.beskrivelse) { D.h2('Beskrivelse og tiltak'); D.p(a.beskrivelse, 9.5, INK); }
   if (t) {
     try {
       const z = await tegnUtsnitt(t, a.pos, true); const o = await tegnUtsnitt(t, a.pos, false);
-      D.h2('Plassering på tegning – ' + t.navn);
+      D.h2(tu('Plassering på tegning – {0}', t.navn));
       const zi = await D.pdf.embedJpg(z.data); const zw = W - 2 * M; const zh = zw * z.h / z.w; D.plass(zh + 10);
       D.page.drawImage(zi, { x: M, y: D.y - zh, width: zw, height: zh }); D.page.drawRectangle({ x: M, y: D.y - zh, width: zw, height: zh, borderColor: LINE, borderWidth: 0.6 }); D.y -= zh + 8;
       const oi = await D.pdf.embedJpg(o.data); const ow = (W - 2 * M) * 0.55; const oh = ow * o.h / o.w; D.plass(oh + 24);
@@ -98,7 +99,7 @@ export async function aoPdf(id: string) {
     } catch { D.p('Tegningen kunne ikke hentes.', 9, RED); }
   }
   D.h2('Utført');
-  D.p(`Kvitter ut digitalt (med bilder og dokumentasjon) via lenken: ${aoLenke(a.id)}`, 9, INK);
+  D.p(tu('Kvitter ut digitalt (med bilder og dokumentasjon) via lenken: {0}', aoLenke(a.id)), 9, INK);
   D.plass(70); ['Utført dato', 'Utført av', 'Kommentar'].forEach((l, i) => { const y = D.y - 22 - i * 22; D.t(l, M, y + 4, 8.5, MUTED); D.page.drawLine({ start: { x: M + 90, y }, end: { x: W - M, y }, thickness: 0.5, color: LINE }); }); D.y -= 80;
   return await D.pdf.save();
 }
@@ -119,7 +120,7 @@ function SendAo({ id, varsle, epost = '', close }: { id: string; varsle: boolean
     setBusy(true);
     try {
       await lagreAvvik(id, x => x); // oppdater stedsinformasjonen før sending
-      const pdfB = pdf ? tilBase64(await aoPdf(id)) : undefined;
+      const pdfB = pdf ? tilBase64(await medUtSprak(sp, () => aoPdf(id))) : undefined;
       const r = await aoApi({ action: varsle ? 'varsle' : 'inviter', avvik_id: id, epost: ep, melding: m, pdf: pdfB, lenkeBase: location.origin, mottakerSprak: sp });
       setRes(r); if (r.sendt) toast(tt("Arbeidsordren er sendt til ") + r.til);
     } catch (e: any) { toast(e.message || tt("Feil")); }

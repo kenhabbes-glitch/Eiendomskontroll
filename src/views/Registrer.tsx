@@ -8,33 +8,36 @@ import { tt, sprak } from '../lib/i18n';
 const TYPER: [string, string][] = [['eier', 'Gårdeier / eiendomsselskap'], ['forvalter', 'Forvaltningsselskap'], ['drift', 'Driftsselskap'], ['service', 'Servicefirma']];
 
 export function Registrer() {
-  const [f, setF] = useState({ orgnr: '', type: 'eier', navn: '', epost: '', nettside: '' }); const [samtykke, setSamtykke] = useState(false);
-  const [enhet, setEnhet] = useState<{ navn: string; form?: string; feil?: string } | null>(null); const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const [ferdig, setFerdig] = useState('');
+  const [f, setF] = useState({ orgnr: '', firma: '', land: 'NO', type: 'eier', navn: '', epost: '', nettside: '' }); const [samtykke, setSamtykke] = useState(false);
+  const [enhet, setEnhet] = useState<{ navn: string; form?: string; feil?: string } | null>(null); const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const [ferdig, setFerdig] = useState(''); const [utenNr, setUtenNr] = useState(false);
   const [vis, setVis] = useState<'' | 'vilkar' | 'personvern'>('');
   const set = (k: string, v: string) => setF(o => ({ ...o, [k]: v }));
-  const nr = f.orgnr.replace(/\D/g, '');
-  useEffect(() => { setEnhet(null); if (nr.length !== 9) return; let av = false;
+  const nr = f.orgnr.replace(/[\s.\-]/g, '').toUpperCase();
+  useEffect(() => { setEnhet(null); if (nr.length !== 9 || !/^\d+$/.test(nr) || f.land !== 'NO') return; let av = false;
     hentEnhet(nr).then((e: any) => { if (av) return; setEnhet(!e ? { navn: '', feil: 'Fant ikke organisasjonsnummeret' } : e.slettet ? { navn: e.navn, feil: 'Organisasjonen er slettet' } : e.konkurs || e.avvikling || e.tvangsavvikling ? { navn: e.navn, feil: 'Organisasjonen er konkurs eller under avvikling' } : { navn: e.navn, form: e.orgform }); }).catch(() => !av && setEnhet(null));
-    return () => { av = true; }; }, [nr]);
+    return () => { av = true; }; }, [nr, f.land]);
   const send = async (e: React.FormEvent) => { e.preventDefault(); setErr('');
     if (!samtykke) return setErr(tt("Du må godta vilkårene og databehandleravtalen"));
     setBusy(true);
     try { const r = await fetch('/.netlify/functions/registrer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, sprak: sprak(), orgnr: nr, samtykke: true, vilkaar: VILKAR_VERSJON, redirectTo: location.origin + '/' }) });
-      const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Registreringen feilet'); setFerdig(j.firmanavn || enhet?.navn || ''); }
-    catch (x: any) { setErr(x.message); } finally { setBusy(false); } };
+      const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Registreringen feilet'); setUtenNr(!!j.utenOrgnr); setFerdig(j.firmanavn || enhet?.navn || ''); }
+    catch (x: any) { setErr(tt(x.message)); } finally { setBusy(false); } };
 
   if (vis) return <div className="login"><div className="card" style={{ maxWidth: 760, maxHeight: '90vh', overflow: 'auto' }}>{vis === 'vilkar' ? <VilkarTekst /> : <PersonvernTekst />}<p><button className="btn" onClick={() => setVis('')}>{tt("Tilbake til registreringen")}</button></p></div></div>;
   if (ferdig) return <div className="login"><div className="card" style={{ maxWidth: 520 }}>
     <h1>{tt("Sjekk e-posten din")}</h1>
-    <p><b>{ferdig}</b> {tt("er registrert med 30 dagers gratis prøveperiode på alle moduler.")}</p>
+    <p><b>{ferdig}</b> {utenNr ? tt("er registrert. Prøveperioden på 30 dager starter når du har lagt inn organisasjonsnummeret (du får et varsel etter innlogging).") : tt("er registrert med 30 dagers gratis prøveperiode på alle moduler.")}</p>
     <p>{tt("Vi har sendt en invitasjon til")} <b>{f.epost}</b>{tt(". Trykk på lenken i e-posten for å sette passord og logge inn. Finner du den ikke, sjekk søppelpost.")}</p>
     <p className="small muted">{tt("Når du er logget inn, kan du legge inn eiendommene og invitere kollegaer under «Organisasjon og tilgang».")}</p>
     <a className="btn" href="#/">{tt("Til innlogging")}</a></div></div>;
   return <div className="login"><form className="card" onSubmit={send} style={{ maxWidth: 520 }}>
     <h1>{tt("Prøv Eiendomskontroll")}</h1>
     <p className="muted" style={{ marginTop: 0 }}>{tt("30 dager gratis med alle moduler. Ingen betalingskort. Prøveperioden avsluttes av seg selv.")}</p>
-    <div className="fld"><label>{tt("Organisasjonsnummer")}</label><input inputMode="numeric" value={f.orgnr} onChange={e => set('orgnr', e.target.value)} placeholder={tt("9 siffer")} required autoFocus />
+    <div className="fld"><label>{tt("Land")}</label><select value={f.land} onChange={e => set('land', e.target.value)}>{[['NO', 'Norge'], ['SE', 'Sverige'], ['DK', 'Danmark'], ['MX', 'México']].map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></div>
+    <div className="fld"><label>{tt("Organisasjonsnummer")} <span className="muted">({tt("valgfritt")})</span></label><input value={f.orgnr} onChange={e => set('orgnr', e.target.value)} placeholder={f.land === 'NO' ? tt("9 siffer") : ''} autoFocus />
+      {!nr && <div className="small muted" style={{ marginTop: 4 }}>{tt("Har du ikke organisasjonsnummer ennå, kan du registrere deg uten og legge det inn senere. Prøveperioden starter når det er lagt inn.")}</div>}
       {enhet && (enhet.feil ? <div className="err" style={{ marginTop: 4 }}>{enhet.feil}</div> : <div className="small" style={{ marginTop: 4 }}>✓ <b>{enhet.navn}</b>{enhet.form ? ' · ' + enhet.form : ''}</div>)}</div>
+    {!nr && <div className="fld"><label>{tt("Firmanavn")}</label><input value={f.firma} onChange={e => set('firma', e.target.value)} autoComplete="organization" required /></div>}
     <div className="fld"><label>{tt("Hva slags virksomhet?")}</label><select value={f.type} onChange={e => set('type', e.target.value)}>{TYPER.map(([k, l]) => <option key={k} value={k}>{tt(l)}</option>)}</select></div>
     <div className="fld"><label>{tt("Ditt navn")}</label><input value={f.navn} onChange={e => set('navn', e.target.value)} autoComplete="name" required /></div>
     <div className="fld"><label>{tt("Din e-post (jobb)")}</label><input type="email" value={f.epost} onChange={e => set('epost', e.target.value)} autoComplete="email" required /><div className="small muted" style={{ marginTop: 4 }}>{tt("Du blir administrator for organisasjonen og får en e-post for å sette passord.")}</div></div>

@@ -1,6 +1,6 @@
 import { KOMP, TFM_KODER, AV_LUKKET, TYPE_TAGGER, NS_TAGG } from './catalog';
 import { S, ARKIV } from './store';
-import { lokale, sprak } from './i18n';
+import { lokale, sprak, utSprak } from './i18n';
 
 export type Rec = { id: string; [k: string]: any };
 
@@ -16,6 +16,8 @@ export function addInt(s: string, i?: { n?: number; enhet?: string }) {
 export function addDays(s: string, n: number) { const d = new Date(s + 'T12:00:00'); d.setDate(d.getDate() + n); return iso(d); }
 export function dUntil(s?: string): number | null { if (!s) return null; return Math.round((new Date(s + 'T12:00:00').getTime() - new Date(today() + 'T12:00:00').getTime()) / 864e5); }
 export function fd(s?: string) { if (!s) return '–'; const [y, m, d] = s.slice(0, 10).split('-'); const sp = sprak(); return sp === 'nb' || sp === 'da' ? `${d}.${m}.${y}` : sp === 'sv' ? `${y}-${m}-${d}` : `${d}/${m}/${y}`; }
+/** Dato på dokumentets språk (se medUtSprak) */
+export function fdU(s?: string) { if (!s) return '–'; const [y, m, d] = s.slice(0, 10).split('-'); const sp = utSprak(); return sp === 'nb' || sp === 'da' ? `${d}.${m}.${y}` : sp === 'sv' ? `${y}-${m}-${d}` : `${d}/${m}/${y}`; }
 export function fdt(s?: string) { if (!s) return '–'; return new Date(s).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' }); }
 export function intTxt(i?: { n?: number; enhet?: string }) {
   if (!i) return '–'; const n = +(i.n || 1);

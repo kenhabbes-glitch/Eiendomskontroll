@@ -9,7 +9,7 @@ import { confirmBox, copyText, FileLink, formModal, showModal, type Field } from
 import { autoKvitterIK, vurderPliktRef } from '../lib/actions';
 import { lagPakke, lesPakke, pakkeNavn, blobTilBase64, type ImportResultat } from '../lib/sjekklistePakke';
 import { uploadFile, isStaff } from '../lib/store';
-import { tt } from '../lib/i18n';
+import { tt, medUtSprak } from '../lib/i18n';
 import { sprakForEiendom, sprakValg } from '../components/MottakerSprak';
 
 export async function lastNedPakke(l: Rec, frist: string) {
@@ -64,7 +64,7 @@ export function sendSjekkliste(lid: string) {
       if (!(await confirmBox(tt("Sende e-post med sjekklisten til {0} ({1})? Er testmodus på, holdes e-posten tilbake og du får teksten i stedet.", String(x.epost).trim(), l.navn), tt("Send e-post")))) return false;
       try {
         let vedlegg: any;
-        if (x.maate !== 'lenke') { const b = await lagPakke(l, x.frist); vedlegg = { navn: pakkeNavn(l) + tt(".zip"), base64: await blobTilBase64(b), type: 'application/zip' }; }
+        if (x.maate !== 'lenke') { const b = await medUtSprak(x.mottakerSprak, () => lagPakke(l, x.frist)); vedlegg = { navn: (await medUtSprak(x.mottakerSprak, async () => pakkeNavn(l))) + '.zip', base64: await blobTilBase64(b), type: 'application/zip' }; }
         const r = await aoApi({ action: 'lt_send', leietaker_id: lid, epost: x.epost, frist: x.frist, melding: x.melding, lenkeBase: location.origin, maate: x.maate, vedlegg, mottakerSprak: x.mottakerSprak });
         if (!r.sendt && vedlegg) lastNedPakke(l, x.frist);
         if (r.sendt) { toast(tt("Sjekklisten er sendt til ") + r.til); return; }

@@ -1,5 +1,6 @@
 import { PrLenke } from './views/ProsjektRapport';
 import { Registrer } from './views/Registrer';
+import { OrgnrVarsel } from './components/OrgnrVarsel';
 import { VilkarTekst } from './components/Vilkar';
 import './views/KomponentRunde';
 import { svaktPassord, PASSORDKRAV } from './lib/utils';
@@ -207,6 +208,7 @@ export default function App() {
     </aside>
     <main id="main">
       {state.error && <div className="banner">{state.error}</div>}
+      <OrgnrVarsel />
       {(state.offline || !navigator.onLine) && <div className="offline-band" role="status">{tt("Uten nett")}{(state as any).kopiTid ? tt(" – viser data fra {0}", new Date((state as any).kopiTid).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' })) : ''}{tt(". Befaringer kan gjennomføres og lagres på enheten; andre endringer krever nett.")}</div>}
       {state.loading && !S.eiendommer.length ? <div className="empty"><b>{tt("Laster data …")}</b></div> : body}
     </main>

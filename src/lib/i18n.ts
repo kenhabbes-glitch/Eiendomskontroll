@@ -46,6 +46,23 @@ export function tt(s: any, ...a: any[]): string {
   if (a.length) for (let i = 0; i < a.length; i++) r = r.split('{' + i + '}').join(String(a[i] ?? ''));
   return r;
 }
+// ---------- Utgående dokumenter (PDF, Excel) på mottakerens språk, uavhengig av språket i appen
+let UT: { sp: Sprak; dict: Record<string, string> | null } | null = null;
+const ORDBOKER: Partial<Record<Sprak, Record<string, string> | null>> = {};
+async function ordbok(sp: Sprak) { if (sp === 'nb') return null; if (sp in ORDBOKER) return ORDBOKER[sp]!; const f = LASTERE[sp]; let d: any = null; if (f) { try { const m = await f(); d = m.default || m; } catch { } } return (ORDBOKER[sp] = d); }
+/** Lager et dokument på et annet språk: tu(), fdU() og PDF-tekstene bruker språket mens fn kjører */
+export async function medUtSprak<T>(sp: string | undefined, fn: () => Promise<T>): Promise<T> {
+  const s = (SPRAK.some(x => x.k === sp) ? sp : SP) as Sprak; const gml = UT; UT = { sp: s, dict: await ordbok(s) };
+  try { return await fn(); } finally { UT = gml; }
+}
+export const utSprak = (): Sprak => UT ? UT.sp : SP;
+/** Som tt(), men på dokumentets språk (medUtSprak) */
+export function tu(s: any, ...a: any[]): string {
+  if (!UT) return tt(s, ...a); if (typeof s !== 'string') return s;
+  let r = s; if (UT.dict && s) { const d = UT.dict[s] ?? UT.dict[norm(s)]; if (d) r = d; }
+  if (a.length) for (let i = 0; i < a.length; i++) r = r.split('{' + i + '}').join(String(a[i] ?? ''));
+  return r;
+}
 /** Oversetter en lagret verdi bare for visning (f.eks. status «Ny» → «Nuevo») */
 export const vis = (v: any) => (typeof v === 'string' && v ? tt(v) : v);
 /** Tekst med kontekst, for norske ord som oversettes ulikt etter sammenheng: ttc('svar', 'Avvik') slår opp «Avvik|svar» først */

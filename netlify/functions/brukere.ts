@@ -102,6 +102,34 @@ const handler = async (req: Request) => {
     return json(200, { ok: true, brukere });
   }
 
+  // ---------- Legg inn org.nr. senere (org-admin) – starter prøveperioden hvis den ikke er startet
+  if (body.action === 'org_orgnr') {
+    const id = String(body.org_id || ''); const nr = String(body.orgnr || '').replace(/[\s.\-]/g, '').toUpperCase();
+    if (!plattform && !(await erOrgAdmin(id))) return json(403, { error: 'Bare administrator i organisasjonen kan legge inn organisasjonsnummer' });
+    const { data: org } = await admin.from('organisasjoner').select('id, navn, orgnr, data').eq('id', id).maybeSingle();
+    if (!org) return json(404, { error: 'Fant ikke organisasjonen' });
+    if (org.orgnr) return json(409, { error: 'Organisasjonen har allerede organisasjonsnummer' });
+    if (nr.length < 5 || nr.length > 20 || !/^[A-Z0-9]+$/.test(nr)) return json(400, { error: 'Ugyldig organisasjonsnummer' });
+    if (/^\d{9}$/.test(nr) && (org.data?.land || 'NO') === 'NO') {
+      try { const r = await fetch(`https://data.brreg.no/enhetsregisteret/api/enheter/${nr}`, { headers: { Accept: 'application/json' } });
+        if (r.status === 404 || r.status === 410) return json(400, { error: 'Fant ikke organisasjonsnummeret i Enhetsregisteret' });
+        if (!r.ok) return json(503, { error: 'Fikk ikke kontakt med Enhetsregisteret. Prøv igjen litt senere.' });
+        const e: any = await r.json(); if (e.slettedato || e.konkurs || e.underAvvikling || e.underTvangsavviklingEllerTvangsopplosning) return json(400, { error: 'Organisasjonen er slettet, konkurs eller under avvikling' });
+      } catch { return json(503, { error: 'Fikk ikke kontakt med Enhetsregisteret. Prøv igjen litt senere.' }); }
+    }
+    const { data: fins } = await admin.from('organisasjoner').select('id').eq('orgnr', nr).maybeSingle();
+    if (fins) return json(409, { error: 'Dette organisasjonsnummeret er allerede registrert. Be administratoren i den organisasjonen om å invitere deg.' });
+    const { error } = await admin.from('organisasjoner').update({ orgnr: nr, data: { ...(org.data || {}), utenOrgnr: false, orgnrDato: new Date().toISOString() } }).eq('id', id);
+    if (error) return json(500, { error: error.message });
+    const { count } = await admin.from('org_modul').select('modul', { count: 'exact', head: true }).eq('org_id', id);
+    let prove = false;
+    if (!count) { const til = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+      const { error: me } = await admin.from('org_modul').insert(['brannvern', 'vedlikehold', 'prosjekter', 'tilsyn', 'dokumentlesing', 'rapporter', 'befaring'].map(m => ({ org_id: id, modul: m, prove_til: til, merknad: 'Prøveperiode' })));
+      prove = !me; }
+    await logg(id, `Organisasjonsnummer ${nr} lagt inn for «${org.navn}».${prove ? ' Prøveperiode på 30 dager startet.' : ''}`);
+    return json(200, { ok: true, prove });
+  }
+
   // ---------- Ny organisasjon (plattformadministrator)
   if (body.action === 'ny_org') {
     if (!plattform) return json(403, { error: 'Bare plattformadministrator kan opprette organisasjoner' });

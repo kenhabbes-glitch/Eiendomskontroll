@@ -28,9 +28,14 @@ const handler = async (req: Request) => {
 
   let b: any; try { b = await req.json(); } catch { return json(400, { error: 'Ugyldig forespørsel' }); }
   if (b.nettside) return json(200, { ok: true }); // honningkrukke: feltet er skjult for mennesker
-  const orgnr = String(b.orgnr || '').replace(/\D/g, ''); const navn = String(b.navn || '').trim().slice(0, 120);
+  const orgnr = String(b.orgnr || '').replace(/[\s.\-]/g, '').toUpperCase().slice(0, 20); const navn = String(b.navn || '').trim().slice(0, 120);
   const epost = String(b.epost || '').trim().toLowerCase(); const type = TYPER.includes(b.type) ? b.type : 'eier';
-  if (orgnr.length !== 9) return json(400, { error: 'Organisasjonsnummeret må ha 9 siffer' });
+  const land = ['NO', 'SE', 'DK', 'MX'].includes(String(b.land)) ? String(b.land) : 'NO';
+  const uten = !orgnr; // uten org.nr. (f.eks. Mexico): organisasjonen opprettes, men prøveperioden starter først når org.nr. legges inn
+  const firmaInn = String(b.firma || '').trim().slice(0, 120);
+  if (uten) { if (firmaInn.length < 2) return json(400, { error: 'Skriv inn firmanavnet, eller organisasjonsnummer' }); }
+  else if (land === 'NO' && orgnr.length !== 9) return json(400, { error: 'Organisasjonsnummeret må ha 9 siffer' });
+  else if (land !== 'NO' && (orgnr.length < 5 || orgnr.length > 20)) return json(400, { error: 'Ugyldig organisasjonsnummer' });
   if (navn.length < 2) return json(400, { error: 'Skriv inn navnet ditt' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(epost) || epost.length > 200) return json(400, { error: 'Ugyldig e-postadresse' });
   if (b.samtykke !== true) return json(400, { error: 'Du må godta vilkårene for å registrere' });
@@ -43,22 +48,26 @@ const handler = async (req: Request) => {
 
   // Enhetsregisteret
   let enhet: any = null;
+  if (!uten && land === 'NO') {
   try { const r = await fetch(`https://data.brreg.no/enhetsregisteret/api/enheter/${orgnr}`, { headers: { Accept: 'application/json' } }); if (r.ok) enhet = await r.json(); else if (r.status !== 404 && r.status !== 410) return json(503, { error: 'Fikk ikke kontakt med Enhetsregisteret. Prøv igjen litt senere.' }); }
   catch { return json(503, { error: 'Fikk ikke kontakt med Enhetsregisteret. Prøv igjen litt senere.' }); }
   if (!enhet || enhet.slettedato || enhet._slettet) return json(400, { error: 'Fant ikke organisasjonsnummeret i Enhetsregisteret' });
   if (enhet.konkurs || enhet.underAvvikling || enhet.underTvangsavviklingEllerTvangsopplosning) return json(400, { error: 'Organisasjonen er registrert som konkurs eller under avvikling' });
-  const firmanavn = String(enhet.navn || '').trim();
+  }
+  const firmanavn = uten || land !== 'NO' ? firmaInn : String(enhet.navn || '').trim();
+  if (firmanavn.length < 2) return json(400, { error: 'Skriv inn firmanavnet' });
 
   // Finnes fra før?
-  const { data: finsOrg } = await admin.from('organisasjoner').select('id').eq('orgnr', orgnr).maybeSingle();
+  const { data: finsOrg } = uten ? { data: null } : await admin.from('organisasjoner').select('id').eq('orgnr', orgnr).maybeSingle();
   if (finsOrg) return json(409, { error: `${firmanavn} er allerede registrert. Be administratoren i organisasjonen om å invitere deg.` });
   const { data: finsBruker } = await admin.from('profiles').select('id').eq('epost', epost).maybeSingle();
   if (finsBruker) return json(409, { error: 'E-postadressen har allerede en bruker. Logg inn, eller bruk «Glemt passord?».' });
 
   // Opprett organisasjon (gir 30 dagers prøve på alle moduler via trigger i databasen)
-  const { data: org, error: oe } = await admin.from('organisasjoner').insert({ navn: firmanavn, orgnr, type, aktiv: true,
-    data: { selvregistrert: true, registrert: new Date().toISOString(), registrertAv: { navn, epost }, vilkaar: VILKAR_VERSJON, orgform: enhet.organisasjonsform?.beskrivelse || '', adresse: enhet.forretningsadresse || null } }).select().single();
+  const { data: org, error: oe } = await admin.from('organisasjoner').insert({ navn: firmanavn, orgnr: uten ? null : orgnr, type, aktiv: true,
+    data: { selvregistrert: true, utenOrgnr: uten, land, registrert: new Date().toISOString(), registrertAv: { navn, epost }, vilkaar: VILKAR_VERSJON, orgform: enhet?.organisasjonsform?.beskrivelse || '', adresse: enhet?.forretningsadresse || null } }).select().single();
   if (oe || !org) return json(500, { error: 'Kunne ikke opprette organisasjonen' });
+  if (uten) await admin.from('org_modul').delete().eq('org_id', org.id); // trigger gir prøveperiode ved opprettelse; den starter først når org.nr. er lagt inn
 
   // Invitasjon på e-post – brukeren setter passord selv
   const inv = await admin.auth.admin.inviteUserByEmail(epost, { data: { navn, sprak: ['nb', 'en', 'sv', 'da', 'es-MX', 'es-ES'].includes(b.sprak) ? b.sprak : 'nb' }, redirectTo });
@@ -68,13 +77,13 @@ const handler = async (req: Request) => {
     const grunn = kode === 'over_email_send_rate_limit' || status === 429 ? 'For mange e-poster er sendt den siste timen. Prøv igjen senere.'
       : status >= 500 ? 'E-postutsendingen er ikke riktig satt opp hos oss. Vi er varslet – prøv igjen litt senere.'
       : (e.message || kode || 'ukjent feil');
-    await admin.from('hendelseslogg').insert({ tabell: 'hendelse', handling: 'registrering', bruker: navn, tekst: `Registrering av ${firmanavn} (${orgnr}) feilet ved utsending av invitasjon til ${epost}: ${e.message || kode || status || 'ukjent'}` });
+    await admin.from('hendelseslogg').insert({ tabell: 'hendelse', handling: 'registrering', bruker: navn, tekst: `Registrering av ${firmanavn} (${orgnr || 'uten org.nr.'}) feilet ved utsending av invitasjon til ${epost}: ${e.message || kode || status || 'ukjent'}` });
     return json(status === 429 ? 429 : 502, { error: 'Kunne ikke sende invitasjon: ' + grunn });
   }
   const uid = inv.data.user.id;
   await admin.from('profiles').upsert({ id: uid, epost, navn, rolle: 'ingen', aktiv: true });
   const { error: me } = await admin.from('org_medlem').upsert({ org_id: org.id, user_id: uid, rolle: 'admin', alle_bygg: true, aktiv: true });
   if (me) { await admin.from('organisasjoner').delete().eq('id', org.id); return json(500, { error: 'Kunne ikke opprette administrator' }); }
-  await admin.from('hendelseslogg').insert({ bruker_id: uid, bruker: navn, tabell: 'hendelse', handling: 'registrering', org_id: org.id, tekst: `Ny kunde registrert: ${firmanavn} (${orgnr}), administrator ${navn} <${epost}>. Vilkår ${VILKAR_VERSJON} godtatt. Prøveperiode 30 dager.` });
-  return json(200, { ok: true, firmanavn });
+  await admin.from('hendelseslogg').insert({ bruker_id: uid, bruker: navn, tabell: 'hendelse', handling: 'registrering', org_id: org.id, tekst: `Ny kunde registrert: ${firmanavn} (${orgnr || 'uten org.nr.'}), administrator ${navn} <${epost}>. Vilkår ${VILKAR_VERSJON} godtatt. ${uten ? 'Uten org.nr. – prøveperioden starter når org.nr. legges inn.' : 'Prøveperiode 30 dager.'}` });
+  return json(200, { ok: true, firmanavn, utenOrgnr: uten });
 };
