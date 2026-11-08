@@ -2,7 +2,7 @@
 // Appen viser bare det brukeren har lov til å endre – databasen håndhever reglene uansett.
 import React, { useEffect, useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
-import { AbonnementOversikt, modulAdmin } from './Abonnement';
+import { AbonnementOversikt, Bestillinger, modulAdmin, prisEditor } from './Abonnement';
 import { S, adminApi, isPlattform, mineOrg, reloadAdmin, sb, state, toast, useStore, feiltekst, orgNavn, save, bump } from '../lib/store';
 import { eNavn, fd, sortBy, today, aNavn } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, type Field } from '../components/ui';
@@ -276,12 +276,12 @@ export function Organisasjon() {
     c = <><div className="toolbar">{orgVelger(admin, org)}<span className="muted small">Notat til advokat om hvordan appen behandler personopplysninger. Skriv ut eller lagre som PDF og send til advokaten; noter tilbakemeldingen her.</span></div>
       <PersonvernNotat key={org} org={org} /></>;
   }
-  if (fane === 'abonnement' && admin.length) c = <AbonnementOversikt />;
+  if (fane === 'abonnement' && admin.length) c = <AbonnementOversikt orgId={org} velger={admin.length > 1 ? orgVelger(admin, org) : undefined} />;
   if (fane === 'kunder' && isPlattform()) {
     const O = sortBy(S.orgs, o => o.navn);
-    c = <><FullTilgang /><div className="toolbar"><span className="muted small">{O.length} organisasjoner.{S.fullTilgang ? ' Full tilgang er på: du ser og kan endre alle kunders data.' : ' Som plattformadministrator administrerer du kunder, men ser ikke deres data med mindre du er medlem.'}</span><button className="btn pri" style={{ marginLeft: 'auto' }} onClick={nyOrg}>+ Ny kunde</button></div>
+    c = <><FullTilgang /><Bestillinger /><div className="toolbar"><span className="muted small">{O.length} organisasjoner.{S.fullTilgang ? ' Full tilgang er på: du ser og kan endre alle kunders data.' : ' Som plattformadministrator administrerer du kunder, men ser ikke deres data med mindre du er medlem.'}</span><button className="btn" style={{ marginLeft: 'auto' }} onClick={prisEditor}>Prisliste</button><button className="btn pri" onClick={nyOrg}>+ Ny kunde</button></div>
       <div className="tbl-wrap"><table><thead><tr><th>Organisasjon</th><th>Type</th><th>Org.nr.</th><th>Opprettet</th><th>Status</th><th /></tr></thead><tbody>
-        {O.map(o => <tr key={o.id}><td><b style={{ fontWeight: 600 }}>{o.navn}</b>{o.data?.selvregistrert && <div className="small muted">Selvregistrert {fd(String(o.data.registrert || '').slice(0, 10))} av {o.data.registrertAv?.navn} · {o.data.registrertAv?.epost}</div>}</td><td className="small">{typeNavn(o.type)}</td><td className="mono small">{o.orgnr || '–'}</td><td className="small">{fd(String(o.opprettet || '').slice(0, 10))}</td><td>{o.aktiv ? <Chip c="green">Aktiv</Chip> : <Chip c="red">Sperret</Chip>}</td>
+        {O.map(o => <tr key={o.id}><td><b style={{ fontWeight: 600 }}>{o.navn}</b>{o.abonnement_trinn && <span className="small muted"> · {o.abonnement_trinn === 'en' ? 'Enbruker' : 'Flerbruker'}</span>}{o.data?.selvregistrert && <div className="small muted">Selvregistrert {fd(String(o.data.registrert || '').slice(0, 10))} av {o.data.registrertAv?.navn} · {o.data.registrertAv?.epost}</div>}</td><td className="small">{typeNavn(o.type)}</td><td className="mono small">{o.orgnr || '–'}</td><td className="small">{fd(String(o.opprettet || '').slice(0, 10))}</td><td>{o.aktiv ? <Chip c="green">Aktiv</Chip> : <Chip c="red">Sperret</Chip>}</td>
           <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" style={{ marginRight: 6 }} onClick={() => modulAdmin(o)}>Moduler</button><button className="btn sm" style={{ marginRight: 6 }} onClick={() => endreOrg(o)}>Endre</button><button className="btn sm" onClick={async () => { if (!(await confirmBox(o.aktiv ? `Sperre «${o.navn}»? Alle brukere i organisasjonen mister tilgangen umiddelbart.` : `Gjenåpne «${o.navn}»?`, o.aktiv ? 'Sperr' : 'Gjenåpne'))) return; const { error } = await sb.from('organisasjoner').update({ aktiv: !o.aktiv }).eq('id', o.id); if (error) toast(feiltekst(error)); else { o.aktiv = !o.aktiv; bump(); } }}>{o.aktiv ? 'Sperr' : 'Gjenåpne'}</button></td></tr>)}
       </tbody></table></div></>;
   }

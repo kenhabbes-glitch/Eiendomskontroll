@@ -28,8 +28,22 @@ export function harModul(k: ModulKey, eid?: string): boolean {
   const ownerless = S.eiendommer.some(e => !e.eierOrgId); if (ownerless) return true;
   return RADER.some(r => r.modul === k);
 }
+/** Har en bestemt organisasjon modulen? */
+export const orgHar = (org: string, k: ModulKey) => k === 'kjerne' || RADER === null || RADER.some(r => r.org_id === org && r.modul === k);
 /** Prøveperiode som gjelder modulen for brukerens egen organisasjon */
 export const proveTil = (k: string, org = S.primarOrg) => RADER?.find(r => r.org_id === org && r.modul === k)?.prove_til || null;
 
 /** Rute → modul (for menyen og sperret side) */
 export const RUTE_MODUL: Record<string, ModulKey> = { prosjekter: 'prosjekter', prosjekt: 'prosjekter', vedlikehold: 'vedlikehold', tilsyn: 'tilsyn', innboks: 'dokumentlesing' };
+
+// ---------- Priser (settes av leverandøren; leses av alle innloggede)
+export type Trinn = 'en' | 'fler';
+export const TRINN: [Trinn, string, string][] = [['en', 'Enbruker', 'Én bruker'], ['fler', 'Flerbruker', 'Ubegrenset antall brukere i organisasjonen']];
+export type Priser = { moduler: Record<string, { en: number | null; fler: number | null }>; notat?: string; oppdatert?: string };
+let PRISER: Priser | null = null;
+export async function lastPriser(): Promise<Priser | null> {
+  try { const { data, error } = await sb.from('plattform_innstilling').select('verdi').eq('nokkel', 'priser').maybeSingle(); PRISER = error ? null : (data?.verdi as Priser) || { moduler: {} }; } catch { PRISER = null; }
+  return PRISER;
+}
+export const priser = () => PRISER;
+export const kr = (n: number | null | undefined) => n === null || n === undefined || isNaN(n as number) ? '' : Math.round(n).toLocaleString('nb-NO') + ' kr';
