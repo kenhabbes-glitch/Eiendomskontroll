@@ -714,7 +714,7 @@ function AvvikKoblinger({ id, lukk }: { id: string; lukk: () => void }) {
       <b>↻ {G.length} avvik på {a.komponentId ? 'denne komponenten' : 'dette systemet'} siste {GJENTATT_MND} måneder.</b> Gjentatte feil kan bety at {a.komponentId ? 'komponenten' : 'systemet'} bør skiftes i stedet for å repareres.
       <ul style={{ margin: '6px 0', paddingLeft: 18 }}>{G.slice(0, 8).map(x => <li key={x.id}>{x.id === id ? <b>#{x.nr} {x.tittel} (dette)</b> : <a href="#" onClick={e => { e.preventDefault(); lukk(); editAvvik(x.id); }}>#{x.nr} {x.tittel}</a>} <span className="muted">· {fd(x.oppdaget)} · {x.status}</span></li>)}</ul>
       {ed && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {aid && (pr || harModul('prosjekter', a.eiendomId)) && (pr ? <button type="button" className="btn sm" onClick={() => { lukk(); location.hash = '#/prosjekt/' + pr.id; }}>Åpne utskiftingsprosjektet</button>
+        {aid && harModul('prosjekter', a.eiendomId) && (pr ? <button type="button" className="btn sm" onClick={() => { lukk(); location.hash = '#/prosjekt/' + pr.id; }}>Åpne utskiftingsprosjektet</button>
           : <button type="button" className="btn sm pri" onClick={async () => { const pid = await opprettUtskifting(aid); if (pid) { await save('avvik', { ...byId('avvik', id)!, logg: [...(byId('avvik', id)!.logg || []), { t: new Date().toISOString(), s: a.status, k: `Utskiftingsprosjekt opprettet etter ${G.length} gjentatte avvik`, av: state.me?.navn }] }); lukk(); location.hash = '#/prosjekt/' + pid; } }}>Opprett utskiftingsprosjekt for {aNavn(aid)}</button>)}
         {m && <button type="button" className="btn sm" onClick={fremskynd}>Fremskynd utskifting i vedlikeholdsplanen{m.planAar ? ` (nå ${m.planAar})` : ''}</button>}</div>}</div>}
   </>;

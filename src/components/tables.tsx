@@ -1,4 +1,5 @@
 import { gjentattTelling, gjentattAntall, GJENTATT_MIN, GJENTATT_MND } from '../lib/avvikLenker';
+import { harModul } from '../lib/moduler';
 import { bvStatus } from '../lib/brannvern';
 import { TgForslagChip } from './TgKg';
 import React, { type ReactNode } from 'react';
@@ -93,7 +94,7 @@ function SysKost({ a }: { a: Rec }) {
 
 /** Merke for system som har et aktivt utskiftingsprosjekt – klikk åpner prosjektet */
 export function UtskiftMerke({ aid }: { aid: string }) {
-  const p = S.prosjekter.find(x => x.gammeltSystemId === aid && !['Ferdigstilt', 'Avbrutt'].includes(x.status)); if (!p) return null;
+  const p = S.prosjekter.find(x => x.gammeltSystemId === aid && !['Ferdigstilt', 'Avbrutt'].includes(x.status)); if (!p || !harModul('prosjekter', p.eiendomId)) return null;
   return <a href={'#/prosjekt/' + p.id} onClick={e => e.stopPropagation()} title={`Utskiftingsprosjekt: ${p.navn} · ${p.fase || p.status}. Klikk for å åpne prosjektet.`} style={{ textDecoration: 'none' }}><Chip c="amber">↻ Utskiftes · {p.fase || p.status}</Chip></a>;
 }
 export function AnleggTable({ list, showE = false }: { list: Rec[]; showE?: boolean }) {
