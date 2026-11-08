@@ -65,6 +65,7 @@ function visAvvik(a: any) {
   </>);
 }
 
+import { meldingerFor } from './Driftsmeldinger';
 export function Portal() {
   useStore();
   const l = S.leietakere.find(x => x.id === state.me?.leietakerId);
@@ -83,6 +84,7 @@ export function Portal() {
       </div>
       {e.kontaktLeietaker && <p className="small" style={{ marginBottom: 0 }}>{tt("Kontakt utleier:")} {e.kontaktLeietaker}</p>}
     </div>
+    {meldingerFor(l.eiendomId, l.id).map(m => <div key={m.id} className="banner" role="status" style={{ display: 'block' }}><b>{m.tittel}</b> <span className="small muted">{fd(m.tid.slice(0, 10))}</span><div style={{ whiteSpace: 'pre-wrap' }}>{m.tekst}</div></div>)}
     {harModul('brannvern', l.eiendomId) && <PortalBrannvern l={l} refresh={refreshMine} />}
     <div className="sec"><h2>{tt("Internkontroll og plikter")}</h2><p className="small muted" style={{ marginTop: -6 }}>{tt("Som leietaker har virksomheten egne plikter etter forskrift om brannforebygging, internkontrollforskriften og leieavtalen. Fyll ut sjekklisten for hver plikt, legg ved dokumentasjon og send til utleier for godkjenning.")}</p>
       <div className="tbl-wrap"><table><thead><tr><th>{tt("Plikt")}</th><th>{tt("Hjemmel")}</th><th>{tt("Frekvens")}</th><th>{tt("Sist bekreftet")}</th><th>{tt("Status")}</th><th /></tr></thead><tbody>
