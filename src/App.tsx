@@ -1,4 +1,6 @@
 import { PrLenke } from './views/ProsjektRapport';
+import { Registrer } from './views/Registrer';
+import { VilkarTekst } from './components/Vilkar';
 import './views/KomponentRunde';
 import { svaktPassord, PASSORDKRAV } from './lib/utils';
 import { MfaSkjerm } from './components/Tofaktor';
@@ -112,6 +114,8 @@ export default function App() {
   if (r.v === 'ko' && r.id) return <><KoLenke token={r.id} /><Toast /></>;
   if (r.v === 'pr' && r.id) return <><PrLenke token={r.id} /><ModalHost /><Toast /></>;
   if (r.v === 'personvern') return <div className="login"><div className="card" style={{ maxWidth: 640 }}><PersonvernTekst /><p className="small"><a href="#/">Tilbake</a></p></div></div>;
+  if (!state.me && r.v === 'registrer') return <><Registrer /><Toast /></>;
+  if (r.v === 'vilkar') return <div className="login"><div className="card" style={{ maxWidth: 760 }}><VilkarTekst /><p className="small"><a href="#/">Tilbake</a></p></div></div>;
   if (!state.me) return <Login />;
   if (state.me.rolle === 'ingen' && !state.me.plattform) return <NoAccess />;
 
@@ -223,7 +227,7 @@ function Login() {
     {err && <div className="err">{err}</div>}
     <button className="btn pri" style={{ width: '100%', justifyContent: 'center' }} disabled={busy}>{busy ? 'Vent …' : glemt ? 'Send lenke' : 'Logg inn'}</button>
     <p className="small" style={{ marginBottom: 0 }}><a href="#" onClick={e => { e.preventDefault(); setGlemt(!glemt); setErr(''); }}>{glemt ? 'Tilbake til innlogging' : 'Glemt passord?'}</a></p>
-    <p className="small muted" style={{ marginBottom: 0 }}>Har du ikke bruker? Kontakt administratoren for å få en invitasjon.</p>
+    <p className="small muted" style={{ marginBottom: 0 }}>Har du ikke bruker? Be administratoren i organisasjonen din om en invitasjon{(import.meta as any).env?.VITE_SELVREGISTRERING ? <> – eller <a href="#/registrer">registrer bedriften din og prøv gratis i 30 dager</a></> : null}.</p>
     <Toast />
   </form></div>;
 }
