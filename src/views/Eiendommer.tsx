@@ -6,7 +6,7 @@ import { eierRapport } from './EierRapport';
 import { capexRapport } from './CapexRapport';
 import { verdiModal } from './Verdivurdering';
 import { harModul } from '../lib/moduler';
-import { S, canEdit, isAdmin, useStore, mineOrg } from '../lib/store';
+import { S, canEdit, isAdmin, isPlattform, orgNavn, useStore, mineOrg } from '../lib/store';
 import { activeTasks, byId, dUntil, openAvvik, sortBy } from '../lib/utils';
 import { autoTfm, editAnlegg, editAvvik, editDok, editEiendom, editKomponent, editLeietaker, editOppgave, generatePlan, importTfm, visOppgave } from '../lib/actions';
 import { AvvikTable, CoverageTable, DokTable, LeieTable, ServiceavtaleTable, TaskTable, TfmTree } from '../components/tables';
@@ -19,15 +19,27 @@ const go = (p: string) => { location.hash = '#/' + p; };
 
 export function Eiendommer() {
   useStore();
+  const [fk, setFk] = useState(''); const [fp, setFp] = useState('');
+  const kunder = [...new Set(S.eiendommer.map(e => e.eierOrgId || ''))]; const flereKunder = kunder.length > 1;
+  const portNavn = (id?: string) => S.portefoljer.find(p => p.id === id)?.navn || '';
+  const ports = sortBy(S.portefoljer.filter(p => S.eiendommer.some(e => e.portefoljeId === p.id) && (!fk || p.eierOrgId === fk || p.eier_org_id === fk)), p => p.navn);
+  const L = sortBy(S.eiendommer.filter(e => (!fk || (e.eierOrgId || '') === fk) && (!fp || (fp === '-' ? !e.portefoljeId : e.portefoljeId === fp))), e => (flereKunder ? orgNavn(e.eierOrgId) + '|' : '') + e.navn);
+  const kort = (e: any) => { const f = activeTasks().filter(o => o.eiendomId === e.id && (dUntil(o.nesteFrist) as number) < 0).length; const a = openAvvik().filter(x => x.eiendomId === e.id); const kh = a.filter(x => x.alv === 'Kritisk' || x.alv === 'Høy').length;
+    return <div key={e.id} className="card prop" onClick={() => go('eiendom/' + e.id)}>
+      <div className="t">{e.navn}</div><div className="a">{[e.adresse, e.poststed].filter(Boolean).join(', ') || '–'}</div>
+      {(fk && flereKunder || e.portefoljeId) && <div className="small muted" style={{ marginTop: 2 }}>{[fk && flereKunder ? orgNavn(e.eierOrgId) || 'Uten kunde' : '', e.portefoljeId ? 'Portefølje: ' + portNavn(e.portefoljeId) : ''].filter(Boolean).join(' · ')}</div>}
+      <div className="row">{e.kategori && <span className="tag">{e.kategori}</span>}{e.byggeaar && <span className="tag">Bygget {e.byggeaar}</span>}{e.bta && <span className="tag">{e.bta} m²</span>}{e.tfmBygg && <span className="tag mono">+{e.tfmBygg}</span>}</div>
+      <div className="row" style={{ marginTop: 10 }}>{f ? <Chip c="red">{f} forfalte</Chip> : <Chip c="green">Ingen forfalte</Chip>}{a.length > 0 && <Chip c={kh ? 'red' : 'amber'}>{a.length} åpne avvik</Chip>}</div>
+    </div>; };
+  const grupper: [string, any[]][] = flereKunder && !fk ? [...new Set(L.map(e => e.eierOrgId || ''))].map(k => [k, L.filter(e => (e.eierOrgId || '') === k)]) : [['', L]];
   return <>
     <div className="head"><div className="grow"><h1>Eiendommer<Hjelp id="side.eiendommer" /></h1><p className="sub">{S.eiendommer.length} eiendommer</p></div>{(isAdmin() || mineOrg(['admin', 'forvalter']).length > 0) && <button className="btn" onClick={() => importerSystemer()}>Importer systemer fra Excel</button>}{isAdmin() && <button className="btn pri" onClick={() => editEiendom()}>+ Ny eiendom</button>}</div>
-    {S.eiendommer.length ? <div className="props">{sortBy(S.eiendommer, e => e.navn).map(e => {
-      const f = activeTasks().filter(o => o.eiendomId === e.id && (dUntil(o.nesteFrist) as number) < 0).length; const a = openAvvik().filter(x => x.eiendomId === e.id); const kh = a.filter(x => x.alv === 'Kritisk' || x.alv === 'Høy').length;
-      return <div key={e.id} className="card prop" onClick={() => go('eiendom/' + e.id)}>
-        <div className="t">{e.navn}</div><div className="a">{[e.adresse, e.poststed].filter(Boolean).join(', ') || '–'}</div>
-        <div className="row">{e.kategori && <span className="tag">{e.kategori}</span>}{e.byggeaar && <span className="tag">Bygget {e.byggeaar}</span>}{e.bta && <span className="tag">{e.bta} m²</span>}{e.tfmBygg && <span className="tag mono">+{e.tfmBygg}</span>}</div>
-        <div className="row" style={{ marginTop: 10 }}>{f ? <Chip c="red">{f} forfalte</Chip> : <Chip c="green">Ingen forfalte</Chip>}{a.length > 0 && <Chip c={kh ? 'red' : 'amber'}>{a.length} åpne avvik</Chip>}</div>
-      </div>; })}</div> : <div className="card"><Empty t="Ingen eiendommer">{isAdmin() ? 'Registrer den første eiendommen.' : 'Du har ikke fått tilgang til noen eiendommer ennå.'}</Empty></div>}
+    {(flereKunder || ports.length > 0) && S.eiendommer.length > 0 && <div className="toolbar" style={{ marginBottom: 12, gap: 8 }}>
+      {flereKunder && <select value={fk} onChange={e => { setFk(e.target.value); setFp(''); }}><option value="">Alle kunder ({kunder.length})</option>{sortBy(kunder, k => orgNavn(k)).map(k => <option key={k} value={k}>{orgNavn(k) || 'Uten kunde'} ({S.eiendommer.filter(e => (e.eierOrgId || '') === k).length})</option>)}</select>}
+      {(ports.length > 0) && <select value={fp} onChange={e => setFp(e.target.value)}><option value="">Alle porteføljer</option>{ports.map(p => <option key={p.id} value={p.id}>{p.navn}{flereKunder && !fk ? ` (${orgNavn(p.eierOrgId || p.eier_org_id)})` : ''}</option>)}<option value="-">Uten portefølje</option></select>}
+      <span className="small muted">{L.length} vist</span></div>}
+    {S.eiendommer.length ? grupper.map(([k, G]) => <React.Fragment key={k || 'x'}>{grupper.length > 1 && <h2 style={{ margin: '14px 0 8px' }}>{orgNavn(k) || 'Uten kunde'} <span className="muted small">{G.length} eiendom{G.length === 1 ? '' : 'mer'}</span></h2>}<div className="props">{G.map(kort)}</div></React.Fragment>)
+      : <div className="card"><Empty t="Ingen eiendommer">{isAdmin() ? 'Registrer den første eiendommen.' : 'Du har ikke fått tilgang til noen eiendommer ennå.'}</Empty></div>}
   </>;
 }
 
@@ -47,6 +59,7 @@ export function Eiendom({ id }: { id: string }) {
   let c: React.ReactNode = null;
   if (cur === 'info') {
     const dl: [string, any][] = ([['Adresse', [e.adresse, e.poststed].filter(Boolean).join(', ')], ['Kommune', e.kommune], ['Gnr./bnr.', e.gnrbnr ? <>{e.gnrbnr}{e.kommunenummer ? <span className="muted"> · knr. {e.kommunenummer}</span> : null}{seEiendomUrl(e) && <> · <a href={seEiendomUrl(e)} target="_blank" rel="noopener noreferrer">Se eiendom</a></>}{kartUrl(e) && <> · <a href={kartUrl(e)} target="_blank" rel="noopener noreferrer">Kart</a></>}</> : ''],
+      ['Kunde i appen', S.eiendommer.some(x => x.eierOrgId !== e.eierOrgId) || isPlattform() ? orgNavn(e.eierOrgId) : ''], ['Portefølje', S.portefoljer.find(p => p.id === e.portefoljeId)?.navn || ''],
       ['Eier', e.eierNavn ? <>{e.eierNavn}{e.eierOrgnr ? <span className="muted mono small"> {e.eierOrgnr}</span> : null}{e.eierBrreg && enhetStatus(e.eierBrreg).c !== 'green' && <> <Chip c="red">{enhetStatus(e.eierBrreg).t}</Chip></>}</> : ''], ['TFM byggnummer', e.tfmBygg ? '+' + e.tfmBygg : ''], ['Kategori', e.kategori], ['Byggeår', e.byggeaar], ['Rehabilitert', e.rehabaar], ['BTA', e.bta ? e.bta + ' m²' : ''], ['Etasjer', e.etasjer], ['Risikoklasse', e.risikoklasse], ['Brannklasse', e.brannklasse], ['Energikarakter', e.energimerke], ['Tilsynsobjekt brann', e.tilsyn], ['Driftsansvarlig', e.driftsansvarlig], ['Brannansvarlig (eier)', e.brannansvarlig], ['Forsikring', ed ? e.forsikring : ''], ['Kontakt for leietakere', e.kontaktLeietaker]] as [string, any][]).filter(x => x[1]);
     const f = T.filter(o => o.aktiv !== false && (dUntil(o.nesteFrist) as number) < 0); const nx = sortBy(T.filter(o => o.aktiv !== false && (dUntil(o.nesteFrist) as number) >= 0), o => o.nesteFrist).slice(0, 6);
     const staff = S.profiles.filter(p => S.tilganger.some(t => t.user_id === p.id && t.eiendom_id === id));
