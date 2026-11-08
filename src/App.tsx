@@ -1,6 +1,7 @@
 import { PrLenke } from './views/ProsjektRapport';
 import { Registrer } from './views/Registrer';
 import { OrgnrVarsel } from './components/OrgnrVarsel';
+import { QrLenke } from './views/QrMelding';
 import { NyheterPopup } from './components/Nyheter';
 import { VilkarTekst } from './components/Vilkar';
 import './views/KomponentRunde';
@@ -123,6 +124,7 @@ export default function App() {
   if (!state.ready) return <div className="login"><div className="card"><p>{tt("Laster …")}</p></div></div>;
   if (state.mfa && !['ao', 'lt', 'ko', 'pr', 'personvern'].includes(r.v)) return <><MfaSkjerm /><Toast /></>;
   if (state.recovery && state.me) return <SetPassword />;
+  if (r.v === 'qr' && r.id) return <><QrLenke token={r.id} /><Toast /></>;
   if (r.v === 'ao' && r.id) return <><AoLenke token={r.id} /><Toast /></>;
   if (r.v === 'lt' && r.id) return <><LtLenke token={r.id} /><Toast /></>;
   if (r.v === 'ko' && r.id) return <><KoLenke token={r.id} /><Toast /></>;
