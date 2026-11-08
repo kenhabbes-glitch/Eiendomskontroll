@@ -42,6 +42,7 @@ const handler = async (req: Request) => {
   const niva = async (eid: string) => { const { data } = await admin.rpc('niva_for', { p_uid: me.id, eid }); return data as string | null; };
   const logg = (org: string | null, tekst: string) => admin.from('hendelseslogg').insert({ bruker_id: me.id, bruker: me.navn || me.epost, tabell: 'hendelse', handling: 'bruker', org_id: org, tekst });
 
+  const SPRAK_OK = ['nb', 'en', 'sv', 'da', 'es-MX', 'es-ES'];
   let body: any; try { body = await req.json(); } catch { return json(400, { error: 'Ugyldig forespørsel' }); }
   const redirectTo = typeof body.redirectTo === 'string' && /^https?:\/\//.test(body.redirectTo) ? body.redirectTo : undefined;
 
@@ -62,7 +63,7 @@ const handler = async (req: Request) => {
     if (!passord && !(await kanSendeTil(epost))) throw new Error(`Testmodus for e-post er på – invitasjon til ${epost} ble ikke sendt. Opprett brukeren med passord (testbruker), legg adressen til i listen over tillatte mottakere eller slå av testmodus under Innstillinger → E-post.`);
     const r = passord
       ? await admin.auth.admin.createUser({ email: epost, password: passord, email_confirm: true, user_metadata: { navn, test: true } })
-      : await admin.auth.admin.inviteUserByEmail(epost, { data: { navn }, redirectTo });
+      : await admin.auth.admin.inviteUserByEmail(epost, { data: { navn, sprak: SPRAK_OK.includes(body.sprak) ? body.sprak : 'nb' }, redirectTo });
     if (r.error) throw new Error(r.error.message);
     const id = r.data.user!.id;
     await admin.from('profiles').upsert({ id, epost, navn: navn || epost, rolle: 'ingen', aktiv: true });

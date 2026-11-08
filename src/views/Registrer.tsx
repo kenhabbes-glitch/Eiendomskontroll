@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { hentEnhet } from '../lib/oppslag';
 import { VILKAR_VERSJON, VilkarTekst } from '../components/Vilkar';
 import { PersonvernTekst } from '../components/Personvern';
-import { tt } from '../lib/i18n';
+import { tt, sprak } from '../lib/i18n';
 
 const TYPER: [string, string][] = [['eier', 'Gårdeier / eiendomsselskap'], ['forvalter', 'Forvaltningsselskap'], ['drift', 'Driftsselskap'], ['service', 'Servicefirma']];
 
@@ -19,7 +19,7 @@ export function Registrer() {
   const send = async (e: React.FormEvent) => { e.preventDefault(); setErr('');
     if (!samtykke) return setErr(tt("Du må godta vilkårene og databehandleravtalen"));
     setBusy(true);
-    try { const r = await fetch('/.netlify/functions/registrer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, orgnr: nr, samtykke: true, vilkaar: VILKAR_VERSJON, redirectTo: location.origin + '/' }) });
+    try { const r = await fetch('/.netlify/functions/registrer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...f, sprak: sprak(), orgnr: nr, samtykke: true, vilkaar: VILKAR_VERSJON, redirectTo: location.origin + '/' }) });
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || 'Registreringen feilet'); setFerdig(j.firmanavn || enhet?.navn || ''); }
     catch (x: any) { setErr(x.message); } finally { setBusy(false); } };
 

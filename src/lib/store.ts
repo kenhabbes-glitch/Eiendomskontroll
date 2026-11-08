@@ -250,6 +250,8 @@ export async function loadMe() {
   const mfa = await mfaSjekk();
   if (mfa) { state.mfa = mfa; state.mfaEpost = session.user.email || ''; state.me = null; state.ready = true; bump(); return; }
   state.mfa = '';
+  // Språket lagres på brukeren, så e-post fra innloggingen (tilbakestill passord o.l.) kan sendes på samme språk
+  if (navigator.onLine && session.user.user_metadata?.sprak !== sprak()) sb.auth.updateUser({ data: { sprak: sprak() } }).catch(() => null);
   const { data, error } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
   let kopi: any = null; if ((error || !data) && !navigator.onLine) { try { kopi = JSON.parse(localStorage.getItem('ek.me') || 'null'); } catch { } }
   if (kopi?.id === session.user.id) state.me = kopi;
@@ -318,9 +320,9 @@ export async function fileUrl(path: string) {
 // ---- brukeradministrasjon (Netlify-funksjon med service-nøkkel)
 export async function adminApi(body: any) {
   const { data: { session } } = await sb.auth.getSession();
-  const r = await fetch('/.netlify/functions/brukere', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (session?.access_token || '') }, body: JSON.stringify(body) });
+  const r = await fetch('/.netlify/functions/brukere', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (session?.access_token || '') }, body: JSON.stringify({ sprak: sprak(), ...body }) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error || 'Feil ' + r.status), j, { status: r.status });
+  if (!r.ok) throw Object.assign(new Error(j.error ? tt(j.error) : tt('Feil {0}', r.status)), j, { status: r.status });
   return j;
 }
 export async function reloadAdmin() { S.profiles = await loadAll('profiles'); S.tilganger = await loadAll('eiendom_tilgang'); await loadOrg(); bump(); }

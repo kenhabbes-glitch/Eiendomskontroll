@@ -1,5 +1,6 @@
 // Hjelpetekster. Nøkler: «side.<visning>» for sider, «felt.<feltnøkkel>» for skjemafelt (kobles automatisk),
 // og frie emner. Tekst: avsnitt skilles med tom linje, linjer som starter med «- » blir punkter.
+import { tt } from './i18n';
 export type HjelpEmne = { tittel: string; tekst: string; gruppe: 'Sider' | 'Begreper' | 'Skjemafelt' };
 
 export const HJELP: Record<string, HjelpEmne> = {
@@ -285,4 +286,5 @@ Det er «Kontraktstype» over som styrer ansvarsfordelingen og hvilke plikter le
   'felt.varsel': { gruppe: 'Skjemafelt', tittel: 'Varslingsfrist', tekst: `Hvor mange måneder før avtaleutløp du vil få varsel om å fornye eller si opp.` },
 };
 
-export const hjelpFor = (id?: string) => (id ? HJELP[id] : undefined);
+/** Hjelpeemnet på valgt språk (tittel og tekst slås opp i ordboken; mangler de, vises norsk) */
+export const hjelpFor = (id?: string): HjelpEmne | undefined => { const e = id ? HJELP[id] : undefined; return e && { ...e, tittel: tt(e.tittel), tekst: tt(e.tekst) }; };

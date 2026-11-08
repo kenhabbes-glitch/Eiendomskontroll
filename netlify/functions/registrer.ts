@@ -61,7 +61,7 @@ const handler = async (req: Request) => {
   if (oe || !org) return json(500, { error: 'Kunne ikke opprette organisasjonen' });
 
   // Invitasjon på e-post – brukeren setter passord selv
-  const inv = await admin.auth.admin.inviteUserByEmail(epost, { data: { navn }, redirectTo });
+  const inv = await admin.auth.admin.inviteUserByEmail(epost, { data: { navn, sprak: ['nb', 'en', 'sv', 'da', 'es-MX', 'es-ES'].includes(b.sprak) ? b.sprak : 'nb' }, redirectTo });
   if (inv.error || !inv.data?.user) {
     await admin.from('organisasjoner').delete().eq('id', org.id);
     const e: any = inv.error || {}; const kode = String(e.code || ''); const status = e.status || 0;
