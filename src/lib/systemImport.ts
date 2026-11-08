@@ -39,7 +39,7 @@ const tallV = (v: any) => typeof v === 'number' ? v : typeof v === 'string' && v
 const midt = (v: any) => { if (typeof v === 'number') return v; const m = String(v || '').match(/(\d+)\s*[-–]\s*(\d+)/); return m ? Math.round((+m[1] + +m[2]) / 2) : tallV(v); };
 
 export type ImportRad = { rad: number; kode: string; gruppe: string; del: string; lop: string; navn: string; type: string; antall: number | null; enhet: string; enhetskost: number | null; kost: number | null; kostAar: number | null;
-  tg: string; levetid: number | null; aar: number | null; planAar: number | null; service: string; komm: string; finnes?: Rec | null; ta: boolean };
+  tg: string; levetid: number | null; aar: number | null; planAar: number | null; service: string; komm: string; finnes?: Rec | null; ta: boolean; ekstra?: Record<string, any> };
 
 /** Finn katalogtype ut fra NS 3451-kode og beskrivelse */
 export function gjettType(kode: string, tekst: string): string {
@@ -101,6 +101,70 @@ export function tilSystem(r: ImportRad, eid: string, eks?: Rec | null): Rec {
     ...(m2 ? { kostMetode: 'm2', mengde: r.antall, m2pris: r.enhetskost, kost: Math.round(r.antall! * r.enhetskost!), kostAar: r.kostAar || new Date().getFullYear() }
       : r.kost ? { kostMetode: 'fast', kost: r.kost, kostAar: r.kostAar || new Date().getFullYear() } : {}),
     ...(notat ? { notat: eks?.notat && !eks.notat.includes(notat) ? eks.notat + '\n' + notat : notat } : {}),
+    ...(r.ekstra || {}),
     importKilde: { dato: new Date().toISOString().slice(0, 10), rad: r.rad } } as any;
   return ny;
+}
+
+
+// ---------- Generell import fra andre FDV-systemer (CSV eller Excel) med kolonnekobling
+/** Enkel CSV-leser: finner skilletegn (; , tab), støtter anførselstegn og linjeskift i felt */
+export function lesCsv(tekst: string): any[][] {
+  const t = tekst.replace(/^\uFEFF/, ''); const første = t.split(/\r?\n/, 1)[0] || '';
+  const skille = [';', '\t', ','].map(c => [c, första(første, c)] as [string, number]).sort((a, b) => b[1] - a[1])[0][0];
+  const ut: any[][] = []; let rad: any[] = [], felt = '', q = false;
+  for (let i = 0; i < t.length; i++) { const c = t[i];
+    if (q) { if (c === '"') { if (t[i + 1] === '"') { felt += '"'; i++; } else q = false; } else felt += c; }
+    else if (c === '"') q = true; else if (c === skille) { rad.push(felt); felt = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; rad.push(felt); felt = ''; if (rad.some(x => String(x).trim())) ut.push(rad); rad = []; }
+    else felt += c; }
+  rad.push(felt); if (rad.some(x => String(x).trim())) ut.push(rad);
+  return ut.map(r => r.map(v => { const x = String(v).trim(); return x !== '' && /^-?\d+([.,]\d+)?$/.test(x) && !/^0\d/.test(x) ? +x.replace(',', '.') : x; }));
+}
+function första(l: string, c: string) { let n = 0, q = false; for (const ch of l) { if (ch === '"') q = !q; else if (ch === c && !q) n++; } return n; }
+
+export const GEN_FELT: { k: string; navn: string; re: RegExp }[] = [
+  { k: 'navn', navn: 'Navn / betegnelse', re: /^(navn|name|betegnelse|beskrivelse|description|asset( name)?|equipment|utstyr|anlegg|komponent|objekt|namn|benævnelse|benaevnelse|title|tittel)$/ },
+  { k: 'type', navn: 'Type / kategori', re: /^(type|kategori|category|class|klasse|system(type)?|fagomr[aå]de|discipline|asset type|equipment type|typ)$/ },
+  { k: 'kode', navn: 'NS 3451 / TFM-kode', re: /(ns ?3451|tfm|bygningsdel|systemkode|byggdel|bygningsdelskode|komponentkode|kode|code|classification)/ },
+  { k: 'lop', navn: 'Løpenummer', re: /^(l[øo]penr|l[øo]penummer|nr|no|number|id|unik id|tag|merking|l[öo]pnummer)$/ },
+  { k: 'aar', navn: 'Installasjonsår', re: /(installasjons|installed|install date|installation|bygge[aå]r|monterings|innkj[øo]p|anskaffelse|purchase|year built|[åa]r$|^year$|installerat)/ },
+  { k: 'levetid', navn: 'Levetid (år)', re: /(levetid|livsl[aä]ngd|lifetime|service life|useful life|life expectancy|lev\.?tid)/ },
+  { k: 'tg', navn: 'Tilstandsgrad (TG)', re: /(tilstandsgrad|^tg$|condition|tillst[aå]nds)/ },
+  { k: 'kost', navn: 'Kostnad (utskifting)', re: /(kost|cost|pris|price|replacement|utskifting|belop|bel[øo]p)/ },
+  { k: 'fabrikat', navn: 'Fabrikat / produsent', re: /(fabrikat|produsent|manufacturer|make|brand|leverand[øo]r|tillverkare|producent)/ },
+  { k: 'serienr', navn: 'Serienummer', re: /(serie|serial)/ },
+  { k: 'plassering', navn: 'Plassering', re: /(plassering|location|rom|room|etasje|floor|sted|plats|placering)/ },
+  { k: 'komm', navn: 'Merknad', re: /(merknad|kommentar|comment|notes?|notat|anmerkning|remarks?)/ },
+];
+const hnorm = (h: any) => String(h ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+/** Finn overskriftsrad (første rad med minst 3 tekstceller) og foreslå kolonnekobling ut fra overskriftene */
+export function foreslaKolonner(R: any[][]): { hode: number; map: Record<string, number> } {
+  let hode = R.findIndex(r => (r || []).filter(c => typeof c === 'string' && c.trim()).length >= 3); if (hode < 0) hode = 0;
+  const hdr = (R[hode] || []).map(hnorm); const map: Record<string, number> = {}; const brukt = new Set<number>();
+  for (const f of GEN_FELT) { const i = hdr.findIndex((h, j) => h && !brukt.has(j) && f.re.test(h)); if (i >= 0) { map[f.k] = i; brukt.add(i); } }
+  return { hode, map };
+}
+const aarFra = (v: any): number | null => { if (typeof v === 'number') { if (v > 20000 && v < 80000) return +serieDato(v).slice(0, 4); return v > 1800 && v < 2200 ? Math.round(v) : null; } const m = String(v ?? '').match(/(18|19|20|21)\d{2}/); return m ? +m[0] : null; };
+
+/** Gjør rader fra en generell fil om til importforslag. Type og NS 3451-kode utledes fra tekst der de ikke er oppgitt. */
+export function tolkGenerell(R: any[][], hode: number, map: Record<string, number>, eid: string): ImportRad[] {
+  const v = (r: any[], k: string) => map[k] != null && map[k] >= 0 ? r[map[k]] : null; const ut: ImportRad[] = []; const brukt: Record<string, number> = {}; const tatt = new Set<string>();
+  R.forEach((r, i) => {
+    if (!r || i <= hode) return; const navn = String(v(r, 'navn') ?? '').trim(); const typeTxt = String(v(r, 'type') ?? '').trim(); if (!navn && !typeTxt) return;
+    const kodeRå = String(v(r, 'kode') ?? '').trim(); const kode3 = (kodeRå.match(/(?:^|[^\d])(\d{3})(?!\d)/) || kodeRå.match(/^(\d{2})(?!\d)/) || [])[1] || '';
+    const tekst = [navn, typeTxt, kodeRå].filter(Boolean).join(' '); let type = gjettType(kode3.length === 3 ? kode3 : kode3 ? kode3 + '0' : '', tekst); if (!type) type = gjettType(kode3, tekst); if (!type) { for (const k of Object.keys(KOMP)) if (KOMP[k].n.toLowerCase() === typeTxt.toLowerCase() || KOMP[k].n.toLowerCase() === navn.toLowerCase()) { type = k; break; } }
+    const tfm = kode3.length === 3 ? kode3 : type ? (TFM_DEF[type]?.[0] || '') : ''; const lopRå = v(r, 'lop'); const lopNum = (typeof lopRå === 'number' || /^\d{1,3}$/.test(String(lopRå ?? ''))) && +lopRå < 1000 ? pad(lopRå) : '';
+    let lop = ''; let finnes: Rec | null = null;
+    if (tfm) { lop = lopNum; if (!lop) { const tidl = S.anlegg.find(a => a.eiendomId === eid && a.tfmSys === tfm && !tatt.has(a.id) && (a.navn || '') === navn && a.importKilde); if (tidl) lop = pad(tidl.tfmLop); }
+      if (!lop) { const fra = Math.max(0, ...S.anlegg.filter(a => a.eiendomId === eid && a.tfmSys === tfm).map(a => +a.tfmLop || 0), brukt[tfm] || 0); lop = pad(fra + 1); } brukt[tfm] = Math.max(brukt[tfm] || 0, +lop);
+      finnes = S.anlegg.find(a => a.eiendomId === eid && a.tfmSys === tfm && pad(a.tfmLop) === lop) || null; }
+    else finnes = S.anlegg.find(a => a.eiendomId === eid && !tatt.has(a.id) && (a.navn || '').toLowerCase() === navn.toLowerCase() && (!type || a.type === type)) || null;
+    if (finnes) tatt.add(finnes.id);
+    const lev = tallV(v(r, 'levetid')); const tgR = String(v(r, 'tg') ?? '').trim().toUpperCase(); const tg = /^TG[0-3]$/.test(tgR) ? tgR : /^[0-3]$/.test(tgR) ? 'TG' + tgR : '';
+    const ekstra: Record<string, any> = {}; for (const k of ['fabrikat', 'serienr', 'plassering']) { const x = String(v(r, k) ?? '').trim(); if (x) ekstra[k] = x; }
+    ut.push({ rad: i + 1, kode: tfm, gruppe: typeTxt, del: '', lop, navn: navn || typeTxt, type, antall: null, enhet: '', enhetskost: null, kost: tallV(v(r, 'kost')), kostAar: null, tg,
+      levetid: lev != null && lev > 0 && lev < 200 ? lev : null, aar: aarFra(v(r, 'aar')), planAar: null, service: '', komm: String(v(r, 'komm') ?? '').trim(), finnes, ta: true, ekstra });
+  });
+  return ut;
 }
