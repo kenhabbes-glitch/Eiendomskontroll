@@ -1,6 +1,7 @@
 import { PrLenke } from './views/ProsjektRapport';
 import { Registrer } from './views/Registrer';
 import { OrgnrVarsel } from './components/OrgnrVarsel';
+import { InstallerApp, skannQr } from './components/Felt';
 import { QrLenke } from './views/QrMelding';
 import { NyheterPopup } from './components/Nyheter';
 import { VilkarTekst } from './components/Vilkar';
@@ -13,7 +14,7 @@ import { Innboks, useInnboksAntall } from './views/Innboks';
 import { RUTE_MODUL, harModul } from './lib/moduler';
 import { ModulSperret } from './views/Abonnement';
 import React, { useEffect, useState } from 'react';
-import { mineOrg, kanDrifteE } from './lib/store';
+import { mineOrg, kanDrifteE, sendKo } from './lib/store';
 import { autoKvitterIK } from './lib/actions';
 import { canEdit, configured, initAuth, isAdmin, isStaff, isTenant, isUtforer, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
 import { activeTasks, dUntil, openAvvik } from './lib/utils';
@@ -110,7 +111,7 @@ const ADMIN_NAV = ['innstillinger', 'logg', 'arkiv', 'brukere', 'data'];
 export default function App() {
   useEffect(() => { initAuth(); }, []);
   // Befaringer gjort uten nett: last inn fra enheten og synk når appen er klar
-  useEffect(() => { if (state.ready && state.me) { lastLokale(); const t = setTimeout(() => synkAlle(), 2500); return () => clearTimeout(t); } }, [state.ready, state.me?.id]);
+  useEffect(() => { if (state.ready && state.me) { lastLokale(); const t = setTimeout(() => { synkAlle(); sendKo(); }, 2500); return () => clearTimeout(t); } }, [state.ready, state.me?.id]);
   const [admApen, setAdmApen] = useState(() => { try { return localStorage.getItem('navAdmin') === '1'; } catch { return false; } });
   const settAdmApen = (b: boolean) => { setAdmApen(b); try { localStorage.setItem('navAdmin', b ? '1' : '0'); } catch { } };
   useStore();
@@ -205,6 +206,8 @@ export default function App() {
       })()}</nav>
       <div className="sidefoot">
         <a className="userbox" href="#/profil" style={{ textDecoration: 'none' }}><span className="av">{ini}</span><span><div style={{ color: '#fff' }}>{me.navn || me.epost}</div><div className="r">{rolleNavn(me.rolle)}</div></span></a>
+        <button onClick={() => skannQr()}>{tt("Skann QR-kode")}</button>
+        <InstallerApp />
         <AppVersjon />
         <button onClick={() => signOut()}>{tt("Logg ut")}</button>
       </div>

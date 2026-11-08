@@ -115,7 +115,13 @@ export function toast(m: string) { toasts.msg = m; toasts.t = Date.now(); bump()
 
 // ---- lagring
 export async function save(col: Col, obj: any): Promise<string> {
-  const o = { ...obj }; const exists = !!o.id && ((S[col] as any[]).some(x => x.id === o.id) || ((ARK_COLS as readonly string[]).includes(col) && ARKIV[col as typeof ARK_COLS[number]].some(x => x.id === o.id)));
+  const o = { ...obj };
+  const exists = !!o.id && ((S[col] as any[]).some(x => x.id === o.id) || ((ARK_COLS as readonly string[]).includes(col) && ARKIV[col as typeof ARK_COLS[number]].some(x => x.id === o.id)));
+  // Nytt avvik uten nett: lagres på enheten og sendes automatisk når nettet er tilbake
+  if (col === 'avvik' && !exists && typeof navigator !== 'undefined' && navigator.onLine === false) {
+    if (!o.id) o.id = crypto.randomUUID(); const { koLegg } = await import('./offline'); await koLegg(o.id, { col, obj: o, tid: Date.now() });
+    apply(col, 'upsert', { ...o, usynket: true }); toast(tt("Ingen nett – avviket er lagret på enheten og sendes når du er på nett igjen")); return o.id;
+  }
   if (!o.id) o.id = crypto.randomUUID();
   const row = toRow(col, o); const t = TABLES[col].table;
   const res = exists
@@ -207,7 +213,18 @@ async function hentKopi(): Promise<boolean> {
 }
 // Tilbake på nett: last på nytt og synk befaringer som er gjort uten nett
 if (typeof window !== 'undefined') window.addEventListener('offline', () => bump());
-if (typeof window !== 'undefined') window.addEventListener('online', () => { bump(); if (state.offline) { loadedFor = ''; loadMe(); } setTimeout(() => import('./befaring').then(m => m.synkAlle()), 1500); });
+if (typeof window !== 'undefined') window.addEventListener('online', () => { bump(); if (state.offline) { loadedFor = ''; loadMe(); } setTimeout(() => import('./befaring').then(m => m.synkAlle()), 1500); setTimeout(() => sendKo(), 2500); });
+/** Sender avvik som ble registrert uten nett. Bruker samme lagring som vanlig, og fjerner dem fra køen når de er sendt. */
+export async function sendKo() {
+  if (!state.me || navigator.onLine === false) return;
+  const { koAlle, koSlett } = await import('./offline'); const K = await koAlle(); let n = 0;
+  for (const { key, v } of K) {
+    try { const o = { ...v.obj }; delete o.usynket; const row = toRow(v.col as Col, o); const r = await sb.from(TABLES[v.col as Col].table).insert(row).select().single();
+      if (r.error && !/duplicate key/i.test(r.error.message)) throw r.error;
+      if (r.data) apply(v.col as Col, 'upsert', fromRow(v.col as Col, r.data)); await koSlett(key); n++; } catch { /* prøves igjen senere */ }
+  }
+  if (n) toast(tt("{0} avvik registrert uten nett er nå sendt", n));
+}
 let tilgT: any = 0;
 function reloadTilgang() { clearTimeout(tilgT); tilgT = setTimeout(async () => { const prev = S.tilganger.filter(t => t.user_id === state.me?.id).length; S.tilganger = await loadAll('eiendom_tilgang'); const now = S.tilganger.filter(t => t.user_id === state.me?.id).length; if (prev !== now && state.me?.rolle !== 'admin') loadData(); else bump(); }, 400); }
 // ---- organisasjoner, porteføljer, oppdrag og tilgangsnivå per eiendom

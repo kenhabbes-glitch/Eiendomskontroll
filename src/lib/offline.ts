@@ -3,14 +3,15 @@
 //  * filer   – bilder tatt under befaringen som ikke er lastet opp ennå
 //  * tegn    – nedlastede tegninger (bildefilen), så de kan vises uten nett
 //  * snap    – kopi av sist lastede data, så appen kan startes uten nett
+//  * ko      – nye avvik registrert uten nett, sendes når enheten er på nett igjen
 // Ingenting her sendes noe sted før enheten er på nett og brukeren er innlogget.
-const DB = 'ek-offline', VER = 1;
+const DB = 'ek-offline', VER = 2;
 let dbP: Promise<IDBDatabase> | null = null;
 function db(): Promise<IDBDatabase> {
   if (dbP) return dbP;
   dbP = new Promise((res, rej) => {
     const r = indexedDB.open(DB, VER);
-    r.onupgradeneeded = () => { const d = r.result; ['utkast', 'filer', 'tegn', 'snap'].forEach(s => { if (!d.objectStoreNames.contains(s)) d.createObjectStore(s); }); };
+    r.onupgradeneeded = () => { const d = r.result; ['utkast', 'filer', 'tegn', 'snap', 'ko'].forEach(s => { if (!d.objectStoreNames.contains(s)) d.createObjectStore(s); }); };
     r.onsuccess = () => res(r.result); r.onerror = () => { dbP = null; rej(r.error); };
   });
   return dbP;
@@ -82,3 +83,9 @@ export const alleUtkast = () => idbAlle<Utkast>('utkast');
 export const lagreSnap = (v: any) => idbPut('snap', 'S', { v, t: Date.now() }).catch(() => { });
 export const hentSnap = () => idbGet<{ v: any; t: number }>('snap', 'S');
 export async function tomAlt() { for (const s of ['utkast', 'filer', 'tegn', 'snap']) { const a = await idbAlle(s); for (const x of a) await idbDel(s, x.key); } }
+
+// ---- Kø for nye avvik registrert uten nett
+export type KoPost = { col: string; obj: any; tid: number };
+export const koLegg = (id: string, p: KoPost) => idbPut('ko', id, p);
+export const koAlle = () => idbAlle<KoPost>('ko');
+export const koSlett = (id: string) => idbDel('ko', id);
