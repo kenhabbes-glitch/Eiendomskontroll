@@ -67,7 +67,7 @@ export function Eiendom({ id }: { id: string }) {
     const f = T.filter(o => o.aktiv !== false && (dUntil(o.nesteFrist) as number) < 0); const nx = sortBy(T.filter(o => o.aktiv !== false && (dUntil(o.nesteFrist) as number) >= 0), o => o.nesteFrist).slice(0, 6);
     const staff = S.profiles.filter(p => S.tilganger.some(t => t.user_id === p.id && t.eiendom_id === id));
     c = <><div className="grid g2">
-      <div className="card"><h2>{tt("Eiendomsdata")}</h2>{dl.length ? <dl className="dl">{dl.map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl> : <p className="muted">{tt("Ingen detaljer registrert.")}</p>}{e.notat && <p className="small" style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>{e.notat}</p>}
+      <div className="card"><h2>{tt("Eiendomsdata")}</h2>{dl.length ? <dl className="dl">{dl.map(([k, v]) => <React.Fragment key={k}><dt>{tt(k)}</dt><dd>{v}</dd></React.Fragment>)}</dl> : <p className="muted">{tt("Ingen detaljer registrert.")}</p>}{e.notat && <p className="small" style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>{e.notat}</p>}
         {isAdmin() && <p className="small muted" style={{ marginBottom: 0 }}>{tt("Tilgang:")} {staff.length ? staff.map(p => p.navn || p.epost).join(', ') : tt("bare administratorer")} · <a href="#/brukere">{tt("Endre")}</a></p>}</div>
       <div className="card"><h2>{tt("Kontroller")}</h2>{f.length > 0 && <p style={{ marginTop: 0 }}><Chip c="red">{f.length} {tt("forfalte")}</Chip></p>}
         {T.length ? <div className="list">{[...f, ...nx].slice(0, 8).map(o => <div key={o.id} className="li" onClick={() => visOppgave(o.id)}><DueChip s={o.nesteFrist} /><div className="grow"><div className="lt">{o.navn}</div></div></div>)}</div>

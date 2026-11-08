@@ -64,7 +64,7 @@ export function LeietakerView({ id }: { id: string }) {
     <p className="small" style={{ margin: '0 0 6px' }}><a href="#/leietakere">{tt("← Leietakere")}</a></p>
     <div className="head"><div className="grow"><h1>{l.navn}</h1><p className="sub">{eNavn(l.eiendomId)}{l.lokale ? ' · ' + l.lokale : ''}</p></div><button className="btn" onClick={() => editLeietaker(id)}>{tt("Rediger")}</button><button className="btn pri" onClick={() => brev(id)}>{tt("Lag oppfølgingsbrev")}</button></div>
     <div className="grid g2">
-      <div className="card"><h2>{tt("Leieforhold")}</h2><dl className="dl">{dl.map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl>
+      <div className="card"><h2>{tt("Leieforhold")}</h2><dl className="dl">{dl.map(([k, v]) => <React.Fragment key={k}><dt>{tt(k)}</dt><dd>{v}</dd></React.Fragment>)}</dl>
         {docMiss.length > 0 && <p className="small" style={{ marginBottom: 0 }}><Chip c="amber">{tt("Mangler:")} {docMiss.join(', ')}</Chip> <a href="#" onClick={e => { e.preventDefault(); editDok(undefined, { eiendomId: l.eiendomId, leietakerId: id, type: docMiss[0], tittel: docMiss[0] + ' – ' + l.navn }); }}>{tt("Registrer")}</a></p>}
         {l.notat && <p className="small" style={{ whiteSpace: 'pre-wrap' }}>{l.notat}</p>}
         <h3 style={{ marginTop: 16 }}>{tt("Brukere hos leietaker")}</h3>
@@ -73,7 +73,7 @@ export function LeietakerView({ id }: { id: string }) {
       </div>
       <div className="card"><div className="toolbar" style={{ marginBottom: 6 }}><h2 style={{ margin: 0, flex: 1 }}>{tt("Brønnøysundregistrene")}</h2><button className="btn sm" onClick={() => oppdaterBrreg(l)}>{l.brreg ? tt("Oppdater") : tt("Hent opplysninger")}</button></div>
         {l.brreg ? (() => { const b = l.brreg; const st = enhetStatus(b); return <><p style={{ margin: '0 0 8px' }}><Chip c={st.c}>{st.t}</Chip> <span className="small muted">{tt("sjekket")} {fd(b.sjekket)}</span></p>
-          <dl className="dl">{([['Org.nr.', b.orgnr], ['Organisasjonsform', b.orgform], ['Næring', b.naering], ['Ansatte', b.ansatte != null ? String(b.ansatte) : ''], ['Forretningsadresse', b.adresse], ['Daglig leder', b.dagligLeder], ['Styreleder', b.styreleder], ['Stiftet', b.stiftet ? fd(b.stiftet) : ''], ['Kontakt', [b.epost, b.telefon].filter(Boolean).join(' · ')]] as [string, string][]).filter(x => x[1]).map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl>
+          <dl className="dl">{([['Org.nr.', b.orgnr], ['Organisasjonsform', b.orgform], ['Næring', b.naering], ['Ansatte', b.ansatte != null ? String(b.ansatte) : ''], ['Forretningsadresse', b.adresse], ['Daglig leder', b.dagligLeder], ['Styreleder', b.styreleder], ['Stiftet', b.stiftet ? fd(b.stiftet) : ''], ['Kontakt', [b.epost, b.telefon].filter(Boolean).join(' · ')]] as [string, string][]).filter(x => x[1]).map(([k, v]) => <React.Fragment key={k}><dt>{tt(k)}</dt><dd>{v}</dd></React.Fragment>)}</dl>
           <p className="small" style={{ marginBottom: 0 }}><a href={`https://virksomhet.brreg.no/nb/oppslag/enheter/${b.orgnr}`} target="_blank" rel="noopener noreferrer">{tt("Se i Brønnøysundregistrene")}</a></p></>; })()
           : <p className="small muted" style={{ margin: 0 }}>{rensOrgnr(l.orgnr || '').length === 9 ? tt("Ikke hentet ennå.") : tt("Legg inn org.nr. for å hente opplysninger og overvåke status (konkurs, avvikling).")}</p>}</div>
     </div>

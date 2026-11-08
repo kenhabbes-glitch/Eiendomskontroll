@@ -257,7 +257,7 @@ export function KoLenke({ token }: { token: string }) {
       : <>
         <h1 style={{ marginBottom: 4 }}>{info.navn}</h1>
         <p className="muted" style={{ marginTop: 0 }}>{[info.eiendom, info.adresse].filter(Boolean).join(', ')}</p>
-        <dl className="dl small">{([['System', info.system], ['Frist', info.frist ? fd(info.frist) : ''], ['Grunnlag', info.hjemmel], ['Kontakt', info.kontakt], ['Oppdragsgiver', info.oppdragsgiver]] as [string, string][]).filter(x => x[1]).map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl>
+        <dl className="dl small">{([['System', info.system], ['Frist', info.frist ? fd(info.frist) : ''], ['Grunnlag', info.hjemmel], ['Kontakt', info.kontakt], ['Oppdragsgiver', info.oppdragsgiver]] as [string, string][]).filter(x => x[1]).map(([k, v]) => <React.Fragment key={k}><dt>{tt(k)}</dt><dd>{v}</dd></React.Fragment>)}</dl>
         {info.notat && <div className="note small" style={{ whiteSpace: 'pre-wrap', color: 'var(--ink)' }}><b>{tt("Sjekkpunkter / merknader")}</b><br />{info.notat}</div>}
         {info.bilder?.length > 0 && <div style={{ marginTop: 12 }}><b className="small">{tt("Lokasjon")}{info.tegning ? ' – ' + info.tegning : ''}</b>
           {info.bilder.map((b: any) => <figure key={b.url} style={{ margin: '6px 0 10px' }}><a href={b.url} target="_blank" rel="noopener noreferrer"><img src={b.url} alt={b.tittel} style={{ width: '100%', border: '1px solid var(--line2)', borderRadius: 6, display: 'block' }} /></a><figcaption className="small muted">{b.tittel}</figcaption></figure>)}</div>}

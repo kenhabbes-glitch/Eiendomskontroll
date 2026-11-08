@@ -42,7 +42,7 @@ export function Regelverk() {
     return <>
     <div className="head"><div className="grow"><h1>{tt("Plikter og regelverk")}<Hjelp id="side.regelverk" /></h1><p className="sub">{tt("Hva som forventes av deg som leietaker")}</p></div></div>
     <Sok q={f.q} set={q => setF({ q })} n={null} />
-    {MX ? <div className="grid g2">{SEK_MX.filter(([t]) => t === 'Arrendatarios' || t.startsWith('Prevención')).map(([t, l]) => <div key={t} className="card rules"><h3>{t}</h3><ul>{l.map((h, i) => <Li key={i} h={h} />)}</ul></div>)}</div> :
+    {MX ? <div className="grid g2">{SEK_MX.filter(([t]) => t === 'Arrendatarios' || t.startsWith('Prevención')).map(([t, l]) => <div key={t} className="card rules"><h3>{tt(t)}</h3><ul>{l.map((h, i) => <Li key={i} h={h} />)}</ul></div>)}</div> :
     <div className="grid g2">
       <div className="card rules"><h3>{tt("Brannsikkerhet (forskrift om brannforebygging kap. 3)")}</h3><ul><Li h="Utpek en ansvarlig for brannsikkerheten i virksomheten og meld navnet til eier." /><Li h="Sørg for at ansatte får opplæring og at det gjennomføres brannøvelser." /><Li h="Hold rømningsveier frie, og meld fra om feil på brannalarm, nødlys, branndører eller slokkeutstyr." /><Li h="Dokumenter rutiner og egenkontroller." /></ul></div>
       <div className="card rules"><h3>{tt("Internkontroll (HMS)")}</h3><ul><Li h="Virksomheten skal ha systematisk HMS-arbeid med risikovurdering og årlig gjennomgang (internkontrollforskriften § 5)." /><Li h="Samordning med eier og andre virksomheter i bygget avtales skriftlig (§ 6)." /></ul></div>
@@ -66,7 +66,7 @@ export function Regelverk() {
     <RegelverkStatus land={land} />
     <Sok q={f.q} set={q => setF({ q })} n={n} />
     {n === 0 && <Tom />}
-    <div className="grid g2">{sek.map(([t, l]) => <div key={t} className="card rules"><h3>{t}</h3><ul>{l.map((h, i) => <Li key={i} h={h} />)}</ul></div>)}</div>
+    <div className="grid g2">{sek.map(([t, l]) => <div key={t} className="card rules"><h3>{tt(t)}</h3><ul>{l.map((h, i) => <Li key={i} h={h} />)}</ul></div>)}</div>
     {(tfmTekst || koder.length > 0) && <div className="sec"><h2>{tt("Tverrfaglig merkesystem (TFM)")}</h2><div className="card rules"><p style={{ marginTop: 0 }}>{tt("Systemer og komponenter registreres med TFM-kode, slik at samme ID brukes på merkeskilt, tegninger, FDV-dokumentasjon, servicerapporter og i avvik.")}</p>
       <div className="note mono" style={{ fontSize: 15, color: 'var(--ink)', marginBottom: 10 }}>{tt("+01=360.001-JV001%…")}</div>
       <ul><Li h="<b class='mono'>+01</b> – lokalisering/byggnummer (settes på eiendommen)" /><Li h="<b class='mono'>=360</b> – systemkode etter NS 3451 (her 36 Luftbehandling)" /><Li h="<b class='mono'>.001</b> – systemløpenummer, unikt per systemkode i bygget" /><Li h="<b class='mono'>-JV</b> – komponentkode (to bokstaver) fra TFM-komponenttabellen (JV = vifte)" /><Li h="<b class='mono'>001</b> – komponentløpenummer innen systemet" /><Li h="<b class='mono'>%</b> – valgfri typekode for komponenttype/produkt" /></ul>

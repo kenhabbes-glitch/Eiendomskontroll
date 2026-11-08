@@ -180,12 +180,12 @@ export function CoverageTable({ es }: { es: Rec[] }) {
 }
 function CoverageTable1({ es }: { es: Rec[] }) {
   const ok = canEdit(); const PK = dokPaakrevd(es[0].id);
-  return <Wrap><table className="matrix"><thead><tr><th>{tt("Eiendom")}</th>{PK.map(t => <th key={t} title={t} style={{ whiteSpace: 'normal', minWidth: 80, fontSize: 10.5 }}>{t.split(/[\/(]/)[0]}</th>)}<th>{tt("Dekning")}</th></tr></thead><tbody>
+  return <Wrap><table className="matrix"><thead><tr><th>{tt("Eiendom")}</th>{PK.map(t => <th key={t} title={tt(t)} style={{ whiteSpace: 'normal', minWidth: 80, fontSize: 10.5 }}>{tt(t).split(/[\/(]/)[0]}</th>)}<th>{tt("Dekning")}</th></tr></thead><tbody>
     {es.map(e => { const c = docCoverage(e, PK); const rel = c.filter(x => x.s !== 'na'); const okk = rel.filter(x => x.s === 'ok' || x.s === 'soon').length;
       return <tr key={e.id}><td><a href={'#/eiendom/' + e.id}>{e.navn}</a></td>
         {c.map(x => { const sym = ({ ok: ['ok', '✓'], soon: ['exp', '!'], exp: ['exp', '!'], no: ['no', '✕'], na: ['na', '–'] } as any)[x.s]; const tip = ({ ok: 'Finnes', soon: 'Utløper innen 90 dager', exp: 'Utløpt', no: ok ? 'Mangler – klikk for å registrere' : 'Mangler', na: 'Ikke relevant' } as any)[x.s];
           const click = () => { if (x.d) editDok(x.d.id); else if (!ok) return; else if (x.s === 'na') toggleDokNA(e.id, x.t); else editDok(undefined, { eiendomId: e.id, type: x.t, tittel: x.t }); };
-          return <td key={x.t}><span className={'dot ' + sym[0]} style={{ cursor: 'pointer' }} data-tip={`${x.t}: ${tip}`} onClick={click}>{sym[1]}</span>
+          return <td key={x.t}><span className={'dot ' + sym[0]} style={{ cursor: 'pointer' }} data-tip={`${tt(x.t)}: ${tt(tip)}`} onClick={click}>{sym[1]}</span>
             {x.s === 'no' && ok && <><br /><a href="#" className="small muted" style={{ fontSize: 10.5 }} onClick={ev => { ev.preventDefault(); toggleDokNA(e.id, x.t); }}>{tt("ikke rel.")}</a></>}</td>; })}
         <td className="mono">{rel.length ? Math.round(okk / rel.length * 100) : 100}%</td></tr>; })}
   </tbody></table></Wrap>;

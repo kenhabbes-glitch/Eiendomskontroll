@@ -16,7 +16,7 @@ import { sendAo } from '../lib/arbeidsordre';
 import { ART_NAVN, BSTATUS, BTYPER, LEIEFORLOP, ROLLER_DELT, ROM_PUNKTER, alleBefaringer, btype, erLokal, forkastUtkast, funnStatus, lagreBefaring, lastLokale, lokaleBefaringer, loggB, nyBefaring, sisteFor, synkBefaring, synkStatus, tellFunn, useBefaring, vpliktPunkter, type Art, type BFil, type Funn, type Punkt, type Shape } from '../lib/befaring';
 import { komprimer, lagreLokalFil, lokalUrl, paaNett, tegningBlob, harTegningLokalt } from '../lib/offline';
 import { befaringPdf, sha256 } from '../lib/befaringRapport';
-import { tt, lokale } from '../lib/i18n';
+import { tt, lokale, ttc } from '../lib/i18n';
 
 type O = Record<string, any>;
 const go = (p: string) => { location.hash = '#/' + p; };
@@ -182,7 +182,7 @@ function Sjekkpunkter({ b, oppd, ro }: { b: Rec; oppd: (f: (b: Rec) => Rec) => v
       {L.map(p => <div key={p.id} className={'bf-punkt' + (p.svar === 'avvik' ? ' av' : '')}>
         <div className="bf-ptekst"><div>{tt(p.tekst)}{p.hjelp && <div className="small muted">{tt(p.hjelp)}</div>}
           {p.ref && <div className="small" style={{ color: 'var(--blue)' }}>{tt("Ved overtakelse")} {p.ref.dato ? fd(p.ref.dato) : ''}: {({ ok: 'OK', avvik: 'Avvik', ia: 'Ikke aktuelt', merk: 'Merknad', '': 'ikke kontrollert' } as any)[p.ref.svar || '']}{p.ref.komm ? ' – ' + p.ref.komm : ''}</div>}</div>
-          <div className="bf-svar" role="group" aria-label={tt("Svar for ") + p.tekst}>{([['ok', 'OK'], ['avvik', 'Avvik'], ['merk', 'Merknad'], ['ia', 'IA']] as [Punkt['svar'], string][]).map(([k, l]) => <button key={k} type="button" disabled={ro} aria-pressed={p.svar === k} className={'bf-s ' + k + (p.svar === k ? ' on' : '')} onClick={() => svar(p, k)}>{tt(l)}</button>)}
+          <div className="bf-svar" role="group" aria-label={tt("Svar for ") + p.tekst}>{([['ok', 'OK'], ['avvik', 'Avvik'], ['merk', 'Merknad'], ['ia', 'IA']] as [Punkt['svar'], string][]).map(([k, l]) => <button key={k} type="button" disabled={ro} aria-pressed={p.svar === k} className={'bf-s ' + k + (p.svar === k ? ' on' : '')} onClick={() => svar(p, k)}>{ttc('svar', l)}</button>)}
             <button type="button" className="btn sm ghost" aria-label={tt("Kommentar og bilder")} onClick={() => setApen(apen === p.id ? '' : p.id)}>{p.komm || p.bilder?.length ? '✎•' : '✎'}</button></div></div>
         {(apen === p.id || p.komm || p.bilder?.length) ? <div className="bf-pdet">
           {apen === p.id && !ro ? <textarea rows={2} defaultValue={p.komm || ''} placeholder={tt("Kommentar")} onBlur={e => { if (e.target.value !== (p.komm || '')) sett(p.id, { komm: e.target.value }); }} /> : p.komm ? <div className="small">{p.komm}</div> : null}

@@ -57,7 +57,7 @@ export const A4 = [595.28, 841.89]; export const M = 44;
 export const INK = rgb(0.11, 0.14, 0.13), MUTED = rgb(0.42, 0.45, 0.43), LINE = rgb(0.85, 0.86, 0.84), ACC = rgb(0.12, 0.44, 0.36), RED = rgb(0.71, 0.14, 0.09), GREEN = rgb(0.12, 0.44, 0.36), SOFT = rgb(0.96, 0.96, 0.95);
 export const hex = (h: string) => { const n = parseInt(h.replace('#', ''), 16); return rgb((n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255); };
 /** Bare tegn som standardfontene (WinAnsi) kan vise */
-export const safe = (s: any) => String(s ?? '').replace(/−/g, '-').replace(/[   ]/g, ' ').replace(/[^\x20-\x7E -ÿ–—‘’“”•…€]/g, '');
+export const safe = (s: any) => String(typeof s === 'string' ? tt(s) : s ?? '').replace(/−/g, '-').replace(/[   ]/g, ' ').replace(/[^\x20-\x7E -ÿ–—‘’“”•…€]/g, '');
 const nm2 = (v: number) => (Math.round(v * 10) / 10).toLocaleString(lokale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' m²';
 const sgn = (v: number) => (v >= 0.05 ? '+' : v <= -0.05 ? '-' : '') + nm2(Math.abs(v));
 const kr = (v: number) => Math.round(v).toLocaleString(lokale()) + ' kr';
@@ -67,7 +67,7 @@ export class Doc {
   pdf!: PDFDocument; f!: PDFFont; b!: PDFFont; page!: PDFPage; y = 0; side = 0; tittel = '';
   static async ny(tittel: string) { const d = new Doc(); d.pdf = await PDFDocument.create(); d.f = await d.pdf.embedFont(StandardFonts.Helvetica); d.b = await d.pdf.embedFont(StandardFonts.HelveticaBold); d.tittel = tittel; d.pdf.setTitle(tittel); d.pdf.setCreator('Eiendomskontroll'); return d; }
   nyside(liggende = false) { this.page = this.pdf.addPage(liggende ? [A4[1], A4[0]] : [A4[0], A4[1]]); this.side++; this.y = this.page.getHeight() - M; this.fot(); return this.page; }
-  fot() { const p = this.page; p.drawLine({ start: { x: M, y: 30 }, end: { x: p.getWidth() - M, y: 30 }, thickness: 0.5, color: LINE }); this.t(this.tittel, M, 18, 7.5, MUTED); const s = 'Side ' + this.side; this.t(s, p.getWidth() - M - this.f.widthOfTextAtSize(s, 7.5), 18, 7.5, MUTED); }
+  fot() { const p = this.page; p.drawLine({ start: { x: M, y: 30 }, end: { x: p.getWidth() - M, y: 30 }, thickness: 0.5, color: LINE }); this.t(this.tittel, M, 18, 7.5, MUTED); const s = tt('Side {0}', this.side); this.t(s, p.getWidth() - M - this.f.widthOfTextAtSize(s, 7.5), 18, 7.5, MUTED); }
   t(s: any, x: number, y: number, size = 9, color = INK, bold = false) { this.page.drawText(safe(s), { x, y, size, font: bold ? this.b : this.f, color }); }
   w(s: any, size = 9, bold = false) { return (bold ? this.b : this.f).widthOfTextAtSize(safe(s), size); }
   fit(s: any, max: number, size = 9, bold = false) { let x = safe(s); if (this.w(x, size, bold) <= max) return x; while (x.length > 1 && this.w(x + '…', size, bold) > max) x = x.slice(0, -1); return x + '…'; }
