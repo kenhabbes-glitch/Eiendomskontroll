@@ -91,7 +91,8 @@ export function pliktStatus(p: Rec): { c: string; t: string; o: number; nx?: str
 }
 export function taskFromMal(k: string, MALER: any, eiendomId: string, anleggId: string, frist: string) {
   const m = MALER[k];
-  return { malKey: k, eiendomId, anleggId: anleggId || '', navn: m.n, kategori: m.k, type: m.t, hjemmel: m.h, intervall: { n: m.i[0], enhet: m.i[1] }, utfores: m.u, ansvar: 'Eier', nesteFrist: frist, aktiv: true, historikk: [] };
+  const alto = k === 'mx_simulacro' && S.eiendommer.find(e => e.id === eiendomId)?.grado === 'alto';
+  return { malKey: k, eiendomId, anleggId: anleggId || '', navn: m.n, kategori: m.k, type: m.t, hjemmel: m.h, intervall: alto ? { n: 6, enhet: 'mnd' } : { n: m.i[0], enhet: m.i[1] }, utfores: m.u, ansvar: 'Eier', nesteFrist: frist, aktiv: true, historikk: [] };
 }
 
 // ---- arealer

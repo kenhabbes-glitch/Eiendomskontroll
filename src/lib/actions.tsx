@@ -15,6 +15,8 @@ import { sysSjekkFor, sysSjekkAvvik } from './komponentsjekk';
 import { aktivtProsjektFor, opprettUtskifting } from './prosjekt';
 import { rapportFor, gjentatte, GJENTATT_MIN, GJENTATT_MND } from './avvikLenker';
 import { TILSYN_KILDER, TS_TYPER, MYND } from './tilsyn';
+import { TILSYN_MX as TILSYN_MX_K } from './land/mx';
+import { alleTilsynKilder, kompMaler, myndighet, propMaler, landFor, LAND, landInfo, hovedLand } from './land';
 import { lesRapport, pdfKilder } from '../views/RapportLeser';
 import { MEDIER, MAALER_KODER, sisteAvl, enhet as mEnhet, grenseTekst, tall as mTall, fmt as mFmt } from './maaler';
 import { SysSjekkVelger, SysSjekkKort } from '../components/SysSjekk';
@@ -27,7 +29,7 @@ import { openPlan, plasserteFor } from '../views/Arealer';
 import { AoPanel, HendelseListe, aoSnapshot } from './arbeidsordre';
 import { adresseFelter, brregData, enhetStatus, seEiendomUrl, virksomhetFraNaering, rensOrgnr } from './oppslag';
 import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip, DueChip, TaggChips, TaggVelger, Chip, type Field } from '../components/ui';
-import { tt, lokale } from './i18n';
+import { tt, lokale, sprak } from './i18n';
 
 const go = (p: string) => { location.hash = '#/' + p; };
 const eOpts = () => sortBy(S.eiendommer, e => e.navn).map(e => [e.id, e.navn] as [string, string]);
@@ -56,7 +58,7 @@ const tgFelt = (): Field[] => [
 // ================= EIENDOM =================
 export function editEiendom(id?: string, etter?: (nid: string) => void, preset?: Rec) {
   const eierOrg = mineOrg(['admin', 'forvalter']);
-  const e = id ? byId('eiendommer', id)! : { eierOrgId: (eierOrg.find(o => o.id === S.primarOrg) || eierOrg.find(o => o.type === 'eier') || eierOrg[0])?.id, ...(preset || {}) } as Rec;
+  const e = id ? byId('eiendommer', id)! : { land: sprak() === 'es-MX' ? 'MX' : hovedLand(), eierOrgId: (eierOrg.find(o => o.id === S.primarOrg) || eierOrg.find(o => o.type === 'eier') || eierOrg[0])?.id, ...(preset || {}) } as Rec;
   if (!id && !eierOrg.length) { toast(tt("Du må være administrator eller forvalter i en organisasjon for å opprette eiendommer")); return; }
   const kanEie = id ? mineOrg(['admin']).some(o => o.id === e.eierOrgId) : true;
   const flyttTil = mineOrg(['admin']).filter(o => o.type === 'eier' || o.id === e.eierOrgId); const flyttbar = !!id && kanEie && flyttTil.length > 1;
@@ -64,24 +66,27 @@ export function editEiendom(id?: string, etter?: (nid: string) => void, preset?:
     ...((!id && eierOrg.length > 1) || (id && flyttbar) ? [{ k: 'eierOrgId', label: id ? tt("Eier i appen (kunde)") : tt("Eier (organisasjon)"), type: 'select', options: (id ? flyttTil : eierOrg).map(o => [o.id, o.navn] as [string, string]), req: true,
       hint: id ? tt("Flytter eiendommen med alt innhold til en annen kunde. Porteføljen nullstilles, og oppdrag/tildelinger fra den gamle eieren gjelder ikke lenger.") : undefined } as Field] : []),
     { k: 'portefoljeId', label: tt("Portefølje"), type: 'select', options: (v?: any) => sortBy(S.portefoljer.filter(p => p.eier_org_id === (v?.eierOrgId || e.eierOrgId || '')), p => p.navn).map(p => [p.id, p.navn] as [string, string]), empty: tt("(ingen portefølje)"), help: tt("portefolje"), show: () => S.portefoljer.some(p => p.eier_org_id === e.eierOrgId) || !!id },
-    { k: 'sokAdr', type: 'custom', label: tt("Hent fra Kartverket"), render: (v, set) => <AdresseSok onPick={a => set({ ...adresseFelter(a), navn: v.navn || a.adressetekst })} /> },
+    { k: 'land', label: tt("Land (styrer regelverket)"), type: 'select', options: LAND.map(l => [l.k, l.navn] as [string, string]), half: true, hint: tt("Kontroller, plikter og dokumentkrav følger landet") },
+    { k: 'region', label: tt("Delstat / region"), type: 'select', options: (v: Rec) => landInfo(v.land).regioner || [], half: true, show: v => !!landInfo(v.land).regioner, hint: tt("Regler for Ciudad de México er lagt inn. Andre delstater får de føderale reglene.") },
+    { k: 'grado', label: tt("Brannrisiko (NOM-002-STPS-2010)"), type: 'select', options: [['', '–'], ['ordinario', 'Ordinario'], ['alto', 'Alto']], half: true, show: v => v.land === 'MX', hint: tt("Høy risiko gir to øvelser i året") },
+    { k: 'sokAdr', type: 'custom', show: (v: Rec) => (v.land || 'NO') === 'NO', label: tt("Hent fra Kartverket"), render: (v, set) => <AdresseSok onPick={a => set({ ...adresseFelter(a), navn: v.navn || a.adressetekst })} /> },
     { k: 'navn', label: tt("Navn på eiendom/bygg"), req: true },
     { k: 'adresse', label: tt("Adresse"), half: true }, { k: 'poststed', label: tt("Postnr. og sted"), half: true },
-    { k: 'kommune', label: tt("Kommune"), half: true }, { k: 'gnrbnr', label: tt("Gnr./bnr. (/fnr/snr)"), half: true, ph: '12/345' },
-    { k: 'matInfo', type: 'custom', show: v => !!v.kommunenummer, render: v => <div className="small muted">{tt("Kommunenr.")} {v.kommunenummer}{v.matrikkelSjekket ? tt(" · hentet fra matrikkelen {0}", fd(v.matrikkelSjekket)) : ''}{seEiendomUrl(v) && <> · <a href={seEiendomUrl(v)} target="_blank" rel="noopener noreferrer">{tt("Åpne i Se eiendom")}</a></>}</div> },
+    { k: 'kommune', label: tt("Kommune"), half: true }, { k: 'gnrbnr', show: (v: Rec) => (v.land || 'NO') === 'NO', label: tt("Gnr./bnr. (/fnr/snr)"), half: true, ph: '12/345' },
+    { k: 'matInfo', type: 'custom', show: v => (v.land || 'NO') === 'NO' && !!v.kommunenummer, render: v => <div className="small muted">{tt("Kommunenr.")} {v.kommunenummer}{v.matrikkelSjekket ? tt(" · hentet fra matrikkelen {0}", fd(v.matrikkelSjekket)) : ''}{seEiendomUrl(v) && <> · <a href={seEiendomUrl(v)} target="_blank" rel="noopener noreferrer">{tt("Åpne i Se eiendom")}</a></>}</div> },
     { k: 'tfmBygg', label: tt("TFM byggnummer / lokaliseringskode"), half: true, mono: true, ph: '01', hint: tt("Brukes som +kode foran systemkoden, f.eks. +01=360.001") },
     { k: 'kategori', label: tt("Kategori"), type: 'select', options: KATEGORIER, half: true, empty: '–' },
     { k: 'bta', label: tt("BTA (m²)"), type: 'number', half: true }, { k: 'byggeaar', label: tt("Byggeår"), type: 'number', half: true },
     { k: 'rehabaar', label: tt("Sist totalrehabilitert (år)"), type: 'number', half: true }, { k: 'etasjer', label: tt("Antall etasjer"), type: 'number', half: true },
-    { k: 'risikoklasse', label: tt("Risikoklasse (TEK)"), type: 'select', options: ['', '1', '2', '3', '4', '5', '6'], half: true },
-    { k: 'brannklasse', label: tt("Brannklasse"), type: 'select', options: ['', '1', '2', '3', '4'], half: true },
-    { k: 'energimerke', label: tt("Energikarakter"), type: 'select', options: ['', 'A', 'B', 'C', 'D', 'E', 'F', 'G'], half: true },
-    { k: 'tilsyn', label: tt("Tilsynsobjekt hos brannvesenet"), type: 'select', options: ['', 'Ja', 'Nei', 'Ukjent'], half: true },
+    { k: 'risikoklasse', show: (v: Rec) => (v.land || 'NO') === 'NO', label: tt("Risikoklasse (TEK)"), type: 'select', options: ['', '1', '2', '3', '4', '5', '6'], half: true },
+    { k: 'brannklasse', show: (v: Rec) => (v.land || 'NO') === 'NO', label: tt("Brannklasse"), type: 'select', options: ['', '1', '2', '3', '4'], half: true },
+    { k: 'energimerke', show: (v: Rec) => (v.land || 'NO') === 'NO', label: tt("Energikarakter"), type: 'select', options: ['', 'A', 'B', 'C', 'D', 'E', 'F', 'G'], half: true },
+    { k: 'tilsyn', show: (v: Rec) => (v.land || 'NO') === 'NO', label: tt("Tilsynsobjekt hos brannvesenet"), type: 'select', options: ['', 'Ja', 'Nei', 'Ukjent'], half: true },
     { k: 's0', label: tt("Eier (hjemmelshaver)"), type: 'sec' },
-    { k: 'sokEier', type: 'custom', render: (v, set) => <EnhetSok ph={tt("Søk eierselskap (navn eller org.nr.) i Brønnøysund")} onPick={async en => { set({ eierNavn: en.navn, eierOrgnr: en.orgnr, eierAdresse: en.adresse || '' }); const b = await brregData(en.orgnr).catch(() => null); if (b) set({ eierBrreg: b }); }} /> },
+    { k: 'sokEier', type: 'custom', show: (v: Rec) => (v.land || 'NO') === 'NO', render: (v, set) => <EnhetSok ph={tt("Søk eierselskap (navn eller org.nr.) i Brønnøysund")} onPick={async en => { set({ eierNavn: en.navn, eierOrgnr: en.orgnr, eierAdresse: en.adresse || '' }); const b = await brregData(en.orgnr).catch(() => null); if (b) set({ eierBrreg: b }); }} /> },
     { k: 'eierNavn', label: tt("Eier / hjemmelshaver"), half: true }, { k: 'eierOrgnr', label: tt("Eiers org.nr."), half: true, mono: true },
     { k: 'avsenderNavn', label: tt("Avsendernavn på e-post"), half: true, ph: tt("Tom = eier/hjemmelshaver"), hint: tt("Navnet mottakeren ser når arbeidsordre, kontrolloppdrag og sjekklister sendes for denne eiendommen.") },
-    { k: 'eierInfo', type: 'custom', render: v => <div className="small muted">{v.eierBrreg ? <>{[v.eierBrreg.orgform, v.eierBrreg.adresse, v.eierBrreg.dagligLeder ? 'Daglig leder: ' + v.eierBrreg.dagligLeder : '', v.eierBrreg.styreleder ? 'Styreleder: ' + v.eierBrreg.styreleder : ''].filter(Boolean).join(' · ')}. </> : null}
+    { k: 'eierInfo', type: 'custom', show: (v: Rec) => (v.land || 'NO') === 'NO', render: v => <div className="small muted">{v.eierBrreg ? <>{[v.eierBrreg.orgform, v.eierBrreg.adresse, v.eierBrreg.dagligLeder ? 'Daglig leder: ' + v.eierBrreg.dagligLeder : '', v.eierBrreg.styreleder ? 'Styreleder: ' + v.eierBrreg.styreleder : ''].filter(Boolean).join(' · ')}. </> : null}
       {tt("Tinglyst hjemmelshaver finnes ikke i noe åpent API")}{seEiendomUrl(v) ? <> {tt("– kontroller den i")} <a href={seEiendomUrl(v)} target="_blank" rel="noopener noreferrer">{tt("Se eiendom")}</a> {tt("(innlogging med ID-porten).")}</> : tt(" – søk opp adressen over for å få lenke til Se eiendom.")}</div> },
     { k: 's1', label: tt("Ansvar og kontakter"), type: 'sec' },
     { k: 'driftsansvarlig', label: tt("Driftsansvarlig / driftstekniker"), half: true }, { k: 'brannansvarlig', label: tt("Eiers ansvarlige for brannsikkerhet"), half: true },
@@ -264,7 +269,7 @@ export function kompFraTegning(aid: string, lukk?: () => void) {
 export function editAnlegg(id?: string, eiendomId?: string) {
   const a: Rec = id ? byId('anlegg', id)! : { eiendomId: eiendomId || S.eiendommer.find(e => kanRedigereE(e.id))?.id, type: 'ventilasjon', ansvar: 'Eier' } as any;
   const ro = !kanRedigereE(a.eiendomId);
-  if (!id) { a.tfmSys = TFM_DEF[a.type][0]; a.tfmLop = nextSysLop(a.eiendomId, a.tfmSys); a.mk = KOMP[a.type]?.m || []; a.forste = addDays(today(), 30); }
+  if (!id) { a.tfmSys = TFM_DEF[a.type][0]; a.tfmLop = nextSysLop(a.eiendomId, a.tfmSys); a.mk = kompMaler(a.type, a.eiendomId); a.forste = addDays(today(), 30); }
   const touched: Record<string, boolean> = {};
   const fields: Field[] = [
     ...(id ? [{ k: 'utskInfo', type: 'custom', show: () => !!aktivtProsjektFor(id) && harModul('prosjekter', byId('anlegg', id)?.eiendomId), render: () => { const pr = aktivtProsjektFor(id)!; return <div className="note" style={{ color: 'var(--ink)', display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -312,12 +317,12 @@ export function editAnlegg(id?: string, eiendomId?: string) {
   ];
   // Eksisterende system: vis standardkontroller for typen og hvilke som mangler
   if (id && !ro) fields.push({ k: 'mkNy', type: 'custom', label: tt("Standardkontroller for denne typen"), help: tt("kontroller.system"), def: [], render: (v, set) => {
-    const ms = KOMP[v.type]?.m || []; if (!ms.length) return <div className="muted small">{tt("Ingen standardkontroller for denne typen.")}</div>;
+    const ms = kompMaler(v.type, v.eiendomId); if (!ms.length) return <div className="muted small">{tt("Ingen standardkontroller for denne typen.")}</div>;
     return <div className="checks">{ms.map(k => { const fins = S.oppgaver.find(o => o.anleggId === id && o.malKey === k && o.aktiv !== false);
       return <label key={k} style={{ opacity: fins ? .75 : 1 }}>{fins ? <span style={{ color: 'var(--green)', fontWeight: 700, width: 16, display: 'inline-block' }}>✓</span> : <input type="checkbox" checked={(v.mkNy || []).includes(k)} onChange={e => set({ mkNy: e.target.checked ? [...(v.mkNy || []), k] : (v.mkNy || []).filter((x: string) => x !== k) })} />}
         <span><span className="ct">{MALER[k].n}</span><br /><span className="cs">{fins ? tt("Finnes – neste frist {0}", fd(fins.nesteFrist)) : tt("Mangler – kryss av for å opprette")} · {MALER[k].t} · {intTxt({ n: MALER[k].i[0], enhet: MALER[k].i[1] })} · {MALER[k].h}</span></span></label>; })}</div>; } });
   if (!id) fields.push(
-    { k: 'mk', type: 'custom', label: tt("Kontroller som opprettes for dette systemet"), hint: tt("Du kan justere hver kontroll senere."), render: (v, set) => { const ms = KOMP[v.type]?.m || []; return ms.length ? <div className="checks">{ms.map(k => <label key={k}><input type="checkbox" checked={(v.mk || []).includes(k)} onChange={e => set({ mk: e.target.checked ? [...(v.mk || []), k] : (v.mk || []).filter((x: string) => x !== k) })} /><span><span className="ct">{MALER[k].n}</span><br /><span className="cs">{MALER[k].t} · {intTxt({ n: MALER[k].i[0], enhet: MALER[k].i[1] })} · {MALER[k].h}</span></span></label>)}</div> : <div className="muted small">{tt("Ingen standardkontroller for denne typen.")}</div>; } },
+    { k: 'mk', type: 'custom', label: tt("Kontroller som opprettes for dette systemet"), hint: tt("Du kan justere hver kontroll senere."), render: (v, set) => { const ms = kompMaler(v.type, v.eiendomId); return ms.length ? <div className="checks">{ms.map(k => <label key={k}><input type="checkbox" checked={(v.mk || []).includes(k)} onChange={e => set({ mk: e.target.checked ? [...(v.mk || []), k] : (v.mk || []).filter((x: string) => x !== k) })} /><span><span className="ct">{MALER[k].n}</span><br /><span className="cs">{MALER[k].t} · {intTxt({ n: MALER[k].i[0], enhet: MALER[k].i[1] })} · {MALER[k].h}</span></span></label>)}</div> : <div className="muted small">{tt("Ingen standardkontroller for denne typen.")}</div>; } },
     { k: 'forste', label: tt("Første frist for nye kontroller"), type: 'date', half: true });
   const closeRef: { c?: () => void } = {};
   closeRef.c = formModal({
@@ -330,7 +335,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
       if (k === 'levetid') p.levetidKilde = undefined;
       if ((k === 'type' || k === 'tfmSys') && !id && !touched.lev) { const r = levetidRef(k === 'type' ? (TFM_DEF[v.type]?.[0] || v.tfmSys) : v.tfmSys); const t = midt(r?.tek || null); if (t) { p.levetid = t; p.levetidKilde = `NS 3451 ${r!.kode} teknisk`; } }
       if (k === 'levetid') touched.lev = true;
-      if (k === 'type' && !id) { if (!touched.sys) p.tfmSys = TFM_DEF[v.type]?.[0] || ''; p.mk = KOMP[v.type]?.m || []; }
+      if (k === 'type' && !id) { if (!touched.sys) p.tfmSys = TFM_DEF[v.type]?.[0] || ''; p.mk = kompMaler(v.type, v.eiendomId); }
       if ((k === 'type' || k === 'tfmSys' || k === 'eiendomId') && !touched.lop && !id) p.tfmLop = nextSysLop(v.eiendomId, p.tfmSys ?? v.tfmSys);
       return p;
     },
@@ -461,8 +466,8 @@ function GenPlanBody({ eid, isNew, close }: { eid: string; isNew?: boolean; clos
   const e = byId('eiendommer', eid) || ({} as Rec); const ex = S.oppgaver.filter(o => o.eiendomId === eid);
   const has = (k: string, a: string) => ex.some(o => o.malKey === k && (o.anleggId || '') === (a || ''));
   const rows: { k: string; a: string; def: boolean }[] = [];
-  PROP_MALER.forEach(k => { if (!has(k, '')) rows.push({ k, a: '', def: !(k === 'energiattest' && +e.bta && +e.bta < 1000) && k !== 'radon' }); });
-  S.anlegg.filter(a => a.eiendomId === eid).forEach(a => (KOMP[a.type]?.m || []).forEach(k => { if (!has(k, a.id)) rows.push({ k, a: a.id, def: true }); }));
+  propMaler(eid).forEach(k => { if (!has(k, '')) rows.push({ k, a: '', def: !(k === 'energiattest' && +e.bta && +e.bta < 1000) && k !== 'radon' }); });
+  S.anlegg.filter(a => a.eiendomId === eid).forEach(a => kompMaler(a.type, eid).forEach(k => { if (!has(k, a.id)) rows.push({ k, a: a.id, def: true }); }));
   const [sel, setSel] = useState(() => rows.map(r => r.def)); const [d, setD] = useState(addDays(today(), 30)); const [busy, setBusy] = useState(false);
   const run = async () => { setBusy(true); const L = rows.filter((_, i) => sel[i]); for (const r of L) await save('oppgaver', taskFromMal(r.k, MALER, eid, r.a, d || today())); close(); toast(tt("{0} kontroller opprettet", L.length)); };
   return <>
@@ -732,15 +737,15 @@ export function editAvvik(id?: string, preset: any = {}) {
     { k: 'anleggId', label: tt("System"), type: 'select', options: () => S.anlegg.map(x => [x.id, eNavn(x.eiendomId) + ' – ' + aNavn(x.id)] as [string, string]), empty: '–', half: true, hint: tt("Hovedsystemet avviket gjelder – følger med i arbeidsordren") },
     { k: 'komponentId', label: tt("Komponent (TFM)"), type: 'select', options: () => sortBy(S.komponenter, c => kNavn(c.id)).map(c => [c.id, eNavn(c.eiendomId) + ' – ' + kNavn(c.id)] as [string, string]), empty: '–' },
     { k: 'alv', label: tt("Alvorlighet"), type: 'select', options: AV_ALV, half: true }, { k: 'status', label: tt("Status"), type: 'select', options: AV_STATUS, half: true },
-    { k: 'kilde', label: tt("Kilde"), type: 'select', options: AV_KILDE, half: true }, { k: 'meldtAv', label: tt("Meldt av / referanse"), half: true, ph: tt("Navn, rapportnr., tilsynsref.") },
-    { k: 'secTs', label: tt("Tilsyn"), type: 'sec', show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType) },
-    { k: 'tsType', label: tt("Type"), type: 'select', options: TS_TYPER, empty: '–', half: true, show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType), hint: tt("Pålegg er et vedtak med frist – klarer dere ikke fristen, be skriftlig om utsettelse før den går ut") },
-    { k: 'tsPunkt', label: tt("Punkt i tilsynsrapporten"), half: true, show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType) },
-    { k: 'tsMyndighet', label: tt("Myndighet / avdeling"), half: true, show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType), ph: tt("F.eks. Brannvesenet") },
-    { k: 'tsRef', label: tt("Saksnummer / referanse"), half: true, show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType) },
-    { k: 'tsDato', label: tt("Tilsynsdato"), type: 'date', half: true, show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType) },
-    { k: 'tsSvarfrist', label: tt("Frist for tilbakemelding til myndigheten"), type: 'date', half: true, show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType) },
-    { k: 'tsTiltak', label: tt("Tiltak (tas med i tilbakemeldingen)"), type: 'textarea', show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType), ph: tt("Hva er gjort eller planlagt, av hvem og når") },
+    { k: 'kilde', label: tt("Kilde"), type: 'select', options: (x: Rec) => landFor(x.eiendomId) === 'MX' ? ['Befaring', ...TILSYN_MX_K, 'Eier/drift', 'Annet'] : AV_KILDE, half: true }, { k: 'meldtAv', label: tt("Meldt av / referanse"), half: true, ph: tt("Navn, rapportnr., tilsynsref.") },
+    { k: 'secTs', label: tt("Tilsyn"), type: 'sec', show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType) },
+    { k: 'tsType', label: tt("Type"), type: 'select', options: TS_TYPER, empty: '–', half: true, show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType), hint: tt("Pålegg er et vedtak med frist – klarer dere ikke fristen, be skriftlig om utsettelse før den går ut") },
+    { k: 'tsPunkt', label: tt("Punkt i tilsynsrapporten"), half: true, show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType) },
+    { k: 'tsMyndighet', label: tt("Myndighet / avdeling"), half: true, show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType), ph: tt("F.eks. Brannvesenet") },
+    { k: 'tsRef', label: tt("Saksnummer / referanse"), half: true, show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType) },
+    { k: 'tsDato', label: tt("Tilsynsdato"), type: 'date', half: true, show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType) },
+    { k: 'tsSvarfrist', label: tt("Frist for tilbakemelding til myndigheten"), type: 'date', half: true, show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType) },
+    { k: 'tsTiltak', label: tt("Tiltak (tas med i tilbakemeldingen)"), type: 'textarea', show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType), ph: tt("Hva er gjort eller planlagt, av hvem og når") },
     { k: 'ansvar', label: tt("Ansvarlig for utbedring"), type: 'select', options: UTBEDRER, half: true },
     { k: 'utbedresAv', label: tt("Serviceselskap / leverandør"), half: true, show: x => x.ansvar === 'Leverandør/entreprenør', ph: tt("Firma som skal rette avviket") },
     ...(canEdit() ? [{ k: 'leietakerId', label: tt("Leietaker"), type: 'select', options: (v?: any) => S.leietakere.filter(l => !v?.eiendomId || l.eiendomId === v.eiendomId).map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true, show: (x: any) => ['Leietaker', 'Felles'].includes(x.ansvar) || !!x.leietakerId, hint: tt("Leietakeren som skal utbedre, eller som deler ansvaret") } as Field] : []),
@@ -774,7 +779,7 @@ export function editAvvik(id?: string, preset: any = {}) {
     extraFoot: close => id && canEdit() ? <button className="btn danger" onClick={async () => { if (await confirmBox(tt("Slette avviket permanent? Vanligvis bør avvik heller settes til «Avvist» eller «Lukket» slik at historikken bevares."))) { await removeDoc('avvik', id); close(); } }}>{tt("Slett")}</button> : null,
     onSave: async x => {
       const komm = x.komm; const bilder: File[] = x.bilder || []; delete x.komm; delete x.bilder; delete x.secPos; delete x.secFoto; delete x.secTs;
-      if (TILSYN_KILDER.includes(x.kilde) && !x.tsMyndighet) x.tsMyndighet = MYND[x.kilde];
+      if (alleTilsynKilder.includes(x.kilde) && !x.tsMyndighet) x.tsMyndighet = myndighet(x.kilde);
       if (x.ansvar !== 'Leietaker' && x.ansvar !== 'Felles' && !canEdit()) delete x.leietakerId;
       if (x.komponentId) { const kc = byId('komponenter', x.komponentId); if (kc) { x.anleggId = kc.anleggId; x.eiendomId = kc.eiendomId; } }
       const base: Rec = id ? { ...(byId('avvik', id) || a) } : a; // ferske felt (plassering, tildeling, vedlegg, logg) kan være endret mens skjemaet var åpent

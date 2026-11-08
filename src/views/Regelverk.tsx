@@ -6,6 +6,8 @@ import { isTenant } from '../lib/store';
 import { intTxt } from '../lib/utils';
 import { Search, useFilter } from './common';
 import { tt } from '../lib/i18n';
+import { LAND, landInfo, malerForLand, mineLand, type Land } from '../lib/land';
+import { PLIKTER_MX, SEK_MX } from '../lib/land/mx';
 
 // Søk: alle ord må finnes (uten HTML-tagger, uavhengig av store/små bokstaver)
 const ren = (t: string) => t.replace(/<[^>]+>/g, ' ').toLowerCase();
@@ -26,9 +28,13 @@ const SEK: [string, string[]][] = [
 ];
 const Li = ({ h }: { h: string }) => <li dangerouslySetInnerHTML={{ __html: h }} />;
 
+const plikterFor = (l: Land) => Object.entries(PLIKTER).filter(([k]) => l === 'MX' ? k in PLIKTER_MX : !(k in PLIKTER_MX)).map(([, p]) => p);
+const LandValg = ({ l, set }: { l: Land; set: (l: Land) => void }) => { const ml = mineLand(); return ml.length > 1 ? <div className="seg" style={{ marginBottom: 12 }}>{LAND.filter(x => ml.includes(x.k)).map(x => <button key={x.k} className={'btn sm' + (x.k === l ? ' pri' : '')} onClick={() => set(x.k)}>{tt(x.navn)}</button>)}</div> : null; };
+
 export function Regelverk() {
-  const [f, setF] = useFilter('regelverk', { q: '' }); const q = (f.q || '').trim();
-  if (isTenant()) { const PL = Object.values(PLIKTER).filter(p => treff(q, p.n, p.h, ...(p.dok || [])));
+  const [f, setF] = useFilter('regelverk', { q: '', land: '' }); const q = (f.q || '').trim();
+  const land: Land = (mineLand().includes(f.land) ? f.land : mineLand()[0]) as Land; const MX = land === 'MX';
+  if (isTenant()) { const PL = plikterFor(land).filter(p => treff(q, p.n, p.h, ...(p.dok || [])));
     if (q) return <>
     <div className="head"><div className="grow"><h1>{tt("Plikter og regelverk")}<Hjelp id="side.regelverk" /></h1><p className="sub">{tt("Hva som forventes av deg som leietaker")}</p></div></div>
     <Sok q={f.q} set={q => setF({ q })} n={PL.length} />
@@ -36,25 +42,28 @@ export function Regelverk() {
     return <>
     <div className="head"><div className="grow"><h1>{tt("Plikter og regelverk")}<Hjelp id="side.regelverk" /></h1><p className="sub">{tt("Hva som forventes av deg som leietaker")}</p></div></div>
     <Sok q={f.q} set={q => setF({ q })} n={null} />
+    {MX ? <div className="grid g2">{SEK_MX.filter(([t]) => t === 'Arrendatarios' || t.startsWith('Prevención')).map(([t, l]) => <div key={t} className="card rules"><h3>{t}</h3><ul>{l.map((h, i) => <Li key={i} h={h} />)}</ul></div>)}</div> :
     <div className="grid g2">
       <div className="card rules"><h3>{tt("Brannsikkerhet (forskrift om brannforebygging kap. 3)")}</h3><ul><Li h="Utpek en ansvarlig for brannsikkerheten i virksomheten og meld navnet til eier." /><Li h="Sørg for at ansatte får opplæring og at det gjennomføres brannøvelser." /><Li h="Hold rømningsveier frie, og meld fra om feil på brannalarm, nødlys, branndører eller slokkeutstyr." /><Li h="Dokumenter rutiner og egenkontroller." /></ul></div>
       <div className="card rules"><h3>{tt("Internkontroll (HMS)")}</h3><ul><Li h="Virksomheten skal ha systematisk HMS-arbeid med risikovurdering og årlig gjennomgang (internkontrollforskriften § 5)." /><Li h="Samordning med eier og andre virksomheter i bygget avtales skriftlig (§ 6)." /></ul></div>
       <div className="card rules"><h3>{tt("Vedlikehold etter leieavtalen")}</h3><ul><Li h="Se fordelingen av vedlikeholdsansvar under «Mitt leieforhold»." /><Li h="Meld skader, feil og avvik i bygget så snart de oppdages." /><Li h="Endret bruk eller ombygging må avklares med eier – det kan kreve søknad (pbl. § 20-1)." /></ul></div>
-    </div>
-    <h2 className="sec">{tt("Standard plikter")}</h2><div className="tbl-wrap"><table><thead><tr><th>{tt("Plikt")}</th><th>{tt("Hjemmel")}</th></tr></thead><tbody>{Object.values(PLIKTER).map(p => <tr key={p.n}><td>{p.n}</td><td className="small muted">{p.h}</td></tr>)}</tbody></table></div>
+    </div>}
+    <h2 className="sec">{tt("Standard plikter")}</h2><div className="tbl-wrap"><table><thead><tr><th>{tt("Plikt")}</th><th>{tt("Hjemmel")}</th></tr></thead><tbody>{plikterFor(land).map(p => <tr key={p.n}><td>{p.n}</td><td className="small muted">{p.h}</td></tr>)}</tbody></table></div>
   </>; }
-  const byK: Record<string, any[]> = {}; Object.values(MALER).filter(m => treff(q, m.n, m.t, m.u, m.h, m.k, intTxt({ n: m.i[0], enhet: m.i[1] }))).forEach(m => { (byK[m.k] = byK[m.k] || []).push(m); });
-  const sek = SEK.map(([t, l]) => [t, treff(q, t) ? l : l.filter(h => treff(q, h))] as [string, string[]]).filter(([, l]) => l.length);
-  const koder = TFM_KODER.filter(([c, n]) => treff(q, c, n));
-  const pl = Object.values(PLIKTER).filter(p => treff(q, p.n, p.h, ...(p.dok || [])));
+  const byK: Record<string, any[]> = {}; Object.values(malerForLand(land)).filter(m => treff(q, m.n, m.t, m.u, m.h, m.k, intTxt({ n: m.i[0], enhet: m.i[1] }))).forEach(m => { (byK[m.k] = byK[m.k] || []).push(m); });
+  const sek = (MX ? SEK_MX : SEK).map(([t, l]) => [t, treff(q, t) ? l : l.filter(h => treff(q, h))] as [string, string[]]).filter(([, l]) => l.length);
+  const koder = MX ? [] : TFM_KODER.filter(([c, n]) => treff(q, c, n));
+  const pl = plikterFor(land).filter(p => treff(q, p.n, p.h, ...(p.dok || [])));
   const lev = Object.values(KOMP).filter(k => k.n !== 'Annet' && treff(q, k.n, k.g, String(k.l)));
   const nMal = Object.values(byK).reduce((a, x) => a + x.length, 0);
-  const tfmTekst = treff(q, 'TFM tverrfaglig merkesystem merkeskilt lokalisering systemkode systemløpenummer komponentkode NS 3451');
+  const tfmTekst = !MX && treff(q, 'TFM tverrfaglig merkesystem merkeskilt lokalisering systemkode systemløpenummer komponentkode NS 3451');
   const n = q ? sek.reduce((a, [, l]) => a + l.length, 0) + koder.length + pl.length + lev.length + nMal + (tfmTekst ? 1 : 0) : null;
   return <>
     <div className="head"><div className="grow"><h1>{tt("Regelverk og eiers plikter")}<Hjelp id="side.regelverk" /></h1><p className="sub">{tt("Hva som hviler på eier av næringseiendom, og grunnlaget for malene i programmet")}</p></div></div>
-    <div className="note" style={{ marginBottom: 16 }}>{tt("Oversikten er et arbeidsverktøy, ikke juridisk rådgivning. Krav og intervaller avhenger av byggets bruk, størrelse og anleggenes utførelse, og regelverket endres. Kontroller mot")} <a href="https://lovdata.no" target="_blank" rel="noopener noreferrer">{tt("Lovdata")}</a>{tt(", DSB, DiBK, NVE og Miljødirektoratet, og mot krav fra forsikringsselskapet.")}</div>
-    <RegelverkStatus />
+    {!MX && <div className="note" style={{ marginBottom: 16 }}>{tt("Oversikten er et arbeidsverktøy, ikke juridisk rådgivning. Krav og intervaller avhenger av byggets bruk, størrelse og anleggenes utførelse, og regelverket endres. Kontroller mot")} <a href="https://lovdata.no" target="_blank" rel="noopener noreferrer">{tt("Lovdata")}</a>{tt(", DSB, DiBK, NVE og Miljødirektoratet, og mot krav fra forsikringsselskapet.")}</div>}
+    <LandValg l={land} set={l => setF({ land: l })} />
+    {MX && <div className="note" style={{ marginBottom: 16 }}>{tt("Regelverket for Mexico er satt sammen fra offisielle kilder (DOF, Secretaría de Economía, Gaceta Oficial CDMX), men er ikke kvalitetssikret av lokal fagperson ennå. Bruk det som sjekkliste og kontroller kravene for eiendommens delstat og bruk.")}</div>}
+    <RegelverkStatus land={land} />
     <Sok q={f.q} set={q => setF({ q })} n={n} />
     {n === 0 && <Tom />}
     <div className="grid g2">{sek.map(([t, l]) => <div key={t} className="card rules"><h3>{t}</h3><ul>{l.map((h, i) => <Li key={i} h={h} />)}</ul></div>)}</div>

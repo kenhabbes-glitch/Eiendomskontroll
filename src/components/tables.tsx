@@ -4,7 +4,8 @@ import { bvStatus } from '../lib/brannvern';
 import { TgForslagChip } from './TgKg';
 import React, { type ReactNode } from 'react';
 import { Hjelp } from './Hjelp';
-import { KOMP, DOK_PAAKREVD, AV_LUKKET, SERVICEAVTALE, MALER, NS_DOK, dokNs } from '../lib/catalog';
+import { dokPaakrevd, landInfo } from '../lib/land';
+import { KOMP, AV_LUKKET, SERVICEAVTALE, MALER, NS_DOK, dokNs } from '../lib/catalog';
 import { ikDekning } from '../lib/utils';
 import { S, canEdit, save } from '../lib/store';
 import { kostNaa, kostTip, kostJustert, nok, YEAR, leieAreal, m2, sysKostNaa, sysKostUtskift, sysKostTip, kompAar, egetAar, sysNaaverdi, kompNaaverdi, nvTip, saStatus, taggerFor, erForslag, harForslag } from '../lib/utils';
@@ -173,9 +174,14 @@ export function TfmTree({ list, q, onNewKomp, eid, onDok }: { list: Rec[]; q: st
 }
 
 export function CoverageTable({ es }: { es: Rec[] }) {
-  if (!es.length) return null; const ok = canEdit();
-  return <Wrap><table className="matrix"><thead><tr><th>{tt("Eiendom")}</th>{DOK_PAAKREVD.map(t => <th key={t} title={t} style={{ whiteSpace: 'normal', minWidth: 80, fontSize: 10.5 }}>{t.split(/[\/(]/)[0]}</th>)}<th>{tt("Dekning")}</th></tr></thead><tbody>
-    {es.map(e => { const c = docCoverage(e, DOK_PAAKREVD); const rel = c.filter(x => x.s !== 'na'); const okk = rel.filter(x => x.s === 'ok' || x.s === 'soon').length;
+  if (!es.length) return null; const grp: Record<string, Rec[]> = {}; es.forEach(e => (grp[e.land || 'NO'] ||= []).push(e));
+  const g = Object.entries(grp); if (g.length === 1) return <CoverageTable1 es={es} />;
+  return <>{g.map(([l, xs]) => <div key={l}><h4 style={{ margin: '12px 0 6px' }}>{tt(landInfo(l).navn)}</h4><CoverageTable1 es={xs} /></div>)}</>;
+}
+function CoverageTable1({ es }: { es: Rec[] }) {
+  const ok = canEdit(); const PK = dokPaakrevd(es[0].id);
+  return <Wrap><table className="matrix"><thead><tr><th>{tt("Eiendom")}</th>{PK.map(t => <th key={t} title={t} style={{ whiteSpace: 'normal', minWidth: 80, fontSize: 10.5 }}>{t.split(/[\/(]/)[0]}</th>)}<th>{tt("Dekning")}</th></tr></thead><tbody>
+    {es.map(e => { const c = docCoverage(e, PK); const rel = c.filter(x => x.s !== 'na'); const okk = rel.filter(x => x.s === 'ok' || x.s === 'soon').length;
       return <tr key={e.id}><td><a href={'#/eiendom/' + e.id}>{e.navn}</a></td>
         {c.map(x => { const sym = ({ ok: ['ok', '✓'], soon: ['exp', '!'], exp: ['exp', '!'], no: ['no', '✕'], na: ['na', '–'] } as any)[x.s]; const tip = ({ ok: 'Finnes', soon: 'Utløper innen 90 dager', exp: 'Utløpt', no: ok ? 'Mangler – klikk for å registrere' : 'Mangler', na: 'Ikke relevant' } as any)[x.s];
           const click = () => { if (x.d) editDok(x.d.id); else if (!ok) return; else if (x.s === 'na') toggleDokNA(e.id, x.t); else editDok(undefined, { eiendomId: e.id, type: x.t, tittel: x.t }); };

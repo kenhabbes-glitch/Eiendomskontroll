@@ -15,16 +15,17 @@ import { formModal } from '../components/ui';
 import { Sel, eiendomOpts, useFilter } from './common';
 
 import { TILSYN_KILDER, TS_TYPER, MYND } from '../lib/tilsyn';
-import { tt } from '../lib/i18n';
+import { alleTilsynKilder, myndighet, tilsynKilder } from '../lib/land';
+import { tt, vis } from '../lib/i18n';
 export { TILSYN_KILDER, TS_TYPER };
-export const erTilsyn = (a: Rec) => TILSYN_KILDER.includes(a.kilde) || !!a.tsType;
+export const erTilsyn = (a: Rec) => alleTilsynKilder.includes(a.kilde) || !!a.tsType;
 export const sakNokkel = (a: Rec) => `${a.eiendomId}|${a.tsRef || ''}|${a.tsDato || (a.tsRef ? '' : a.oppdaget || '')}|${a.kilde}`;
 
 export type Sak = { key: string; eiendomId: string; kilde: string; myndighet: string; ref: string; dato: string; svarfrist: string; svarSendt: string; lukket: string; svarDokId: string; avvik: Rec[]; apne: number };
 export function tilsynssaker(): Sak[] {
   const g: Record<string, Sak> = {};
   for (const a of S.avvik.filter(erTilsyn)) { const k = sakNokkel(a);
-    const s = (g[k] ||= { key: k, eiendomId: a.eiendomId, kilde: a.kilde, myndighet: a.tsMyndighet || MYND[a.kilde] || a.kilde, ref: a.tsRef || '', dato: a.tsDato || a.oppdaget || '', svarfrist: '', svarSendt: '', lukket: '', svarDokId: '', avvik: [], apne: 0 });
+    const s = (g[k] ||= { key: k, eiendomId: a.eiendomId, kilde: a.kilde, myndighet: a.tsMyndighet || myndighet(a.kilde) || a.kilde, ref: a.tsRef || '', dato: a.tsDato || a.oppdaget || '', svarfrist: '', svarSendt: '', lukket: '', svarDokId: '', avvik: [], apne: 0 });
     s.avvik.push(a); if (!AV_LUKKET.includes(a.status)) s.apne++;
     if (a.tsSvarfrist && (!s.svarfrist || a.tsSvarfrist < s.svarfrist)) s.svarfrist = a.tsSvarfrist;
     if (a.tsSvarSendt) s.svarSendt = a.tsSvarSendt; if (a.tsLukket) s.lukket = a.tsLukket; if (a.tsSvarDokId) s.svarDokId = a.tsSvarDokId; if (a.tsMyndighet) s.myndighet = a.tsMyndighet; }
@@ -82,7 +83,7 @@ type Rad = { id: string; type: string; punkt: string; t: string; alv: string; fr
 export function registrerTilsyn(sak?: Sak) { openModal({ wide: true, render: close => <RegistrerTilsyn close={close} sak={sak} /> }); }
 function RegistrerTilsyn({ close, sak }: { close: () => void; sak?: Sak }) {
   useStore(); const ny = (): Rad => ({ id: Math.random().toString(36).slice(2), type: 'Avvik', punkt: '', t: '', alv: 'Høy', frist: '', tiltak: '' });
-  const [h, setH0] = useState<Rec>(() => sak ? { eiendomId: sak.eiendomId, kilde: sak.kilde, myndighet: sak.myndighet, ref: sak.ref, dato: sak.dato, svarfrist: sak.svarfrist } : { eiendomId: S.eiendommer[0]?.id || '', kilde: 'Brannvesen/tilsyn', myndighet: MYND['Brannvesen/tilsyn'], ref: '', dato: today(), svarfrist: '' });
+  const [h, setH0] = useState<Rec>(() => sak ? { eiendomId: sak.eiendomId, kilde: sak.kilde, myndighet: sak.myndighet, ref: sak.ref, dato: sak.dato, svarfrist: sak.svarfrist } : { eiendomId: S.eiendommer[0]?.id || '', kilde: tilsynKilder(S.eiendommer[0]?.id)[0], myndighet: myndighet(tilsynKilder(S.eiendommer[0]?.id)[0]), ref: '', dato: today(), svarfrist: '' });
   const setH = (x: Rec) => setH0(v => ({ ...v, ...x }));
   const [R, setR] = useState<Rad[]>([ny()]); const [fil, setFil] = useState<File | null>(null); const [busy, setBusy] = useState(false);
   const setRad = (i: number, x: Partial<Rad>) => setR(L => L.map((r, j) => j === i ? { ...r, ...x } : r));
@@ -102,7 +103,7 @@ function RegistrerTilsyn({ close, sak }: { close: () => void; sak?: Sak }) {
     foot={<><button className="btn" onClick={close}>{tt("Avbryt")}</button><button className="btn pri" disabled={busy} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Registrer {0} avvik", R.filter(r => r.t.trim()).length || '')}</button></>}>
     <div className="pa-grid">
       <label className="pa-felt half"><span>{tt("Eiendom")}</span><select value={h.eiendomId} disabled={!!sak} onChange={e => setH({ eiendomId: e.target.value })}>{eiendomOpts().map(([k, l]) => <option key={k} value={k}>{tt(l)}</option>)}</select></label>
-      <label className="pa-felt half"><span>{tt("Type tilsyn")}</span><select value={h.kilde} disabled={!!sak} onChange={e => setH({ kilde: e.target.value, myndighet: MYND[e.target.value] })}>{TILSYN_KILDER.map(k => <option key={k}>{k}</option>)}</select></label>
+      <label className="pa-felt half"><span>{tt("Type tilsyn")}</span><select value={h.kilde} disabled={!!sak} onChange={e => setH({ kilde: e.target.value, myndighet: myndighet(e.target.value) })}>{tilsynKilder(h.eiendomId).map(k => <option key={k} value={k}>{vis(k)}</option>)}</select></label>
       <label className="pa-felt half"><span>{tt("Myndighet / avdeling")}</span><input value={h.myndighet} onChange={e => setH({ myndighet: e.target.value })} /></label>
       <label className="pa-felt half"><span>{tt("Saksnummer / referanse")}</span><input value={h.ref} disabled={!!sak} onChange={e => setH({ ref: e.target.value })} placeholder={tt("F.eks. 2026/1234")} /></label>
       <label className="pa-felt half"><span>{tt("Tilsynsdato")}</span><input type="date" value={h.dato} disabled={!!sak} onChange={e => setH({ dato: e.target.value })} /></label>

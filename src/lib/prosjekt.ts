@@ -1,5 +1,6 @@
 // Prosjektmodul: faser, oppgaver, økonomi (budsjett, forpliktet, påløpt, prognose), regnskapsklassifisering, FDV,
 // og utskiftingsprosjekt der nytt system erstatter det gamle ved ferdigstillelse.
+import { kompMaler } from './land';
 import { S, save, state, toast } from './store';
 import { addDays, addInt, byId, today, kNavn, aNavn, nextSysLop, type Rec } from './utils';
 import { KOMP, MALER, AV_LUKKET, TFM_DEF } from './catalog';
@@ -119,7 +120,7 @@ export async function ferdigstill(pid: string, opt: { lukkAvvik: boolean; dato?:
     const arkivert = { dato, prosjektId: pid, erstattetAv: nid, av, grunn: `Erstattet i prosjekt «${p.navn}»` };
     // Kontroller: arkiver de gamle, lag nye for det nye systemet
     const gamleK = S.oppgaver.filter(o => o.anleggId === gml.id);
-    const nyeMal = new Set<string>(KOMP[type]?.m || []);
+    const nyeMal = new Set<string>(kompMaler(type, p.eiendomId));
     for (const o of gamleK) {
       await save('oppgaver', { ...o, aktiv: false, arkivert });
       if (o.malKey && !nyeMal.has(o.malKey) && type !== gml.type) continue; // katalogkontroll som ikke gjelder ny type
@@ -145,7 +146,7 @@ export async function ferdigstill(pid: string, opt: { lukkAvvik: boolean; dato?:
     const sid = await save('anlegg', { eiendomId: p.eiendomId, type: ns.type || '', navn: ns.navn || '', fabrikat: ns.fabrikat || '', aar: +String(ns.aar || dato.slice(0, 4)), levetid: ns.levetid || KOMP[ns.type]?.l || '',
       kost: ns.kost || '', kostAar: new Date().getFullYear(), tg: 'TG0', tgdato: dato, tgKomm: `Nytt system fra prosjekt «${p.navn}»`, tfmSys: tfm, tfmLop: lop, prosjektId: pid,
       ansvar: ns.ansvar || 'Eier', leietakerId: ns.ansvar === 'Leietaker' ? (p.leietakerId || '') : '', notat: ns.notat || '' });
-    for (const k of KOMP[ns.type]?.m || []) { const m = MALER[k]; if (!m) continue;
+    for (const k of kompMaler(ns.type, p.eiendomId)) { const m = MALER[k]; if (!m) continue;
       await save('oppgaver', { malKey: k, eiendomId: p.eiendomId, anleggId: sid, navn: m.n, kategori: m.k, type: m.t, hjemmel: m.h, intervall: { n: m.i[0], enhet: m.i[1] }, utfores: m.u, ansvar: ns.ansvar === 'Leietaker' ? 'Leietaker' : 'Eier', leietakerId: ns.ansvar === 'Leietaker' ? (p.leietakerId || '') : '', nesteFrist: addInt(dato, { n: m.i[0], enhet: m.i[1] }), aktiv: true, historikk: [], fraProsjekt: pid }); }
     ns.opprettetId = sid; logg.push({ t: new Date().toISOString(), k: `Nytt system registrert: ${aNavn(sid)}`, av });
   }

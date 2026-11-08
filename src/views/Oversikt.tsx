@@ -8,7 +8,7 @@ import { PortefoljeStatistikk } from './Portefolje';
 import { tilGodkjenning, vurderPlikt } from './Sjekkliste';
 import { Hjelp } from '../components/Hjelp';
 import { bvOppfolging, aktiveMidl } from '../lib/brannvern';
-import { DOK_PAAKREVD } from '../lib/catalog';
+import { dokPaakrevd } from '../lib/land';
 import { eierRapport } from './EierRapport';
 import { harModul } from '../lib/moduler';
 import { S, canEdit, isAdmin, state, useStore } from '../lib/store';
@@ -36,7 +36,7 @@ export function Oversikt() {
   const T = activeTasks(); const forf = T.filter(o => (dUntil(o.nesteFrist) as number) < 0); const d30 = T.filter(o => { const d = dUntil(o.nesteFrist); return d !== null && d >= 0 && d <= 30; });
   const OA = openAvvik(); const krit = OA.filter(a => a.alv === 'Kritisk' || a.alv === 'Høy'); const avForf = OA.filter(a => a.frist && (dUntil(a.frist) as number) < 0);
   const dokExp = S.dokumenter.filter(d => d.gyldigTil && (dUntil(d.gyldigTil) as number) <= 90);
-  const cov = ed ? S.eiendommer.flatMap(e => docCoverage(e, DOK_PAAKREVD).filter(x => x.s === 'no' || x.s === 'exp')) : [];
+  const cov = ed ? S.eiendommer.flatMap(e => docCoverage(e, dokPaakrevd(e.id)).filter(x => x.s === 'no' || x.s === 'exp')) : [];
   const ikL = S.leietakere.filter(l => (l.plikter || []).some((p: any) => pliktStatus(p).o >= 2));
   const ikMiss = S.leietakere.flatMap(l => (l.plikter || []).filter((p: any) => pliktStatus(p).o >= 2));
   const lev = [...S.anlegg, ...S.komponenter.filter(k => k.levetid || k.planAar || k.tg)].filter(a => { const r = compRest(a); return (r !== null && r <= 3) || a.tg === 'TG3'; });
@@ -69,7 +69,7 @@ export function Oversikt() {
     </div>
     {isStaff() && <PortefoljeStatistikk />}
     <div className="sec"><h2>{tt("Status per eiendom")}</h2><div className="tbl-wrap"><table><thead><tr><th>{tt("Eiendom")}</th><th>{tt("Kategori")}</th><th className="num">{tt("Forfalte")}</th><th className="num">≤ 30 d</th><th className="num">{tt("Åpne avvik")}</th><th className="num">{tt("Kritisk/høy")}</th>{ed && <th className="num">{tt("Dok.dekning")}</th>}{ed && <th className="num">{tt("Leietakere")}</th>}</tr></thead><tbody>
-      {sortBy(S.eiendommer, e => e.navn).map(e => { const t = T.filter(o => o.eiendomId === e.id); const a = OA.filter(x => x.eiendomId === e.id); const c = docCoverage(e, DOK_PAAKREVD).filter(x => x.s !== 'na'); const okk = c.filter(x => x.s === 'ok' || x.s === 'soon').length; const f = t.filter(o => (dUntil(o.nesteFrist) as number) < 0).length; const kh = a.filter(x => x.alv === 'Kritisk' || x.alv === 'Høy').length; const pct = c.length ? Math.round(okk / c.length * 100) : 100;
+      {sortBy(S.eiendommer, e => e.navn).map(e => { const t = T.filter(o => o.eiendomId === e.id); const a = OA.filter(x => x.eiendomId === e.id); const c = docCoverage(e, dokPaakrevd(e.id)).filter(x => x.s !== 'na'); const okk = c.filter(x => x.s === 'ok' || x.s === 'soon').length; const f = t.filter(o => (dUntil(o.nesteFrist) as number) < 0).length; const kh = a.filter(x => x.alv === 'Kritisk' || x.alv === 'Høy').length; const pct = c.length ? Math.round(okk / c.length * 100) : 100;
         return <tr key={e.id} className="click" onClick={() => go('eiendom/' + e.id)}><td><b style={{ fontWeight: 500 }}>{e.navn}</b><div className="small muted">{e.adresse}</div></td><td className="small">{e.kategori}</td>
           <td className="num" style={f ? { color: 'var(--red)', fontWeight: 600 } : undefined}>{f}</td><td className="num">{t.filter(o => { const d = dUntil(o.nesteFrist); return d !== null && d >= 0 && d <= 30; }).length}</td><td className="num">{a.length}</td>
           <td className="num" style={kh ? { color: 'var(--red)', fontWeight: 600 } : undefined}>{kh}</td>{ed && <td className="num" style={pct < 70 ? { color: 'var(--amber)' } : undefined}>{pct}%</td>}{ed && <td className="num">{S.leietakere.filter(l => l.eiendomId === e.id).length}</td>}</tr>; })}

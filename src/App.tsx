@@ -44,6 +44,7 @@ import { SignerLenke } from './views/SignerLenke';
 import { synkAlle, lastLokale } from './lib/befaring';
 import { tt, lokale, sprak } from './lib/i18n';
 import { SprakVelger } from './components/SprakVelger';
+import './lib/land';
 
 export function go(path: string) { if (location.hash === '#/' + path) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = '#/' + path; }
 function useRoute() {

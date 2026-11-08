@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { S, orgNavn, canEdit, useStore } from '../lib/store';
-import { DOK_PAAKREVD } from '../lib/catalog';
+import { dokPaakrevd } from '../lib/land';
 import { YEAR, activeTasks, compYear, dUntil, docCoverage, m2, nok, openAvvik, sysKostNaa, sysKostUtskift, naaverdi, sortBy, kostNaa, type Rec } from '../lib/utils';
 import { tt } from '../lib/i18n';
 
@@ -13,7 +13,7 @@ function beregn(E: Rec[]): Tall {
   const A = S.anlegg.filter(a => sett.has(a.eiendomId)); const K = S.komponenter.filter(k => sett.has(k.eiendomId));
   let utsk10 = 0, nv10 = 0, etterslep = 0;
   A.forEach(a => { const y = compYear(a); if (!y) return; if (y < YEAR) { etterslep += sysKostNaa(a).tot || 0; return; } if (y <= YEAR + 10) { const v = sysKostUtskift(a, y); utsk10 += v; nv10 += naaverdi(v, y); } });
-  const dek = E.map(e => { const c = docCoverage(e, DOK_PAAKREVD).filter(x => x.s !== 'na'); return c.length ? c.filter(x => x.s === 'ok' || x.s === 'soon').length / c.length : 1; });
+  const dek = E.map(e => { const c = docCoverage(e, dokPaakrevd(e.id)).filter(x => x.s !== 'na'); return c.length ? c.filter(x => x.s === 'ok' || x.s === 'soon').length / c.length : 1; });
   return {
     bygg: E.length, bta: E.reduce((s, e) => s + (+e.bta || 0), 0), avvik: OA.length, kritisk: OA.filter(a => ['Kritisk', 'Høy'].includes(a.alv)).length,
     forfalt: T.filter(o => (dUntil(o.nesteFrist) as number) < 0).length, tg23: [...A, ...K].filter(x => ['TG2', 'TG3'].includes(x.tg)).length,

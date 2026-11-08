@@ -1,7 +1,8 @@
 // Statusrapport til eier: eiers lov- og forskriftsfestede oppgaver, påkrevde dokumenter, avvik, tilsyn,
 // leietakeroppfølging og brannvern – med trafikklys og prioriterte tiltak.
 import { S } from './store';
-import { AV_LUKKET, DOK_PAAKREVD, KOMP, MALER, PROP_MALER } from './catalog';
+import { AV_LUKKET, MALER } from './catalog';
+import { dokPaakrevd, kompMaler, propMaler } from './land';
 import { aNavn, addDays, dUntil, docCoverage, fd, intTxt, pliktStatus, sortBy, today, type Rec } from './utils';
 import { bvStatus, bvVersjon, aktiveMidl, mangelAnsvarlig } from './brannvern';
 import { tilsynssaker } from '../views/Tilsyn';
@@ -60,8 +61,8 @@ export function eierStatus(eid: string): EierStatus {
   });
   const har = (k: string, a: string) => S.oppgaver.some(o => o.eiendomId === eid && o.malKey === k && (o.anleggId || '') === a && o.aktiv !== false);
   const forventet: [string, string][] = [
-    ...PROP_MALER.filter(k => LOVTYPER.includes(MALER[k]?.t) && !(k === 'energiattest' && +e.bta && +e.bta < 1000)).map(k => [k, ''] as [string, string]),
-    ...S.anlegg.filter(a => a.eiendomId === eid && !a.arkivert).flatMap(a => (KOMP[a.type]?.m || []).filter(k => LOVTYPER.includes(MALER[k]?.t)).map(k => [k, a.id] as [string, string])),
+    ...propMaler(eid).filter(k => LOVTYPER.includes(MALER[k]?.t) && !(k === 'energiattest' && +e.bta && +e.bta < 1000)).map(k => [k, ''] as [string, string]),
+    ...S.anlegg.filter(a => a.eiendomId === eid && !a.arkivert).flatMap(a => kompMaler(a.type, eid).filter(k => LOVTYPER.includes(MALER[k]?.t)).map(k => [k, a.id] as [string, string])),
   ];
   for (const [k, a] of forventet) if (!har(k, a)) { const m = MALER[k];
     kontroller.push({ navn: m.n, system: a ? aNavn(a) : 'Eiendommen', hjemmel: m.h, intervall: intTxt({ n: m.i[0], enhet: m.i[1] }), sist: '', frist: '', lys: 'red', status: 'Ikke i kontrollplanen', type: m.t, mangler: true }); }
@@ -71,7 +72,7 @@ export function eierStatus(eid: string): EierStatus {
   const kLys = verst(kForf.length || kMangl.length ? 'red' : 'green', kSnart.length ? 'amber' : 'green');
 
   // ---- Dokumenter eier skal ha
-  const dok: DokRad[] = docCoverage(e, DOK_PAAKREVD).map((c: any) => { const g = DOK_GRUNNLAG[c.t] || { h: '', krav: 'anbefalt' as const };
+  const dok: DokRad[] = docCoverage(e, dokPaakrevd(eid)).map((c: any) => { const g = DOK_GRUNNLAG[c.t] || { h: '', krav: 'anbefalt' as const };
     const d = c.d as Rec | undefined; const krav = KRAV_TEKST[g.krav];
     const [lys, status]: [Lys, string] = c.s === 'na' ? ['grey', 'Ikke relevant'] : c.s === 'ok' ? ['green', 'Foreligger'] : c.s === 'soon' ? ['amber', 'Utløper snart'] : c.s === 'exp' ? [g.krav === 'lov' ? 'red' : 'amber', 'Utløpt'] : [g.krav === 'lov' ? 'red' : 'amber', 'Mangler'];
     return { type: c.t, h: g.h, krav, lys, status, dato: d?.dato || '', gyldigTil: d?.gyldigTil || '', tittel: d?.tittel || '' }; });
