@@ -62,7 +62,15 @@ const handler = async (req: Request) => {
 
   // Invitasjon på e-post – brukeren setter passord selv
   const inv = await admin.auth.admin.inviteUserByEmail(epost, { data: { navn }, redirectTo });
-  if (inv.error || !inv.data?.user) { await admin.from('organisasjoner').delete().eq('id', org.id); return json(400, { error: 'Kunne ikke sende invitasjon: ' + (inv.error?.message || 'ukjent feil') }); }
+  if (inv.error || !inv.data?.user) {
+    await admin.from('organisasjoner').delete().eq('id', org.id);
+    const e: any = inv.error || {}; const kode = String(e.code || ''); const status = e.status || 0;
+    const grunn = kode === 'over_email_send_rate_limit' || status === 429 ? 'For mange e-poster er sendt den siste timen. Prøv igjen senere.'
+      : status >= 500 ? 'E-postutsendingen er ikke riktig satt opp hos oss. Vi er varslet – prøv igjen litt senere.'
+      : (e.message || kode || 'ukjent feil');
+    await admin.from('hendelseslogg').insert({ tabell: 'hendelse', handling: 'registrering', bruker: navn, tekst: `Registrering av ${firmanavn} (${orgnr}) feilet ved utsending av invitasjon til ${epost}: ${e.message || kode || status || 'ukjent'}` });
+    return json(status === 429 ? 429 : 502, { error: 'Kunne ikke sende invitasjon: ' + grunn });
+  }
   const uid = inv.data.user.id;
   await admin.from('profiles').upsert({ id: uid, epost, navn, rolle: 'ingen', aktiv: true });
   const { error: me } = await admin.from('org_medlem').upsert({ org_id: org.id, user_id: uid, rolle: 'admin', alle_bygg: true, aktiv: true });
