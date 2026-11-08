@@ -139,19 +139,26 @@ const handler = async (req: Request) => {
     if (!rolle) return json(400, { error: 'Ugyldig rolle' });
     const { data: fins } = await admin.from('profiles').select('id, rolle').eq('epost', epost).maybeSingle();
     if (fins && fins.rolle === 'leietaker') return json(409, { error: 'E-posten brukes av en leietakerbruker' });
-    { // Antall brukerlisenser: ikke flere aktive brukere enn kunden betaler for
+    let oppgradert: { fra: number; til: number } | null = null;
+    { // Antall brukerlisenser: er alle i bruk, må administratoren bekrefte at abonnementet økes med én bruker
       const { data: o } = await admin.from('organisasjoner').select('lisenser').eq('id', org).maybeSingle(); const lis = (o as any)?.lisenser;
       if (lis) {
         const { data: fm } = await admin.from('profiles').select('id').eq('epost', epost).maybeSingle();
         const { count } = await admin.from('org_medlem').select('user_id', { count: 'exact', head: true }).eq('org_id', org).eq('aktiv', true).neq('user_id', fm?.id || '00000000-0000-0000-0000-000000000000');
-        if ((count || 0) >= lis) return json(402, { error: `Abonnementet har ${lis} bruker${lis === 1 ? '' : 'e'}, og alle er i bruk. Øk antall brukere under Organisasjon og tilgang → Abonnement.` });
+        if ((count || 0) >= lis) {
+          if (body.oppgrader !== true) return json(409, { error: `Abonnementet har ${lis} bruker${lis === 1 ? '' : 'e'}, og alle er i bruk.`, kanOppgradere: true, lisenser: lis, aktive: count || 0 });
+          const til = Math.min(1000, (count || 0) + 1);
+          const { error: le } = await admin.from('organisasjoner').update({ lisenser: til }).eq('id', org); if (le) return json(500, { error: 'Kunne ikke øke antall brukere: ' + le.message });
+          oppgradert = { fra: lis, til };
+          await logg(org, `Antall brukerlisenser økt automatisk fra ${lis} til ${til} da ${epost} ble lagt til`);
+        }
       }
     }
     try {
       const b = await finnEllerOpprett(epost, navn, passord);
       await settMedlem(org, b.id, rolle, !!body.alle_bygg, body.tildelinger || []);
       await logg(org, `${b.ny ? 'Ny bruker' : 'Eksisterende bruker'} ${epost} lagt til som ${rolle}${body.alle_bygg ? ' (alle bygg)' : ''}`);
-      return json(200, { ok: true, id: b.id, ny: b.ny });
+      return json(200, { ok: true, id: b.id, ny: b.ny, oppgradert });
     } catch (e: any) { return json(400, { error: e.message }); }
   }
 

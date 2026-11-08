@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { AbonnementOversikt, Bestillinger, modulAdmin, prisEditor } from './Abonnement';
-import { S, adminApi, isPlattform, mineOrg, reloadAdmin, sb, state, toast, useStore, feiltekst, orgNavn, save, bump } from '../lib/store';
+import { byggFor, kr, orgPris } from '../lib/moduler';
+import { S, aoApi, adminApi, isPlattform, mineOrg, reloadAdmin, sb, state, toast, useStore, feiltekst, orgNavn, save, bump } from '../lib/store';
 import { eNavn, fd, sortBy, today, aNavn } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, type Field } from '../components/ui';
 import { KOMP } from '../lib/catalog';
@@ -73,8 +74,20 @@ export function leggTilMedlem(org: string) {
     top: <p className="small" style={{ marginTop: 0 }}>Nye brukere får e-post med lenke for å velge passord. Har personen allerede bruker (f.eks. i en annen organisasjon), legges hen til uten ny invitasjon.</p>,
     onSave: async v => {
       const tildelinger = [...(v.tild?.e || []).map((e: string) => ({ eiendom_id: e })), ...(v.tild?.p || []).map((p: string) => ({ portefolje_id: p }))];
-      try { const r = await adminApi({ action: v.passord ? 'testbruker' : 'inviter', org_id: org, epost: v.epost.trim(), navn: v.navn, rolle: v.rolle, alle_bygg: v.rolle === 'admin' || !!v.alle_bygg, tildelinger, passord: v.passord || undefined, redirectTo: location.origin }); toast(r.ny ? (v.passord ? 'Testbruker opprettet' : 'Invitasjon sendt til ' + v.epost) : 'Eksisterende bruker lagt til'); }
-      catch (e: any) { toast('Feilet: ' + e.message); return false; }
+      const body = { action: v.passord ? 'testbruker' : 'inviter', org_id: org, epost: v.epost.trim(), navn: v.navn, rolle: v.rolle, alle_bygg: v.rolle === 'admin' || !!v.alle_bygg, tildelinger, passord: v.passord || undefined, redirectTo: location.origin };
+      const ferdig = (r: any) => toast(r.ny ? (v.passord ? 'Testbruker opprettet' : 'Invitasjon sendt til ' + v.epost) : 'Eksisterende bruker lagt til');
+      try { ferdig(await adminApi(body)); }
+      catch (e: any) {
+        if (!e.kanOppgradere) { toast('Feilet: ' + e.message); return false; }
+        // Alle brukerlisenser er i bruk: tilby å øke abonnementet med én bruker
+        const fra = +e.lisenser || 0, til = Math.max(fra, +e.aktive || 0) + 1; const gml = orgPris(org, fra), ny = orgPris(org, til);
+        const pris = ny > 0 ? `\n\nNy månedspris for aktive moduler: ${kr(ny)} eks. mva.${gml > 0 ? ` (i dag ${kr(gml)}, +${kr(ny - gml)})` : ''}. Prisen beregnes ut fra antall bygg (${byggFor(org)}) og brukere.` : '';
+        if (!await confirmBox(`Abonnementet har ${fra} bruker${fra === 1 ? '' : 'e'}, og alle er i bruk.\n\nVil du øke til ${til} brukere og legge til ${v.epost.trim()}?${pris}\n\nAlle administratorer i organisasjonen får e-post om endringen.`, 'Øk og legg til')) return false;
+        try {
+          const r = await adminApi({ ...body, oppgrader: true }); ferdig(r);
+          if (r.oppgradert) aoApi({ action: 'abonnement_varsel', org_id: org, type: 'bruker', fra: r.oppgradert.fra, navn: v.navn || v.epost.trim(), gml, ny: orgPris(org, r.oppgradert.til) }).catch(() => {});
+        } catch (e2: any) { toast('Feilet: ' + e2.message); return false; }
+      }
       await reloadAdmin();
     },
   });

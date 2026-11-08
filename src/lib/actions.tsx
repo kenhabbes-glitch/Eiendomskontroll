@@ -4,9 +4,9 @@ import React, { useState } from 'react';
 import { SERVICEAVTALE, TG_DEF, KG_DEF, NS_DOK } from './catalog';
 import { levetidRef, midt, spenn } from './ns3451';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER } from './catalog';
-import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore, kanRedigereE, kanDrifteE, mineOrg, oppdaterNiva } from './store';
+import { S, aoApi, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore, kanRedigereE, kanDrifteE, mineOrg, oppdaterNiva } from './store';
 import { leieAreal, m2, FELLES_AVTALE } from './utils';
-import { byggTillegg, harModul } from './moduler';
+import { byggTillegg, harModul, orgPris } from './moduler';
 import { TgKgVelger, tgAvviker, tgTekst } from '../components/TgKg';
 import { PosVelger, BildeVelger, VedleggGalleri } from '../components/PosVelger';
 import { ServiceHistorikk } from '../views/Servicehistorikk';
@@ -101,7 +101,9 @@ export function editEiendom(id?: string, etter?: (nid: string) => void, preset?:
       const m = String(v.gnrbnr || '').match(/^\s*(\d+)\s*\/\s*(\d+)(?:\s*\/\s*(\d+))?(?:\s*\/\s*(\d+))?/);
       if (m) Object.assign(v, { gnr: +m[1], bnr: +m[2], fnr: m[3] ? +m[3] : '', snr: m[4] ? +m[4] : '' });
       if (v.eierOrgnr && rensOrgnr(v.eierOrgnr).length === 9 && v.eierBrreg?.orgnr !== rensOrgnr(v.eierOrgnr)) { const b = await brregData(v.eierOrgnr).catch(() => null); if (b) { v.eierBrreg = b; if (!v.eierNavn) v.eierNavn = b.navn; } }
-      const nid = await save('eiendommer', { ...e, ...v }); toast(flyttet ? 'Eiendommen er flyttet' : 'Eiendom lagret'); if (flyttet) await oppdaterNiva(); if (!id) { await oppdaterNiva(); if (etter) etter(nid); else { go('eiendom/' + nid); setTimeout(() => generatePlan(nid, true), 300); } } },
+      const bOrg = !id ? (v.eierOrgId || e.eierOrgId) : null; const bTillegg = bOrg ? byggTillegg(bOrg) : 0; const bGml = bOrg && bTillegg ? orgPris(bOrg) : 0;
+      const nid = await save('eiendommer', { ...e, ...v });
+      if (bOrg && bTillegg > 0) aoApi({ action: 'abonnement_varsel', org_id: bOrg, type: 'bygg', navn: v.navn || e.navn, gml: bGml, ny: bGml + bTillegg }).catch(() => {}); toast(flyttet ? 'Eiendommen er flyttet' : 'Eiendom lagret'); if (flyttet) await oppdaterNiva(); if (!id) { await oppdaterNiva(); if (etter) etter(nid); else { go('eiendom/' + nid); setTimeout(() => generatePlan(nid, true), 300); } } },
   });
 }
 

@@ -69,6 +69,13 @@ export const prisTotal = (P: Priser | null, moduler: string[], nU: number, nB = 
 export const kr = (n: number | null | undefined) => n === null || n === undefined || isNaN(n as number) ? '' : Math.round(n).toLocaleString('nb-NO') + ' kr';
 /** Antall bygg en organisasjon eier i appen */
 export const byggFor = (org: string) => S.eiendommer.filter(e => e.eierOrgId === org).length;
+/** Månedspris for betalte moduler (ikke prøve) med gitt antall brukere og bygg */
+export function orgPris(org: string, nU?: number, nB?: number): number {
+  if (!PRISER || RADER === null || !org) return 0;
+  const o = S.orgs.find(x => x.id === org); const u = nU ?? (o?.lisenser || Math.max(1, S.medlemmer.filter(m => m.org_id === org && m.aktiv).length));
+  const M = MODULER.filter(m => orgHar(org, m.k) && !proveTil(m.k, org)).map(m => m.k);
+  return prisTotal(PRISER, M, u, nB ?? byggFor(org));
+}
 /** Hva ett bygg til koster per måned for organisasjonen (betalte moduler, ikke prøve). 0 = ingen kostnad/ukjent */
 export function byggTillegg(org: string): number {
   if (!PRISER || RADER === null || !org) return 0;

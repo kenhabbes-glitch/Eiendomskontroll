@@ -99,7 +99,7 @@ export async function aoApi(body: any, medInnlogging = true) {
   if (medInnlogging) { const { data: { session } } = await sb.auth.getSession(); if (session) headers.Authorization = 'Bearer ' + session.access_token; }
   const r = await fetch('/.netlify/functions/arbeidsordre', { method: 'POST', headers, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || 'Feil ' + r.status);
+  if (!r.ok) throw Object.assign(new Error(j.error || 'Feil ' + r.status), j, { status: r.status });
   return j;
 }
 /** Fører en egen hendelse i hendelsesloggen (i tillegg til de automatiske) */
@@ -289,7 +289,7 @@ export async function adminApi(body: any) {
   const { data: { session } } = await sb.auth.getSession();
   const r = await fetch('/.netlify/functions/brukere', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (session?.access_token || '') }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || 'Feil ' + r.status);
+  if (!r.ok) throw Object.assign(new Error(j.error || 'Feil ' + r.status), j, { status: r.status });
   return j;
 }
 export async function reloadAdmin() { S.profiles = await loadAll('profiles'); S.tilganger = await loadAll('eiendom_tilgang'); await loadOrg(); bump(); }

@@ -580,6 +580,26 @@ const handler = async (req: Request) => {
       await logg(manuelt || SYS, a, k); }
     return { sendt, til };
   }
+  // Varsel til kundens administratorer når abonnementet endres (flere brukere eller nytt bygg)
+  if (body.action === 'abonnement_varsel') {
+    const p = await hvem(); if (!p) return json(401, { error: 'Ikke innlogget' }); const org = String(body.org_id || ''); if (!org) return json(400, { error: 'Mangler organisasjon' });
+    const { data: med } = await admin.from('org_medlem').select('user_id, rolle, aktiv').eq('org_id', org);
+    const erAdm = (med || []).some((m: any) => m.user_id === p.id && m.aktiv && ['admin', 'forvalter'].includes(m.rolle)) || !!(p as any).plattform_admin;
+    if (!erAdm) return json(403, { error: 'Ingen tilgang' });
+    const { data: o } = await admin.from('organisasjoner').select('navn, lisenser').eq('id', org).maybeSingle();
+    const { count: bygg } = await admin.from('eiendommer').select('id', { count: 'exact', head: true }).eq('eier_org_id', org);
+    const hva = body.type === 'bygg' ? `Et nytt bygg er lagt til${body.navn ? ` («${String(body.navn).slice(0, 120)}»)` : ''}.` : `Antall brukere er økt fra ${+body.fra || '?'} til ${o?.lisenser ?? '?'}${body.navn ? ` fordi ${String(body.navn).slice(0, 120)} ble lagt til` : ''}.`;
+    const pris = Number.isFinite(+body.ny) && +body.ny > 0 ? `Ny månedspris for aktive moduler er ${Math.round(+body.ny).toLocaleString('nb-NO')} kr eks. mva.${Number.isFinite(+body.gml) && +body.gml > 0 ? ` (før: ${Math.round(+body.gml).toLocaleString('nb-NO')} kr).` : ''}` : '';
+    const tekst = `${hva}\n\nAbonnementet for ${o?.navn || 'organisasjonen'} er justert i henhold til antall bygg og brukere: nå ${bygg ?? '?'} bygg og ${o?.lisenser ?? '?'} brukere. ${pris}\n\nEndringen ble gjort av ${p?.navn || p?.epost || 'en administrator'}. Du ser abonnementet under Organisasjon og tilgang → Abonnement.`;
+    const html = tekst.split('\n\n').map(x => `<p>${x.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' } as any)[c])}</p>`).join('');
+    const adm = (med || []).filter((m: any) => m.aktiv && m.rolle === 'admin').map((m: any) => m.user_id);
+    const { data: prof } = adm.length ? await admin.from('profiles').select('epost').in('id', adm) : { data: [] as any[] };
+    const opps = await hentOppsett(org); let sendt = 0; const feil: string[] = [];
+    for (const r of prof || []) { if (!r.epost) continue; const res: any = await sendEpost(r.epost, `Abonnementet er justert – ${o?.navn || ''}`.trim(), html, tekst, undefined, undefined, opps); if (res.sendt) sendt++; else if (res.grunn) feil.push(res.grunn); }
+    await admin.from('hendelseslogg').insert({ bruker_id: p.id, bruker: p?.navn || p?.epost, tabell: 'hendelse', handling: 'abonnement', org_id: org, tekst: hva + ' ' + pris + ` Varsel sendt til ${sendt} administrator(er).` });
+    return json(200, { ok: true, sendt, feil: feil.slice(0, 1) });
+  }
+
   // Manuell purring fra appen («Send purring nå»)
   if (body.action === 'av_purr') {
     const p = await hvem(); if (!p) return json(401, { error: 'Ikke innlogget' });
