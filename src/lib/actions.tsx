@@ -58,9 +58,11 @@ export function editEiendom(id?: string, etter?: (nid: string) => void, preset?:
   const e = id ? byId('eiendommer', id)! : { eierOrgId: (eierOrg.find(o => o.id === S.primarOrg) || eierOrg.find(o => o.type === 'eier') || eierOrg[0])?.id, ...(preset || {}) } as Rec;
   if (!id && !eierOrg.length) { toast('Du må være administrator eller forvalter i en organisasjon for å opprette eiendommer'); return; }
   const kanEie = id ? mineOrg(['admin']).some(o => o.id === e.eierOrgId) : true;
+  const flyttTil = mineOrg(['admin']).filter(o => o.type === 'eier' || o.id === e.eierOrgId); const flyttbar = !!id && kanEie && flyttTil.length > 1;
   const fields: Field[] = [
-    ...(!id && eierOrg.length > 1 ? [{ k: 'eierOrgId', label: 'Eier (organisasjon)', type: 'select', options: eierOrg.map(o => [o.id, o.navn] as [string, string]), req: true } as Field] : []),
-    { k: 'portefoljeId', label: 'Portefølje', type: 'select', options: () => sortBy(S.portefoljer.filter(p => p.eier_org_id === (e.eierOrgId || '')), p => p.navn).map(p => [p.id, p.navn] as [string, string]), empty: '(ingen portefølje)', help: 'portefolje', show: () => S.portefoljer.some(p => p.eier_org_id === e.eierOrgId) || !!id },
+    ...((!id && eierOrg.length > 1) || (id && flyttbar) ? [{ k: 'eierOrgId', label: id ? 'Eier i appen (kunde)' : 'Eier (organisasjon)', type: 'select', options: (id ? flyttTil : eierOrg).map(o => [o.id, o.navn] as [string, string]), req: true,
+      hint: id ? 'Flytter eiendommen med alt innhold til en annen kunde. Porteføljen nullstilles, og oppdrag/tildelinger fra den gamle eieren gjelder ikke lenger.' : undefined } as Field] : []),
+    { k: 'portefoljeId', label: 'Portefølje', type: 'select', options: (v?: any) => sortBy(S.portefoljer.filter(p => p.eier_org_id === (v?.eierOrgId || e.eierOrgId || '')), p => p.navn).map(p => [p.id, p.navn] as [string, string]), empty: '(ingen portefølje)', help: 'portefolje', show: () => S.portefoljer.some(p => p.eier_org_id === e.eierOrgId) || !!id },
     { k: 'sokAdr', type: 'custom', label: 'Hent fra Kartverket', render: (v, set) => <AdresseSok onPick={a => set({ ...adresseFelter(a), navn: v.navn || a.adressetekst })} /> },
     { k: 'navn', label: 'Navn på eiendom/bygg', req: true },
     { k: 'adresse', label: 'Adresse', half: true }, { k: 'poststed', label: 'Postnr. og sted', half: true },
@@ -91,10 +93,14 @@ export function editEiendom(id?: string, etter?: (nid: string) => void, preset?:
     }}>Slett</button> : null,
     onSave: async v => {
       delete v.sokAdr; delete v.sokEier; delete v.matInfo; delete v.eierInfo;
+      const flyttet = !!id && !!v.eierOrgId && v.eierOrgId !== e.eierOrgId;
+      if (flyttet) { const til = S.orgs.find(o => o.id === v.eierOrgId)?.navn || 'den nye kunden';
+        if (!(await confirmBox(`Flytte «${e.navn}» med alle systemer, kontroller, avvik, dokumenter og leietakere til ${til}? Porteføljen nullstilles, og brukere hos den gamle eieren mister tilgangen (med mindre de har oppdrag).`, 'Flytt'))) return false;
+        if (v.portefoljeId && !S.portefoljer.some(p => p.id === v.portefoljeId && p.eier_org_id === v.eierOrgId)) v.portefoljeId = ''; }
       const m = String(v.gnrbnr || '').match(/^\s*(\d+)\s*\/\s*(\d+)(?:\s*\/\s*(\d+))?(?:\s*\/\s*(\d+))?/);
       if (m) Object.assign(v, { gnr: +m[1], bnr: +m[2], fnr: m[3] ? +m[3] : '', snr: m[4] ? +m[4] : '' });
       if (v.eierOrgnr && rensOrgnr(v.eierOrgnr).length === 9 && v.eierBrreg?.orgnr !== rensOrgnr(v.eierOrgnr)) { const b = await brregData(v.eierOrgnr).catch(() => null); if (b) { v.eierBrreg = b; if (!v.eierNavn) v.eierNavn = b.navn; } }
-      const nid = await save('eiendommer', { ...e, ...v }); toast('Eiendom lagret'); if (!id) { await oppdaterNiva(); if (etter) etter(nid); else { go('eiendom/' + nid); setTimeout(() => generatePlan(nid, true), 300); } } },
+      const nid = await save('eiendommer', { ...e, ...v }); toast(flyttet ? 'Eiendommen er flyttet' : 'Eiendom lagret'); if (flyttet) await oppdaterNiva(); if (!id) { await oppdaterNiva(); if (etter) etter(nid); else { go('eiendom/' + nid); setTimeout(() => generatePlan(nid, true), 300); } } },
   });
 }
 
