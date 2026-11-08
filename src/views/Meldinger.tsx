@@ -2,13 +2,20 @@
 import { useEffect, useState } from 'react';
 import { S, kanDrifteE, sb, useStore } from '../lib/store';
 import { Samtale, malAv, type Melding } from '../components/Samtale';
-import { Empty, showModal } from '../components/ui';
-import { byId } from '../lib/utils';
+import { AlvChip, Empty, FileLink, StChip, showModal } from '../components/ui';
+import { byId, fd } from '../lib/utils';
 import { tt, lokale } from '../lib/i18n';
 
 export function samtaleModal(m: { eiendom_id: string; leietaker_id: string | null; avvik_id: string | null }) {
   const l = m.leietaker_id ? byId('leietakere', m.leietaker_id) : null; const a = m.avvik_id ? byId('avvik', m.avvik_id) : null;
-  showModal(`${l?.navn || byId('eiendommer', m.eiendom_id)?.navn || tt("Samtale")}${a ? ` – #${a.nr} ${a.tittel}` : ''}`, () => <Samtale eiendomId={m.eiendom_id} leietakerId={m.leietaker_id || undefined} avvikId={m.avvik_id || undefined} />, { wide: true });
+  showModal(`${l?.navn || byId('eiendommer', m.eiendom_id)?.navn || tt("Samtale")}${a ? ` – #${a.nr} ${a.tittel}` : ''}`, close => <>
+    {a && <div className="note small" style={{ color: 'var(--ink)', marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><b>{tt("Saken")} #{a.nr}</b><StChip s={a.status} /><AlvChip a={a.alv} /><span className="muted">{tt("Meldt")} {fd(a.oppdaget)}{a.meldtAv ? ' ' + tt("av") + ' ' + a.meldtAv : ''}</span>
+        <button className="btn sm" style={{ marginLeft: 'auto' }} onClick={() => { close(); location.hash = '#/arbeidsordre/' + a.id; }}>{tt("Åpne arbeidsordre")}</button></div>
+      {a.beskrivelse && <p style={{ whiteSpace: 'pre-wrap', margin: '8px 0 0' }}>{a.beskrivelse}</p>}
+      {(a.vedlegg || []).length > 0 && <p style={{ margin: '6px 0 0' }}>{a.vedlegg.map((f: any, i: number) => <span key={i} style={{ marginRight: 10 }}>📎 <FileLink fil={f} /></span>)}</p>}
+    </div>}
+    <Samtale eiendomId={m.eiendom_id} leietakerId={m.leietaker_id || undefined} avvikId={m.avvik_id || undefined} /></>, { wide: true });
 }
 
 export function MeldingerView() {
