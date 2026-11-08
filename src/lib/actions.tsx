@@ -6,7 +6,7 @@ import { levetidRef, midt, spenn } from './ns3451';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore, kanRedigereE, kanDrifteE, mineOrg, oppdaterNiva } from './store';
 import { leieAreal, m2, FELLES_AVTALE } from './utils';
-import { harModul } from './moduler';
+import { byggTillegg, harModul } from './moduler';
 import { TgKgVelger, tgAvviker, tgTekst } from '../components/TgKg';
 import { PosVelger, BildeVelger, VedleggGalleri } from '../components/PosVelger';
 import { ServiceHistorikk } from '../views/Servicehistorikk';
@@ -88,6 +88,7 @@ export function editEiendom(id?: string, etter?: (nid: string) => void, preset?:
     { k: 'notat', label: 'Notater', type: 'textarea' }];
   formModal({
     title: id ? 'Rediger eiendom' : 'Ny eiendom', fields, values: e,
+    top: !id && byggTillegg(e.eierOrgId) > 0 ? <div className="note small" style={{ color: 'var(--ink)' }}>Et nytt bygg øker abonnementet med <b>{byggTillegg(e.eierOrgId).toLocaleString('nb-NO')} kr per måned</b> eks. mva. (pris per bygg for aktive moduler).</div> : undefined,
     extraFoot: close => id && kanEie ? <button className="btn danger" onClick={async () => {
       if (await confirmBox(`Slette «${e.navn}» med ALLE tilknyttede systemer, kontroller, avvik, dokumenter, leietakere og tegninger? Dette kan ikke angres.`)) { await removeDoc('eiendommer', id); close(); go('eiendommer'); }
     }}>Slett</button> : null,

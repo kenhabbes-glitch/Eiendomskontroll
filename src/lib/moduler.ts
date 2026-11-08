@@ -36,23 +36,43 @@ export const proveTil = (k: string, org = S.primarOrg) => RADER?.find(r => r.org
 /** Rute → modul (for menyen og sperret side) */
 export const RUTE_MODUL: Record<string, ModulKey> = { prosjekter: 'prosjekter', prosjekt: 'prosjekter', vedlikehold: 'vedlikehold', tilsyn: 'tilsyn', innboks: 'dokumentlesing' };
 
-// ---------- Priser per bruker med rabatttrapp (settes av leverandøren; leses av alle innloggede)
+// ---------- Priser per bygg og per bruker med rabatttrapper (settes av leverandøren; leses av alle innloggede)
 export type Trapp = { fra: number; rabatt: number }[];
-export type Priser = { moduler: Record<string, { pris: number | null; min: number | null }>; trapp: Trapp; notat?: string; oppdatert?: string };
+export type ModulPris = { pris: number | null; min: number | null; prisBygg?: number | null; minBygg?: number | null };
+export type Priser = { moduler: Record<string, ModulPris>; trapp: Trapp; trappBygg: Trapp; notat?: string; oppdatert?: string };
+export type Enhet = 'bruker' | 'bygg';
 export const STD_TRAPP: Trapp = [{ fra: 1, rabatt: 0 }, { fra: 2, rabatt: 10 }, { fra: 6, rabatt: 20 }, { fra: 11, rabatt: 30 }, { fra: 26, rabatt: 40 }];
+export const STD_TRAPP_BYGG: Trapp = [{ fra: 1, rabatt: 0 }, { fra: 6, rabatt: 10 }, { fra: 21, rabatt: 20 }, { fra: 51, rabatt: 30 }];
 let PRISER: Priser | null = null;
-const normaliser = (v: any): Priser => ({ moduler: v?.moduler || {}, trapp: Array.isArray(v?.trapp) && v.trapp.length ? [...v.trapp].sort((a: any, b: any) => a.fra - b.fra) : STD_TRAPP, notat: v?.notat || '', oppdatert: v?.oppdatert });
+const sorter = (t: any, std: Trapp) => Array.isArray(t) && t.length ? [...t].sort((a: any, b: any) => a.fra - b.fra) : std;
+const normaliser = (v: any): Priser => ({ moduler: v?.moduler || {}, trapp: sorter(v?.trapp, STD_TRAPP), trappBygg: sorter(v?.trappBygg, STD_TRAPP_BYGG), notat: v?.notat || '', oppdatert: v?.oppdatert });
 export async function lastPriser(): Promise<Priser | null> {
   try { const { data, error } = await sb.from('plattform_innstilling').select('verdi').eq('nokkel', 'priser').maybeSingle(); PRISER = error ? null : normaliser(data?.verdi); } catch { PRISER = null; }
   return PRISER;
 }
 export const priser = () => PRISER;
-export const rabattFor = (P: Priser | null, n: number) => { let r = 0; for (const t of P?.trapp || STD_TRAPP) if (n >= t.fra) r = t.rabatt; return r; };
-/** Pris per bruker per måned for modulen ved n brukere: listepris minus rabatt, men aldri under minimumsprisen. null = på forespørsel */
-export function prisPerBruker(P: Priser | null, k: string, n: number): number | null {
+export const trappFor = (P: Priser | null, e: Enhet) => e === 'bygg' ? (P?.trappBygg || STD_TRAPP_BYGG) : (P?.trapp || STD_TRAPP);
+export const rabattFor = (P: Priser | null, n: number, e: Enhet = 'bruker') => { let r = 0; for (const t of trappFor(P, e)) if (n >= t.fra) r = t.rabatt; return r; };
+/** Pris per enhet (bruker eller bygg) per måned ved n enheter: listepris minus rabatt, aldri under minimum. Bare minimum satt = fast pris. null = ikke priset */
+export function prisPer(P: Priser | null, k: string, n: number, e: Enhet): number | null {
   const m = P?.moduler?.[k]; if (!m) return null;
-  if (m.pris === null || m.pris === undefined) return m.min === null || m.min === undefined ? null : m.min; // bare minimum satt = fast pris per bruker
-  const r = Math.round(m.pris * (1 - rabattFor(P, n) / 100)); return Math.max(m.min ?? 0, r);
+  const pris = e === 'bygg' ? m.prisBygg : m.pris; const min = e === 'bygg' ? m.minBygg : m.min;
+  if (pris === null || pris === undefined) return min === null || min === undefined ? null : min;
+  return Math.max(min ?? 0, Math.round(pris * (1 - rabattFor(P, n, e) / 100)));
 }
-export const prisTotal = (P: Priser | null, moduler: string[], n: number) => moduler.reduce((s, k) => s + (prisPerBruker(P, k, n) || 0) * n, 0);
+export const prisPerBruker = (P: Priser | null, k: string, n: number) => prisPer(P, k, n, 'bruker');
+/** Har modulen en pris i det hele tatt (per bygg eller per bruker)? */
+export const harPris = (P: Priser | null, k: string) => prisPer(P, k, 1, 'bruker') !== null || prisPer(P, k, 1, 'bygg') !== null;
+/** Månedspris for modulen ved nU brukere og nB bygg */
+export const modulPris = (P: Priser | null, k: string, nU: number, nB: number) => (prisPer(P, k, nU, 'bruker') || 0) * nU + (prisPer(P, k, nB, 'bygg') || 0) * nB;
+export const prisTotal = (P: Priser | null, moduler: string[], nU: number, nB = 0) => moduler.reduce((s, k) => s + modulPris(P, k, nU, nB), 0);
 export const kr = (n: number | null | undefined) => n === null || n === undefined || isNaN(n as number) ? '' : Math.round(n).toLocaleString('nb-NO') + ' kr';
+/** Antall bygg en organisasjon eier i appen */
+export const byggFor = (org: string) => S.eiendommer.filter(e => e.eierOrgId === org).length;
+/** Hva ett bygg til koster per måned for organisasjonen (betalte moduler, ikke prøve). 0 = ingen kostnad/ukjent */
+export function byggTillegg(org: string): number {
+  if (!PRISER || RADER === null || !org) return 0;
+  const o = S.orgs.find(x => x.id === org); const nU = o?.lisenser || Math.max(1, S.medlemmer.filter(m => m.org_id === org && m.aktiv).length); const nB = byggFor(org);
+  const M = MODULER.filter(m => orgHar(org, m.k) && !proveTil(m.k, org)).map(m => m.k);
+  return Math.max(0, prisTotal(PRISER, M, nU, nB + 1) - prisTotal(PRISER, M, nU, nB));
+}

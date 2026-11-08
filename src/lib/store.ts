@@ -198,7 +198,7 @@ async function loadOrg() {
   const { data: niv } = await sb.rpc('mine_tilganger'); S.niva = Object.fromEntries((niv || []).map((r: any) => [r.eiendom_id, r.niva]));
   const { data: po } = await sb.rpc('min_primar_org'); S.primarOrg = po || '';
   if (state.me?.plattform) { try { const { data: ft } = await sb.rpc('full_tilgang', { p_uid: state.me.id }); S.fullTilgang = ft === true; } catch { S.fullTilgang = false; } } else S.fullTilgang = false;
-  try { const { lastModuler } = await import('./moduler'); await lastModuler(); } catch { /* ikke tilgjengelig */ }
+  try { const { lastModuler, lastPriser } = await import('./moduler'); await lastModuler(); lastPriser(); } catch { /* ikke tilgjengelig */ }
 }
 export async function oppdaterNiva() { const { data: niv } = await sb.rpc('mine_tilganger'); S.niva = Object.fromEntries((niv || []).map((r: any) => [r.eiendom_id, r.niva])); bump(); }
 let orgT: any = 0;

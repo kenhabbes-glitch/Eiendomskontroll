@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { S, mineOrg, sb, state, toast, useStore, feiltekst, bump } from '../lib/store';
 import { Chip, openModal, confirmBox } from '../components/ui';
 import { fd, today } from '../lib/utils';
-import { MODULER, STD_TRAPP, kr, lastModuler, lastPriser, modulerAktivert, orgHar, prisPerBruker, prisTotal, priser, proveTil, type ModulKey, type Priser } from '../lib/moduler';
+import { MODULER, STD_TRAPP, STD_TRAPP_BYGG, byggFor, kr, lastModuler, lastPriser, modulPris, modulerAktivert, orgHar, prisPer, prisTotal, priser, proveTil, trappFor, type Enhet, type ModulKey, type ModulPris, type Priser, type Trapp } from '../lib/moduler';
 
 export function ModulSperret({ k }: { k: ModulKey }) {
   const m = MODULER.find(x => x.k === k);
@@ -15,117 +15,128 @@ export function ModulSperret({ k }: { k: ModulKey }) {
     <a className="btn" href="#/brukere">Se abonnement og priser</a></div></>;
 }
 
-const MND = ' per bruker/mnd';
 const aktiveBrukere = (org: string) => S.medlemmer.filter(m => m.org_id === org && m.aktiv).length;
-const trappTekst = (P: Priser | null) => { const T = P?.trapp || STD_TRAPP; return T.map((t, i) => { const til = T[i + 1] ? T[i + 1].fra - 1 : null; return { t, navn: til === null ? `${t.fra}+` : til === t.fra ? `${t.fra}` : `${t.fra}–${til}` }; }); };
+const trappTekst = (P: Priser | null, e: Enhet = 'bruker') => { const T = trappFor(P, e); return T.map((t, i) => { const til = T[i + 1] ? T[i + 1].fra - 1 : null; return { t, navn: til === null ? `${t.fra}+` : til === t.fra ? `${t.fra}` : `${t.fra}–${til}` }; }); };
+const flertall = (n: number, e: Enhet) => e === 'bygg' ? 'bygg' : n === 1 ? 'bruker' : 'brukere';
+/** Prislinje for en modul: «390 kr per bygg + 120 kr per bruker» */
+function PrisLinje({ P, k, nU, nB }: { P: Priser | null; k: string; nU: number; nB: number }) {
+  const pB = prisPer(P, k, nB, 'bygg'); const pU = prisPer(P, k, nU, 'bruker');
+  if (pB === null && pU === null) return <b>Pris på forespørsel</b>;
+  if (!pB && !pU) return <b>Inkludert</b>;
+  const tot = modulPris(P, k, nU, nB);
+  return <><div>{pB ? <><b style={{ fontSize: 15 }}>{kr(pB)}</b><span className="small muted"> per bygg</span></> : null}{pB && pU ? <span className="small muted"> + </span> : null}{pU ? <><b style={{ fontSize: 15 }}>{kr(pU)}</b><span className="small muted"> per bruker</span></> : null}<span className="small muted"> /mnd</span></div>
+    <div className="small muted">{[pB ? `${nB} bygg` : '', pU ? `${nU} ${flertall(nU, 'bruker')}` : ''].filter(Boolean).join(' og ')} = {kr(tot)}/mnd</div></>;
+}
 
-/** Kundens oversikt: antall brukere, moduler med pris per bruker, prisoversikt og bestilling */
+/** Kundens oversikt: bygg og brukere, moduler med pris, prisoversikt og bestilling */
 export function AbonnementOversikt({ orgId, velger }: { orgId: string; velger?: React.ReactNode }) {
   useStore();
   const org = S.orgs.find(o => o.id === orgId) || mineOrg()[0]; const [P, setP] = useState<Priser | null>(priser()); const [B, setB] = useState<any[] | null>(null);
   const lastB = () => { sb.from('modul_bestilling').select('*').eq('org_id', orgId).order('opprettet', { ascending: false }).then(({ data, error }) => setB(error ? null : data || [])); };
   useEffect(() => { lastPriser().then(setP); lastB(); }, [orgId]);
   if (!modulerAktivert()) return <div className="card"><p className="muted">Modulstyring er ikke slått på ennå – alle funksjoner er tilgjengelige.</p></div>;
-  const lis: number | null = org?.lisenser ?? null; const brukt = aktiveBrukere(orgId); const n = lis || Math.max(1, brukt);
+  const lis: number | null = org?.lisenser ?? null; const brukt = aktiveBrukere(orgId); const nU = lis || Math.max(1, brukt); const nB = Math.max(1, byggFor(orgId)); const ekteBygg = byggFor(orgId);
   const betalte = MODULER.filter(m => orgHar(orgId, m.k) && !proveTil(m.k, orgId)).map(m => m.k);
-  const sum = prisTotal(P, betalte, n);
+  const sum = prisTotal(P, betalte, nU, ekteBygg);
   const venter = (k: string) => B?.find(b => b.modul === k && b.status === 'ny');
-  const bestill = (k: ModulKey) => openModal({ render: close => <BestillBody orgId={orgId} k={k} P={P} n={n} close={close} ferdig={lastB} /> });
-  const endreAntall = () => openModal({ render: close => <AntallBody orgId={orgId} P={P} n={n} brukt={brukt} moduler={betalte} close={close} /> });
-  const TT = trappTekst(P);
+  const bestill = (k: ModulKey) => openModal({ render: close => <BestillBody orgId={orgId} k={k} P={P} nU={nU} nB={nB} close={close} ferdig={lastB} /> });
+  const endreAntall = () => openModal({ render: close => <AntallBody orgId={orgId} P={P} n={nU} nB={ekteBygg} brukt={brukt} moduler={betalte} close={close} /> });
+  const harByggPris = MODULER.some(m => prisPer(P, m.k, 1, 'bygg') !== null); const harBrukerPris = MODULER.some(m => prisPer(P, m.k, 1, 'bruker') !== null);
+  const Tabell = ({ e }: { e: Enhet }) => { const TT = trappTekst(P, e); const n = e === 'bygg' ? nB : nU;
+    return <div className="tbl-wrap" style={{ marginTop: 6 }}><table><thead><tr><th>Pris per {e} per måned</th>{TT.map(x => <th key={x.navn} className="num">{x.navn} {flertall(x.t.fra === 1 && x.navn === '1' ? 1 : 2, e)}</th>)}</tr></thead><tbody>
+      {MODULER.filter(m => prisPer(P, m.k, 1, e) !== null).map(m => <tr key={m.k}><td>{m.navn}</td>{TT.map((x, i) => { const v = prisPer(P, m.k, x.t.fra, e); const her = n >= x.t.fra && (TT[i + 1]?.t.fra ?? 1e9) > n; return <td key={x.navn} className="num" style={{ fontWeight: her ? 700 : 400 }}>{v === null ? '–' : v === 0 ? 'Inkl.' : kr(v)}</td>; })}</tr>)}
+      <tr><td className="small muted">Rabatt</td>{TT.map(x => <td key={x.navn} className="num small muted">{x.t.rabatt ? `−${x.t.rabatt} %` : '–'}</td>)}</tr></tbody></table></div>; };
   return <>
     <div className="card" style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
       <div style={{ flex: 1, minWidth: 220 }}><div className="small muted">Abonnement {velger || <b>{org?.navn}</b>}</div>
-        <div style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>{lis ? `${lis} bruker${lis === 1 ? '' : 'e'}` : 'Antall brukere ikke valgt'}</div>
-        <div className="small muted">{brukt} i bruk{lis ? ` · ${Math.max(0, lis - brukt)} ledig${lis - brukt === 1 ? '' : 'e'}` : ' · ingen grense i prøveperioden'}</div></div>
+        <div style={{ fontSize: 18, fontWeight: 700, marginTop: 2 }}>{ekteBygg} bygg · {lis ? `${lis} ${flertall(lis, 'bruker')}` : 'antall brukere ikke valgt'}</div>
+        <div className="small muted">{brukt} {flertall(brukt, 'bruker')} i bruk{lis ? ` · ${Math.max(0, lis - brukt)} ledig${lis - brukt === 1 ? '' : 'e'}` : ' · ingen grense i prøveperioden'} · antall bygg telles automatisk</div></div>
       <button className="btn" onClick={endreAntall}>{lis ? 'Endre antall brukere' : 'Velg antall brukere'}</button>
-      {sum > 0 && <div style={{ textAlign: 'right', minWidth: 160 }}><div className="small muted">Per måned for aktive moduler</div><div style={{ fontSize: 18, fontWeight: 700 }}>{kr(sum)}</div><div className="small muted">eks. mva. · {kr(Math.round(sum / n))} per bruker</div></div>}
+      {sum > 0 && <div style={{ textAlign: 'right', minWidth: 160 }}><div className="small muted">Per måned for aktive moduler</div><div style={{ fontSize: 18, fontWeight: 700 }}>{kr(sum)}</div><div className="small muted">eks. mva.</div></div>}
     </div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12, marginTop: 12 }}>
-      {MODULER.map(m => { const har = orgHar(orgId, m.k); const pt = proveTil(m.k, orgId); const v = venter(m.k); const pb = prisPerBruker(P, m.k, n); const p1 = prisPerBruker(P, m.k, 1);
+      {MODULER.map(m => { const har = orgHar(orgId, m.k); const pt = proveTil(m.k, orgId); const v = venter(m.k);
         return <div key={m.k} className="card" style={{ margin: 0, display: 'flex', flexDirection: 'column', borderColor: har && !pt ? 'var(--green)' : undefined }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}><b style={{ flex: 1, fontSize: 15 }}>{m.navn}</b>
             {har ? (pt ? <Chip c="amber">Prøve til {fd(pt)}</Chip> : <Chip c="green">{m.k === 'kjerne' ? 'Inkludert' : 'Aktiv'}</Chip>) : v ? <Chip c="amber">Bestilt</Chip> : null}</div>
           <p className="small muted" style={{ margin: '4px 0 8px' }}>{m.tekst}</p>
           <ul className="small" style={{ margin: '0 0 10px', paddingLeft: 18, flex: 1 }}>{m.inneholder.map(x => <li key={x}>{x}</li>)}</ul>
-          <div style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>
-            {pb === null ? <b>Pris på forespørsel</b> : pb === 0 ? <b>Inkludert</b> : <><b style={{ fontSize: 16 }}>{kr(pb)}</b><span className="small muted">{MND}</span>
-              <div className="small muted">{n > 1 ? `ved ${n} brukere = ${kr(pb * n)}/mnd${p1 && p1 > pb ? ` · listepris ${kr(p1)}` : ''}` : 'ved 1 bruker'}</div></>}
-          </div>
+          <div style={{ border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}><PrisLinje P={P} k={m.k} nU={nU} nB={nB} /></div>
           {m.k !== 'kjerne' && (!har || pt) && (v ? <p className="small muted" style={{ margin: 0 }}>Bestilt {fd(String(v.opprettet || v.created_at || '').slice(0, 10))} – aktiveres av leverandøren.</p>
             : <button className="btn pri sm" onClick={() => bestill(m.k)}>{pt ? 'Bestill – behold etter prøveperioden' : 'Bestill modulen'}</button>)}
         </div>; })}
     </div>
-    {P && Object.values(P.moduler).some(x => x?.pris) && <div className="card" style={{ marginTop: 12 }}><b>Pris per bruker per måned etter antall brukere</b>
-      <div className="tbl-wrap" style={{ marginTop: 6 }}><table><thead><tr><th>Modul</th>{TT.map(x => <th key={x.navn} className="num">{x.navn} {x.navn === '1' ? 'bruker' : 'brukere'}</th>)}</tr></thead><tbody>
-        {MODULER.map(m => <tr key={m.k}><td>{m.navn}</td>{TT.map(x => { const v = prisPerBruker(P, m.k, x.t.fra); return <td key={x.navn} className="num" style={{ fontWeight: n >= x.t.fra && (TT.find(y => y.t.fra > x.t.fra)?.t.fra ?? 1e9) > n ? 700 : 400 }}>{v === null ? '–' : v === 0 ? 'Inkl.' : kr(v)}</td>; })}</tr>)}
-        <tr><td className="small muted">Rabatt</td>{TT.map(x => <td key={x.navn} className="num small muted">{x.t.rabatt ? `−${x.t.rabatt} %` : '–'}</td>)}</tr></tbody></table></div>
-      <p className="small muted" style={{ margin: '6px 0 0' }}>Prisen per bruker synker med antall brukere, men går aldri under minimumsprisen for modulen.</p></div>}
-    <p className="small muted" style={{ marginTop: 8 }}>Priser eks. mva.{P?.notat ? ' ' + P.notat : ''} Antall brukere kan økes når som helst. Moduler aktiveres av leverandøren etter bestilling, normalt innen én virkedag.</p>
+    {P && (harByggPris || harBrukerPris) && <div className="card" style={{ marginTop: 12 }}><b>Prisene synker med antall bygg og brukere</b>
+      {harByggPris && <Tabell e="bygg" />}{harBrukerPris && <Tabell e="bruker" />}
+      <p className="small muted" style={{ margin: '6px 0 0' }}>Uthevet = deres trinn. Prisen går aldri under minimumsprisen for modulen.</p></div>}
+    <p className="small muted" style={{ marginTop: 8 }}>Priser eks. mva.{P?.notat ? ' ' + P.notat : ''} Antall bygg telles fra eiendommene dere har i appen. Antall brukere kan økes når som helst. Moduler aktiveres av leverandøren etter bestilling, normalt innen én virkedag.</p>
     {B && B.length > 0 && <div className="card"><b>Bestillinger</b><table style={{ marginTop: 6 }}><tbody>{B.slice(0, 10).map(b => <tr key={b.id}><td className="small">{fd(String(b.opprettet || b.created_at || '').slice(0, 10))}</td><td>{MODULER.find(m => m.k === b.modul)?.navn || b.modul}</td><td>{b.status === 'ny' ? <Chip c="amber">Venter</Chip> : b.status === 'aktivert' ? <Chip c="green">Aktivert</Chip> : <Chip c="grey">Avvist</Chip>}</td></tr>)}</tbody></table></div>}
   </>;
 }
 
-function AntallBody({ orgId, P, n, brukt, moduler, close }: { orgId: string; P: Priser | null; n: number; brukt: number; moduler: string[]; close: () => void }) {
+function AntallBody({ orgId, P, n, nB, brukt, moduler, close }: { orgId: string; P: Priser | null; n: number; nB: number; brukt: number; moduler: string[]; close: () => void }) {
   const [a, setA] = useState(String(n)); const [busy, setBusy] = useState(false); const ny = Math.max(0, Math.floor(+a || 0));
-  const gml = prisTotal(P, moduler, n); const nyS = prisTotal(P, moduler, ny || 1);
+  const gml = prisTotal(P, moduler, n, nB); const nyS = prisTotal(P, moduler, ny || 1, nB);
   const lagre = async () => { if (ny < Math.max(1, brukt)) return toast(`Minst ${Math.max(1, brukt)} – organisasjonen har ${brukt} aktive brukere`); setBusy(true);
     const { error } = await sb.rpc('sett_lisenser', { p_org: orgId, p_antall: ny }); setBusy(false);
     if (error) return toast(/function|schema/i.test(error.message) ? 'Endring av antall brukere er ikke slått på ennå.' : feiltekst(error));
     const o = S.orgs.find(x => x.id === orgId); if (o) o.lisenser = ny; bump(); toast(`Antall brukere er satt til ${ny}`); close(); };
   return <><div className="mh"><h2>Antall brukere</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
-    <div className="mb"><p className="small muted" style={{ marginTop: 0 }}>Velg hvor mange brukere organisasjonen skal ha. Prisen per bruker blir lavere jo flere brukere dere har. Dere har {brukt} aktive brukere nå.</p>
+    <div className="mb"><p className="small muted" style={{ marginTop: 0 }}>Velg hvor mange brukere organisasjonen skal ha. Prisen per bruker blir lavere jo flere brukere dere har. Dere har {brukt} aktive brukere og {nB} bygg nå.</p>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><button className="btn" onClick={() => setA(String(Math.max(Math.max(1, brukt), ny - 1)))} aria-label="Færre">−</button>
         <input type="number" min={Math.max(1, brukt)} max={1000} value={a} onChange={e => setA(e.target.value)} style={{ width: 100, textAlign: 'center', fontSize: 18 }} />
         <button className="btn" onClick={() => setA(String(Math.min(1000, ny + 1)))} aria-label="Flere">+</button><span className="small muted">brukere</span></div>
       {moduler.length > 0 && <table style={{ marginTop: 12 }}><thead><tr><th>Aktiv modul</th><th className="num">Per bruker</th><th className="num">Per måned</th></tr></thead><tbody>
-        {moduler.map(k => { const pb = prisPerBruker(P, k, ny || 1); return <tr key={k}><td>{MODULER.find(m => m.k === k)?.navn}</td><td className="num">{pb === null ? 'forespørsel' : kr(pb)}</td><td className="num">{pb === null ? '–' : kr(pb * (ny || 1))}</td></tr>; })}
-        <tr className="sum"><td>Sum per måned</td><td /><td className="num"><b>{kr(nyS)}</b></td></tr></tbody></table>}
+        {moduler.map(k => { const pb = prisPer(P, k, ny || 1, 'bruker'); return <tr key={k}><td>{MODULER.find(m => m.k === k)?.navn}</td><td className="num">{pb === null ? '–' : kr(pb)}</td><td className="num">{kr(modulPris(P, k, ny || 1, nB))}</td></tr>; })}
+        <tr className="sum"><td>Sum per måned (inkl. bygg)</td><td /><td className="num"><b>{kr(nyS)}</b></td></tr></tbody></table>}
       {ny !== n && gml > 0 && <p className="small">Endring: {nyS >= gml ? '+' : '−'}{kr(Math.abs(nyS - gml))} per måned eks. mva.</p>}
     </div>
-    <div className="mf"><button className="btn" onClick={close}>Avbryt</button><button className="btn pri" disabled={busy || ny < Math.max(1, brukt) || ny === n && !!S.orgs.find(o => o.id === orgId)?.lisenser} onClick={lagre}>Bekreft {ny} bruker{ny === 1 ? '' : 'e'}</button></div></>;
+    <div className="mf"><button className="btn" onClick={close}>Avbryt</button><button className="btn pri" disabled={busy || ny < Math.max(1, brukt) || ny === n && !!S.orgs.find(o => o.id === orgId)?.lisenser} onClick={lagre}>Bekreft {ny} {flertall(ny, 'bruker')}</button></div></>;
 }
 
-function BestillBody({ orgId, k, P, n, close, ferdig }: { orgId: string; k: ModulKey; P: Priser | null; n: number; close: () => void; ferdig: () => void }) {
-  const m = MODULER.find(x => x.k === k)!; const [komm, setKomm] = useState(''); const [busy, setBusy] = useState(false); const pb = prisPerBruker(P, k, n);
+function BestillBody({ orgId, k, P, nU, nB, close, ferdig }: { orgId: string; k: ModulKey; P: Priser | null; nU: number; nB: number; close: () => void; ferdig: () => void }) {
+  const m = MODULER.find(x => x.k === k)!; const [komm, setKomm] = useState(''); const [busy, setBusy] = useState(false);
   const send = async () => { setBusy(true);
     const { error } = await sb.from('modul_bestilling').insert({ org_id: orgId, modul: k, status: 'ny', kommentar: komm.slice(0, 1000) || null, bestilt_av_navn: state.me?.navn || state.me?.epost });
     setBusy(false); if (error) return toast(/relation|does not exist|schema/i.test(error.message) ? 'Bestilling er ikke slått på ennå – ta kontakt med leverandøren.' : feiltekst(error));
     toast('Bestillingen er sendt – leverandøren aktiverer modulen'); ferdig(); close(); };
   return <><div className="mh"><h2>Bestill {m.navn}</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
     <div className="mb"><p className="small muted" style={{ marginTop: 0 }}>{m.tekst}</p>
-      <div className="card" style={{ margin: '0 0 10px' }}>{pb === null ? <b>Pris på forespørsel</b> : <><b style={{ fontSize: 16 }}>{kr(pb)}</b><span className="small muted">{MND}</span><div className="small">Ved {n} bruker{n === 1 ? '' : 'e'}: <b>{kr(pb * n)}</b> per måned eks. mva.</div></>}</div>
+      <div className="card" style={{ margin: '0 0 10px' }}><PrisLinje P={P} k={k} nU={nU} nB={nB} /><div className="small muted" style={{ marginTop: 4 }}>Eks. mva. Prisen følger antall bygg og brukere.</div></div>
       <label style={{ display: 'block' }}><span className="small" style={{ fontWeight: 600 }}>Kommentar (valgfritt)</span><textarea rows={2} value={komm} onChange={e => setKomm(e.target.value)} style={{ width: '100%' }} placeholder="F.eks. fakturaadresse eller ønsket startdato" /></label>
     </div>
     <div className="mf"><button className="btn" onClick={close}>Avbryt</button><button className="btn pri" disabled={busy} onClick={send}>Send bestilling</button></div></>;
 }
 
-// ---------- Plattformadministrator: prisliste med rabatttrapp
+// ---------- Plattformadministrator: prisliste med rabatttrapper for bygg og brukere
 export function prisEditor() { openModal({ wide: true, render: close => <PrisBody close={close} /> }); }
+function TrappEditor({ T, set, enhet }: { T: Trapp; set: (t: Trapp) => void; enhet: Enhet }) {
+  const settT = (i: number, f: 'fra' | 'rabatt', v: string) => set(T.map((t, j) => j === i ? { ...t, [f]: Math.max(f === 'fra' ? 1 : 0, Math.min(f === 'rabatt' ? 90 : 10000, +v || 0)) } : t));
+  return <div><b>Rabatt etter antall {enhet === 'bygg' ? 'bygg' : 'brukere'}</b><table style={{ marginTop: 6 }}><thead><tr><th className="num">Fra</th><th className="num">Rabatt %</th><th /></tr></thead><tbody>
+    {T.map((t, i) => <tr key={i}><td className="num"><input type="number" min={1} style={{ width: 70, textAlign: 'right' }} value={t.fra} disabled={i === 0} onChange={e => settT(i, 'fra', e.target.value)} /></td><td className="num"><input type="number" min={0} max={90} style={{ width: 70, textAlign: 'right' }} value={t.rabatt} disabled={i === 0} onChange={e => settT(i, 'rabatt', e.target.value)} /></td>
+      <td>{i > 0 && <button className="btn ghost sm" onClick={() => set(T.filter((_, j) => j !== i))} aria-label="Fjern trinn">✕</button>}</td></tr>)}</tbody></table>
+    <button className="btn sm" style={{ marginTop: 6 }} onClick={() => set([...T, { fra: (T[T.length - 1]?.fra || 1) * 2, rabatt: Math.min(90, (T[T.length - 1]?.rabatt || 0) + 10) }])}>+ Trinn</button></div>;
+}
 function PrisBody({ close }: { close: () => void }) {
-  const [P, setP] = useState<Priser>({ moduler: {}, trapp: STD_TRAPP }); const [busy, setBusy] = useState(false); const [ok, setOk] = useState(false);
-  useEffect(() => { lastPriser().then(p => { setP(p || { moduler: {}, trapp: STD_TRAPP }); setOk(true); }); }, []);
-  const sett = (k: string, f: 'pris' | 'min', v: string) => setP(o => ({ ...o, moduler: { ...o.moduler, [k]: { pris: o.moduler[k]?.pris ?? null, min: o.moduler[k]?.min ?? null, [f]: v === '' ? null : Math.max(0, +v) } } }));
-  const settT = (i: number, f: 'fra' | 'rabatt', v: string) => setP(o => ({ ...o, trapp: o.trapp.map((t, j) => j === i ? { ...t, [f]: Math.max(f === 'fra' ? 1 : 0, Math.min(f === 'rabatt' ? 90 : 10000, +v || 0)) } : t) }));
-  const lagre = async () => { const trapp = [...P.trapp].sort((a, b) => a.fra - b.fra); if (trapp[0]?.fra !== 1) trapp.unshift({ fra: 1, rabatt: 0 });
-    setBusy(true); const { error } = await sb.from('plattform_innstilling').upsert({ nokkel: 'priser', verdi: { ...P, trapp, oppdatert: today() }, endret: new Date().toISOString() }); setBusy(false);
+  const [P, setP] = useState<Priser>({ moduler: {}, trapp: STD_TRAPP, trappBygg: STD_TRAPP_BYGG }); const [busy, setBusy] = useState(false); const [ok, setOk] = useState(false);
+  useEffect(() => { lastPriser().then(p => { setP(p || { moduler: {}, trapp: STD_TRAPP, trappBygg: STD_TRAPP_BYGG }); setOk(true); }); }, []);
+  const sett = (k: string, f: keyof ModulPris, v: string) => setP(o => ({ ...o, moduler: { ...o.moduler, [k]: { ...({ pris: null, min: null, prisBygg: null, minBygg: null } as ModulPris), ...(o.moduler[k] || {}), [f]: v === '' ? null : Math.max(0, +v) } } }));
+  const fiks = (t: Trapp) => { const x = [...t].sort((a, b) => a.fra - b.fra); if (x[0]?.fra !== 1) x.unshift({ fra: 1, rabatt: 0 }); return x; };
+  const lagre = async () => { setBusy(true); const { error } = await sb.from('plattform_innstilling').upsert({ nokkel: 'priser', verdi: { ...P, trapp: fiks(P.trapp), trappBygg: fiks(P.trappBygg), oppdatert: today() }, endret: new Date().toISOString() }); setBusy(false);
     if (error) return toast(feiltekst(error)); await lastPriser(); bump(); toast('Prislisten er lagret'); close(); };
-  const TT = trappTekst(P);
-  return <><div className="mh"><h2>Prisliste – per bruker per måned eks. mva.</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
+  const felt = (k: string, f: keyof ModulPris, ph: string) => <td className="num"><input type="number" min={0} step={10} style={{ width: 90, textAlign: 'right' }} value={(P.moduler[k] as any)?.[f] ?? ''} placeholder={ph} onChange={e => sett(k, f, e.target.value)} /></td>;
+  const eks = (n: number, e: Enhet) => MODULER.filter(m => prisPer(P, m.k, 1, e) !== null).map(m => `${m.navn}: ${kr(prisPer(P, m.k, n, e))}`);
+  return <><div className="mh"><h2>Prisliste – per måned eks. mva.</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
     <div className="mb">{!ok ? <p className="muted">Laster …</p> : <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.6fr) minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
-        <div><b>Moduler</b><table style={{ marginTop: 6 }}><thead><tr><th>Modul</th><th className="num">Listepris per bruker<div className="small muted" style={{ fontWeight: 400 }}>ved 1 bruker</div></th><th className="num">Minimum per bruker<div className="small muted" style={{ fontWeight: 400 }}>laveste med rabatt</div></th></tr></thead><tbody>
-          {MODULER.map(m => <tr key={m.k}><td>{m.navn}</td>{(['pris', 'min'] as const).map(f => <td key={f} className="num"><input type="number" min={0} step={10} style={{ width: 100, textAlign: 'right' }} value={P.moduler[m.k]?.[f] ?? ''} placeholder={f === 'pris' ? 'forespørsel' : '0'} onChange={e => sett(m.k, f, e.target.value)} /></td>)}</tr>)}</tbody></table>
-          {MODULER.some(m => P.moduler[m.k]?.pris == null && P.moduler[m.k]?.min != null) && <p className="small" style={{ color: 'var(--amber)' }}>Noen moduler har bare minimum. De får fast pris lik minimum (uten rabatt). Fyll inn listepris for å få rabatt etter antall brukere.</p>}
-          <p className="small muted">Listepris = pris per bruker ved 1 bruker. Minimum = laveste pris per bruker uansett antall. Tom listepris = «På forespørsel», 0 = «Inkludert».</p></div>
-        <div><b>Rabatttrapp</b><table style={{ marginTop: 6 }}><thead><tr><th className="num">Fra brukere</th><th className="num">Rabatt %</th><th /></tr></thead><tbody>
-          {P.trapp.map((t, i) => <tr key={i}><td className="num"><input type="number" min={1} style={{ width: 70, textAlign: 'right' }} value={t.fra} disabled={i === 0} onChange={e => settT(i, 'fra', e.target.value)} /></td><td className="num"><input type="number" min={0} max={90} style={{ width: 70, textAlign: 'right' }} value={t.rabatt} disabled={i === 0} onChange={e => settT(i, 'rabatt', e.target.value)} /></td>
-            <td>{i > 0 && <button className="btn ghost sm" onClick={() => setP(o => ({ ...o, trapp: o.trapp.filter((_, j) => j !== i) }))} aria-label="Fjern trinn">✕</button>}</td></tr>)}</tbody></table>
-          <button className="btn sm" style={{ marginTop: 6 }} onClick={() => setP(o => ({ ...o, trapp: [...o.trapp, { fra: (o.trapp[o.trapp.length - 1]?.fra || 1) * 2, rabatt: Math.min(90, (o.trapp[o.trapp.length - 1]?.rabatt || 0) + 10) }] }))}>+ Trinn</button></div>
-      </div>
-      <b style={{ display: 'block', marginTop: 14 }}>Slik ser kunden det (pris per bruker)</b>
-      <div className="tbl-wrap"><table><thead><tr><th>Modul</th>{TT.map(x => <th key={x.navn} className="num">{x.navn}</th>)}</tr></thead><tbody>
-        {MODULER.map(m => <tr key={m.k}><td>{m.navn}</td>{TT.map(x => { const v = prisPerBruker(P, m.k, x.t.fra); return <td key={x.navn} className="num">{v === null ? '–' : v === 0 ? 'Inkl.' : kr(v)}</td>; })}</tr>)}</tbody></table></div>
+      <table><thead><tr><th>Modul</th><th className="num" colSpan={2} style={{ textAlign: 'center' }}>Per bygg</th><th className="num" colSpan={2} style={{ textAlign: 'center' }}>Per bruker</th></tr>
+        <tr><th /><th className="num small">Listepris</th><th className="num small">Minimum</th><th className="num small">Listepris</th><th className="num small">Minimum</th></tr></thead><tbody>
+        {MODULER.map(m => <tr key={m.k}><td>{m.navn}</td>{felt(m.k, 'prisBygg', '–')}{felt(m.k, 'minBygg', '–')}{felt(m.k, 'pris', '–')}{felt(m.k, 'min', '–')}</tr>)}</tbody></table>
+      <p className="small muted">Listepris = pris ved 1 bygg / 1 bruker. Minimum = laveste pris med rabatt. Bare minimum = fast pris uten rabatt. Begge tomme = ingen pris for den delen; er alt tomt for en modul, vises «På forespørsel». 0 = inkludert.</p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginTop: 8 }}>
+        <TrappEditor T={P.trappBygg} set={t => setP(o => ({ ...o, trappBygg: t }))} enhet="bygg" /><TrappEditor T={P.trapp} set={t => setP(o => ({ ...o, trapp: t }))} enhet="bruker" /></div>
+      <div className="card" style={{ marginTop: 12, background: 'var(--surface2)' }}><b>Eksempel: kunde med 10 bygg og 4 brukere, alle moduler</b>
+        <div style={{ fontSize: 18, fontWeight: 700, margin: '4px 0' }}>{kr(prisTotal(P, MODULER.map(m => m.k), 4, 10))} per måned</div>
+        <div className="small muted">{[...eks(10, 'bygg').map(x => x + '/bygg'), ...eks(4, 'bruker').map(x => x + '/bruker')].join(' · ') || 'Ingen priser lagt inn ennå'}</div></div>
       <label style={{ display: 'block', marginTop: 10 }}><span className="small" style={{ fontWeight: 600 }}>Tekst under prislisten (valgfritt)</span><input style={{ width: '100%' }} value={P.notat || ''} onChange={e => setP({ ...P, notat: e.target.value })} placeholder="F.eks. Fakturering kvartalsvis forskudd. Ingen binding." /></label></>}</div>
     <div className="mf"><button className="btn" onClick={close}>Avbryt</button><button className="btn pri" disabled={busy || !ok} onClick={lagre}>Lagre prisliste</button></div></>;
 }
@@ -142,7 +153,7 @@ export function Bestillinger() {
     await sb.from('modul_bestilling').update({ status: aktiver ? 'aktivert' : 'avvist', behandlet: new Date().toISOString() }).eq('id', b.id);
     await lastModuler(); bump(); toast(aktiver ? 'Modulen er aktivert' : 'Bestillingen er avvist'); last(); };
   return <div className="card" style={{ borderColor: 'var(--amber)', marginBottom: 12 }}><b>Nye bestillinger ({B.length})</b>
-    <table style={{ marginTop: 6 }}><tbody>{B.map(b => { const o = S.orgs.find(x => x.id === b.org_id); return <tr key={b.id}><td className="small">{fd(String(b.opprettet || b.created_at || '').slice(0, 10))}</td><td><b style={{ fontWeight: 600 }}>{o?.navn || '?'}</b><div className="small muted">{b.bestilt_av_navn}{o?.lisenser ? ` · ${o.lisenser} brukere` : ''}{b.kommentar ? ' · «' + b.kommentar + '»' : ''}</div></td>
+    <table style={{ marginTop: 6 }}><tbody>{B.map(b => { const o = S.orgs.find(x => x.id === b.org_id); return <tr key={b.id}><td className="small">{fd(String(b.opprettet || b.created_at || '').slice(0, 10))}</td><td><b style={{ fontWeight: 600 }}>{o?.navn || '?'}</b><div className="small muted">{b.bestilt_av_navn}{` · ${byggFor(b.org_id)} bygg`}{o?.lisenser ? ` · ${o.lisenser} brukere` : ''}{b.kommentar ? ' · «' + b.kommentar + '»' : ''}</div></td>
       <td>{MODULER.find(m => m.k === b.modul)?.navn || b.modul}</td>
       <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm pri" style={{ marginRight: 6 }} onClick={() => behandle(b, true)}>Aktiver</button><button className="btn sm" onClick={() => behandle(b, false)}>Avvis</button></td></tr>; })}</tbody></table></div>;
 }
@@ -165,11 +176,11 @@ function ModulAdminBody({ org, close }: { org: { id: string; navn: string; lisen
     if (!error && nyL !== (org.lisenser || null)) { const { error: le } = nyL ? await sb.rpc('sett_lisenser', { p_org: org.id, p_antall: nyL }) : await sb.from('organisasjoner').update({ lisenser: null }).eq('id', org.id);
       if (le) toast(/function|schema|lisenser/i.test(le.message) ? 'Brukerlisenser krever databaseendring 017' : feiltekst(le)); else { const o = S.orgs.find(x => x.id === org.id); if (o) o.lisenser = nyL; } }
     setBusy(false); if (error) return toast(feiltekst(error)); await lastModuler(); bump(); toast('Abonnementet er oppdatert for ' + org.navn); close(); };
-  const P = priser(); const nL = +lis || 0; const sum = nL && P ? prisTotal(P, MODULER.filter(m => m.k === 'kjerne' || ['betalt', 'oppsagt'].includes(status(R[m.k]))).map(m => m.k), nL) : 0;
+  const P = priser(); const nL = +lis || 0; const sum = P ? prisTotal(P, MODULER.filter(m => m.k === 'kjerne' || ['betalt', 'oppsagt'].includes(status(R[m.k]))).map(m => m.k), nL || Math.max(1, S.medlemmer.filter(m => m.org_id === org.id && m.aktiv).length), byggFor(org.id)) : 0;
   return <><div className="mh"><h2>Abonnement – {org.navn}</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
     <div className="mb">{feil ? <div className="note">{feil}</div> : last ? <p className="muted">Laster …</p> : <>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}><b>Brukerlisenser</b>
-        <input type="number" min={1} max={1000} value={lis} onChange={e => setLis(e.target.value)} placeholder="ingen grense" style={{ width: 120 }} /><span className="small muted">{S.medlemmer.filter(m => m.org_id === org.id && m.aktiv).length} aktive brukere</span>
+        <input type="number" min={1} max={1000} value={lis} onChange={e => setLis(e.target.value)} placeholder="ingen grense" style={{ width: 120 }} /><span className="small muted">{S.medlemmer.filter(m => m.org_id === org.id && m.aktiv).length} aktive brukere · {byggFor(org.id)} bygg</span>
         {sum > 0 && <span className="small muted" style={{ marginLeft: 'auto' }}>Per måned for betalte moduler: <b>{kr(sum)}</b> eks. mva.</span>}</div>
       <div className="tbl-wrap"><table><thead><tr><th>Modul</th><th>Status</th><th>Dato</th><th>Merknad</th></tr></thead><tbody>
         {MODULER.filter(m => m.k !== 'kjerne').map(m => { const r = R[m.k]; const s = status(r);
