@@ -10,6 +10,7 @@ import { autoKvitterIK, vurderPliktRef } from '../lib/actions';
 import { lagPakke, lesPakke, pakkeNavn, blobTilBase64, type ImportResultat } from '../lib/sjekklistePakke';
 import { uploadFile, isStaff } from '../lib/store';
 import { tt } from '../lib/i18n';
+import { sprakForEiendom, sprakValg } from '../components/MottakerSprak';
 
 export async function lastNedPakke(l: Rec, frist: string) {
   const b = await lagPakke(l, frist); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = pakkeNavn(l) + '.zip'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
@@ -52,6 +53,7 @@ export function sendSjekkliste(lid: string) {
     { k: 'maate', label: tt("Hvordan skal leietaker svare?"), type: 'select', def: 'lenke', options: [['lenke', 'Lenke – fylles ut i Eiendomskontroll (leietaker får egen bruker)'], ['fil', 'Fil – Excel-sjekkliste og mapper (ZIP) på e-post, returneres og importeres'], ['begge', 'Begge – lenke og fil']] },
     { k: 'epost', label: tt("E-post til leietakers kontaktperson"), type: 'email', def: l.epost || '', req: true },
     { k: 'frist', label: tt("Svarfrist"), type: 'date', def: (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })(), half: true },
+    { k: 'mottakerSprak', label: tt("Mottakerens språk"), type: 'select', def: sprakForEiendom(l.eiendomId), options: sprakValg(), half: true },
     { k: 'melding', label: tt("Melding (valgfri)"), type: 'textarea', ph: tt("Standardtekst brukes hvis feltet er tomt") },
   ];
   formModal({
@@ -63,7 +65,7 @@ export function sendSjekkliste(lid: string) {
       try {
         let vedlegg: any;
         if (x.maate !== 'lenke') { const b = await lagPakke(l, x.frist); vedlegg = { navn: pakkeNavn(l) + tt(".zip"), base64: await blobTilBase64(b), type: 'application/zip' }; }
-        const r = await aoApi({ action: 'lt_send', leietaker_id: lid, epost: x.epost, frist: x.frist, melding: x.melding, lenkeBase: location.origin, maate: x.maate, vedlegg });
+        const r = await aoApi({ action: 'lt_send', leietaker_id: lid, epost: x.epost, frist: x.frist, melding: x.melding, lenkeBase: location.origin, maate: x.maate, vedlegg, mottakerSprak: x.mottakerSprak });
         if (!r.sendt && vedlegg) lastNedPakke(l, x.frist);
         if (r.sendt) { toast(tt("Sjekklisten er sendt til ") + r.til); return; }
         showModal(tt("Send sjekklisten selv"), () => <>

@@ -7,6 +7,7 @@ import { openModal, useFileUrl } from '../components/ui';
 import { Doc, INK, MUTED, RED, LINE } from './arealRapport';
 import { openPlan } from '../views/Arealer';
 import { tt, lokale } from './i18n';
+import { MottakerSprak, sprakForEiendom } from '../components/MottakerSprak';
 
 const navnPaa = (id?: string) => { if (!id) return ''; if (id === state.me?.id) return state.me?.navn || state.me?.epost || ''; const p = S.profiles.find(x => x.id === id); return p ? p.navn || p.epost : ''; };
 export const tildeltNavn = navnPaa;
@@ -113,13 +114,13 @@ const tilBase64 = (b: Uint8Array) => { let s = ''; for (let i = 0; i < b.length;
 export function sendAo(id: string, varsle = false, epost = '') { openModal({ render: close => <SendAo id={id} varsle={varsle} epost={epost} close={close} /> }); }
 function SendAo({ id, varsle, epost = '', close }: { id: string; varsle: boolean; epost?: string; close: () => void }) {
   const a = byId('avvik', id)!; const tp = a.tildeltId ? S.profiles.find(p => p.id === a.tildeltId) : null;
-  const [ep, setEp] = useState(varsle ? tp?.epost || '' : epost); const [m, setM] = useState(''); const [pdf, setPdf] = useState(true); const [busy, setBusy] = useState(false); const [res, setRes] = useState<any>(null);
+  const [ep, setEp] = useState(varsle ? tp?.epost || '' : epost); const [m, setM] = useState(''); const [pdf, setPdf] = useState(true); const [busy, setBusy] = useState(false); const [res, setRes] = useState<any>(null); const [sp, setSp] = useState(() => sprakForEiendom(a.eiendomId));
   const send = async () => {
     setBusy(true);
     try {
       await lagreAvvik(id, x => x); // oppdater stedsinformasjonen før sending
       const pdfB = pdf ? tilBase64(await aoPdf(id)) : undefined;
-      const r = await aoApi({ action: varsle ? 'varsle' : 'inviter', avvik_id: id, epost: ep, melding: m, pdf: pdfB, lenkeBase: location.origin });
+      const r = await aoApi({ action: varsle ? 'varsle' : 'inviter', avvik_id: id, epost: ep, melding: m, pdf: pdfB, lenkeBase: location.origin, mottakerSprak: sp });
       setRes(r); if (r.sendt) toast(tt("Arbeidsordren er sendt til ") + r.til);
     } catch (e: any) { toast(e.message || tt("Feil")); }
     setBusy(false);
@@ -132,6 +133,7 @@ function SendAo({ id, varsle, epost = '', close }: { id: string; varsle: boolean
       {!res ? <>
         <p className="small" style={{ marginTop: 0 }}>{varsle ? tt("Mottakeren får en e-post med lenke til arbeidsordren i appen.") : tt("Mottakeren får arbeidsordren med lokasjon og en lenke. Via lenken kan vedkommende opprette bruker (eller logge inn), se plasseringen på tegningen, kvittere ut og laste opp bilder og dokumentasjon. Avviket tildeles mottakeren når lenken tas i bruk.")}</p>
         <div className="form"><div className="fld"><label>{tt("Til (e-post)")}</label><input style={inp} type="email" value={ep} onChange={e => setEp(e.target.value)} placeholder={tt("tekniker@firma.no")} readOnly={varsle} /></div>
+          <div className="fld"><label>{tt("Mottakerens språk")}</label><MottakerSprak value={sp} onChange={setSp} style={inp} /></div>
           <div className="fld"><label>{tt("Melding (valgfritt)")}</label><textarea style={{ ...inp, minHeight: 80 }} value={m} onChange={e => setM(e.target.value)} placeholder={tt("F.eks. Nøkkel hentes i resepsjonen. Ring Kari på 900 00 000 ved ankomst.")} /></div></div>
         <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={pdf} onChange={e => setPdf(e.target.checked)} />{tt("Legg ved arbeidsordren som PDF (med tegningsutsnitt)")}</label>
         {!a.pos && <p className="small" style={{ color: 'var(--amber)' }}>{tt("Avviket er ikke plassert på tegning. Plasser det først om lokasjonen skal vises.")}</p>}

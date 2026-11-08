@@ -14,6 +14,7 @@ import { TgKgVelger, tgTekst, type Tilstand } from '../components/TgKg';
 import { KoPanelRef, utfor } from '../lib/actions';
 import { save } from '../lib/store';
 import { tt } from '../lib/i18n';
+import { MottakerSprak, sprakForEiendom } from '../components/MottakerSprak';
 
 const gyldig = (e?: string) => /^\S+@\S+\.\S+$/.test(String(e || '').trim());
 export const koMottaker = (o: Rec) => String(o.ao?.epost || byId('anlegg', o.anleggId)?.leverandorEpost || '').trim();
@@ -119,13 +120,13 @@ KoPanelRef.C = KoPanel;
 export function sendKo(id: string) { openModal({ render: close => <SendKo id={id} close={close} /> }); }
 function SendKo({ id, close }: { id: string; close: () => void }) {
   const o = byId('oppgaver', id)!;
-  const [ep, setEp] = useState(koMottaker(o)); const [m, setM] = useState(o.ao?.melding || ''); const [busy, setBusy] = useState(false); const [res, setRes] = useState<any>(null); const [husk, setHusk] = useState(!o.ao?.epost);
+  const [ep, setEp] = useState(koMottaker(o)); const [m, setM] = useState(o.ao?.melding || ''); const [sp, setSp] = useState(() => o.ao?.sprak || sprakForEiendom(o.eiendomId)); const [busy, setBusy] = useState(false); const [res, setRes] = useState<any>(null); const [husk, setHusk] = useState(!o.ao?.epost);
   const send = async () => {
     setBusy(true);
     try {
-      if (husk && ep.trim() !== (o.ao?.epost || '')) await save('oppgaver', { ...byId('oppgaver', id)!, ao: { ...(o.ao || {}), epost: ep.trim() } });
+      if (husk && (ep.trim() !== (o.ao?.epost || '') || sp !== (o.ao?.sprak || sprakForEiendom(o.eiendomId)))) await save('oppgaver', { ...byId('oppgaver', id)!, ao: { ...(o.ao || {}), epost: ep.trim(), sprak: sp === sprakForEiendom(o.eiendomId) ? undefined : sp } });
       await sikreLokasjonsbilder(id, false);
-      const r = await aoApi({ action: 'ko_send', oppgave_id: id, epost: ep.trim(), melding: m, lenkeBase: location.origin }); setRes(r); if (r.sendt) toast(tt("Arbeidsordren er sendt til ") + r.til);
+      const r = await aoApi({ action: 'ko_send', oppgave_id: id, epost: ep.trim(), melding: m, lenkeBase: location.origin, mottakerSprak: sp }); setRes(r); if (r.sendt) toast(tt("Arbeidsordren er sendt til ") + r.til);
     } catch (e: any) { toast(e.message || tt("Feil")); }
     setBusy(false);
   };
@@ -136,6 +137,7 @@ function SendKo({ id, close }: { id: string; close: () => void }) {
     <div className="mb">{!res ? <>
       <p className="small" style={{ marginTop: 0 }}>{tt("Servicefirmaet får oppdraget med eiendom, system, frist, grunnlag og sjekkpunkter, og en lenke der de registrerer utført og laster opp servicerapporten – uten å opprette bruker. Du godkjenner rapporten før kontrollen registreres som utført.")}</p>
       <div className="form"><div className="fld"><label>{tt("Til (e-post)")}</label><input style={inp} type="email" value={ep} onChange={e => setEp(e.target.value)} placeholder={tt("service@firma.no")} /></div>
+        <div className="fld"><label>{tt("Mottakerens språk")}</label><MottakerSprak value={sp} onChange={setSp} style={inp} /></div>
         <div className="fld"><label>{tt("Melding (valgfritt)")}</label><textarea style={{ ...inp, minHeight: 80 }} value={m} onChange={e => setM(e.target.value)} placeholder={tt("F.eks. Avtal tidspunkt med driftsleder. Nøkkel i resepsjonen.")} /></div></div>
       <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={husk} onChange={e => setHusk(e.target.checked)} />{tt("Husk mottakeren på kontrollen")}</label>
       {o.aoBilder ? <><p className="small" style={{ marginBottom: 0 }}>{tt("Lokasjonen på tegningen følger med (oversikt og zoom):")}</p><Lokasjon o={o} /></> : lokasjonsGrunnlag(o) ? <p className="small muted">{tt("Lokasjonsbilder fra tegningen lages når du sender.")}</p> : <p className="small muted">{tt("Systemet er ikke plassert på tegning – arbeidsordren sendes uten lokasjonsbilder.")}</p>}

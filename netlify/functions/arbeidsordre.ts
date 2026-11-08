@@ -102,6 +102,14 @@ const handler = async (req: Request) => {
     const land = e?.data?.land || 'NO'; const sp = (overstyr && SPRAK_OK.includes(overstyr) ? overstyr : '') || e?.data?.epostSprak || LAND_SPRAK[land] || 'nb';
     return (spCache[k] = await lagSp(sp, land));
   };
+  /** Språk for e-post til en bruker av appen: brukerens eget språk (user_metadata.sprak), ellers eiendommens */
+  const sprakForBruker = async (uid?: string | null, eid?: string | null, epost?: string): Promise<Sp> => {
+    let id = uid || ''; if (!id && epost) { const { data: pr } = await admin.from('profiles').select('id').eq('epost', String(epost).toLowerCase()).maybeSingle(); id = pr?.id || ''; }
+    const s = id ? (await admin.auth.admin.getUserById(id).catch(() => null as any))?.data?.user?.user_metadata?.sprak : '';
+    if (!SPRAK_OK.includes(s)) return sprakFor(eid);
+    const { data: e } = eid ? await admin.from('eiendommer').select('data').eq('id', eid).maybeSingle() : { data: null as any };
+    return lagSp(s, e?.data?.land || 'NO');
+  };
   /** Språk for organisasjonen (purringer og varsler til eier): det vanligste blant eiendommene */
   const sprakForOrg = async (org: string, overstyr?: string): Promise<Sp> => {
     if (overstyr && SPRAK_OK.includes(overstyr)) return lagSp(overstyr);
@@ -329,7 +337,7 @@ const handler = async (req: Request) => {
     await admin.from('ao_invitasjon').update({ kvittert: t, svar: { navn, firma, komm, filer, samtykke: sam, tilstand: tl, nyttForslag } }).eq('token', inv.token);
     await logg_(a, av, `Arbeidsordre for avvik #${a.nr} kvittert ut via lenke av ${av} <${inv.epost}> – til kontroll`);
     if (inv.opprettet_av) { const { data: avs } = await admin.from('profiles').select('epost').eq('id', inv.opprettet_av).maybeSingle();
-      if (avs?.epost) { const { t } = await sprakFor(a.eiendom_id); await sendEpost(avs.epost, t('Utført: avvik #{0} {1}', a.nr, d.tittel || ''), `<p>${esc(t('{0} har kvittert ut avvik #{1} {2} som utført:', av, a.nr, d.tittel || ''))}</p><p>${esc(komm).replace(/\n/g, '<br>')}</p><p>${esc(t('{0} vedlegg. Avviket står som «Utført – til kontroll» i Eiendomskontroll.', filer.length))}</p>`, `${t('{0} har kvittert ut avvik #{1} {2} som utført:', av, a.nr, d.tittel || '')} ${komm}`, undefined, undefined, await oppsettFor(a.eiendom_id)); } }
+      if (avs?.epost) { const { t } = await sprakForBruker(inv.opprettet_av, a.eiendom_id); await sendEpost(avs.epost, t('Utført: avvik #{0} {1}', a.nr, d.tittel || ''), `<p>${esc(t('{0} har kvittert ut avvik #{1} {2} som utført:', av, a.nr, d.tittel || ''))}</p><p>${esc(komm).replace(/\n/g, '<br>')}</p><p>${esc(t('{0} vedlegg. Avviket står som «Utført – til kontroll» i Eiendomskontroll.', filer.length))}</p>`, `${t('{0} har kvittert ut avvik #{1} {2} som utført:', av, a.nr, d.tittel || '')} ${komm}`, undefined, undefined, await oppsettFor(a.eiendom_id)); } }
     return json(200, { ok: true });
   }
 
@@ -504,7 +512,7 @@ const handler = async (req: Request) => {
       const path = d.aoBilder?.[k]?.path; if (!path || !String(path).startsWith(o.eiendom_id + '/')) continue;
       const { data: bl } = await admin.storage.from('filer').download(path); if (bl) vedl.push({ navn, base64: Buffer.from(await bl.arrayBuffer()).toString('base64'), type: 'image/jpeg', cid });
     }
-    const L = await sprakFor(o.eiendom_id, (o as any)._sprak); const m = koTekst(o, sn, lenke, melding, avsender, vedl.length === 2, L);
+    const L = await sprakFor(o.eiendom_id, (o as any)._sprak || d.ao?.sprak); const m = koTekst(o, sn, lenke, melding, avsender, vedl.length === 2, L);
     const r = await sendEpost(til, m.emne, m.html, m.tekst, vedl, p?.epost || undefined, await oppsettFor(o.eiendom_id, sn.org || (p ? await minOrg(p) : null)));
     const fersk = (await hentOppg(o.id))?.data || d;
     if (r.sendt) await admin.from('oppgaver').update({ data: { ...fersk, aoSendt: { frist: d.nesteFrist || '', dato: new Date().toISOString(), til, auto: !p, av: p ? (p.navn || p.epost) : 'Automatisk' } } }).eq('id', o.id);
@@ -518,7 +526,7 @@ const handler = async (req: Request) => {
     if (!(await harEiendom(p, o.eiendom_id))) return json(403, { error: 'Du har ikke tilgang til eiendommen' });
     const til = String(body.epost || '').trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(til)) return json(400, { error: 'Ugyldig e-postadresse' });
     const base = typeof body.lenkeBase === 'string' && /^https?:\/\//.test(body.lenkeBase) ? body.lenkeBase.replace(/\/+$/, '') : (process.env.URL || '');
-    return json(200, await koSend(o, til, String(body.melding || '').slice(0, 2000), base, p));
+    (o as any)._sprak = body.mottakerSprak; return json(200, await koSend(o, til, String(body.melding || '').slice(0, 2000), base, p));
   }
 
   // Regelverkssjekk mot Lovdata (kalles ukentlig av GitHub Actions med REGELVERK_TOKEN)
@@ -772,7 +780,7 @@ const handler = async (req: Request) => {
     await koLogg({ id: null, navn: `${rapport.av || inv.epost}${rapport.firma ? ' (' + rapport.firma + ')' : ''}` }, o, `Servicerapport mottatt for «${fersk.navn}»: ${res}${rapport.avvik.length ? `, ${rapport.avvik.length} avvik` : ''}, ${filer.length} vedlegg – venter på godkjenning`, sn.org);
     // Varsle den som sendte arbeidsordren (eller ingen, hvis automatisk og uten mottaker)
     if (inv.opprettet_av) { const { data: av } = await admin.from('profiles').select('epost').eq('id', inv.opprettet_av).maybeSingle();
-      if (av?.epost) { const { t } = await sprakFor(o.eiendom_id); const hvemR = `${rapport.av || inv.epost}${rapport.firma ? ' (' + rapport.firma + ')' : ''}`; const L2 = await sprakFor(o.eiendom_id); const linje = t('{0} har registrert {1} på {2} som utført {3}: {4}.', hvemR, t(fersk.navn), sn.eiendom, L2.dato(dato), t(res)) + ' ' + t('Gå til kontrollen i Eiendomskontroll for å godkjenne.');
+      if (av?.epost) { const L2 = await sprakForBruker(inv.opprettet_av, o.eiendom_id); const { t } = L2; const hvemR = `${rapport.av || inv.epost}${rapport.firma ? ' (' + rapport.firma + ')' : ''}`; const linje = t('{0} har registrert {1} på {2} som utført {3}: {4}.', hvemR, t(fersk.navn), sn.eiendom, L2.dato(dato), t(res)) + ' ' + t('Gå til kontrollen i Eiendomskontroll for å godkjenne.');
         await sendEpost(av.epost, `${t('Rapport mottatt')}: ${t(fersk.navn)} – ${sn.eiendom}`, `<p>${esc(linje)}</p>`, linje, undefined, undefined, await oppsettFor(o.eiendom_id, sn.org)); } }
     return json(200, { ok: true });
   }
@@ -843,7 +851,7 @@ const handler = async (req: Request) => {
     }
     await admin.from('prosjekter').update({ data: { ...d, fase, status: status2, logg, rapporter: d.rapporter.map((x: any) => x.id === f.r.id ? { ...x, status, svar: beslutning === 'Kommentar' ? x.svar : svar, kommentarer } : x) } }).eq('id', f.p.id);
     await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: navn, tabell: 'hendelse', rad_id: f.p.id, eiendom_id: f.p.eiendom_id, handling: 'prosjekt', tekst: logg[logg.length - (fase !== d.fase ? 2 : 1)].k });
-    if (f.r.sendtAvEpost) { const { t: tr } = await sprakFor(f.p.eiendom_id); const fn = (k: string) => tr(FASENAVN[k] || '');
+    if (f.r.sendtAvEpost) { const { t: tr } = await sprakForBruker(null, f.p.eiendom_id, f.r.sendtAvEpost); const fn = (k: string) => tr(FASENAVN[k] || '');
       const linje = f.r.type === 'fase' ? tr('{0} har svart på beslutningsnotatet for {1}: {2}.', navn, d.navn, tr(beslutning)) : tr('{0} har svart på statusrapporten for {1}: {2}.', navn, d.navn, tr(beslutning));
       await sendEpost(f.r.sendtAvEpost, `${tr(beslutning)}: ${d.navn}${f.r.type === 'fase' ? ' – ' + fn(f.r.fase) : ''}`,
       `<p>${esc(linje)}</p>${komm ? `<p>${esc(komm).replace(/\n/g, '<br>')}</p>` : ''}${fase !== d.fase ? `<p>${esc(tr('Prosjektet er flyttet til fasen «{0}».', fn(fase)))}</p>` : ''}`,

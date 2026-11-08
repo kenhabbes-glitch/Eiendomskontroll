@@ -9,6 +9,7 @@ import { BESLUTNING_TEKST, GODKJENT, krevGodkjenning, n, oppdaterP, snapshot, tr
 import { Gantt, GanttForklaring } from '../components/Gantt';
 import { nsNavn } from '../components/NsVelger';
 import { tt } from '../lib/i18n';
+import { MottakerSprak, sprakForEiendom } from '../components/MottakerSprak';
 
 const kr = (v: any) => nok(Math.round(+v || 0));
 export const RAP_CSS = `.rap{font:10.5pt/1.5 system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:#1d2521}.rap h1{font-size:18pt;margin:0 0 2px}.rap h2{font-size:12pt;margin:20px 0 6px;padding-bottom:3px;border-bottom:1px solid #d7dbd5}
@@ -126,7 +127,7 @@ function RapportDialog({ pid, type, fase0, close }: { pid: string; type: 'fase' 
   const sendNa = async () => {
     if (!send?.epost || !/^\S+@\S+\.\S+$/.test(send.epost)) return toast(tt("Skriv en gyldig e-postadresse"));
     setBusy(true);
-    try { const id = await lagre(); const r = await aoApi({ action: 'pr_send', prosjekt_id: pid, rapport_id: id, epost: send.epost, navn: send.navn, melding: send.melding, lenkeBase: location.origin }); await refetch('prosjekter', pid); setRes(r); if (r.sendt) toast(tt("Sendt til ") + r.til); }
+    try { const id = await lagre(); const r = await aoApi({ action: 'pr_send', prosjekt_id: pid, rapport_id: id, epost: send.epost, navn: send.navn, melding: send.melding, lenkeBase: location.origin, mottakerSprak: send.sprak || sprakForEiendom(p.eiendomId) }); await refetch('prosjekter', pid); setRes(r); if (r.sendt) toast(tt("Sendt til ") + r.til); }
     catch (e: any) { toast(e.message); } finally { setBusy(false); }
   };
   const ek = p.eierKontakt || {};
@@ -141,6 +142,7 @@ function RapportDialog({ pid, type, fase0, close }: { pid: string; type: 'fase' 
     : send ? <div className="pa-grid">
       <label className="pa-felt half"><span>{tt("Mottaker (navn)")}</span><input value={send.navn} onChange={e => setSend({ ...send, navn: e.target.value })} placeholder={tt("F.eks. styreleder")} /></label>
       <label className="pa-felt half"><span>{tt("E-post")}</span><input type="email" value={send.epost} onChange={e => setSend({ ...send, epost: e.target.value })} /></label>
+      <label className="pa-felt half"><span>{tt("Mottakerens språk")}</span><MottakerSprak value={send.sprak || sprakForEiendom(p.eiendomId)} onChange={v => setSend({ ...send, sprak: v })} /></label>
       <label className="pa-felt"><span>{tt("Melding")}</span><textarea rows={4} value={send.melding} onChange={e => setSend({ ...send, melding: e.target.value })} /></label>
       <p className="small muted" style={{ gridColumn: '1/-1' }}>{tt("Eieren får en personlig lenke (gyldig i 90 dager) der rapporten kan leses")}{type === 'fase' ? tt(" og godkjennes, godkjennes med merknader eller avvises. Ved godkjenning går prosjektet automatisk videre til neste fase") : tt(" og kommenteres")}{tt(". Mottakeren trenger ikke bruker i appen.")}</p></div>
     : <>

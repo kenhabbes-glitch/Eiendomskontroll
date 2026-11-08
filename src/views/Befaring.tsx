@@ -17,6 +17,7 @@ import { ART_NAVN, BSTATUS, BTYPER, LEIEFORLOP, ROLLER_DELT, ROM_PUNKTER, alleBe
 import { komprimer, lagreLokalFil, lokalUrl, paaNett, tegningBlob, harTegningLokalt } from '../lib/offline';
 import { befaringPdf, sha256 } from '../lib/befaringRapport';
 import { tt, lokale, ttc } from '../lib/i18n';
+import { sprakForEiendom, sprakValg } from '../components/MottakerSprak';
 
 type O = Record<string, any>;
 const go = (p: string) => { location.hash = '#/' + p; };
@@ -353,9 +354,10 @@ function Rapport({ b, oppd, kan }: { b: Rec; oppd: (f: (b: Rec) => Rec) => void;
     formModal({ title: tt("Send rapporten til signering"), saveTxt: tt("Send"), values: { valgt: parter.filter(p => !mangler.includes(p) && !signertAv(p.id)).map(p => p.id), melding: '' }, fields: [
       { k: 'i', type: 'custom', render: () => <p className="small" style={{ margin: 0 }}>{tt("Hver part får en personlig lenke på e-post. De leser rapporten, skriver navnet sitt (og kan tegne signatur) og bekrefter med en engangskode som sendes til samme e-postadresse. Når alle har signert, får alle den signerte rapporten med signeringsside.")}{mangler.length ? <><br /><b>{tt("Mangler e-post:")}</b> {mangler.map(p => p.navn || p.rolle).join(', ')} {tt("– legg inn under «Deltakere og info», eller la dem signere på stedet.")}</> : null}</p> },
       { k: 'valgt', label: tt("Send til"), type: 'custom', def: [], render: (v, set) => <div>{parter.filter(p => !mangler.includes(p)).map(p => <label key={p.id} className="small" style={{ display: 'flex', gap: 6, fontWeight: 400 }}><input type="checkbox" style={{ width: 'auto' }} disabled={!!signertAv(p.id)} checked={(v.valgt || []).includes(p.id)} onChange={e => set({ valgt: e.target.checked ? [...v.valgt, p.id] : v.valgt.filter((x: string) => x !== p.id) })} />{p.navn} ({p.rolle}) – {p.epost}{signertAv(p.id) ? tt(" · signert") : ''}</label>)}</div> },
+      { k: 'mottakerSprak', label: tt("Mottakerens språk"), type: 'select', def: sprakForEiendom(b.eiendomId), options: sprakValg(), half: true },
       { k: 'melding', label: tt("Melding (valgfri)"), type: 'textarea' }],
       onSave: async v => { if (!v.valgt?.length) { toast(tt("Velg minst én")); return false; }
-        try { await synkBefaring(b.id); const res = await aoApi({ action: 'bef_sign_send', befaring_id: b.id, parter: parter.map(p => ({ id: p.id, navn: p.navn, epost: p.epost, rolle: p.rolle, firma: p.firma || '' })), send: v.valgt, melding: v.melding, lenkeBase: location.origin });
+        try { await synkBefaring(b.id); const res = await aoApi({ action: 'bef_sign_send', befaring_id: b.id, parter: parter.map(p => ({ id: p.id, navn: p.navn, epost: p.epost, rolle: p.rolle, firma: p.firma || '' })), send: v.valgt, melding: v.melding, lenkeBase: location.origin, mottakerSprak: v.mottakerSprak });
           toast(res.sendt ? tt("Sendt til {0} {1}", res.sendt, res.sendt === 1 ? 'part' : 'parter') : res.grunn || tt("Klargjort – e-post ble ikke sendt")); if (res.lenker?.length && !res.sendt) visLenker(res.lenker); }
         catch (e: any) { toast(e.message); return false; } } });
   };
