@@ -92,7 +92,7 @@ const I: Record<string, string> = {
 
 function navFor(): [string, string][] {
   if (isTenant()) return [['portal', 'Mitt leieforhold'], ['regelverk', 'Plikter og regelverk'], ['hjelp', 'Hjelp']];
-  if (isUtforer()) return [['arbeidsordre', 'Mine arbeidsordre'], ['hjelp', 'Hjelp']];
+  if (isUtforer()) return [['arbeidsordre', 'Mine arbeidsordre'], ['meldinger', 'Meldinger'], ['hjelp', 'Hjelp']];
   const n: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['kontroller', 'Kontrollplan'], ['runde', 'Kontrollrunde'], ['avvik', 'Avvik'], ['arbeidsordre', 'Mine arbeidsordre']];
   if (canEdit() && harModul('tilsyn')) n.splice(5, 0, ['tilsyn', 'Tilsynssaker']);
   if (S.eiendommer.some(e => kanDrifteE(e.id) && harModul('befaring', e.id))) { n.splice(4, 0, ['befaringer', 'Befaringer']); n.splice(5, 0, ['tilsynsanalyser', 'Tilsynsanalyser']); }

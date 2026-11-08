@@ -1,6 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-12', dato: '2026-11-12', tittel: 'Koble på vaktmester eller servicefirma i meldinger', punkter: [
+    'Du kan koble en bruker (vaktmester, servicefirma) på en samtale, og velge per melding om den skal være synlig for alle, bare for utleier og ressurser, eller internt. Samtalen kan overføres til en arbeidsordre.',
+  ] },
   { id: '2026-11-11', dato: '2026-11-11', tittel: 'Toveis meldinger med leietakere', punkter: [
     'Leietakere kan skrive til deg fra portalen, og du kan svare på saker og generelt. Du velger per melding om leietakeren skal se den (ellers er den et internt notat). Se menyvalget Meldinger.',
     'Bilder og dokumenter kan legges ved meldingene.',
