@@ -1,5 +1,6 @@
 // Dokumentinnboks: slipp inn mange filer, appen tolker dem i nettleseren og foreslår hvor de hører hjemme.
 // Køen lagres i nettleseren (IndexedDB) til dokumentene er arkivert – ingenting lastes opp før du trykker «Arkiver».
+import { harModul } from '../lib/moduler';
 import React, { useEffect, useRef, useState } from 'react';
 import { S, canEdit, kanDrifteE, save, state, toast, uploadFile, useStore } from '../lib/store';
 import { DOK_TYPER } from '../lib/catalog';
@@ -70,7 +71,7 @@ export function Innboks() {
       anleggId: v.anleggId || '', anleggIds: v.anleggId ? [v.anleggId] : [], fil, notat: v.notat || '', kilde: 'innboks' });
     await fjern(p.id);
     if (!stille) { toast('Arkivert: ' + (v.tittel || type)); if (type === 'Brannkonsept/brannteknisk dokumentasjon' && /\.pdf$/i.test(p.navn)) setTimeout(() => import('../lib/brannkonseptLes').then(m => m.tilbyLesing(v.eiendomId!, id)), 300);
-      if (type === 'Tilsynsrapport') setTimeout(() => import('./Tilsyn').then(m => m.registrerTilsyn()), 300); }
+      if (type === 'Tilsynsrapport' && harModul('tilsyn', v.eiendomId)) setTimeout(() => import('./Tilsyn').then(m => m.registrerTilsyn()), 300); }
     return true;
   };
   const klare = P.filter(p => p.status === 'klar' && p.v?.eiendomId && p.v?.type && p.v.type !== 'Annet' && (p.t?.typeScore || 0) >= 0.7 && !['Servicerapport', 'Egenkontrollskjema', 'Tilsynsrapport'].includes(p.v.type) && !(KONFIDENSIELLE.includes(p.v.type) && !p.v.leietakerId && p.v.type !== 'Forsikringspolise'));
@@ -105,7 +106,7 @@ function PostKort({ p, oppd, arkiver, fjern, ocr }: { p: Post; oppd: (x: Partial
   const sikker = (s: number) => <span className={'chip ' + (s >= 0.75 ? 'green' : s >= 0.5 ? 'amber' : 'plain')} style={{ fontSize: 11 }}>{Math.round(s * 100)} %</span>;
   const g = (s?: string) => s ? <span className="small muted"> · {s}</span> : null;
   const visSys = TYPER_MED_SYSTEM.includes(v.type || '') || !!v.anleggId; const visLt = KONFIDENSIELLE.includes(v.type || '') && v.type !== 'Forsikringspolise';
-  const knapp = kontroll ? 'Arkiver og registrer kontrollen' : v.type === 'Tilsynsrapport' ? 'Arkiver og registrer tilsynssak' : 'Arkiver';
+  const knapp = kontroll ? 'Arkiver og registrer kontrollen' : v.type === 'Tilsynsrapport' && harModul('tilsyn', v.eiendomId) ? 'Arkiver og registrer tilsynssak' : 'Arkiver';
   return <div className="card ib-post">
     <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
       <b style={{ flex: 1, wordBreak: 'break-all' }}>{p.navn}</b><span className="small muted">{kb(p.str)}</span>

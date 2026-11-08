@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { harModul } from '../lib/moduler';
 import { Hjelp } from '../components/Hjelp';
 import { PurringKort } from './Purring';
 import { RapportLesingKort } from './RapportLeser';
@@ -70,7 +71,7 @@ export function Innstillinger() {
     </div>
     <RenteKort ro={ro} />
     <PurringKort />
-    <RapportLesingKort />
+    {harModul('dokumentlesing') && <RapportLesingKort />}
     {isAdmin() && <EpostKort />}
   </>;
 }

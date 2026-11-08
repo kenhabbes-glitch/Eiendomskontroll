@@ -216,7 +216,7 @@ export function LeieTable({ list, showE = true }: { list: Rec[]; showE?: boolean
         <td className="small">{l.lokale || '–'}</td><td className="num">{(() => { const la = leieAreal(l); return la.verdi === null ? '–' : <>{m2(la.verdi)}{la.adv.length > 0 && <span data-tip={la.adv.join('\n')} style={{ color: 'var(--amber)', marginLeft: 4 }}>⚠</span>}{la.kilde === 'overstyrt' && <div className="small muted">overstyrt</div>}</>; })()}</td>
         <td>{d === null ? <span className="muted">–</span> : d < 0 ? <Chip c="red">Utløpt {fd(l.slutt)}</Chip> : d <= varsel ? <Chip c="amber">{fd(l.slutt)}</Chip> : <span className="small">{fd(l.slutt)}</span>}</td>
         <td>{ps.length ? (bad ? <Chip c="red">{bad} av {ps.length} mangler</Chip> : <Chip c="green">{ps.length} av {ps.length} OK</Chip>) : <span className="muted">–</span>}</td>
-        <td>{(() => { const b = bvStatus(l); return <Chip c={b.c} title={b.hint}>{b.t}</Chip>; })()}</td>
+        <td>{harModul('brannvern', l.eiendomId) ? (() => { const b = bvStatus(l); return <Chip c={b.c} title={b.hint}>{b.t}</Chip>; })() : <span className="muted">–</span>}</td>
         <td className="num">{openAvvik().filter(a => a.leietakerId === l.id).length}</td>
         <td className="small">{users ? `${users} bruker${users > 1 ? 'e' : ''}` : <span className="muted">Ingen</span>}</td></tr>; })}
   </tbody></table></Wrap>;

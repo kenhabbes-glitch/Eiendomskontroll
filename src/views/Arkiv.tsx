@@ -1,4 +1,5 @@
 // Arkiv: systemer, komponenter og kontroller som er erstattet (f.eks. i et utskiftingsprosjekt), samt ferdige prosjekter. Kan søkes i og åpnes.
+import { harModul } from '../lib/moduler';
 import React from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { ARKIV, S, useStore } from '../lib/store';
@@ -21,7 +22,7 @@ function rader(): ARad[] {
 }
 
 function visArkivert(r: ARad) {
-  if (r.type === 'Prosjekt') return go('prosjekt/' + r.o.id);
+  if (r.type === 'Prosjekt') return harModul('prosjekter', r.o.eiendomId) ? go('prosjekt/' + r.o.id) : undefined;
   const o = r.o; const erst = o.arkivert?.erstattetAv ? byId('anlegg', o.arkivert.erstattetAv) : null; const pr = o.arkivert?.prosjektId ? byId('prosjekter', o.arkivert.prosjektId) : null;
   const K = r.type === 'System' ? ARKIV.oppgaver.filter(x => x.anleggId === o.id) : r.type === 'Kontroll' ? [o] : [];
   const komp = r.type === 'System' ? ARKIV.komponenter.filter(k => k.anleggId === o.id) : [];
@@ -29,7 +30,7 @@ function visArkivert(r: ARad) {
   openModal({ wide: true, render: close => <ModalFrame title={<>{r.navn} <Chip>Arkivert</Chip></>} close={close} foot={<><span className="grow" /><button className="btn" onClick={close}>Lukk</button></>}>
     <div className="note" style={{ color: 'var(--ink)' }}>Arkivert {fd(o.arkivert?.dato)}{o.arkivert?.av ? ' av ' + o.arkivert.av : ''}. {o.arkivert?.grunn}
       {erst && <> Erstattet av <a href="#" onClick={e => { e.preventDefault(); close(); import('../lib/actions').then(m => m.editAnlegg(erst.id)); }}>{aNavn(erst.id)}</a>.</>}
-      {pr && <> Prosjekt: <a href="#" onClick={e => { e.preventDefault(); close(); go('prosjekt/' + pr.id); }}>{pr.navn}</a>.</>}</div>
+      {pr && harModul('prosjekter', pr.eiendomId) && <> Prosjekt: <a href="#" onClick={e => { e.preventDefault(); close(); go('prosjekt/' + pr.id); }}>{pr.navn}</a>.</>}</div>
     {r.type !== 'Kontroll' && <dl className="dl small"><dt>Eiendom</dt><dd>{eNavn(o.eiendomId)}</dd><dt>Type</dt><dd>{KOMP[o.type]?.n || o.kode || '–'}</dd><dt>Fabrikat</dt><dd>{o.fabrikat || '–'}</dd><dt>Installert</dt><dd>{o.aar || '–'}</dd>
       <dt>Tilstand</dt><dd>{o.tg ? <><TgChip t={o.tg} /> {o.tgKomm}</> : '–'}</dd><dt>Kostnad</dt><dd>{o.kost ? nok(+o.kost) : '–'}</dd>{o.notat && <><dt>Notat</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{o.notat}</dd></>}</dl>}
     {komp.length > 0 && <><h3>Komponenter ({komp.length})</h3><div className="small">{komp.map(k => <div key={k.id}>{kNavn(k.id)} <span className="muted">{[k.fabrikat, k.plassering].filter(Boolean).join(' · ')}</span></div>)}</div></>}

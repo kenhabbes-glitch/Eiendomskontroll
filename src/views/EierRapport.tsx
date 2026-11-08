@@ -5,6 +5,7 @@ import { openModal } from '../components/ui';
 import { fd, sortBy, today } from '../lib/utils';
 import { eierStatus, LYS_TEKST, type EierStatus, type Lys } from '../lib/eierRapport';
 import { RAP_CSS, skrivUt } from './ProsjektRapport';
+import { harModul } from '../lib/moduler';
 
 const FARGE: Record<Lys, string> = { green: '#2f7d4f', amber: '#b7791f', red: '#b42318', grey: '#9aa39d' };
 const Dot = ({ l }: { l: Lys }) => <span className="dot" style={{ background: FARGE[l] }} />;
@@ -39,10 +40,10 @@ function EnEiendom({ s, v, kommentar, ny }: { s: EierStatus; v: Valg; kommentar:
       {s.avvik.liste.length > 40 && <p className="hj">Viser 40 av {s.avvik.liste.length}.</p>}</> : <p className="muted">Ingen åpne avvik.</p>}</>}
     {v.tilsyn && s.tilsyn.length > 0 && <><h2>Tilsynssaker fra myndighetene</h2><table><thead><tr><th>Myndighet</th><th>Referanse</th><th>Åpne punkter</th><th>Svarfrist</th><th>Status</th></tr></thead><tbody>
       {s.tilsyn.map((t, i) => <tr key={i}><td>{t.navn}</td><td>{t.ref}</td><td>{t.apne}</td><td>{fd(t.svarfrist)}</td><td><St l={t.lys} t={t.status} /></td></tr>)}</tbody></table></>}
-    {v.leietakere && <><h2>Brannvern og leietakernes internkontroll</h2>
-      <p><St l={s.brannvern.lys} t={s.brannvern.tekst} /></p>
-      {s.leietakere.length ? <table><thead><tr><th>Leietaker</th><th>Internkontroll og plikter</th><th>Brannverninformasjon</th><th>Brannansvarlig</th><th>Avtale til</th></tr></thead><tbody>
-        {s.leietakere.map((l, i) => <tr key={i}><td>{l.navn}</td><td><St l={l.ik} t={l.plikter} /></td><td><St l={l.bvLys} t={l.bv} /></td><td>{l.ansvarlig ? 'Oppgitt' : <span style={{ color: FARGE.amber }}>Mangler</span>}</td><td>{fd(l.slutt)}</td></tr>)}</tbody></table>
+    {v.leietakere && <><h2>{s.harBv ? 'Brannvern og leietakernes internkontroll' : 'Leietakernes internkontroll'}</h2>
+      {s.harBv && <p><St l={s.brannvern.lys} t={s.brannvern.tekst} /></p>}
+      {s.leietakere.length ? <table><thead><tr><th>Leietaker</th><th>Internkontroll og plikter</th>{s.harBv && <><th>Brannverninformasjon</th><th>Brannansvarlig</th></>}<th>Avtale til</th></tr></thead><tbody>
+        {s.leietakere.map((l, i) => <tr key={i}><td>{l.navn}</td><td><St l={l.ik} t={l.plikter} /></td>{s.harBv && <><td><St l={l.bvLys} t={l.bv} /></td><td>{l.ansvarlig ? 'Oppgitt' : <span style={{ color: FARGE.amber }}>Mangler</span>}</td></>}<td>{fd(l.slutt)}</td></tr>)}</tbody></table>
         : <p className="muted">Ingen aktive leietakere.</p>}
       <p className="hj">Eier skal samordne brann- og HMS-arbeidet med leietakerne (internkontrollforskriften § 6) og informere om brannsikkerheten i bygget (forskrift om brannforebygging). Leietakerne bekrefter sine plikter i leietakerportalen.</p></>}
     {v.kommende && s.kommende.length > 0 && <><h2>Neste 90 dager</h2><table><thead><tr><th>Dato</th><th>Hva</th><th>Type</th></tr></thead><tbody>
@@ -55,8 +56,8 @@ function Rapport({ S2, v, kommentar }: { S2: EierStatus[]; v: Valg; kommentar: s
   return <div className="rap"><style>{RAP_CSS + EXTRA_CSS}</style>
     <div className="meta">Statusrapport til eier · {fd(today())} · utarbeidet av {state.me?.navn || state.me?.epost || ''}</div>
     {flere && <><h1>Statusrapport – {S2.length} eiendommer</h1>
-      <table><thead><tr><th>Eiendom</th>{S2[0].omrader.map(o => <th key={o.navn}>{o.navn}</th>)}<th>Samlet</th></tr></thead><tbody>
-        {S2.map(s => <tr key={s.e.id}><td><b>{s.e.navn}</b></td>{s.omrader.map(o => <td key={o.navn}><Dot l={o.lys} /></td>)}<td><St l={s.lys} /></td></tr>)}</tbody></table>
+      <table><thead><tr><th>Eiendom</th>{[...new Set(S2.flatMap(x => x.omrader.map(o => o.navn)))].map(n => <th key={n}>{n}</th>)}<th>Samlet</th></tr></thead><tbody>
+        {S2.map(s => <tr key={s.e.id}><td><b>{s.e.navn}</b></td>{[...new Set(S2.flatMap(x => x.omrader.map(o => o.navn)))].map(n => { const o = s.omrader.find(x => x.navn === n); return <td key={n}>{o ? <Dot l={o.lys} /> : ''}</td>; })}<td><St l={s.lys} /></td></tr>)}</tbody></table>
       {kommentar.trim() && <><h2>Kommentar fra forvalter</h2><p className="pre">{kommentar}</p></>}</>}
     {S2.map((s, i) => <EnEiendom key={s.e.id} s={s} v={v} kommentar={flere ? '' : kommentar} ny={flere || i > 0} />)}
     <p className="hj" style={{ marginTop: 20 }}>Rapporten bygger på registreringene i Eiendomskontroll per {fd(today())}. Hjemmelshenvisningene er korte sammendrag – se «Regelverk og plikter» i appen for forklaring.</p>
@@ -78,8 +79,8 @@ async function lagPdf(S2: EierStatus[], v: Valg, kommentar: string) {
     if (v.dok) { d.h2('Dokumenter eier skal ha'); d.tab([['Dokument', 4], ['Krav', 1.3], ['Gyldig til', 1.3], ['Status', 1.5]], s.dok.filter(x => !v.kun || (x.lys !== 'green' && x.lys !== 'grey')).map(x => ({ c: [x.type, x.krav, fd(x.gyldigTil), x.status], farge: [undefined, undefined, undefined, F(x.lys)] }))); }
     if (v.avvik && s.avvik.apne) { d.h2(`Åpne avvik (${s.avvik.apne})`); d.tab([['Nr', 0.7], ['Avvik', 5], ['Alvorlighet', 1.3], ['Frist', 1.2]], s.avvik.liste.slice(0, 40).map(a => ({ c: [a.nr ? '#' + a.nr : '', a.tittel, a.alv, fd(a.frist)] }))); }
     if (v.tilsyn && s.tilsyn.length) { d.h2('Tilsynssaker'); d.tab([['Myndighet', 3], ['Ref.', 1.5], ['Svarfrist', 1.3], ['Status', 3]], s.tilsyn.map(t => ({ c: [t.navn, t.ref, fd(t.svarfrist), t.status], farge: [undefined, undefined, undefined, F(t.lys)] }))); }
-    if (v.leietakere) { d.h2('Brannvern og leietakernes internkontroll'); d.tekst(s.brannvern.tekst);
-      if (s.leietakere.length) d.tab([['Leietaker', 3], ['Plikter', 2.2], ['Brannvern', 2.6], ['Ansvarlig', 1.2]], s.leietakere.map(l => ({ c: [l.navn, l.plikter, l.bv, l.ansvarlig ? 'Oppgitt' : 'Mangler'], farge: [undefined, F(l.ik), F(l.bvLys), l.ansvarlig ? undefined : F('amber')] }))); }
+    if (v.leietakere) { d.h2(s.harBv ? 'Brannvern og leietakernes internkontroll' : 'Leietakernes internkontroll'); if (s.harBv) d.tekst(s.brannvern.tekst);
+      if (s.leietakere.length) d.tab(s.harBv ? [['Leietaker', 3], ['Plikter', 2.2], ['Brannvern', 2.6], ['Ansvarlig', 1.2]] : [['Leietaker', 3], ['Plikter', 3]], s.leietakere.map(l => s.harBv ? ({ c: [l.navn, l.plikter, l.bv, l.ansvarlig ? 'Oppgitt' : 'Mangler'], farge: [undefined, F(l.ik), F(l.bvLys), l.ansvarlig ? undefined : F('amber')] }) : ({ c: [l.navn, l.plikter], farge: [undefined, F(l.ik)] }))); }
     if (v.kommende && s.kommende.length) { d.h2('Neste 90 dager'); d.tab([['Dato', 1.2], ['Hva', 5], ['Type', 1.3]], s.kommende.map(k => ({ c: [fd(k.d), k.t, k.type] }))); }
   }
   return await d.pdf.save();
@@ -105,7 +106,7 @@ function Body({ eid, close }: { eid?: string; close: () => void }) {
     <div className="mb">
       <div className="pa-grid">
         <label className="pa-felt half"><span>Eiendom</span><select value={valgt} onChange={e => setValgt(e.target.value)}>{E.length > 1 && <option value="*">Alle eiendommer ({E.length})</option>}{E.map(e => <option key={e.id} value={e.id}>{e.navn}</option>)}</select></label>
-        <div className="pa-felt half"><span>Innhold</span><div>{bryter('tiltak', 'Tiltak')}{bryter('kontroller', 'Kontroller')}{bryter('dok', 'Dokumenter')}{bryter('avvik', 'Avvik')}{bryter('tilsyn', 'Tilsyn')}{bryter('leietakere', 'Leietakere/brannvern')}{bryter('kommende', 'Neste 90 dager')}<br />{bryter('kun', 'Vis bare punkter som må følges opp')}</div></div>
+        <div className="pa-felt half"><span>Innhold</span><div>{bryter('tiltak', 'Tiltak')}{bryter('kontroller', 'Kontroller')}{bryter('dok', 'Dokumenter')}{bryter('avvik', 'Avvik')}{harModul('tilsyn') && bryter('tilsyn', 'Tilsyn')}{bryter('leietakere', harModul('brannvern') ? 'Leietakere/brannvern' : 'Leietakere')}{bryter('kommende', 'Neste 90 dager')}<br />{bryter('kun', 'Vis bare punkter som må følges opp')}</div></div>
         <label className="pa-felt"><span>Kommentar til eier (valgfritt)</span><textarea rows={3} value={kommentar} onChange={e => setKommentar(e.target.value)} placeholder="F.eks. status på pågående arbeid, budsjettbehov eller beslutninger eier må ta" /></label>
       </div>
       <div className="card" style={{ marginTop: 10, maxHeight: '58vh', overflow: 'auto', background: '#fff' }} ref={ref}><Rapport S2={S2} v={v} kommentar={kommentar} /></div>

@@ -263,7 +263,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
   if (!id) { a.tfmSys = TFM_DEF[a.type][0]; a.tfmLop = nextSysLop(a.eiendomId, a.tfmSys); a.mk = KOMP[a.type]?.m || []; a.forste = addDays(today(), 30); }
   const touched: Record<string, boolean> = {};
   const fields: Field[] = [
-    ...(id ? [{ k: 'utskInfo', type: 'custom', show: () => !!aktivtProsjektFor(id), render: () => { const pr = aktivtProsjektFor(id)!; return <div className="note" style={{ color: 'var(--ink)', display: 'flex', gap: 8, alignItems: 'center' }}>
+    ...(id ? [{ k: 'utskInfo', type: 'custom', show: () => !!aktivtProsjektFor(id) && harModul('prosjekter', byId('anlegg', id)?.eiendomId), render: () => { const pr = aktivtProsjektFor(id)!; return <div className="note" style={{ color: 'var(--ink)', display: 'flex', gap: 8, alignItems: 'center' }}>
       <Chip c="amber">Utskiftingsprosjekt opprettet</Chip><span style={{ flex: 1 }} className="small">{pr.navn} · {pr.status}</span><button type="button" className="btn sm" onClick={() => { closeRef.c?.(); go('prosjekt/' + pr.id); }}>Åpne prosjektet</button></div>; } } as Field] : []),
     { k: 'eiendomId', label: 'Eiendom', type: 'select', options: eOptsSkriv, req: true },
     { k: 'type', label: 'Type system / bygningsdel', type: 'select', groups: kompGroups },
@@ -716,7 +716,7 @@ function AvvikKoblinger({ id, lukk }: { id: string; lukk: () => void }) {
       {ed && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {aid && harModul('prosjekter', a.eiendomId) && (pr ? <button type="button" className="btn sm" onClick={() => { lukk(); location.hash = '#/prosjekt/' + pr.id; }}>Åpne utskiftingsprosjektet</button>
           : <button type="button" className="btn sm pri" onClick={async () => { const pid = await opprettUtskifting(aid); if (pid) { await save('avvik', { ...byId('avvik', id)!, logg: [...(byId('avvik', id)!.logg || []), { t: new Date().toISOString(), s: a.status, k: `Utskiftingsprosjekt opprettet etter ${G.length} gjentatte avvik`, av: state.me?.navn }] }); lukk(); location.hash = '#/prosjekt/' + pid; } }}>Opprett utskiftingsprosjekt for {aNavn(aid)}</button>)}
-        {m && <button type="button" className="btn sm" onClick={fremskynd}>Fremskynd utskifting i vedlikeholdsplanen{m.planAar ? ` (nå ${m.planAar})` : ''}</button>}</div>}</div>}
+        {m && harModul('vedlikehold', a.eiendomId) && <button type="button" className="btn sm" onClick={fremskynd}>Fremskynd utskifting i vedlikeholdsplanen{m.planAar ? ` (nå ${m.planAar})` : ''}</button>}</div>}</div>}
   </>;
 }
 export function editAvvik(id?: string, preset: any = {}) {
@@ -729,14 +729,14 @@ export function editAvvik(id?: string, preset: any = {}) {
     { k: 'komponentId', label: 'Komponent (TFM)', type: 'select', options: () => sortBy(S.komponenter, c => kNavn(c.id)).map(c => [c.id, eNavn(c.eiendomId) + ' – ' + kNavn(c.id)] as [string, string]), empty: '–' },
     { k: 'alv', label: 'Alvorlighet', type: 'select', options: AV_ALV, half: true }, { k: 'status', label: 'Status', type: 'select', options: AV_STATUS, half: true },
     { k: 'kilde', label: 'Kilde', type: 'select', options: AV_KILDE, half: true }, { k: 'meldtAv', label: 'Meldt av / referanse', half: true, ph: 'Navn, rapportnr., tilsynsref.' },
-    { k: 'secTs', label: 'Tilsyn', type: 'sec', show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType },
-    { k: 'tsType', label: 'Type', type: 'select', options: TS_TYPER, empty: '–', half: true, show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType, hint: 'Pålegg er et vedtak med frist – klarer dere ikke fristen, be skriftlig om utsettelse før den går ut' },
-    { k: 'tsPunkt', label: 'Punkt i tilsynsrapporten', half: true, show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType },
-    { k: 'tsMyndighet', label: 'Myndighet / avdeling', half: true, show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType, ph: 'F.eks. Brannvesenet' },
-    { k: 'tsRef', label: 'Saksnummer / referanse', half: true, show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType },
-    { k: 'tsDato', label: 'Tilsynsdato', type: 'date', half: true, show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType },
-    { k: 'tsSvarfrist', label: 'Frist for tilbakemelding til myndigheten', type: 'date', half: true, show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType },
-    { k: 'tsTiltak', label: 'Tiltak (tas med i tilbakemeldingen)', type: 'textarea', show: x => TILSYN_KILDER.includes(x.kilde) || !!x.tsType, ph: 'Hva er gjort eller planlagt, av hvem og når' },
+    { k: 'secTs', label: 'Tilsyn', type: 'sec', show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType) },
+    { k: 'tsType', label: 'Type', type: 'select', options: TS_TYPER, empty: '–', half: true, show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType), hint: 'Pålegg er et vedtak med frist – klarer dere ikke fristen, be skriftlig om utsettelse før den går ut' },
+    { k: 'tsPunkt', label: 'Punkt i tilsynsrapporten', half: true, show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType) },
+    { k: 'tsMyndighet', label: 'Myndighet / avdeling', half: true, show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType), ph: 'F.eks. Brannvesenet' },
+    { k: 'tsRef', label: 'Saksnummer / referanse', half: true, show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType) },
+    { k: 'tsDato', label: 'Tilsynsdato', type: 'date', half: true, show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType) },
+    { k: 'tsSvarfrist', label: 'Frist for tilbakemelding til myndigheten', type: 'date', half: true, show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType) },
+    { k: 'tsTiltak', label: 'Tiltak (tas med i tilbakemeldingen)', type: 'textarea', show: x => harModul('tilsyn', x.eiendomId) && (TILSYN_KILDER.includes(x.kilde) || !!x.tsType), ph: 'Hva er gjort eller planlagt, av hvem og når' },
     { k: 'ansvar', label: 'Ansvarlig for utbedring', type: 'select', options: UTBEDRER, half: true },
     { k: 'utbedresAv', label: 'Serviceselskap / leverandør', half: true, show: x => x.ansvar === 'Leverandør/entreprenør', ph: 'Firma som skal rette avviket' },
     ...(canEdit() ? [{ k: 'leietakerId', label: 'Leietaker', type: 'select', options: (v?: any) => S.leietakere.filter(l => !v?.eiendomId || l.eiendomId === v.eiendomId).map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true, show: (x: any) => ['Leietaker', 'Felles'].includes(x.ansvar) || !!x.leietakerId, hint: 'Leietakeren som skal utbedre, eller som deler ansvaret' } as Field] : []),
@@ -817,7 +817,7 @@ export function editDok(id?: string, preset: any = {}) {
       const fil = x.fil; delete x.fil; const o: Rec = { ...d, ...x };
       if (fil) { const f = await uploadFile(fil, o.eiendomId, o.leietakerId || undefined); if (!f) return false; if (d.fil) await deleteFile(d.fil); o.fil = f; }
       if (!o.tittel) o.tittel = o.type; const nid = await save('dokumenter', o); toast('Dokument lagret');
-      if (fil && o.type === 'Brannkonsept/brannteknisk dokumentasjon' && !o.leietakerId && /\.pdf$/i.test(o.fil?.navn || '') && canEdit()) setTimeout(() => import('./brannkonseptLes').then(m => m.tilbyLesing(o.eiendomId, nid)), 300);
+      if (fil && o.type === 'Brannkonsept/brannteknisk dokumentasjon' && !o.leietakerId && /\.pdf$/i.test(o.fil?.navn || '') && canEdit() && harModul('dokumentlesing', o.eiendomId)) setTimeout(() => import('./brannkonseptLes').then(m => m.tilbyLesing(o.eiendomId, nid)), 300);
     },
   });
 }

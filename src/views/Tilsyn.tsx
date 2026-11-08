@@ -1,5 +1,6 @@
 // Tilsynssaker: avvik/pålegg fra brannvesen, Arbeidstilsynet, el-tilsyn og forsikring, gruppert per tilsyn.
 // Registrer en hel tilsynsrapport på én gang, følg svarfristen, lag tilbakemeldingsbrev (PDF) og marker sendt/lukket.
+import { harModul } from '../lib/moduler';
 import React, { useState } from 'react';
 import { S, save, state, toast, uploadFile, useStore, canEdit } from '../lib/store';
 import { addDays, byId, eNavn, fd, today, dUntil, sortBy, type Rec } from '../lib/utils';
@@ -29,7 +30,7 @@ export function tilsynssaker(): Sak[] {
   return Object.values(g).sort((x, y) => (+!!x.lukket - +!!y.lukket) || String(x.svarfrist || x.dato || '9').localeCompare(String(y.svarfrist || y.dato || '9')));
 }
 /** Saker der tilbakemelding til myndigheten ikke er sendt og fristen nærmer seg (til purreoversikten) */
-export const svarfristSnart = (dager = 14) => tilsynssaker().filter(s => s.svarfrist && !s.svarSendt && !s.lukket && (dUntil(s.svarfrist) as number) <= dager);
+export const svarfristSnart = (dager = 14) => tilsynssaker().filter(s => harModul('tilsyn', s.eiendomId) && s.svarfrist && !s.svarSendt && !s.lukket && (dUntil(s.svarfrist) as number) <= dager);
 
 async function oppdaterSak(s: Sak, patch: Rec, loggTekst: string) {
   for (const a of s.avvik) { const f = byId('avvik', a.id)!; await save('avvik', { ...f, ...patch, logg: [...(f.logg || []), { t: new Date().toISOString(), s: f.status, k: loggTekst, av: state.me?.navn }] }); }
