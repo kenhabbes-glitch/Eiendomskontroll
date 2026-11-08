@@ -17,6 +17,11 @@ export function MeldingerView() {
     const f = () => setVer(x => x + 1); window.addEventListener('ek-meldinger', f); return () => { on = false; window.removeEventListener('ek-meldinger', f); }; }, [ver]);
   const tr: { key: string; m: Melding; ulest: number }[] = [];
   (L || []).forEach(m => { const key = (m.leietaker_id || '') + '|' + (m.avvik_id || ''); let t = tr.find(x => x.key === key); if (!t) { t = { key, m, ulest: 0 }; tr.push(t); } if (m.data.rolle !== 'utleier' && !m.data.lest && kanDrifteE(m.eiendom_id)) t.ulest++; });
+  // Saker leietakere har meldt inn vises også før det finnes meldinger i dem
+  S.avvik.filter(a => a.leietakerId && kanDrifteE(a.eiendomId) && !tr.some(t => t.m.avvik_id === a.id)).forEach(a => {
+    tr.push({ key: (a.leietakerId || '') + '|' + a.id, ulest: a.status === 'Ny' ? 1 : 0,
+      m: { id: 'sak-' + a.id, eiendom_id: a.eiendomId, leietaker_id: a.leietakerId, avvik_id: a.id, created_at: a.opprettet || a.oppdaget || new Date().toISOString(), data: { tekst: a.beskrivelse || a.tittel || '', rolle: 'leietaker' } } as Melding });
+  });
   const nrAv = (t: { m: Melding }) => (t.m.avvik_id ? byId('avvik', t.m.avvik_id)?.nr || 0 : -1);
   tr.sort((a, b) => nrAv(b) - nrAv(a)); // etter saksnummer (arbeidsordre-nr), nyeste først; samtaler uten sak sist
   const q = sok.trim().toLowerCase().replace(/^#/, '');

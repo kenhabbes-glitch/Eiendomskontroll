@@ -30,6 +30,9 @@ function meldAvvik(l: any) {
       const o: any = { tittel: v.tittel, beskrivelse: [v.beskrivelse, v.plassering ? 'Sted: ' + v.plassering : ''].filter(Boolean).join('\n'), eiendomId: l.eiendomId, leietakerId: l.id, alv: v.alv, status: 'Ny', kilde: 'Leietaker', ansvar: 'Eier', meldtAv: state.me?.navn || state.me?.epost, oppdaget: today(), frist: addDays(today(), ({ Kritisk: 7, 'Høy': 30, Middels: 90, Lav: 365 } as any)[v.alv]), logg: [{ t: new Date().toISOString(), s: 'Ny', k: 'Meldt av leietaker', av: state.me?.navn || state.me?.epost }] };
       if (v.fil) { const f = await uploadFile(v.fil, l.eiendomId, l.id); if (f) o.vedlegg = [f]; }
       const nyId = await save('avvik', o); toast(tt("Takk! Saken er registrert."));
+      // Beskrivelsen blir første melding i samtalen, så utleier ser den i Meldinger og får den som ulest
+      await sb.from('meldinger').insert({ eiendom_id: l.eiendomId, leietaker_id: l.id, avvik_id: nyId, data: { tekst: [v.tittel, v.beskrivelse, v.plassering ? 'Sted: ' + v.plassering : ''].filter(Boolean).join('\n').slice(0, 4000), rolle: 'leietaker', av: state.me?.navn || state.me?.epost, til: 'alle', synlig: true, lest: false, ...(o.vedlegg ? { vedlegg: o.vedlegg } : {}) } });
+      window.dispatchEvent(new Event('ek-meldinger'));
       const na = byId('avvik', nyId); if (na) setTimeout(() => visAvvik(na), 300);
     },
   });
