@@ -47,7 +47,7 @@ export const PAKKE_DK: Pakke = {
     brannalarm: ['dk_aba', 'dk_aba_aar'], talevarsling: ['dk_ava'], sprinkler: ['dk_sprinkler_uge', 'dk_sprinkler_aar'], slokkere: ['dk_slukker'], brannslanger: ['dk_slange'], nodlys: ['dk_flugtvejslys'],
     branndorer: ['dk_branddor'], roykluker: ['dk_roeg'], brannspjeld: ['dk_spjaeld'], heis: ['dk_elevator_kontrol', 'dk_elevator_insp'], rulletrapp: ['dk_elevator_kontrol', 'dk_elevator_insp'], loft: ['dk_elevator_kontrol'],
     kjole: ['dk_koel'], varmepumpe: ['dk_koel'], trykk: ['dk_tryk'], kjel: ['dk_tryk'], ventilasjon: ['dk_vent'], nodstrom: ['dk_nodstrom'], fettutskiller: ['dk_fedt'], elanlegg: ['dk_el_forsamling'],
-    tak_asfalt: ['dk_tag'], tak_folie: ['dk_tag'], tak_stein: ['dk_tag'],
+    energimerke: ['dk_energimaerke'], tak_asfalt: ['dk_tag'], tak_folie: ['dk_tag'], tak_stein: ['dk_tag'],
   },
   plikter: {
     dk_apv: { n: 'Arbejdspladsvurdering (APV) – mindst hvert 3. år', h: 'Arbejdsmiljøloven § 15 a; bekendtgørelse om arbejdets udførelse', dok: ['Gældende APV', 'Handlingsplan'] },

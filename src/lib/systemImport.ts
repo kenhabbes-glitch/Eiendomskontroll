@@ -46,7 +46,7 @@ export function gjettType(kode: string, tekst: string): string {
   const t = tekst.toLowerCase(); const kand = Object.entries(TFM_DEF).filter(([, d]) => d[0] === kode).map(([k]) => k).filter(k => KOMP[k]);
   const ord: [RegExp, string][] = [[/pvc|folie|membran|protan/, 'tak_folie'], [/papp|asfalt/, 'tak_asfalt'], [/stein|plate/, 'tak_stein'], [/heis/, 'heis'], [/rulletrapp|rullebånd/, 'rulletrapp'], [/løftebord|plattform/, 'loft'],
     [/kanal/, 'kanaler'], [/spjeld/, 'brannspjeld'], [/varmepumpe/, 'varmepumpe'], [/fjernvarme/, 'fjernvarme'], [/fjernkjøl/, 'fjernkjoling'], [/kjøl/, 'kjole'], [/kjel|fyring/, 'kjel'], [/radiator/, 'radiator'],
-    [/nødlys|ledelys/, 'nodlys'], [/brannalarm|brannsentral/, 'brannalarm'], [/sprinkler/, 'sprinkler'], [/belysning|lys|led/, 'belysning'], [/energimerk|energiattest/, 'dok_miljo'], [/slokker/, 'slokkere'], [/røykluke/, 'roykluker']];
+    [/nødlys|ledelys/, 'nodlys'], [/brannalarm|brannsentral/, 'brannalarm'], [/sprinkler/, 'sprinkler'], [/belysning|lys|led/, 'belysning'], [/energimerk|energiattest|energideklaration|energim[æa]rke/, 'energimerke'], [/slokker/, 'slokkere'], [/røykluke/, 'roykluker']];
   // Nøkkelord vinner når typen hører til samme bygningsdelsgruppe (f.eks. «Personheis» i gruppe 62 → heis, ikke løftebord)
   for (const [re, k] of ord) if (re.test(t) && KOMP[k] && (kand.includes(k) || (TFM_DEF[k]?.[0] || '').startsWith(kode.slice(0, 2)))) return k;
   if (kand.length) return kand[0];

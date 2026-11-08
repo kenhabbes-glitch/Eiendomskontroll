@@ -48,7 +48,7 @@ export const PAKKE_SE: Pakke = {
     ventilasjon: ['se_ovk_ftx', 'se_vent_drift'], kanaler: ['se_ovk_ftx'], heis: ['se_hiss', 'se_hiss_service'], rulletrapp: ['se_hiss', 'se_hiss_service'], loft: ['se_hiss'], porter: ['se_port'],
     brannalarm: ['se_brandlarm_kvartal', 'se_brandlarm_revision'], talevarsling: ['se_brandlarm_kvartal'], sprinkler: ['se_sprinkler_vecka', 'se_sprinkler_revision'], slokkere: ['se_slackare'], brannslanger: ['se_brandpost'],
     nodlys: ['se_nodbelysning'], branndorer: ['se_branddorr'], roykluker: ['se_brandgas'], brannspjeld: ['se_spjall'], kjole: ['se_kyla'], varmepumpe: ['se_kyla'], trykk: ['se_tryck'], kjel: ['se_tryck'],
-    nodstrom: ['se_reservkraft'], fettutskiller: ['se_fettavskiljare'], tak_asfalt: ['se_tak'], tak_folie: ['se_tak'], tak_stein: ['se_tak'], eltavle: ['se_elrevision'],
+    nodstrom: ['se_reservkraft'], fettutskiller: ['se_fettavskiljare'], energimerke: ['se_energidekl'], tak_asfalt: ['se_tak'], tak_folie: ['se_tak'], tak_stein: ['se_tak'], eltavle: ['se_elrevision'],
   },
   plikter: {
     se_sba_hg: { n: 'Systematiskt brandskyddsarbete i den egna verksamheten', h: 'LSO 2 kap. 2 § (nyttjanderättshavare); MSB:s allmänna råd om SBA', dok: ['Brandskyddsorganisation och brandskyddsansvarig', 'Rutiner och egenkontroller', 'Utbildning och övning av personal'] },
