@@ -36,14 +36,22 @@ export const proveTil = (k: string, org = S.primarOrg) => RADER?.find(r => r.org
 /** Rute → modul (for menyen og sperret side) */
 export const RUTE_MODUL: Record<string, ModulKey> = { prosjekter: 'prosjekter', prosjekt: 'prosjekter', vedlikehold: 'vedlikehold', tilsyn: 'tilsyn', innboks: 'dokumentlesing' };
 
-// ---------- Priser (settes av leverandøren; leses av alle innloggede)
-export type Trinn = 'en' | 'fler';
-export const TRINN: [Trinn, string, string][] = [['en', 'Enbruker', 'Én bruker'], ['fler', 'Flerbruker', 'Ubegrenset antall brukere i organisasjonen']];
-export type Priser = { moduler: Record<string, { en: number | null; fler: number | null }>; notat?: string; oppdatert?: string };
+// ---------- Priser per bruker med rabatttrapp (settes av leverandøren; leses av alle innloggede)
+export type Trapp = { fra: number; rabatt: number }[];
+export type Priser = { moduler: Record<string, { pris: number | null; min: number | null }>; trapp: Trapp; notat?: string; oppdatert?: string };
+export const STD_TRAPP: Trapp = [{ fra: 1, rabatt: 0 }, { fra: 2, rabatt: 10 }, { fra: 6, rabatt: 20 }, { fra: 11, rabatt: 30 }, { fra: 26, rabatt: 40 }];
 let PRISER: Priser | null = null;
+const normaliser = (v: any): Priser => ({ moduler: v?.moduler || {}, trapp: Array.isArray(v?.trapp) && v.trapp.length ? [...v.trapp].sort((a: any, b: any) => a.fra - b.fra) : STD_TRAPP, notat: v?.notat || '', oppdatert: v?.oppdatert });
 export async function lastPriser(): Promise<Priser | null> {
-  try { const { data, error } = await sb.from('plattform_innstilling').select('verdi').eq('nokkel', 'priser').maybeSingle(); PRISER = error ? null : (data?.verdi as Priser) || { moduler: {} }; } catch { PRISER = null; }
+  try { const { data, error } = await sb.from('plattform_innstilling').select('verdi').eq('nokkel', 'priser').maybeSingle(); PRISER = error ? null : normaliser(data?.verdi); } catch { PRISER = null; }
   return PRISER;
 }
 export const priser = () => PRISER;
+export const rabattFor = (P: Priser | null, n: number) => { let r = 0; for (const t of P?.trapp || STD_TRAPP) if (n >= t.fra) r = t.rabatt; return r; };
+/** Pris per bruker per måned for modulen ved n brukere: listepris minus rabatt, men aldri under minimumsprisen. null = på forespørsel */
+export function prisPerBruker(P: Priser | null, k: string, n: number): number | null {
+  const m = P?.moduler?.[k]; if (!m || m.pris === null || m.pris === undefined) return null;
+  const r = Math.round(m.pris * (1 - rabattFor(P, n) / 100)); return Math.max(m.min ?? 0, r);
+}
+export const prisTotal = (P: Priser | null, moduler: string[], n: number) => moduler.reduce((s, k) => s + (prisPerBruker(P, k, n) || 0) * n, 0);
 export const kr = (n: number | null | undefined) => n === null || n === undefined || isNaN(n as number) ? '' : Math.round(n).toLocaleString('nb-NO') + ' kr';

@@ -139,12 +139,12 @@ const handler = async (req: Request) => {
     if (!rolle) return json(400, { error: 'Ugyldig rolle' });
     const { data: fins } = await admin.from('profiles').select('id, rolle').eq('epost', epost).maybeSingle();
     if (fins && fins.rolle === 'leietaker') return json(409, { error: 'E-posten brukes av en leietakerbruker' });
-    { // Enbruker-abonnement: bare én bruker i organisasjonen
-      const { data: o } = await admin.from('organisasjoner').select('abonnement_trinn').eq('id', org).maybeSingle();
-      if ((o as any)?.abonnement_trinn === 'en') {
+    { // Antall brukerlisenser: ikke flere aktive brukere enn kunden betaler for
+      const { data: o } = await admin.from('organisasjoner').select('lisenser').eq('id', org).maybeSingle(); const lis = (o as any)?.lisenser;
+      if (lis) {
         const { data: fm } = await admin.from('profiles').select('id').eq('epost', epost).maybeSingle();
         const { count } = await admin.from('org_medlem').select('user_id', { count: 'exact', head: true }).eq('org_id', org).eq('aktiv', true).neq('user_id', fm?.id || '00000000-0000-0000-0000-000000000000');
-        if ((count || 0) >= 1) return json(402, { error: 'Abonnementet er Enbruker og har plass til én bruker. Bestill Flerbruker under Organisasjon og tilgang → Abonnement for å legge til flere.' });
+        if ((count || 0) >= lis) return json(402, { error: `Abonnementet har ${lis} bruker${lis === 1 ? '' : 'e'}, og alle er i bruk. Øk antall brukere under Organisasjon og tilgang → Abonnement.` });
       }
     }
     try {
