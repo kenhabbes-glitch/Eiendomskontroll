@@ -1,6 +1,8 @@
+Lim inn bare linjen UNDER navnet (ikke «invite:»/«recovery:»).
+
 invite:
-{{ if eq (printf "%v" .Data.sprak) "en" }}You are invited to Eiendomskontroll{{ else if eq (printf "%v" .Data.sprak) "sv" }}Du är inbjuden till Eiendomskontroll{{ else if eq (printf "%v" .Data.sprak) "da" }}Du er inviteret til Eiendomskontroll{{ else if eq (printf "%v" .Data.sprak) "es-MX" }}Invitación a Eiendomskontroll{{ else if eq (printf "%v" .Data.sprak) "es-ES" }}Invitación a Eiendomskontroll{{ else }}Du er invitert til Eiendomskontroll{{ end }}
+{{$s:=printf "%v" .Data.sprak}}{{if eq $s "en"}}Invitation{{else if eq $s "sv"}}Inbjudan{{else if eq $s "da"}}Invitation{{else if eq $s "es-MX" "es-ES"}}Invitación{{else}}Invitasjon{{end}} – Eiendomskontroll
 
 recovery:
-{{ if eq (printf "%v" .Data.sprak) "en" }}New password for Eiendomskontroll{{ else if eq (printf "%v" .Data.sprak) "sv" }}Nytt lösenord till Eiendomskontroll{{ else if eq (printf "%v" .Data.sprak) "da" }}Ny adgangskode til Eiendomskontroll{{ else if eq (printf "%v" .Data.sprak) "es-MX" }}Nueva contraseña para Eiendomskontroll{{ else if eq (printf "%v" .Data.sprak) "es-ES" }}Nueva contraseña para Eiendomskontroll{{ else }}Nytt passord til Eiendomskontroll{{ end }}
+{{$s:=printf "%v" .Data.sprak}}{{if eq $s "en"}}New password{{else if eq $s "sv"}}Nytt lösenord{{else if eq $s "da"}}Ny adgangskode{{else if eq $s "es-MX" "es-ES"}}Nueva contraseña{{else}}Nytt passord{{end}} – Eiendomskontroll
 

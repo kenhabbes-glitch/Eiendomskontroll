@@ -27,10 +27,14 @@ const kropp = (t) => `<div style="font-family:Arial,sans-serif;font-size:14px;li
   <h2 style="margin:0 0 12px">${t[1]}</h2><p>${t[2]}</p>
   <p style="margin:20px 0"><a href="{{ .ConfirmationURL }}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${t[3]}</a></p>
   <p style="font-size:12px;color:#6b736d">${t[4]}</p></div>`;
-let emner = '';
+// Emnefeltet i Supabase tåler maks 255 tegn: korte ord per språk, felles « – Eiendomskontroll»
+const EMNE = { invite: ['Invitation', 'Inbjudan', 'Invitation', 'Invitación', 'Invitasjon'], recovery: ['New password', 'Nytt lösenord', 'Ny adgangskode', 'Nueva contraseña', 'Nytt passord'] };
+let emner = 'Lim inn bare linjen UNDER navnet (ikke «invite:»/«recovery:»).\n\n';
 for (const [mal, S] of Object.entries(T)) {
   fs.writeFileSync(path.join(__dirname, mal + '.html'), velg(s => '\n' + kropp(S[s]) + '\n') + '\n');
-  emner += `${mal}:\n${velg(s => S[s][0])}\n\n`;
+  const e = EMNE[mal]; const linje = `{{$s:=printf "%v" .Data.sprak}}{{if eq $s "en"}}${e[0]}{{else if eq $s "sv"}}${e[1]}{{else if eq $s "da"}}${e[2]}{{else if eq $s "es-MX" "es-ES"}}${e[3]}{{else}}${e[4]}{{end}} – Eiendomskontroll`;
+  if (linje.length > 255) throw new Error('Emnet er for langt: ' + mal);
+  emner += `${mal}:\n${linje}\n\n`;
 }
 fs.writeFileSync(path.join(__dirname, 'emner.txt'), emner);
 console.log('skrevet invite.html, recovery.html og emner.txt');
