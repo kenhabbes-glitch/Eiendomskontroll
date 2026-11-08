@@ -71,6 +71,7 @@ function AoDetalj({ id }: { id: string }) {
           <h3>{tt("Bilder og dokumentasjon")}</h3>
           {(a.vedlegg || []).length ? <Vedlegg list={a.vedlegg} /> : <p className="small muted">{tt("Ingen filer ennå.")}</p>}
         </div>
+        {staff && a.leietakerId && <div className="card" style={{ marginTop: 12 }}><h2 style={{ marginTop: 0 }}>{tt("Samtale med leietaker")}</h2><Samtale eiendomId={a.eiendomId} leietakerId={a.leietakerId} avvikId={id} /></div>}
         <div className="card" style={{ marginTop: 12 }}><h2 style={{ marginTop: 0 }}>{tt("Logg")}</h2>
           {(a.logg || []).length ? <div className="log">{a.logg.slice().reverse().map((l: any, i: number) => <div key={i}><span className="lt">{new Date(l.t).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' })}{l.av ? ' · ' + l.av : ''}</span> · {l.k}</div>)}</div> : <p className="small muted">{tt("Ingen hendelser.")}</p>}
           <details style={{ marginTop: 10 }}><summary className="small">{tt("Full endringslogg fra databasen")}</summary><div style={{ marginTop: 8 }}><HendelseListe radId={id} /></div></details>
@@ -184,6 +185,7 @@ export function AoLenke({ token }: { token: string }) {
 
 // ---------------- Hendelseslogg (admin/forvalter)
 import { NyheterListe } from '../components/Nyheter';
+import { Samtale } from '../components/Samtale';
 export function Hendelseslogg() {
   useStore();
   const [f, setF] = useFilter('hlogg', { e: '', t: '', q: '' }); const [L, setL] = useState<any[] | null>(null); const [n, setN] = useState(300);

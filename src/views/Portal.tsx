@@ -61,13 +61,15 @@ function visAvvik(a: any) {
   showModal(tt("Melding #{0}: {1}", a.nr || '', a.tittel), () => <>
     <dl className="dl"><dt>{tt("Status")}</dt><dd><StChip s={a.status} /></dd><dt>{tt("Alvorlighet")}</dt><dd><AlvChip a={a.alv} /></dd><dt>{tt("Meldt")}</dt><dd>{fd(a.oppdaget)}{a.meldtAv ? tt(" av ") + a.meldtAv : ''}</dd>{a.planlagt && <><dt>{tt("Planlagt utbedret")}</dt><dd>{fd(a.planlagt)}</dd></>}{a.beskrivelse && <><dt>{tt("Beskrivelse")}</dt><dd style={{ whiteSpace: 'pre-wrap' }}>{a.beskrivelse}</dd></>}</dl>
     {(a.vedlegg || []).length > 0 && <p>{a.vedlegg.map((f: any, i: number) => <FileLink key={i} fil={f} />)}</p>}
+    {a.leietakerId && <><h3 style={{ marginTop: 16 }}>{tt("Meldinger om saken")}</h3><Samtale eiendomId={a.eiendomId} leietakerId={a.leietakerId} avvikId={a.id} /></>}
     <h3 style={{ marginTop: 16 }}>{tt("Historikk")}</h3><div className="log">{(a.logg || []).slice().reverse().map((x: any, i: number) => <div key={i}><span className="lt">{new Date(x.t).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' })}</span> · <StChip s={x.s} />{x.k && <><br />{x.k}</>}</div>)}</div>
   </>);
 }
 
 import { meldingerFor } from './Driftsmeldinger';
+import { Samtale, useUlesteMeldinger } from '../components/Samtale';
 export function Portal() {
-  useStore();
+  useStore(); const nyeSvar = useUlesteMeldinger();
   const l = S.leietakere.find(x => x.id === state.me?.leietakerId);
   if (!l) return <div className="card"><Empty t="Fant ikke leieforholdet">{tt("Brukeren din er ikke koblet til en leietaker. Kontakt utleier.")}</Empty></div>;
   const e = byId('eiendommer', l.eiendomId) || ({} as any);
@@ -90,6 +92,7 @@ export function Portal() {
       <div className="tbl-wrap"><table><thead><tr><th>{tt("Plikt")}</th><th>{tt("Hjemmel")}</th><th>{tt("Frekvens")}</th><th>{tt("Sist bekreftet")}</th><th>{tt("Status")}</th><th /></tr></thead><tbody>
         {pl.length ? pl.map((p: any) => { const s = pliktStatus(p); const v = pliktVis(p); const venter = p.status === 'til_godkjenning'; const dk = PLIKTER[p.key]?.dok || []; return <tr key={p.key}><td>{p.navn}{dk.length > 0 && <div className="small muted">{dk.length} {tt("punkter i sjekklisten")}</div>}{p.status === 'avvist' && p.tilbakemelding && <div className="small" style={{ color: 'var(--red)' }}>{tt("Utleier:")} {p.tilbakemelding.tekst}</div>}{venter && <div className="small muted">{tt("Sendt")} {fd(p.innsendt.tid)} {tt("– venter på utleier")}</div>}</td><td className="small muted">{p.hjemmel}</td><td className="small">{intTxt(p.frekvens)}</td><td className="small">{fd(p.sist)}</td><td><Chip c={v.c}>{v.t}</Chip></td><td><button className={'btn sm ' + (!venter && (s.o >= 1 || p.status === 'avvist') ? 'pri' : '')} onClick={() => bekreft(l, p)}>{venter ? tt("Endre") : p.status === 'avvist' ? tt("Send på nytt") : s.o >= 1 ? tt("Fyll ut") : tt("Oppdater")}</button></td></tr>; }) : <tr><td colSpan={6} className="muted">{tt("Ingen plikter registrert.")}</td></tr>}
       </tbody></table></div></div>
+    <div className="sec"><h2>{tt("Meldinger til utleier")}{nyeSvar > 0 && <span className="chip red" style={{ marginLeft: 8 }}>{nyeSvar} {tt("ny")}</span>}</h2><div className="card"><Samtale eiendomId={l.eiendomId} leietakerId={l.id} /></div></div>
     <div className="sec"><h2>{tt("Mine meldinger og avvik")}</h2>{A.length ? <div className="tbl-wrap"><table><thead><tr><th className="num">{tt("Nr")}</th><th>{tt("Melding")}</th><th>{tt("Alvorlighet")}</th><th>{tt("Status")}</th><th>{tt("Meldt")}</th><th>{tt("Ansvar")}</th></tr></thead><tbody>
       {A.map(a => <tr key={a.id} className="click" onClick={() => visAvvik(a)}><td className="num muted">{a.nr}</td><td><b style={{ fontWeight: 500 }}>{a.tittel}</b></td><td><AlvChip a={a.alv} /></td><td><StChip s={a.status} /></td><td className="small">{fd(a.oppdaget)}</td><td className="small">{a.ansvar === 'Leietaker' ? <Chip c="amber">{tt("Dere")}</Chip> : tt("Utleier")}</td></tr>)}
     </tbody></table></div> : <div className="tbl-wrap"><Empty t="Ingen meldinger">{tt("Bruk «Meld avvik eller feil» når noe må utbedres.")}</Empty></div>}</div>

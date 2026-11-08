@@ -2,6 +2,8 @@ import { PrLenke } from './views/ProsjektRapport';
 import { Registrer } from './views/Registrer';
 import { OrgnrVarsel } from './components/OrgnrVarsel';
 import { InstallerApp, skannQr } from './components/Felt';
+import { useUlesteMeldinger } from './components/Samtale';
+import { MeldingerView } from './views/Meldinger';
 import { QrLenke } from './views/QrMelding';
 import { NyheterPopup } from './components/Nyheter';
 import { VilkarTekst } from './components/Vilkar';
@@ -68,6 +70,7 @@ const I: Record<string, string> = {
   befaringer: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 14l2 2 4-4',
   tilsynsanalyser: 'M3 3v18h18M8 17V11M13 17V7M18 17v-4',
   arkiv: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
+  meldinger: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z',
   innboks: 'M22 12h-6l-2 3h-4l-2-3H2M5.5 5.1L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.5-6.9A2 2 0 0016.7 4H7.3a2 2 0 00-1.8 1.1z',
   tilsyn: 'M9 11l3 3 8-8M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9',
   avvik: 'M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z',
@@ -96,6 +99,7 @@ function navFor(): [string, string][] {
   if (canEdit()) n.push(['leietakere', 'Leietakere']);
   n.push(['maalere', 'Målere'], ['tfm', 'TFM-register'], ['arealer', 'Tegninger og arealer'], ['dokumenter', 'Dokumenter']);
   if (S.eiendommer.some(e => kanDrifteE(e.id) && harModul('dokumentlesing', e.id))) n.push(['innboks', 'Dokumentinnboks']);
+  if (S.leietakere.length && S.eiendommer.some(e => kanDrifteE(e.id))) n.push(['meldinger', 'Meldinger']);
   if (canEdit() && harModul('vedlikehold')) n.push(['vedlikehold', 'Vedlikeholdsplan']);
   if (canEdit() && harModul('prosjekter')) n.push(['prosjekter', 'Prosjekter']);
   n.push(['regelverk', 'Regelverk og plikter']);
@@ -115,7 +119,7 @@ export default function App() {
   const [admApen, setAdmApen] = useState(() => { try { return localStorage.getItem('navAdmin') === '1'; } catch { return false; } });
   const settAdmApen = (b: boolean) => { setAdmApen(b); try { localStorage.setItem('navAdmin', b ? '1' : '0'); } catch { } };
   useStore();
-  const ibN = useInnboksAntall();
+  const ibN = useInnboksAntall(); const mldN = useUlesteMeldinger();
   const r = useRoute();
   // Kvitter ut eierkontroller automatisk når alle leietakere har dokumentert (sjekkes når data endres)
   useEffect(() => { if (state.ready && state.me && canEdit()) { const t = setTimeout(() => autoKvitterIK(), 800); return () => clearTimeout(t); } }, [state.version, state.ready]);
@@ -162,6 +166,7 @@ export default function App() {
     case 'avvik': body = <AvvikView />; break;
     case 'tilsyn': body = <TilsynView />; break;
     case 'innboks': body = <Innboks />; break;
+    case 'meldinger': body = <MeldingerView />; break;
     case 'leietakere': body = <Leietakere />; break;
     case 'leietaker': body = <LeietakerView id={r.id!} />; break;
     case 'tfm': body = <TfmRegister />; break;
@@ -192,7 +197,7 @@ export default function App() {
       <nav id="nav">{(() => {
         const lenke = ([k, l]: [string, string], sub = false) => <a key={k} href={'#/' + k} className={(cur === k ? 'on' : '') + (sub ? ' navsub' : '')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={I[k]} /></svg>{tt(l)}
-          {k === 'kontroller' && forf > 0 && <span className="n">{forf}</span>}{k === 'avvik' && avv > 0 && <span className="n">{avv}</span>}{k === 'innboks' && ibN > 0 && <span className="n">{ibN}</span>}{k === 'tilsyn' && svarfristSnart(14).length > 0 && <span className="n">{svarfristSnart(14).length}</span>}{k === 'arbeidsordre' && mineAo().length > 0 && <span className="n">{mineAo().length}</span>}
+          {k === 'kontroller' && forf > 0 && <span className="n">{forf}</span>}{k === 'avvik' && avv > 0 && <span className="n">{avv}</span>}{k === 'meldinger' && mldN > 0 && <span className="n">{mldN}</span>}{k === 'innboks' && ibN > 0 && <span className="n">{ibN}</span>}{k === 'tilsyn' && svarfristSnart(14).length > 0 && <span className="n">{svarfristSnart(14).length}</span>}{k === 'arbeidsordre' && mineAo().length > 0 && <span className="n">{mineAo().length}</span>}
         </a>;
         const adm = nav.filter(n => ADMIN_NAV.includes(n[0])); const vanlig = nav.filter(n => !ADMIN_NAV.includes(n[0]));
         const iAdm = adm.some(n => n[0] === cur); const apen = admApen || iAdm;

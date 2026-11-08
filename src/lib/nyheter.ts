@@ -1,6 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-11', dato: '2026-11-11', tittel: 'Toveis meldinger med leietakere', punkter: [
+    'Leietakere kan skrive til deg fra portalen, og du kan svare på saker og generelt. Du velger per melding om leietakeren skal se den (ellers er den et internt notat). Se menyvalget Meldinger.',
+  ] },
   { id: '2026-11-10', dato: '2026-11-10', tittel: 'Installer som app og bruk i felt', punkter: [
     'Installer appen på mobilen (knapp nederst i menyen) og bruk den som en vanlig app.',
     'Skann QR-koder med kameraet (knapp nederst i menyen).',
