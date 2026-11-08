@@ -135,3 +135,16 @@ export function useUlesteMeldinger(): number {
   }, [uid, leietaker]);
   return n;
 }
+
+/** Alle meldinger brukeren kan se (leietaker: egne saker). Oppdateres hvert 30. sekund og når en melding sendes. */
+export function useMineMeldinger(): Melding[] {
+  const [L, setL] = useState<Melding[]>([]); const uid = state.me?.id;
+  useEffect(() => {
+    if (!uid) return; let on = true;
+    const hent = async () => { const { data } = await sb.from('meldinger').select('*').order('created_at', { ascending: false }).limit(500); if (on) setL((data as Melding[]) || []); };
+    hent(); const t = setInterval(hent, 30000); window.addEventListener('ek-meldinger', hent);
+    return () => { on = false; clearInterval(t); window.removeEventListener('ek-meldinger', hent); };
+  }, [uid]);
+  return L;
+}
+export const ulestSvar = (m: Melding) => m.data.rolle !== 'leietaker' && new Date(m.created_at).getTime() > +(localStorage.getItem(SIST_SETT + (m.leietaker_id || '') + (m.avvik_id || '')) || 0);

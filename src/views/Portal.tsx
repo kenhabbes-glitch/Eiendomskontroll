@@ -18,8 +18,8 @@ async function refreshMine() {
 
 function meldAvvik(l: any) {
   formModal({
-    title: tt("Meld avvik eller feil"), saveTxt: tt("Send melding"),
-    top: <p className="small muted" style={{ marginTop: 0 }}>{tt("Meldingen går til eier/forvalter av")} {byId('eiendommer', l.eiendomId)?.navn || tt("eiendommen")}{tt(". Du kan følge status her.")}</p>,
+    title: tt("Meld ny sak"), saveTxt: tt("Send inn sak"),
+    top: <p className="small muted" style={{ marginTop: 0 }}>{tt("Meldingen går til eier/forvalter av")} {byId('eiendommer', l.eiendomId)?.navn || tt("eiendommen")}{tt(". Du får et saksnummer og kan følge saken og skrive til utleier her.")}</p>,
     fields: [
       { k: 'tittel', label: tt("Hva gjelder det?"), req: true, ph: tt("F.eks. Nødlys over utgang i 2. etg lyser ikke") },
       { k: 'plassering', label: tt("Hvor?"), ph: tt("Etasje, rom, inngang …"), half: true },
@@ -29,7 +29,8 @@ function meldAvvik(l: any) {
     onSave: async v => {
       const o: any = { tittel: v.tittel, beskrivelse: [v.beskrivelse, v.plassering ? 'Sted: ' + v.plassering : ''].filter(Boolean).join('\n'), eiendomId: l.eiendomId, leietakerId: l.id, alv: v.alv, status: 'Ny', kilde: 'Leietaker', ansvar: 'Eier', meldtAv: state.me?.navn || state.me?.epost, oppdaget: today(), frist: addDays(today(), ({ Kritisk: 7, 'Høy': 30, Middels: 90, Lav: 365 } as any)[v.alv]), logg: [{ t: new Date().toISOString(), s: 'Ny', k: 'Meldt av leietaker', av: state.me?.navn || state.me?.epost }] };
       if (v.fil) { const f = await uploadFile(v.fil, l.eiendomId, l.id); if (f) o.vedlegg = [f]; }
-      await save('avvik', o); toast(tt("Takk! Meldingen er sendt."));
+      const nyId = await save('avvik', o); toast(tt("Takk! Saken er registrert."));
+      const na = byId('avvik', nyId); if (na) setTimeout(() => visAvvik(na), 300);
     },
   });
 }
@@ -67,18 +68,22 @@ function visAvvik(a: any) {
 }
 
 import { meldingerFor } from './Driftsmeldinger';
-import { Samtale, useUlesteMeldinger } from '../components/Samtale';
+import { Samtale, useMineMeldinger, ulestSvar } from '../components/Samtale';
 export function Portal() {
-  useStore(); const nyeSvar = useUlesteMeldinger();
+  useStore();
   const l = S.leietakere.find(x => x.id === state.me?.leietakerId);
   if (!l) return <div className="card"><Empty t="Fant ikke leieforholdet">{tt("Brukeren din er ikke koblet til en leietaker. Kontakt utleier.")}</Empty></div>;
   const e = byId('eiendommer', l.eiendomId) || ({} as any);
-  const A = sortBy(S.avvik.filter(a => a.leietakerId === l.id), a => (AV_LUKKET.includes(a.status) ? '1' : '0') + (a.opprettet || '')).reverse();
+  const A0 = sortBy(S.avvik.filter(a => a.leietakerId === l.id), a => String(a.nr || 0).padStart(9, '0')).reverse();
+  const [sok, setSok] = React.useState(''); const M = useMineMeldinger();
+  const nyeIn = (a: any) => M.filter(m => m.avvik_id === a.id && ulestSvar(m)).length; const sistIn = (a: any) => M.find(m => m.avvik_id === a.id);
+  const q = sok.trim().toLowerCase().replace(/^#/, '');
+  const A = q ? A0.filter(a => String(a.nr) === q || (a.tittel || '').toLowerCase().includes(q) || (a.status || '').toLowerCase().includes(q) || M.some(m => m.avvik_id === a.id && m.data.tekst.toLowerCase().includes(q))) : A0;
   const apne = A.filter(a => !AV_LUKKET.includes(a.status));
   const D = S.dokumenter.filter(d => d.leietakerId === l.id);
   const pl = (l.plikter || []).filter((p: any) => !p.ikkeRelevant); const mangler = pl.filter((p: any) => pliktStatus(p).o >= 1 && p.status !== 'til_godkjenning');
   return <>
-    <div className="portalhero"><div className="head" style={{ marginBottom: 0 }}><div className="grow"><h1>{l.navn}<Hjelp id="side.portal" /></h1><p className="sub">{e.navn}{e.adresse ? ' · ' + e.adresse : ''}{l.lokale ? ' · ' + l.lokale : ''}</p></div><button className="btn pri" onClick={() => meldAvvik(l)}>{tt("+ Meld avvik eller feil")}</button></div>
+    <div className="portalhero"><div className="head" style={{ marginBottom: 0 }}><div className="grow"><h1>{l.navn}<Hjelp id="side.portal" /></h1><p className="sub">{e.navn}{e.adresse ? ' · ' + e.adresse : ''}{l.lokale ? ' · ' + l.lokale : ''}</p></div><button className="btn pri" onClick={() => meldAvvik(l)}>{tt("+ Meld ny sak")}</button></div>
       <div className="kpis" style={{ marginTop: 14, marginBottom: 0 }}>
         <div className={'kpi ' + (mangler.length ? 'warn' : 'ok')} style={{ cursor: 'default' }}><div className="l">{tt("Plikter som må bekreftes")}</div><div className="v">{mangler.length}</div><div className="s">{tt("av")} {pl.length} {tt("plikter")}</div></div>
         <div className="kpi" style={{ cursor: 'default' }}><div className="l">{tt("Åpne meldinger")}</div><div className="v">{apne.length}</div><div className="s">{A.length - apne.length} {tt("avsluttet")}</div></div>
@@ -92,10 +97,11 @@ export function Portal() {
       <div className="tbl-wrap"><table><thead><tr><th>{tt("Plikt")}</th><th>{tt("Hjemmel")}</th><th>{tt("Frekvens")}</th><th>{tt("Sist bekreftet")}</th><th>{tt("Status")}</th><th /></tr></thead><tbody>
         {pl.length ? pl.map((p: any) => { const s = pliktStatus(p); const v = pliktVis(p); const venter = p.status === 'til_godkjenning'; const dk = PLIKTER[p.key]?.dok || []; return <tr key={p.key}><td>{p.navn}{dk.length > 0 && <div className="small muted">{dk.length} {tt("punkter i sjekklisten")}</div>}{p.status === 'avvist' && p.tilbakemelding && <div className="small" style={{ color: 'var(--red)' }}>{tt("Utleier:")} {p.tilbakemelding.tekst}</div>}{venter && <div className="small muted">{tt("Sendt")} {fd(p.innsendt.tid)} {tt("– venter på utleier")}</div>}</td><td className="small muted">{p.hjemmel}</td><td className="small">{intTxt(p.frekvens)}</td><td className="small">{fd(p.sist)}</td><td><Chip c={v.c}>{v.t}</Chip></td><td><button className={'btn sm ' + (!venter && (s.o >= 1 || p.status === 'avvist') ? 'pri' : '')} onClick={() => bekreft(l, p)}>{venter ? tt("Endre") : p.status === 'avvist' ? tt("Send på nytt") : s.o >= 1 ? tt("Fyll ut") : tt("Oppdater")}</button></td></tr>; }) : <tr><td colSpan={6} className="muted">{tt("Ingen plikter registrert.")}</td></tr>}
       </tbody></table></div></div>
-    <div className="sec"><h2>{tt("Meldinger til utleier")}{nyeSvar > 0 && <span className="chip red" style={{ marginLeft: 8 }}>{nyeSvar} {tt("ny")}</span>}</h2><div className="card"><Samtale eiendomId={l.eiendomId} leietakerId={l.id} /></div></div>
-    <div className="sec"><h2>{tt("Mine meldinger og avvik")}</h2>{A.length ? <div className="tbl-wrap"><table><thead><tr><th className="num">{tt("Nr")}</th><th>{tt("Melding")}</th><th>{tt("Alvorlighet")}</th><th>{tt("Status")}</th><th>{tt("Meldt")}</th><th>{tt("Ansvar")}</th></tr></thead><tbody>
-      {A.map(a => <tr key={a.id} className="click" onClick={() => visAvvik(a)}><td className="num muted">{a.nr}</td><td><b style={{ fontWeight: 500 }}>{a.tittel}</b></td><td><AlvChip a={a.alv} /></td><td><StChip s={a.status} /></td><td className="small">{fd(a.oppdaget)}</td><td className="small">{a.ansvar === 'Leietaker' ? <Chip c="amber">{tt("Dere")}</Chip> : tt("Utleier")}</td></tr>)}
-    </tbody></table></div> : <div className="tbl-wrap"><Empty t="Ingen meldinger">{tt("Bruk «Meld avvik eller feil» når noe må utbedres.")}</Empty></div>}</div>
+    <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>{tt("Mine saker")}</h2><input placeholder={tt("Søk i saker (nr, tittel, melding) …")} value={sok} onChange={e => setSok(e.target.value)} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px', width: 280 }} /><button className="btn pri" onClick={() => meldAvvik(l)}>{tt("+ Meld ny sak")}</button></div>
+      <p className="small muted" style={{ marginTop: 0 }}>{tt("Hver sak har et saksnummer. Åpne en sak for å skrive til utleier, legge ved bilder og følge status.")}</p>
+      {A.length ? <div className="tbl-wrap"><table><thead><tr><th className="num">{tt("Sak nr")}</th><th>{tt("Sak")}</th><th>{tt("Status")}</th><th>{tt("Siste melding")}</th><th>{tt("Meldt")}</th></tr></thead><tbody>
+        {A.map(a => { const n = nyeIn(a); const sist = sistIn(a); return <tr key={a.id} className="click" onClick={() => visAvvik(a)}><td className="num muted">#{a.nr}</td><td><b style={{ fontWeight: n ? 700 : 500 }}>{a.tittel}</b>{n > 0 && <span className="chip red" style={{ marginLeft: 6 }}>{n} {tt("ny")}</span>}<div><AlvChip a={a.alv} /></div></td><td><StChip s={a.status} /></td><td className="small">{sist ? sist.data.tekst.slice(0, 60) : <span className="muted">–</span>}</td><td className="small">{fd(a.oppdaget)}</td></tr>; })}
+      </tbody></table></div> : <div className="tbl-wrap"><Empty t={q ? "Ingen treff" : "Ingen saker"}>{q ? tt("Ingen saker passer med søket.") : tt("Bruk «Meld ny sak» når noe må utbedres eller du har et spørsmål til utleier.")}</Empty></div>}</div>
     <div className="grid g2 sec">
       <AnsvarPortal l={l} />
       <div className="card"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>{tt("Dokumenter")}</h2><button className="btn sm" onClick={() => lastOpp(l)}>{tt("+ Last opp")}</button></div>
