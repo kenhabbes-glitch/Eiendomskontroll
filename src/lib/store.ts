@@ -197,6 +197,7 @@ async function loadOrg() {
   S.orgs = orgs; S.medlemmer = med; S.portefoljer = port; S.oppdrag = opp;
   const { data: niv } = await sb.rpc('mine_tilganger'); S.niva = Object.fromEntries((niv || []).map((r: any) => [r.eiendom_id, r.niva]));
   const { data: po } = await sb.rpc('min_primar_org'); S.primarOrg = po || '';
+  try { const { lastModuler } = await import('./moduler'); await lastModuler(); } catch { /* ikke tilgjengelig */ }
 }
 export async function oppdaterNiva() { const { data: niv } = await sb.rpc('mine_tilganger'); S.niva = Object.fromEntries((niv || []).map((r: any) => [r.eiendom_id, r.niva])); bump(); }
 let orgT: any = 0;

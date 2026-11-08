@@ -6,6 +6,7 @@ import { levetidRef, midt, spenn } from './ns3451';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER } from './catalog';
 import { S, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore, kanRedigereE, kanDrifteE, mineOrg, oppdaterNiva } from './store';
 import { leieAreal, m2, FELLES_AVTALE } from './utils';
+import { harModul } from './moduler';
 import { TgKgVelger, tgAvviker, tgTekst } from '../components/TgKg';
 import { PosVelger, BildeVelger, VedleggGalleri } from '../components/PosVelger';
 import { ServiceHistorikk } from '../views/Servicehistorikk';
@@ -327,7 +328,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
       const kc = S.komponenter.filter(k => k.anleggId === id);
       if (await confirmBox(`Slette systemet${kc.length ? ` og ${kc.length} komponenter` : ''}? Tilknyttede kontroller beholdes, men mister koblingen.`)) { await removeDoc('anlegg', id); close(); }
     }}>Slett</button><button className="btn" title="Klikk rundt på en tegning og marker f.eks. hver branndør" onClick={() => kompFraTegning(id, close)}>+ Komponenter fra tegning</button>
-      {!aktivtProsjektFor(id) && <button className="btn" title="Systemet merkes, og et prosjekt åpnes i prosjektmodulen. Når prosjektet ferdigstilles, erstatter nytt system det gamle." onClick={async () => { const pid = await opprettUtskifting(id); if (pid) { close(); toast('Utskiftingsprosjekt opprettet'); go('prosjekt/' + pid); } }}>Opprett utskiftingsprosjekt</button>}</> : null,
+      {!aktivtProsjektFor(id) && harModul('prosjekter', byId('anlegg', id)?.eiendomId) && <button className="btn" title="Systemet merkes, og et prosjekt åpnes i prosjektmodulen. Når prosjektet ferdigstilles, erstatter nytt system det gamle." onClick={async () => { const pid = await opprettUtskifting(id); if (pid) { close(); toast('Utskiftingsprosjekt opprettet'); go('prosjekt/' + pid); } }}>Opprett utskiftingsprosjekt</button>}</> : null,
     onSave: async v => {
       const mk: string[] = [...(v.mk || []), ...(v.mkNy || [])]; const forste = v.forste || addDays(today(), 30); const levMk: any[] = v.levMk || []; delete v.mk; delete v.mkNy; delete v.levMk; delete v.forste; delete v.prev; delete v.beregn;
       if (v.kost && !v.kostAar) v.kostAar = YEAR;
@@ -549,7 +550,7 @@ export function utfor(id: string, pre?: UtforPreset) {
       {tgAvviker(x.tl, tgMaal) && <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={x.tlBruk !== false} onChange={e => set({ tlBruk: e.target.checked })} style={{ width: 'auto' }} />Oppdater tilstanden på {o.komponentId ? 'komponenten' : 'systemet'} til {tgTekst(x.tl)}</label>}</> } as Field] : []),
     ...(pre?.filer?.length ? [{ k: 'filerInfo', type: 'custom', label: 'Rapport og vedlegg fra servicefirmaet', render: () => <div className="small">{pre.filer!.map((f: any) => <div key={f.path}><FileLink fil={f} /></div>)}<div className="muted">Lagres som dokumenter på kontrollen.</div></div> } as Field] : []),
     { k: 'fil', label: pre?.filer?.length ? 'Ekstra rapport / sjekkliste (valgfritt)' : 'Rapport / sjekkliste', type: 'file' },
-    { k: 'les', type: 'custom', render: (v: any, set: any) => { const K = pdfKilder(v.fil, pre?.filer); if (!K.length) return null;
+    { k: 'les', type: 'custom', render: (v: any, set: any) => { const K = pdfKilder(v.fil, pre?.filer); if (!K.length || !harModul('dokumentlesing', o.eiendomId)) return null;
       return <div className="note small" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', color: 'var(--ink)' }}><span style={{ flex: 1 }}>Appen kan lese rapporten (PDF eller bilde) og foreslå avvik. Rapporten leses her i nettleseren.</span>
         <button type="button" className="btn sm pri" onClick={() => lesRapport(o, K, (avs, ok) => { const eks = (v.avs || []).filter((r: any) => r.t?.trim());
           set(ok ? { res: 'OK – ingen avvik' } : { res: 'Avvik funnet', avs: [...eks, ...avs.map(x => ({ ...nyRad(), t: x.t, a: x.a }))] }); })}>Les avvik fra rapporten</button></div>; } } as Field,
@@ -707,7 +708,7 @@ function AvvikKoblinger({ id, lukk }: { id: string; lukk: () => void }) {
       <b>↻ {G.length} avvik på {a.komponentId ? 'denne komponenten' : 'dette systemet'} siste {GJENTATT_MND} måneder.</b> Gjentatte feil kan bety at {a.komponentId ? 'komponenten' : 'systemet'} bør skiftes i stedet for å repareres.
       <ul style={{ margin: '6px 0', paddingLeft: 18 }}>{G.slice(0, 8).map(x => <li key={x.id}>{x.id === id ? <b>#{x.nr} {x.tittel} (dette)</b> : <a href="#" onClick={e => { e.preventDefault(); lukk(); editAvvik(x.id); }}>#{x.nr} {x.tittel}</a>} <span className="muted">· {fd(x.oppdaget)} · {x.status}</span></li>)}</ul>
       {ed && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {aid && (pr ? <button type="button" className="btn sm" onClick={() => { lukk(); location.hash = '#/prosjekt/' + pr.id; }}>Åpne utskiftingsprosjektet</button>
+        {aid && (pr || harModul('prosjekter', a.eiendomId)) && (pr ? <button type="button" className="btn sm" onClick={() => { lukk(); location.hash = '#/prosjekt/' + pr.id; }}>Åpne utskiftingsprosjektet</button>
           : <button type="button" className="btn sm pri" onClick={async () => { const pid = await opprettUtskifting(aid); if (pid) { await save('avvik', { ...byId('avvik', id)!, logg: [...(byId('avvik', id)!.logg || []), { t: new Date().toISOString(), s: a.status, k: `Utskiftingsprosjekt opprettet etter ${G.length} gjentatte avvik`, av: state.me?.navn }] }); lukk(); location.hash = '#/prosjekt/' + pid; } }}>Opprett utskiftingsprosjekt for {aNavn(aid)}</button>)}
         {m && <button type="button" className="btn sm" onClick={fremskynd}>Fremskynd utskifting i vedlikeholdsplanen{m.planAar ? ` (nå ${m.planAar})` : ''}</button>}</div>}</div>}
   </>;

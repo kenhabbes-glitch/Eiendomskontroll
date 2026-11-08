@@ -1,4 +1,5 @@
 import React from 'react';
+import { harModul } from '../lib/moduler';
 import { PLIKTER } from '../lib/catalog';
 import { Hjelp } from '../components/Hjelp';
 import { AV_LUKKET } from '../lib/catalog';
@@ -81,7 +82,7 @@ export function Portal() {
       </div>
       {e.kontaktLeietaker && <p className="small" style={{ marginBottom: 0 }}>Kontakt utleier: {e.kontaktLeietaker}</p>}
     </div>
-    <PortalBrannvern l={l} refresh={refreshMine} />
+    {harModul('brannvern', l.eiendomId) && <PortalBrannvern l={l} refresh={refreshMine} />}
     <div className="sec"><h2>Internkontroll og plikter</h2><p className="small muted" style={{ marginTop: -6 }}>Som leietaker har virksomheten egne plikter etter forskrift om brannforebygging, internkontrollforskriften og leieavtalen. Fyll ut sjekklisten for hver plikt, legg ved dokumentasjon og send til utleier for godkjenning.</p>
       <div className="tbl-wrap"><table><thead><tr><th>Plikt</th><th>Hjemmel</th><th>Frekvens</th><th>Sist bekreftet</th><th>Status</th><th /></tr></thead><tbody>
         {pl.length ? pl.map((p: any) => { const s = pliktStatus(p); const v = pliktVis(p); const venter = p.status === 'til_godkjenning'; const dk = PLIKTER[p.key]?.dok || []; return <tr key={p.key}><td>{p.navn}{dk.length > 0 && <div className="small muted">{dk.length} punkter i sjekklisten</div>}{p.status === 'avvist' && p.tilbakemelding && <div className="small" style={{ color: 'var(--red)' }}>Utleier: {p.tilbakemelding.tekst}</div>}{venter && <div className="small muted">Sendt {fd(p.innsendt.tid)} – venter på utleier</div>}</td><td className="small muted">{p.hjemmel}</td><td className="small">{intTxt(p.frekvens)}</td><td className="small">{fd(p.sist)}</td><td><Chip c={v.c}>{v.t}</Chip></td><td><button className={'btn sm ' + (!venter && (s.o >= 1 || p.status === 'avvist') ? 'pri' : '')} onClick={() => bekreft(l, p)}>{venter ? 'Endre' : p.status === 'avvist' ? 'Send på nytt' : s.o >= 1 ? 'Fyll ut' : 'Oppdater'}</button></td></tr>; }) : <tr><td colSpan={6} className="muted">Ingen plikter registrert.</td></tr>}

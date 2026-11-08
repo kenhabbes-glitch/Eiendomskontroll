@@ -5,6 +5,8 @@ import { MfaSkjerm } from './components/Tofaktor';
 import { visPurringVedPalogging } from './views/Purring';
 import { TilsynView, svarfristSnart } from './views/Tilsyn';
 import { Innboks, useInnboksAntall } from './views/Innboks';
+import { RUTE_MODUL, harModul } from './lib/moduler';
+import { ModulSperret } from './views/Abonnement';
 import React, { useEffect, useState } from 'react';
 import { mineOrg, kanDrifteE } from './lib/store';
 import { autoKvitterIK } from './lib/actions';
@@ -74,11 +76,12 @@ function navFor(): [string, string][] {
   if (isTenant()) return [['portal', 'Mitt leieforhold'], ['regelverk', 'Plikter og regelverk'], ['hjelp', 'Hjelp']];
   if (isUtforer()) return [['arbeidsordre', 'Mine arbeidsordre'], ['hjelp', 'Hjelp']];
   const n: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['kontroller', 'Kontrollplan'], ['runde', 'Kontrollrunde'], ['avvik', 'Avvik'], ['arbeidsordre', 'Mine arbeidsordre']];
-  if (canEdit()) n.splice(5, 0, ['tilsyn', 'Tilsynssaker']);
+  if (canEdit() && harModul('tilsyn')) n.splice(5, 0, ['tilsyn', 'Tilsynssaker']);
   if (canEdit()) n.push(['leietakere', 'Leietakere']);
   n.push(['maalere', 'Målere'], ['tfm', 'TFM-register'], ['arealer', 'Tegninger og arealer'], ['dokumenter', 'Dokumenter']);
-  if (S.eiendommer.some(e => kanDrifteE(e.id))) n.push(['innboks', 'Dokumentinnboks']);
-  if (canEdit()) n.push(['vedlikehold', 'Vedlikeholdsplan'], ['prosjekter', 'Prosjekter']);
+  if (S.eiendommer.some(e => kanDrifteE(e.id) && harModul('dokumentlesing', e.id))) n.push(['innboks', 'Dokumentinnboks']);
+  if (canEdit() && harModul('vedlikehold')) n.push(['vedlikehold', 'Vedlikeholdsplan']);
+  if (canEdit() && harModul('prosjekter')) n.push(['prosjekter', 'Prosjekter']);
   n.push(['regelverk', 'Regelverk og plikter']);
   if (canEdit()) n.push(['innstillinger', 'Innstillinger']);
   if (canEdit()) n.push(['logg', 'Hendelseslogg'], ['arkiv', 'Arkiv']);
@@ -126,7 +129,9 @@ export default function App() {
   const ini = (me.navn || me.epost || '?').split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase();
 
   let body: React.ReactNode;
-  switch (v) {
+  const rm = RUTE_MODUL[v]; const rmOk = !rm || (r.id && v === 'prosjekt' ? harModul(rm, S.prosjekter.find(p => p.id === r.id)?.eiendomId) : harModul(rm));
+  if (!rmOk) body = <ModulSperret k={rm} />;
+  else switch (v) {
     case 'oversikt': body = <Oversikt />; break;
     case 'eiendommer': body = <Eiendommer />; break;
     case 'eiendom': body = <Eiendom id={r.id!} />; break;

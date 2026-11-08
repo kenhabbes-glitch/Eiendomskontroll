@@ -2,6 +2,7 @@
 // Appen viser bare det brukeren har lov til å endre – databasen håndhever reglene uansett.
 import React, { useEffect, useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
+import { AbonnementOversikt, modulAdmin } from './Abonnement';
 import { S, adminApi, isPlattform, mineOrg, reloadAdmin, sb, state, toast, useStore, feiltekst, orgNavn, save, bump } from '../lib/store';
 import { eNavn, fd, sortBy, today, aNavn } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, type Field } from '../components/ui';
@@ -184,7 +185,7 @@ export function Organisasjon() {
   const admin = mineOrg(['admin']); const eierRoller = mineOrg(['admin', 'forvalter']).filter(o => o.type === 'eier' || S.eiendommer.some(e => e.eierOrgId === o.id) || S.portefoljer.some(p => p.eier_org_id === o.id));
   const fane0 = admin.length ? 'medlemmer' : eierRoller.length ? 'portefoljer' : isPlattform() ? 'kunder' : 'medlemmer';
   const [fane, setFane] = useState(fane0); const [orgV, setOrgV] = useState(admin[0]?.id || '');
-  const tabs: [string, string][] = [...(admin.length ? [['medlemmer', 'Brukere og tildeling']] as [string, string][] : []), ...(eierRoller.length ? [['portefoljer', 'Porteføljer'], ['oppdrag', 'Oppdrag']] as [string, string][] : []), ...(admin.length ? [['personvern', 'Personvern']] as [string, string][] : []), ...(isPlattform() ? [['kunder', 'Kunder (plattform)']] as [string, string][] : [])];
+  const tabs: [string, string][] = [...(admin.length ? [['medlemmer', 'Brukere og tildeling']] as [string, string][] : []), ...(eierRoller.length ? [['portefoljer', 'Porteføljer'], ['oppdrag', 'Oppdrag']] as [string, string][] : []), ...(admin.length ? [['personvern', 'Personvern'], ['abonnement', 'Abonnement']] as [string, string][] : []), ...(isPlattform() ? [['kunder', 'Kunder (plattform)']] as [string, string][] : [])];
   const org = admin.find(o => o.id === orgV) ? orgV : admin[0]?.id || '';
   const eierOrg = eierRoller.find(o => o.id === orgV)?.id || eierRoller[0]?.id || '';
   const orgVelger = (L: any[], v: string) => L.length > 1 ? <select value={v} onChange={e => setOrgV(e.target.value)} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '6px 8px' }}>{L.map(o => <option key={o.id} value={o.id}>{o.navn}</option>)}</select> : <b>{L[0]?.navn}</b>;
@@ -241,12 +242,13 @@ export function Organisasjon() {
     c = <><div className="toolbar">{orgVelger(admin, org)}<span className="muted small">Notat til advokat om hvordan appen behandler personopplysninger. Skriv ut eller lagre som PDF og send til advokaten; noter tilbakemeldingen her.</span></div>
       <PersonvernNotat key={org} org={org} /></>;
   }
+  if (fane === 'abonnement' && admin.length) c = <AbonnementOversikt />;
   if (fane === 'kunder' && isPlattform()) {
     const O = sortBy(S.orgs, o => o.navn);
     c = <><div className="toolbar"><span className="muted small">{O.length} organisasjoner. Som plattformadministrator administrerer du kunder, men ser ikke deres data med mindre du er medlem.</span><button className="btn pri" style={{ marginLeft: 'auto' }} onClick={nyOrg}>+ Ny kunde</button></div>
       <div className="tbl-wrap"><table><thead><tr><th>Organisasjon</th><th>Type</th><th>Org.nr.</th><th>Opprettet</th><th>Status</th><th /></tr></thead><tbody>
         {O.map(o => <tr key={o.id}><td><b style={{ fontWeight: 600 }}>{o.navn}</b></td><td className="small">{typeNavn(o.type)}</td><td className="mono small">{o.orgnr || '–'}</td><td className="small">{fd(String(o.opprettet || '').slice(0, 10))}</td><td>{o.aktiv ? <Chip c="green">Aktiv</Chip> : <Chip c="red">Sperret</Chip>}</td>
-          <td><button className="btn sm" onClick={async () => { if (!(await confirmBox(o.aktiv ? `Sperre «${o.navn}»? Alle brukere i organisasjonen mister tilgangen umiddelbart.` : `Gjenåpne «${o.navn}»?`, o.aktiv ? 'Sperr' : 'Gjenåpne'))) return; const { error } = await sb.from('organisasjoner').update({ aktiv: !o.aktiv }).eq('id', o.id); if (error) toast(feiltekst(error)); else { o.aktiv = !o.aktiv; bump(); } }}>{o.aktiv ? 'Sperr' : 'Gjenåpne'}</button></td></tr>)}
+          <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" style={{ marginRight: 6 }} onClick={() => modulAdmin(o)}>Moduler</button><button className="btn sm" onClick={async () => { if (!(await confirmBox(o.aktiv ? `Sperre «${o.navn}»? Alle brukere i organisasjonen mister tilgangen umiddelbart.` : `Gjenåpne «${o.navn}»?`, o.aktiv ? 'Sperr' : 'Gjenåpne'))) return; const { error } = await sb.from('organisasjoner').update({ aktiv: !o.aktiv }).eq('id', o.id); if (error) toast(feiltekst(error)); else { o.aktiv = !o.aktiv; bump(); } }}>{o.aktiv ? 'Sperr' : 'Gjenåpne'}</button></td></tr>)}
       </tbody></table></div></>;
   }
   return <>

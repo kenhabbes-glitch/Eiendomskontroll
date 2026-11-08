@@ -1,4 +1,5 @@
 import React from 'react';
+import { harModul } from '../lib/moduler';
 import { Hjelp } from '../components/Hjelp';
 import { DOK_TYPER } from '../lib/catalog';
 import { S, canEdit, useStore } from '../lib/store';
@@ -20,7 +21,7 @@ export function Dokumenter() {
   if (f.s) L = L.filter(d => d.anleggId === f.s || (d.anleggIds || []).includes(f.s));
   if (f.q) { const q = f.q.toLowerCase(); L = L.filter(d => (d.tittel + ' ' + (d.notat || '') + ' ' + (d.plassering || '')).toLowerCase().includes(q)); }
   return <>
-    <div className="head"><div className="grow"><h1>Dokumenter<Hjelp id="side.dokumenter" /></h1><p className="sub">Påkrevd og relevant dokumentasjon for eiendommene{canEdit() ? '. Klikk i dekningstabellen for å registrere det som mangler.' : ''}</p></div><div style={{ display: 'flex', gap: 6 }}><a className="btn" href="#/innboks">Dokumentinnboks</a><button className="btn pri" onClick={() => editDok()}>+ Dokument</button></div></div>
+    <div className="head"><div className="grow"><h1>Dokumenter<Hjelp id="side.dokumenter" /></h1><p className="sub">Påkrevd og relevant dokumentasjon for eiendommene{canEdit() ? '. Klikk i dekningstabellen for å registrere det som mangler.' : ''}</p></div><div style={{ display: 'flex', gap: 6 }}>{harModul('dokumentlesing') && <a className="btn" href="#/innboks">Dokumentinnboks</a>}<button className="btn pri" onClick={() => editDok()}>+ Dokument</button></div></div>
     {canEdit() && <><h2>Dokumentdekning</h2><CoverageTable es={sortBy(S.eiendommer, e => e.navn)} /></>}
     <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>Serviceavtaler for systemer</h2><label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={!!f.anb} onChange={e => setF({ anb: e.target.checked ? '1' : '' })} />Vis også anbefalte</label></div>
       <ServiceavtaleTable es={f.e ? S.eiendommer.filter(e => e.id === f.e) : sortBy(S.eiendommer, e => e.navn)} visAnb={!!f.anb} showE={!f.e} />

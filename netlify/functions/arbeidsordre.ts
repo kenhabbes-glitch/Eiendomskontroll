@@ -727,6 +727,7 @@ const handler = async (req: Request) => {
     const u = await hvem(); if (!u) return json(401, { error: 'Ikke innlogget' });
     const { data: p } = await admin.from('prosjekter').select('*').eq('id', body.prosjekt_id).maybeSingle(); if (!p) return json(404, { error: 'Fant ikke prosjektet' });
     if (!(await kanRedigere(u, p.eiendom_id))) return json(403, { error: 'Du har ikke skrivetilgang til eiendommen' });
+    { const { data: harM, error: mErr } = await admin.rpc('eiendom_har_modul', { p_eid: p.eiendom_id, p_modul: 'prosjekter' }); if (!mErr && harM === false) return json(403, { error: 'Prosjektmodulen er ikke aktivert for eieren av eiendommen' }); }
     const d = p.data || {}; const r = (d.rapporter || []).find((x: any) => x.id === body.rapport_id); if (!r) return json(404, { error: 'Fant ikke rapporten' });
     const til = String(body.epost || '').trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(til)) return json(400, { error: 'Ugyldig e-postadresse' });
     const navn = String(body.navn || '').slice(0, 120); const melding = String(body.melding || '').slice(0, 4000);
