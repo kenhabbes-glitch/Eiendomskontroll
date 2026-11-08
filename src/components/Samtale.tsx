@@ -1,17 +1,24 @@
 // Toveis samtale mellom utleier og leietaker, enten generelt eller knyttet til et avvik.
 // Utleiersiden velger per melding om leietakeren skal se den (ellers er den et internt notat).
 import { useCallback, useEffect, useState } from 'react';
-import { isTenant, kanDrifteE, sb, state, toast, useStore } from '../lib/store';
+import { isTenant, kanDrifteE, sb, state, toast, uploadFile, useStore, type Fil } from '../lib/store';
+import { FileLink, useFileUrl } from './ui';
 import { byId } from '../lib/utils';
 import { tt, lokale } from '../lib/i18n';
 
-export type Melding = { id: string; eiendom_id: string; leietaker_id: string; avvik_id: string | null; created_at: string; data: { tekst: string; rolle: 'utleier' | 'leietaker'; av?: string; synlig?: boolean; lest?: boolean } };
+export type Melding = { id: string; eiendom_id: string; leietaker_id: string; avvik_id: string | null; created_at: string; data: { tekst: string; rolle: 'utleier' | 'leietaker'; av?: string; synlig?: boolean; lest?: boolean; vedlegg?: Fil[] } };
 const SIST_SETT = 'ek_samtale_sett_';
+const MAKS_FILER = 5, MAKS_MB = 25;
+const erBilde = (f: Fil) => /^image\//.test(f.type || '') || /\.(jpe?g|png|webp|gif|heic)$/i.test(f.navn || '');
+function Vedlegg({ f }: { f: Fil }) {
+  const u = useFileUrl(erBilde(f) ? f.path : undefined);
+  return <div style={{ marginTop: 4 }}>{erBilde(f) && u && <a href={u} target="_blank" rel="noopener noreferrer"><img src={u} alt="" style={{ maxWidth: 220, maxHeight: 160, borderRadius: 6, display: 'block', marginBottom: 2 }} /></a>}<span className="small">📎 <FileLink fil={f}>{f.navn}</FileLink></span></div>;
+}
 
 export function Samtale({ eiendomId, leietakerId, avvikId }: { eiendomId: string; leietakerId: string; avvikId?: string }) {
   useStore();
   const leietaker = isTenant(); const kanSkrive = leietaker || kanDrifteE(eiendomId);
-  const [M, setM] = useState<Melding[] | null>(null); const [tekst, setTekst] = useState(''); const [synlig, setSynlig] = useState(true); const [busy, setBusy] = useState(false);
+  const [M, setM] = useState<Melding[] | null>(null); const [tekst, setTekst] = useState(''); const [synlig, setSynlig] = useState(true); const [busy, setBusy] = useState(false); const [filer, setFiler] = useState<File[]>([]);
   const last = useCallback(async () => {
     const { data, error } = await sb.from('meldinger').select('*').eq('leietaker_id', leietakerId).order('created_at', { ascending: true }).limit(500);
     if (error) { setM([]); return; }
@@ -25,11 +32,20 @@ export function Samtale({ eiendomId, leietakerId, avvikId }: { eiendomId: string
   }, [leietakerId, avvikId, leietaker]);
   useEffect(() => { last(); const t = setInterval(last, 30000); return () => clearInterval(t); }, [last]);
   const send = async () => {
-    const t = tekst.trim(); if (!t) return; setBusy(true);
+    const t = tekst.trim(); if (!t && !filer.length) return; setBusy(true);
+    const vedlegg: Fil[] = []; const skjult = !leietaker && !synlig;
+    for (const f of filer) {
+      // Filer i interne notater lagres utenfor leietakerens mappe, så leietakeren ikke får tilgang til dem
+      const o = await uploadFile(f, eiendomId, skjult ? undefined : leietakerId, undefined, skjult ? 'intern/' + leietakerId : undefined);
+      if (!o) { setBusy(false); return; } vedlegg.push(o);
+    }
     const { error } = await sb.from('meldinger').insert({ eiendom_id: eiendomId, leietaker_id: leietakerId, avvik_id: avvikId || null,
-      data: { tekst: t.slice(0, 4000), rolle: leietaker ? 'leietaker' : 'utleier', av: state.me?.navn || state.me?.epost, synlig: leietaker ? true : synlig, lest: !leietaker ? true : false } });
+      data: { tekst: (t || tt("(vedlegg)")).slice(0, 4000), ...(vedlegg.length ? { vedlegg } : {}), rolle: leietaker ? 'leietaker' : 'utleier', av: state.me?.navn || state.me?.epost, synlig: leietaker ? true : synlig, lest: !leietaker ? true : false } });
     setBusy(false); if (error) return toast(tt("Meldingen ble ikke sendt: {0}", error.message));
-    setTekst(''); await last(); window.dispatchEvent(new Event('ek-meldinger'));
+    setTekst(''); setFiler([]); await last(); window.dispatchEvent(new Event('ek-meldinger'));
+  };
+  const velg = (L: FileList | null) => {
+    if (!L) return; const ny = [...filer]; for (const f of Array.from(L)) { if (f.size > MAKS_MB * 1e6) { toast(tt("«{0}» er over {1} MB", f.name, MAKS_MB)); continue; } if (ny.length >= MAKS_FILER) { toast(tt("Maks {0} filer per melding", MAKS_FILER)); break; } ny.push(f); } setFiler(ny);
   };
   const slett = async (m: Melding) => { const { error } = await sb.from('meldinger').delete().eq('id', m.id); if (error) return toast(error.message); last(); };
   return <div>
@@ -38,15 +54,19 @@ export function Samtale({ eiendomId, leietakerId, avvikId }: { eiendomId: string
         return <div key={m.id} style={{ alignSelf: mine ? 'flex-end' : 'flex-start', maxWidth: '85%', background: skjult ? 'var(--amber-bg, #fff4d6)' : mine ? 'var(--accent-bg, #e3f1ec)' : 'var(--panel2, #f1f1f1)', borderRadius: 10, padding: '7px 11px' }}>
           <div className="small muted">{m.data.av || (m.data.rolle === 'utleier' ? tt("Utleier") : tt("Leietaker"))} · {new Date(m.created_at).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' })}{skjult && <b> · {tt("Internt – skjult for leietaker")}</b>}</div>
           <div style={{ whiteSpace: 'pre-wrap' }}>{m.data.tekst}</div>
+          {(m.data.vedlegg || []).map((f, i) => <Vedlegg key={i} f={f} />)}
           {!leietaker && kanSkrive && <button className="btn sm ghost" style={{ padding: 0, fontSize: 11 }} onClick={() => slett(m)}>{tt("Slett")}</button>}
         </div>; })}
     </div> : <p className="muted small">{tt("Ingen meldinger ennå.")}</p>}
     {kanSkrive && <>
       <textarea style={{ width: '100%' }} rows={3} maxLength={4000} value={tekst} onChange={e => setTekst(e.target.value)} placeholder={leietaker ? tt("Skriv en melding til utleier …") : tt("Skriv en melding …")} />
+      {filer.length > 0 && <div className="small" style={{ marginTop: 4 }}>{filer.map((f, i) => <span key={i} className="chip" style={{ marginRight: 4 }}>📎 {f.name} <a href="#" onClick={e => { e.preventDefault(); setFiler(filer.filter((_, j) => j !== i)); }} aria-label={tt("Fjern")}>✕</a></span>)}</div>}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+        <label className="btn sm">{tt("Legg ved fil")}<input type="file" multiple accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt" style={{ display: 'none' }} onChange={e => velg(e.target.files)} /></label>
+        <label className="btn sm">{tt("Ta bilde")}<input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={e => velg(e.target.files)} /></label>
         {!leietaker && <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={synlig} onChange={e => setSynlig(e.target.checked)} />{tt("Vis for leietaker")}</label>}
         {!leietaker && !synlig && <span className="small muted">{tt("Lagres som internt notat. Leietakeren ser det ikke.")}</span>}
-        <button className="btn pri" style={{ marginLeft: 'auto' }} disabled={busy || !tekst.trim()} onClick={send}>{tt("Send")}</button>
+        <button className="btn pri" style={{ marginLeft: 'auto' }} disabled={busy || (!tekst.trim() && !filer.length)} onClick={send}>{tt("Send")}</button>
       </div></>}
   </div>;
 }
