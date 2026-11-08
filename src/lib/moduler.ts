@@ -2,7 +2,7 @@
 // Tåler at databasen ikke har modultabellen ennå (da er alt tilgjengelig).
 import { S, sb } from './store';
 
-export type ModulKey = 'kjerne' | 'brannvern' | 'vedlikehold' | 'prosjekter' | 'tilsyn' | 'dokumentlesing' | 'rapporter';
+export type ModulKey = 'kjerne' | 'brannvern' | 'vedlikehold' | 'prosjekter' | 'tilsyn' | 'dokumentlesing' | 'rapporter' | 'befaring';
 export const MODULER: { k: ModulKey; navn: string; tekst: string; inneholder: string[] }[] = [
   { k: 'kjerne', navn: 'Kjerne', tekst: 'Alltid med', inneholder: ['Eiendommer og porteføljer', 'Systemer og komponenter (TFM)', 'Dokumenter', 'Kontrollplan og kontrollrunder', 'Avvik og purring', 'Leietakere', 'Tegninger og arealer', 'Målere', 'Regelverk og plikter', 'Arbeidsordre til servicefirma'] },
   { k: 'brannvern', navn: 'Brannvern og leietakeroppfølging', tekst: 'Brannkort, brannverninformasjon til leietakere, bekreftelser og redusert brannsikkerhet', inneholder: ['Brannvern på eiendommen', 'Brannvernpakke og bekreftelse i leietakerportalen', 'Varsel om redusert brannsikkerhet'] },
@@ -10,6 +10,7 @@ export const MODULER: { k: ModulKey; navn: string; tekst: string; inneholder: st
   { k: 'prosjekter', navn: 'Prosjekter', tekst: 'Prosjektstyring fra idé til garanti med beslutningsnotat, SHA, Gantt og arkiv', inneholder: ['Prosjekter', 'Utskiftingsprosjekter fra systemer og avvik', 'Fase- og statusrapporter til eier'] },
   { k: 'tilsyn', navn: 'Tilsynssaker', tekst: 'Registrering og oppfølging av tilsyn fra myndighetene med svarfrister og tilbakemelding', inneholder: ['Tilsynssaker', 'Tilbakemeldingsbrev til myndigheten'] },
   { k: 'dokumentlesing', navn: 'Dokumentinnboks og rapportlesing', tekst: 'Appen leser rapporter og dokumenter lokalt og foreslår avvik, type, bygg og system', inneholder: ['Dokumentinnboks', 'Les avvik fra servicerapporter', 'Tekstgjenkjenning (OCR) og leverandørmaler'] },
+  { k: 'befaring', navn: 'Befaring', tekst: 'Befaringer på mobil og nettbrett – også uten nett – med funn på tegning, måling, ansvar og frist, arbeidsordre, rapport og elektronisk signering', inneholder: ['Leieforløp: forbefaring, overtakelse, tilpasning, vedlikeholdsplikt og tilbakelevering', 'Fang energityven, HMS-befaring, garantibefaring og systemregistrering', 'Funn, mål og tegning på etasjeplan', 'Rapport med signering av partene', 'Tilsynsanalyser'] },
   { k: 'rapporter', navn: 'Eierrapporter og verdivurdering', tekst: 'Statusrapport til eier og internt verdianslag', inneholder: ['Statusrapport til eier', 'Verdivurdering'] },
 ];
 export const modulNavn = (k: string) => MODULER.find(m => m.k === k)?.navn || k;
@@ -34,7 +35,7 @@ export const orgHar = (org: string, k: ModulKey) => k === 'kjerne' || RADER === 
 export const proveTil = (k: string, org = S.primarOrg) => RADER?.find(r => r.org_id === org && r.modul === k)?.prove_til || null;
 
 /** Rute → modul (for menyen og sperret side) */
-export const RUTE_MODUL: Record<string, ModulKey> = { prosjekter: 'prosjekter', prosjekt: 'prosjekter', vedlikehold: 'vedlikehold', tilsyn: 'tilsyn', innboks: 'dokumentlesing' };
+export const RUTE_MODUL: Record<string, ModulKey> = { prosjekter: 'prosjekter', prosjekt: 'prosjekter', vedlikehold: 'vedlikehold', tilsyn: 'tilsyn', innboks: 'dokumentlesing', befaringer: 'befaring', befaring: 'befaring', tilsynsanalyser: 'befaring' };
 
 // ---------- Priser per bygg og per bruker med rabatttrapper (settes av leverandøren; leses av alle innloggede)
 export type Trapp = { fra: number; rabatt: number }[];

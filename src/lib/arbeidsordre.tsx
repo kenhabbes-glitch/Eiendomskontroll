@@ -109,10 +109,10 @@ export async function lastNedAoPdf(id: string) {
 const tilBase64 = (b: Uint8Array) => { let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
 
 // ---------------- Send arbeidsordre på e-post
-export function sendAo(id: string, varsle = false) { openModal({ render: close => <SendAo id={id} varsle={varsle} close={close} /> }); }
-function SendAo({ id, varsle, close }: { id: string; varsle: boolean; close: () => void }) {
+export function sendAo(id: string, varsle = false, epost = '') { openModal({ render: close => <SendAo id={id} varsle={varsle} epost={epost} close={close} /> }); }
+function SendAo({ id, varsle, epost = '', close }: { id: string; varsle: boolean; epost?: string; close: () => void }) {
   const a = byId('avvik', id)!; const tp = a.tildeltId ? S.profiles.find(p => p.id === a.tildeltId) : null;
-  const [ep, setEp] = useState(varsle ? tp?.epost || '' : ''); const [m, setM] = useState(''); const [pdf, setPdf] = useState(true); const [busy, setBusy] = useState(false); const [res, setRes] = useState<any>(null);
+  const [ep, setEp] = useState(varsle ? tp?.epost || '' : epost); const [m, setM] = useState(''); const [pdf, setPdf] = useState(true); const [busy, setBusy] = useState(false); const [res, setRes] = useState<any>(null);
   const send = async () => {
     setBusy(true);
     try {

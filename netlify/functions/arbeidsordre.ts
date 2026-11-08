@@ -804,5 +804,150 @@ const handler = async (req: Request) => {
     return json(200, { ok: true, status, nyFase: fase !== d.fase ? FASENAVN[fase] : null });
   }
 
+  // ================= Befaring: signering av rapport =================
+  // Enkel elektronisk signatur: personlig lenke på e-post + engangskode til samme adresse. Signaturene skrives
+  // bare her (tabellen bef_signatur er skrivebeskyttet for innloggede), med tid, IP, nettleser og SHA-256 av PDF-en.
+  const BTYPE: Record<string, string> = { forbefaring: 'Forbefaring', overtakelse: 'Overtakelse / innflytting', tilpasning: 'Leietakertilpasning', vplikt: 'Leietakers vedlikeholdsplikt', tilbakelevering: 'Tilbakelevering', energi: 'Fang energityven', tilfeldig: 'Befaring', system: 'Systemregistrering', hms: 'HMS-befaring', garanti: 'Garantibefaring', annen: 'Befaring' };
+  const ip = () => (req.headers.get('x-nf-client-connection-ip') || req.headers.get('x-forwarded-for') || '').split(',')[0].trim().slice(0, 60);
+  const ua = () => String(req.headers.get('user-agent') || '').slice(0, 300);
+  const hentBef = async (id: string) => { const { data } = await admin.from('befaringer').select('*').eq('id', id).maybeSingle(); return data as any; };
+  const befTok = async (tok: string) => {
+    if (!/^[0-9a-f]{48}$/i.test(String(tok || ''))) return null; const h = await sha(tok);
+    const { data } = await admin.from('befaringer').select('*').contains('data', { signering: { parter: [{ tokenHash: h }] } }).limit(1);
+    const b = data?.[0]; if (!b) return null; const part = (b.data?.signering?.parter || []).find((x: any) => x.tokenHash === h); return part ? { b, part } : null;
+  };
+  const renPart = (x: any) => ({ id: String(x?.id || '').slice(0, 60), navn: String(x?.navn || '').slice(0, 120), epost: String(x?.epost || '').trim().toLowerCase().slice(0, 200), rolle: String(x?.rolle || '').slice(0, 60), firma: String(x?.firma || '').slice(0, 120) });
+  const renSig = (v: any) => typeof v === 'string' && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(v) && v.length < 400_000 ? v : null;
+  const lastRapport = async (b: any) => { const r = b.data?.rapport; if (!r?.fil?.path) return null; const { data } = await admin.storage.from('filer').download(r.fil.path); if (!data) return null; const buf = new Uint8Array(await data.arrayBuffer()); const { createHash } = await import('node:crypto'); return { buf, hash: createHash('sha256').update(buf).digest('hex'), r }; };
+  const eiendomInfo = async (eid: string) => { const { data } = await admin.from('eiendommer').select('data').eq('id', eid).maybeSingle(); return { navn: data?.data?.navn || '', adresse: [data?.data?.adresse, data?.data?.poststed].filter(Boolean).join(', ') }; };
+  const befLogg = async (b: any, hvem: string, tekst: string, uid?: string | null) => admin.from('hendelseslogg').insert({ bruker_id: uid || null, bruker: hvem, tabell: 'hendelse', rad_id: b.id, eiendom_id: b.eiendom_id, handling: 'befaring', tekst });
+  const oppdaterSignering = async (bid: string, f: (d: any) => any) => { const b = await hentBef(bid); const d = b.data || {}; const nd = f(d); await admin.from('befaringer').update({ data: nd }).eq('id', bid); return { ...b, data: nd }; };
+  const registrer = async (b: any, part: any, navn: string, metode: string, signatur: string | null, forbehold: string, dokHash: string) => {
+    await admin.from('bef_signatur').insert({ befaring_id: b.id, eiendom_id: b.eiendom_id, part_id: part.id, navn, epost: part.epost || null, rolle: part.rolle || null, dok_hash: dokHash, metode, ip: ip() || null, nettleser: ua() || null, signatur_bilde: signatur });
+    const t = new Date().toISOString();
+    const nb = await oppdaterSignering(b.id, d => ({ ...d, signering: { ...d.signering, parter: (d.signering?.parter || []).map((x: any) => x.id === part.id ? { ...x, signert: { t, navn, metode, forbehold }, kodeHash: undefined } : x) },
+      logg: [...(d.logg || []), { t, k: `Signert av ${navn} (${part.rolle || 'part'})${metode === 'epost_kode' ? ' med e-postkode' : ' ' + metode}${forbehold ? ` – forbehold: «${forbehold.slice(0, 200)}»` : ''}`, av: navn }] }));
+    await befLogg(b, navn, `Befaringsrapport signert av ${navn} (${part.rolle || 'part'}) – ${metode}`);
+    const alle = (nb.data.signering?.parter || []).every((x: any) => x.signert);
+    if (alle) await ferdigstillSignering(nb);
+    return alle;
+  };
+  const ferdigstillSignering = async (b: any) => {
+    const R = await lastRapport(b); if (!R || R.hash !== b.data.signering.dokHash) return;
+    const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
+    const pdf = await PDFDocument.load(R.buf); const f = await pdf.embedFont(StandardFonts.Helvetica); const fb = await pdf.embedFont(StandardFonts.HelveticaBold);
+    const safe = (x: any) => String(x ?? '').replace(/[^\x20-\x7E -ÿ–—‘’“”•…€]/g, '');
+    const { data: S } = await admin.from('bef_signatur').select('*').eq('befaring_id', b.id).eq('dok_hash', R.hash).order('signert_at');
+    let pg = pdf.addPage([595.28, 841.89]); let y = 790; const M = 44; const INK = rgb(.11, .14, .13), MUT = rgb(.42, .45, .43);
+    const t = (s: string, x: number, yy: number, z = 9, bold = false, c = INK) => pg.drawText(safe(s), { x, y: yy, size: z, font: bold ? fb : f, color: c });
+    t('SIGNERINGSSIDE', M, y, 8.5, true, rgb(.12, .44, .36)); y -= 22; t(b.data.tittel || 'Befaringsrapport', M, y, 16, true); y -= 18;
+    t(`Dokumentets fingeravtrykk (SHA-256): ${R.hash}`, M, y, 7.5, false, MUT); y -= 12; t(`Rapportversjon ${R.r.versjon || 1}, laget ${String(R.r.laget || '').slice(0, 16).replace('T', ' ')}`, M, y, 7.5, false, MUT); y -= 24;
+    const sist = new Map<string, any>(); (S || []).forEach((x: any) => sist.set(x.part_id, x));
+    for (const p of b.data.signering.parter || []) { const x = sist.get(p.id); if (!x) continue;
+      if (y < 160) { pg = pdf.addPage([595.28, 841.89]); y = 790; }
+      pg.drawRectangle({ x: M, y: y - 104, width: 595.28 - 2 * M, height: 104, borderColor: rgb(.85, .86, .84), borderWidth: .6 });
+      t(`${x.navn} – ${x.rolle || ''}${p.firma ? ', ' + p.firma : ''}`, M + 10, y - 16, 10.5, true);
+      const forb = p.signert?.forbehold ? 'Forbehold: ' + p.signert.forbehold : 'Uten forbehold';
+      [`Signert ${new Date(x.signert_at).toLocaleString('nb-NO', { timeZone: 'Europe/Oslo' })}`, x.metode === 'epost_kode' ? `Metode: personlig lenke og engangskode til ${x.epost || ''}` : `Metode: ${x.metode}`, x.ip ? `IP-adresse: ${x.ip}` : '', forb.slice(0, 110)].filter(Boolean).forEach((l, i) => t(l, M + 10, y - 32 - i * 12, 8.2, false, MUT));
+      if (x.signatur_bilde) { try { const im = await pdf.embedPng(Buffer.from(x.signatur_bilde.split(',')[1], 'base64')); const h = 60, w = Math.min(190, h * im.width / im.height); pg.drawImage(im, { x: 595.28 - M - w - 10, y: y - 90, width: w, height: h }); } catch { } }
+      y -= 116; }
+    t('Signeringen er gjort i Eiendomskontroll. Signaturene er knyttet til fingeravtrykket over – endres dokumentet, stemmer det ikke lenger.', M, 50, 7.5, false, MUT);
+    const ut = await pdf.save(); const navn = `Befaringsrapport signert ${(b.data.dato || '').slice(0, 10)}.pdf`;
+    const path = `${b.eiendom_id}/befaring/${b.id}/${Date.now()}-${asciiNavn(navn)}`;
+    const { error: ue } = await admin.storage.from('filer').upload(path, ut, { contentType: 'application/pdf', upsert: false }); if (ue) { console.error('signert pdf', ue); return; }
+    const fil = { path, navn, type: 'application/pdf', str: ut.length }; const tid = new Date().toISOString();
+    const { createHash } = await import('node:crypto'); const sluttHash = createHash('sha256').update(ut).digest('hex');
+    await admin.from('dokumenter').insert({ eiendom_id: b.eiendom_id, leietaker_id: b.data.leietakerId || null, data: { tittel: `${b.data.tittel || 'Befaringsrapport'} (signert)`, type: 'Befaringsrapport', dato: tid.slice(0, 10), fil, befaringId: b.id } });
+    await oppdaterSignering(b.id, d => ({ ...d, status: 'Signert', signering: { ...d.signering, ferdig: { t: tid, fil, hash: sluttHash } }, logg: [...(d.logg || []), { t: tid, k: 'Alle parter har signert – signert rapport lagret under Dokumenter', av: 'System' }] }));
+    await befLogg(b, 'System', 'Befaringsrapporten er signert av alle parter');
+    const o = await oppsettFor(b.eiendom_id, null); const e = await eiendomInfo(b.eiendom_id); const b64 = ut.length < 9_000_000 ? Buffer.from(ut).toString('base64') : null;
+    for (const p of b.data.signering.parter || []) { if (!p.epost) continue;
+      await sendEpost(p.epost, `Signert: ${b.data.tittel || 'Befaringsrapport'}`, `<div style="font-family:system-ui,Arial,sans-serif;max-width:620px"><p>Alle parter har signert befaringsrapporten for ${esc(e.navn)}.</p><p>Den signerte rapporten med signeringsside ${b64 ? 'ligger vedlagt' : 'kan hentes via lenken du fikk tidligere'}.</p></div>`, `Alle parter har signert befaringsrapporten for ${e.navn}.`, b64 ? { navn, base64: b64, type: 'application/pdf' } : undefined, undefined, o).catch(() => null); }
+  };
+
+  if (body.action === 'bef_sign_send') {
+    const u = await hvem(); if (!u) return json(401, { error: 'Ikke innlogget' });
+    const b = await hentBef(String(body.befaring_id || '')); if (!b) return json(404, { error: 'Fant ikke befaringen – vent til den er lagret på serveren' });
+    if (!(await harEiendom(u, b.eiendom_id))) return json(403, { error: 'Ingen tilgang til eiendommen' });
+    { const { data: harM, error: mErr } = await admin.rpc('eiendom_har_modul', { p_eid: b.eiendom_id, p_modul: 'befaring' }); if (!mErr && harM === false) return json(403, { error: 'Befaringsmodulen er ikke aktivert for eieren av eiendommen' }); }
+    const R = await lastRapport(b); if (!R) return json(400, { error: 'Lag rapporten først' });
+    if (R.hash !== R.r.hash) return json(409, { error: 'Rapportfilen stemmer ikke med fingeravtrykket – lag rapporten på nytt' });
+    const P = (Array.isArray(body.parter) ? body.parter : []).map(renPart).filter((x: any) => x.id).slice(0, 20); const send: string[] = (Array.isArray(body.send) ? body.send : []).map(String);
+    if (!P.length) return json(400, { error: 'Ingen parter' });
+    const gml = b.data?.signering?.dokHash === R.hash ? b.data.signering : null; // samme dokument: behold signaturer og lenker
+    const base = typeof body.lenkeBase === 'string' && /^https?:\/\//.test(body.lenkeBase) ? body.lenkeBase.replace(/\/+$/, '') : (process.env.URL || '');
+    const { randomBytes } = await import('node:crypto'); const t = new Date().toISOString(); const melding = String(body.melding || '').slice(0, 3000);
+    const e = await eiendomInfo(b.eiendom_id); const o = await oppsettFor(b.eiendom_id, await minOrg(u)); let sendt = 0; let grunn = ''; const lenker: any[] = [];
+    const parter: any[] = [];
+    for (const p of P) { const g = gml?.parter?.find((x: any) => x.id === p.id); let ny = { ...(g || {}), ...p, signert: g?.signert || null };
+      if (send.includes(p.id) && !ny.signert && /^\S+@\S+\.\S+$/.test(p.epost)) {
+        const tok = randomBytes(24).toString('hex'); const lenke = `${base}/#/sg/${tok}`; ny = { ...ny, tokenHash: await sha(tok), utloper: new Date(Date.now() + 30 * 864e5).toISOString(), sendt: t, lest: null, kodeHash: undefined, koder: [] };
+        const emne = `Til signering: ${b.data?.tittel || 'Befaringsrapport'} – ${e.navn}`;
+        const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:620px;color:#1d2521"><h2 style="margin:0 0 6px">${esc(b.data?.tittel || 'Befaringsrapport')}</h2><p style="color:#6b736d;margin:0 0 14px">${esc(BTYPE[b.data?.type] || 'Befaring')} · ${esc(e.navn)} · ${esc(String(b.data?.dato || '').split('-').reverse().join('.'))}</p>
+          ${p.navn ? `<p>Hei ${esc(p.navn)},</p>` : ''}<p>Du er bedt om å signere befaringsrapporten som ${esc(p.rolle || 'part')}.</p>${melding ? `<p>${esc(melding).replace(/\n/g, '<br>')}</p>` : ''}
+          <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Les og signer rapporten</a></p>
+          <p style="font-size:12px;color:#6b736d">Lenken er personlig og gjelder i 30 dager. Du bekrefter signaturen med en engangskode som sendes til denne e-postadressen. Du trenger ikke bruker i appen.<br>Sendt av ${esc(u.navn || u.epost)}.</p></div>`;
+        const res = await sendEpost(p.epost, emne, html, `${emne}\n\n${melding ? melding + '\n\n' : ''}Les og signer: ${lenke}\n\nLenken gjelder i 30 dager.`, undefined, u.epost || undefined, o);
+        if (res.sendt) sendt++; else { grunn = res.grunn || grunn; lenker.push({ navn: p.navn || p.epost, lenke }); } }
+      parter.push(ny); }
+    await oppdaterSignering(b.id, d => ({ ...d, status: d.status === 'Signert' && gml ? d.status : 'Til signering', signering: { dokHash: R.hash, rapportPath: R.r.fil.path, versjon: R.r.versjon || 1, sendt: t, sendtAv: u.navn || u.epost, parter, ferdig: gml?.ferdig || null },
+      logg: [...(d.logg || []), { t, k: `Rapport v${R.r.versjon || 1} sendt til signering (${send.length} ${send.length === 1 ? 'part' : 'parter'})`, av: u.navn || u.epost }] }));
+    await befLogg(b, u.navn || u.epost, `Befaringsrapport sendt til signering`, u.id);
+    return json(200, { ok: true, sendt, grunn, lenker });
+  }
+  if (body.action === 'bef_sign_info') {
+    const f = await befTok(body.token); if (!f) return json(404, { error: 'Lenken er ugyldig, eller signeringen er trukket tilbake' });
+    if (f.part.utloper && new Date(f.part.utloper).getTime() < Date.now()) return json(410, { error: 'Lenken er utløpt. Be avsenderen sende rapporten på nytt.' });
+    const d = f.b.data || {}; const sg = d.signering;
+    if (!f.part.lest) await oppdaterSignering(f.b.id, x => ({ ...x, signering: { ...x.signering, parter: x.signering.parter.map((p: any) => p.id === f.part.id ? { ...p, lest: new Date().toISOString() } : p) } }));
+    const { data: u1 } = await admin.storage.from('filer').createSignedUrl(sg.rapportPath, 3600);
+    const { data: u2 } = sg.ferdig?.fil?.path ? await admin.storage.from('filer').createSignedUrl(sg.ferdig.fil.path, 3600) : { data: null as any };
+    const e = await eiendomInfo(f.b.eiendom_id);
+    return json(200, { tittel: d.tittel || 'Befaringsrapport', type: BTYPE[d.type] || 'Befaring', dato: d.dato, eiendom: e.navn, adresse: e.adresse, dokHash: sg.dokHash, pdfUrl: u1?.signedUrl || '', ferdigUrl: u2?.signedUrl || '',
+      part: { navn: f.part.navn, rolle: f.part.rolle, signert: f.part.signert?.t || null }, parter: (sg.parter || []).map((p: any) => ({ navn: p.navn, rolle: p.rolle, firma: p.firma, signert: p.signert?.t || null })) });
+  }
+  if (body.action === 'bef_sign_kode') {
+    const f = await befTok(body.token); if (!f) return json(404, { error: 'Lenken er ugyldig' });
+    if (f.part.utloper && new Date(f.part.utloper).getTime() < Date.now()) return json(410, { error: 'Lenken er utløpt' });
+    if (f.part.signert) return json(409, { error: 'Du har allerede signert' });
+    const naa = Date.now(); const koder = (f.part.koder || []).filter((t: number) => naa - t < 3600e3); if (koder.length >= 5) return json(429, { error: 'For mange koder på kort tid. Prøv igjen om en time.' });
+    const { randomInt } = await import('node:crypto'); const kode = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    await oppdaterSignering(f.b.id, x => ({ ...x, signering: { ...x.signering, parter: x.signering.parter.map((p: any) => p.id === f.part.id ? { ...p, kodeHash: null, koder: [...koder, naa] } : p) } }));
+    const kh = await sha(String(body.token) + ':' + kode);
+    await oppdaterSignering(f.b.id, x => ({ ...x, signering: { ...x.signering, parter: x.signering.parter.map((p: any) => p.id === f.part.id ? { ...p, kodeHash: kh, kodeUtloper: naa + 10 * 60e3, forsok: 0 } : p) } }));
+    const res = await sendEpost(f.part.epost, `Engangskode for signering: ${kode}`, `<div style="font-family:system-ui,Arial,sans-serif"><p>Koden for å signere befaringsrapporten er:</p><p style="font-size:28px;font-weight:700;letter-spacing:4px;font-family:monospace">${kode}</p><p style="font-size:12px;color:#6b736d">Koden gjelder i 10 minutter. Har du ikke bedt om den, kan du se bort fra e-posten.</p></div>`, `Koden for å signere befaringsrapporten er ${kode}. Den gjelder i 10 minutter.`, undefined, undefined, await oppsettFor(f.b.eiendom_id, null));
+    if (!res.sendt) return json(503, { error: 'Kunne ikke sende koden på e-post' + (res.holdt ? ' (e-post er i testmodus hos avsenderen)' : '') + '. Kontakt den som sendte rapporten.' });
+    const [a, dom] = String(f.part.epost).split('@'); return json(200, { ok: true, til: `${a.slice(0, 2)}…@${dom}` });
+  }
+  if (body.action === 'bef_sign_signer') {
+    const f = await befTok(body.token); if (!f) return json(404, { error: 'Lenken er ugyldig' });
+    if (f.part.utloper && new Date(f.part.utloper).getTime() < Date.now()) return json(410, { error: 'Lenken er utløpt' });
+    if (f.part.signert) return json(409, { error: 'Du har allerede signert' });
+    if (!f.part.kodeHash || !f.part.kodeUtloper || f.part.kodeUtloper < Date.now()) return json(400, { error: 'Koden er utløpt – be om en ny' });
+    if ((f.part.forsok || 0) >= 5) return json(429, { error: 'For mange feil forsøk – be om en ny kode' });
+    const riktig = (await sha(String(body.token) + ':' + String(body.kode || '').trim())) === f.part.kodeHash;
+    if (!riktig) { await oppdaterSignering(f.b.id, x => ({ ...x, signering: { ...x.signering, parter: x.signering.parter.map((p: any) => p.id === f.part.id ? { ...p, forsok: (p.forsok || 0) + 1 } : p) } })); return json(400, { error: 'Feil kode' }); }
+    const navn = String(body.navn || '').trim().slice(0, 120); if (navn.length < 2) return json(400, { error: 'Skriv navnet ditt' });
+    const R = await lastRapport(f.b); if (!R || R.hash !== f.b.data.signering.dokHash) return json(409, { error: 'Rapporten er endret etter at den ble sendt. Be avsenderen sende den nye versjonen.' });
+    const alle = await registrer(f.b, f.part, navn, 'epost_kode', renSig(body.signatur), String(body.forbehold || '').slice(0, 1000), R.hash);
+    return json(200, { ok: true, alle });
+  }
+  if (body.action === 'bef_sign_sted') {
+    const u = await hvem(); if (!u) return json(401, { error: 'Ikke innlogget' });
+    const b = await hentBef(String(body.befaring_id || '')); if (!b) return json(404, { error: 'Fant ikke befaringen' });
+    if (!(await harEiendom(u, b.eiendom_id))) return json(403, { error: 'Ingen tilgang til eiendommen' });
+    const R = await lastRapport(b); if (!R) return json(400, { error: 'Rapporten er ikke lastet opp' });
+    if (String(body.dokHash || '') !== R.hash) return json(409, { error: 'Signaturen gjelder en annen versjon av rapporten' });
+    const navn = String(body.navn || '').trim().slice(0, 120); const sig = renSig(body.signatur); if (navn.length < 2 || !sig) return json(400, { error: 'Navn og signatur mangler' });
+    // Opprett signeringen for denne versjonen hvis den ikke finnes
+    let bb = b; if (b.data?.signering?.dokHash !== R.hash) { const P = (Array.isArray(body.parter) ? body.parter : []).map(renPart).filter((x: any) => x.id).slice(0, 20);
+      bb = await oppdaterSignering(b.id, d => ({ ...d, status: 'Til signering', signering: { dokHash: R.hash, rapportPath: R.r.fil.path, versjon: R.r.versjon || 1, sendt: new Date().toISOString(), sendtAv: u.navn || u.epost, parter: P.map((p: any) => ({ ...p, signert: null })), ferdig: null } })); }
+    let part = bb.data.signering.parter.find((x: any) => x.id === String(body.partId)); if (!part) { part = { ...renPart({ id: body.partId, navn, epost: body.epost, rolle: body.rolle, firma: body.firma }), signert: null };
+      bb = await oppdaterSignering(b.id, d => ({ ...d, signering: { ...d.signering, parter: [...d.signering.parter, part] } })); }
+    if (part.signert) return json(409, { error: 'Parten har allerede signert' });
+    const alle = await registrer(bb, part, navn, `på stedet (bekreftet av ${String(u.navn || u.epost).slice(0, 80)})`, sig, String(body.forbehold || '').slice(0, 1000), R.hash);
+    return json(200, { ok: true, alle });
+  }
+
   return json(400, { error: 'Ukjent handling' });
 };

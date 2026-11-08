@@ -36,22 +36,23 @@ export const TABLES = {
   tegninger: { table: 'tegninger', cols: { eiendomId: 'eiendom_id' } as ColMap },
   avlesninger: { table: 'avlesninger', cols: { eiendomId: 'eiendom_id', komponentId: 'komponent_id' } as ColMap },
   prosjekter: { table: 'prosjekter', cols: { eiendomId: 'eiendom_id' } as ColMap },
+  befaringer: { table: 'befaringer', cols: { eiendomId: 'eiendom_id' } as ColMap },
 };
 /** Arkiverte rader (data.arkivert) holdes utenfor de vanlige listene, men finnes for oppslag og arkivsøk */
 export const ARKIV: Record<'anlegg' | 'komponenter' | 'oppgaver', any[]> = { anlegg: [], komponenter: [], oppgaver: [] };
 const ARK_COLS = ['anlegg', 'komponenter', 'oppgaver'] as const;
-const VALGFRIE = ['avlesninger', 'prosjekter'];
+const VALGFRIE = ['avlesninger', 'prosjekter', 'befaringer'];
 export type Col = keyof typeof TABLES;
 export const COLS = Object.keys(TABLES) as Col[];
 
 export type Niva = 'skriv' | 'drift' | 'les' | 'service';
 export const S: Record<Col, any[]> & { profiles: any[]; tilganger: any[]; innst: Record<string, any>; innstMangler: boolean; orgs: any[]; medlemmer: any[]; portefoljer: any[]; oppdrag: any[]; niva: Record<string, Niva>; primarOrg: string; fullTilgang: boolean } = {
-  eiendommer: [], leietakere: [], anlegg: [], komponenter: [], oppgaver: [], avvik: [], dokumenter: [], tegninger: [], avlesninger: [], prosjekter: [], profiles: [], tilganger: [], innst: {}, innstMangler: false,
+  eiendommer: [], leietakere: [], anlegg: [], komponenter: [], oppgaver: [], avvik: [], dokumenter: [], tegninger: [], avlesninger: [], prosjekter: [], befaringer: [], profiles: [], tilganger: [], innst: {}, innstMangler: false,
   orgs: [], medlemmer: [], portefoljer: [], oppdrag: [], niva: {}, primarOrg: '', fullTilgang: false,
 };
 
 export type Me = { id: string; epost: string; navn: string; rolle: Rolle; leietakerId?: string | null; aktiv: boolean; plattform?: boolean };
-export const state = { me: null as Me | null, ready: false, loading: false, error: '', recovery: false, version: 0, mfa: '' as '' | 'verifiser' | 'oppsett', mfaEpost: '' };
+export const state = { me: null as Me | null, ready: false, loading: false, error: '', offline: false, recovery: false, version: 0, mfa: '' as '' | 'verifiser' | 'oppsett', mfaEpost: '' };
 if (FRA_LENKE) state.recovery = true;
 
 // ---- enkel global butikk med abonnement
@@ -170,8 +171,14 @@ export async function loadData() {
       S.tilganger = await loadAll('eiendom_tilgang');
     }
     if (state.me && state.me.rolle !== 'leietaker') await loadOrg();
-  } catch (e: any) { state.error = 'Kunne ikke laste data: ' + feiltekst(e); }
+    state.offline = false; lagreKopi();
+  } catch (e: any) {
+    // Uten nett: bruk kopien fra sist appen var på nett (bare til visning og befaringer)
+    if (!navigator.onLine && await hentKopi()) { state.offline = true; state.error = ''; }
+    else state.error = 'Kunne ikke laste data: ' + feiltekst(e);
+  }
   state.loading = false; bump();
+  if (state.offline) return;
   if (channel) sb.removeChannel(channel);
   channel = sb.channel('endringer');
   COLS.forEach(c => channel.on('postgres_changes', { event: '*', schema: 'public', table: TABLES[c].table }, (p: any) => {
@@ -188,6 +195,18 @@ export async function loadData() {
   if (!S.innstMangler) channel.on('postgres_changes', { event: '*', schema: 'public', table: 'innstillinger' }, (p: any) => { if (p.new?.nokkel) { S.innst[p.new.nokkel] = p.new.data; bump(); } });
   channel.subscribe();
 }
+// ---- kopi av data for oppstart uten nett (IndexedDB på enheten)
+let kopiT: any = 0;
+function lagreKopi() { clearTimeout(kopiT); kopiT = setTimeout(async () => { try { const { lagreSnap } = await import('./offline'); const v: any = { me: state.me, niva: S.niva, primarOrg: S.primarOrg, orgs: S.orgs, medlemmer: S.medlemmer, portefoljer: S.portefoljer, innst: S.innst, profiles: S.profiles.map(p => ({ id: p.id, navn: p.navn, epost: p.epost, rolle: p.rolle, aktiv: p.aktiv })), arkiv: ARKIV };
+  COLS.forEach(c => v[c] = S[c]); await lagreSnap(v); try { localStorage.setItem('ek.me', JSON.stringify(state.me)); } catch { } } catch { } }, 2500); }
+async function hentKopi(): Promise<boolean> {
+  try { const { hentSnap } = await import('./offline'); const k = await hentSnap(); if (!k?.v || k.v.me?.id !== state.me?.id) return false; const v = k.v;
+    COLS.forEach(c => { S[c] = v[c] || []; }); Object.assign(ARKIV, v.arkiv || {}); S.niva = v.niva || {}; S.primarOrg = v.primarOrg || ''; S.orgs = v.orgs || []; S.medlemmer = v.medlemmer || []; S.portefoljer = v.portefoljer || []; S.innst = v.innst || {}; S.profiles = v.profiles || [];
+    (state as any).kopiTid = k.t; return true; } catch { return false; }
+}
+// Tilbake på nett: last på nytt og synk befaringer som er gjort uten nett
+if (typeof window !== 'undefined') window.addEventListener('offline', () => bump());
+if (typeof window !== 'undefined') window.addEventListener('online', () => { bump(); if (state.offline) { loadedFor = ''; loadMe(); } setTimeout(() => import('./befaring').then(m => m.synkAlle()), 1500); });
 let tilgT: any = 0;
 function reloadTilgang() { clearTimeout(tilgT); tilgT = setTimeout(async () => { const prev = S.tilganger.filter(t => t.user_id === state.me?.id).length; S.tilganger = await loadAll('eiendom_tilgang'); const now = S.tilganger.filter(t => t.user_id === state.me?.id).length; if (prev !== now && state.me?.rolle !== 'admin') loadData(); else bump(); }, 400); }
 // ---- organisasjoner, porteføljer, oppdrag og tilgangsnivå per eiendom
@@ -220,14 +239,20 @@ async function mfaSjekk(): Promise<'' | 'verifiser' | 'oppsett'> {
   return '';
 }
 export async function loadMe() {
-  const { data: { session } } = await sb.auth.getSession();
+  const { data: { session } } = await sb.auth.getSession().catch(() => ({ data: { session: null } } as any));
+  if (!session && !navigator.onLine) { // uten nett: bruk sist innloggede bruker på denne enheten (data er låst til samme bruker)
+    let m: any = null; try { m = JSON.parse(localStorage.getItem('ek.me') || 'null'); } catch { }
+    if (m?.id) { state.me = m; state.ready = true; bump(); if (loadedFor !== m.id + m.rolle) { loadedFor = m.id + m.rolle; loadData(); } return; }
+  }
   if (!session) { state.me = null; state.mfa = ''; state.ready = true; bump(); return; }
   // Tofaktor: kode ved innlogging, eller påkrevd oppsett for administratorer/forvaltere. Databasen stenger data uansett.
   const mfa = await mfaSjekk();
   if (mfa) { state.mfa = mfa; state.mfaEpost = session.user.email || ''; state.me = null; state.ready = true; bump(); return; }
   state.mfa = '';
   const { data, error } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
-  if (error || !data) { state.me = { id: session.user.id, epost: session.user.email || '', navn: '', rolle: 'ingen', aktiv: false }; }
+  let kopi: any = null; if ((error || !data) && !navigator.onLine) { try { kopi = JSON.parse(localStorage.getItem('ek.me') || 'null'); } catch { } }
+  if (kopi?.id === session.user.id) state.me = kopi;
+  else if (error || !data) { state.me = { id: session.user.id, epost: session.user.email || '', navn: '', rolle: 'ingen', aktiv: false }; }
   else setMe(data);
   state.ready = true; bump();
   if (state.me && (state.me.rolle !== 'ingen' || state.me.plattform) && loadedFor !== state.me.id + state.me.rolle) { loadedFor = state.me.id + state.me.rolle; loadData(); }
@@ -240,7 +265,12 @@ export function initAuth() {
   });
   loadMe();
 }
-export async function signOut() { if (channel) sb.removeChannel(channel); await sb.auth.signOut(); COLS.forEach(c => S[c] = []); S.profiles = []; S.tilganger = []; S.orgs = []; S.medlemmer = []; S.portefoljer = []; S.oppdrag = []; S.niva = {}; S.primarOrg = ''; state.me = null; state.mfa = ''; loadedFor = ''; bump(); location.hash = ''; }
+export async function signOut() {
+  try { // usynkede befaringer på enheten slettes ved utlogging – synk først, og spør hvis noe fortsatt ikke er lagret
+    const B = await import('./befaring'); await B.synkAlle(); const n = await B.antallUsynket();
+    if (n) { const { confirmBox } = await import('../components/ui'); if (!(await confirmBox(`${n} befaring${n > 1 ? 'er' : ''} på denne enheten er ikke lagret på serveren ennå${navigator.onLine ? '' : ' (du er uten nett)'}. Logger du ut nå, går endringene tapt.`, 'Logg ut likevel'))) return; }
+  } catch { }
+  if (channel) sb.removeChannel(channel); try { localStorage.removeItem('ek.me'); const { tomAlt } = await import('./offline'); await tomAlt(); } catch { } await sb.auth.signOut(); COLS.forEach(c => S[c] = []); S.profiles = []; S.tilganger = []; S.orgs = []; S.medlemmer = []; S.portefoljer = []; S.oppdrag = []; S.niva = {}; S.primarOrg = ''; state.me = null; state.mfa = ''; loadedFor = ''; bump(); location.hash = ''; }
 
 // ---- roller (styrer hva som vises; databasen håndhever tilgangen)
 export const role = () => state.me?.rolle || 'ingen';

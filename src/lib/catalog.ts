@@ -195,7 +195,7 @@ export const VEDL_KAT: [string, string][] = [
   ["Renhold og avfallshåndtering","Leietaker"],
   ["Snømåking, strøing og uteareal","Eier"],
 ];
-export const DOK_TYPER=["Ferdigattest/brukstillatelse","Brannkonsept/brannteknisk dokumentasjon","Branntegninger/rømningsplaner","FDV-dokumentasjon","Energiattest","Samsvarserklæring el-anlegg","Tilstandsrapport","Miljøkartlegging (asbest/PCB)","Forsikringspolise","Tegninger (plan/snitt/fasade)","Radonmåling","Tilsynsrapport","Servicerapport","Egenkontrollskjema","Serviceavtale","Leieavtale","Samordningsavtale","Leietakers IK-dokumentasjon","SHA-plan","Prosjektdokumentasjon","Kontrakt / tilbud","Oversiktsliste (mannskap)","Brannvernpakke (informasjon til leietaker)","Statusrapport til eier","Capex-rapport","Annet"];
+export const DOK_TYPER=["Ferdigattest/brukstillatelse","Brannkonsept/brannteknisk dokumentasjon","Branntegninger/rømningsplaner","FDV-dokumentasjon","Energiattest","Samsvarserklæring el-anlegg","Tilstandsrapport","Miljøkartlegging (asbest/PCB)","Forsikringspolise","Tegninger (plan/snitt/fasade)","Radonmåling","Tilsynsrapport","Servicerapport","Egenkontrollskjema","Serviceavtale","Leieavtale","Samordningsavtale","Leietakers IK-dokumentasjon","SHA-plan","Prosjektdokumentasjon","Kontrakt / tilbud","Oversiktsliste (mannskap)","Brannvernpakke (informasjon til leietaker)","Statusrapport til eier","Capex-rapport","Annet","Befaringsrapport"];
 export const DOK_PAAKREVD=DOK_TYPER.slice(0,9);
 // NS 3451 hovedgruppe 1 – Dokumentasjon (koder 10–19) og hvilken undergruppe hver dokumenttype hører til
 export const NS_DOK: Record<string, string> = { '10': 'Bygningsdokumentasjon', '11': 'Dokumenter for forvaltning', '12': 'Juridiske og offentlige dokumenter', '13': 'Tomt', '14': 'Dimensjonering', '15': 'Miljø', '16': 'Tegninger, planer og kart', '17': 'Branndokumentasjon', '18': 'Sikkerhet', '19': 'Drift og vedlikehold' };
@@ -207,7 +207,7 @@ export const AV_STATUS=["Ny","Under vurdering","Planlagt","Under utbedring","Utf
 export const AV_LUKKET=["Rettet","Avvist","Lukket"];
 export const AV_ALV=["Kritisk","Høy","Middels","Lav"];
 export const AV_FRIST: Record<string, number> = {Kritisk:7,"Høy":30,Middels:90,Lav:365};
-export const AV_KILDE=["Servicerapport","Egenkontroll","Periodisk kontroll","Leietaker","Brannvesen/tilsyn","Arbeidstilsynet","El-tilsyn","Forsikring","Tilstandsvurdering","Eier/drift","Annet"];
+export const AV_KILDE=["Befaring","Servicerapport","Egenkontroll","Periodisk kontroll","Leietaker","Brannvesen/tilsyn","Arbeidstilsynet","El-tilsyn","Forsikring","Tilstandsvurdering","Eier/drift","Annet"];
 export const TYPER=["Lovpålagt","Egenkontroll","Service","Forsikringskrav","Anbefalt","Vedlikehold"];
 export const KATS=["Brann","Elektro","Heis","VVS","Energi","Bygg","Internkontroll","Miljø","Annet"];
 export const ENH: [string, string][] = [["uke","uke(r)"],["mnd","måned(er)"],["år","år"]];

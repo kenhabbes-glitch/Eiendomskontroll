@@ -38,6 +38,10 @@ import { KoLenke } from './views/KontrollAo';
 import { PersonvernTekst } from './components/Personvern';
 import { AoLenke, ArbeidsordreListe, Hendelseslogg, mineAo } from './views/Arbeidsordre';
 import { LtLenke } from './views/Sjekkliste';
+import { Befaringer, BefaringSide } from './views/Befaring';
+import { Tilsynsanalyser } from './views/Tilsynsanalyser';
+import { SignerLenke } from './views/SignerLenke';
+import { synkAlle, lastLokale } from './lib/befaring';
 
 export function go(path: string) { if (location.hash === '#/' + path) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = '#/' + path; }
 function useRoute() {
@@ -54,6 +58,8 @@ const I: Record<string, string> = {
   maalere: 'M12 14l4-5M4.9 19a9 9 0 1114.2 0M12 14a1 1 0 100 .01',
   runde: 'M5 20a2 2 0 100-4 2 2 0 000 4zM19 8a2 2 0 100-4 2 2 0 000 4zM7 18h6a3 3 0 000-6h-2a3 3 0 010-6h6',
   prosjekter: 'M3 7h18v13H3zM8 7V4h8v3M3 12h18',
+  befaringer: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 14l2 2 4-4',
+  tilsynsanalyser: 'M3 3v18h18M8 17V11M13 17V7M18 17v-4',
   arkiv: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
   innboks: 'M22 12h-6l-2 3h-4l-2-3H2M5.5 5.1L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.5-6.9A2 2 0 0016.7 4H7.3a2 2 0 00-1.8 1.1z',
   tilsyn: 'M9 11l3 3 8-8M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9',
@@ -79,6 +85,7 @@ function navFor(): [string, string][] {
   if (isUtforer()) return [['arbeidsordre', 'Mine arbeidsordre'], ['hjelp', 'Hjelp']];
   const n: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['kontroller', 'Kontrollplan'], ['runde', 'Kontrollrunde'], ['avvik', 'Avvik'], ['arbeidsordre', 'Mine arbeidsordre']];
   if (canEdit() && harModul('tilsyn')) n.splice(5, 0, ['tilsyn', 'Tilsynssaker']);
+  if (S.eiendommer.some(e => kanDrifteE(e.id) && harModul('befaring', e.id))) { n.splice(4, 0, ['befaringer', 'Befaringer']); n.splice(5, 0, ['tilsynsanalyser', 'Tilsynsanalyser']); }
   if (canEdit()) n.push(['leietakere', 'Leietakere']);
   n.push(['maalere', 'Målere'], ['tfm', 'TFM-register'], ['arealer', 'Tegninger og arealer'], ['dokumenter', 'Dokumenter']);
   if (S.eiendommer.some(e => kanDrifteE(e.id) && harModul('dokumentlesing', e.id))) n.push(['innboks', 'Dokumentinnboks']);
@@ -96,6 +103,8 @@ function navFor(): [string, string][] {
 const ADMIN_NAV = ['innstillinger', 'logg', 'arkiv', 'brukere', 'data'];
 export default function App() {
   useEffect(() => { initAuth(); }, []);
+  // Befaringer gjort uten nett: last inn fra enheten og synk når appen er klar
+  useEffect(() => { if (state.ready && state.me) { lastLokale(); const t = setTimeout(() => synkAlle(), 2500); return () => clearTimeout(t); } }, [state.ready, state.me?.id]);
   const [admApen, setAdmApen] = useState(() => { try { return localStorage.getItem('navAdmin') === '1'; } catch { return false; } });
   const settAdmApen = (b: boolean) => { setAdmApen(b); try { localStorage.setItem('navAdmin', b ? '1' : '0'); } catch { } };
   useStore();
@@ -113,6 +122,7 @@ export default function App() {
   if (r.v === 'lt' && r.id) return <><LtLenke token={r.id} /><Toast /></>;
   if (r.v === 'ko' && r.id) return <><KoLenke token={r.id} /><Toast /></>;
   if (r.v === 'pr' && r.id) return <><PrLenke token={r.id} /><ModalHost /><Toast /></>;
+  if (r.v === 'sg' && r.id) return <><SignerLenke token={r.id} /><Toast /></>;
   if (r.v === 'personvern') return <div className="login"><div className="card" style={{ maxWidth: 640 }}><PersonvernTekst /><p className="small"><a href="#/">Tilbake</a></p></div></div>;
   if (!state.me && r.v === 'registrer') return <><Registrer /><Toast /></>;
   if (r.v === 'vilkar') return <div className="login"><div className="card" style={{ maxWidth: 760 }}><VilkarTekst /><p className="small"><a href="#/">Tilbake</a></p></div></div>;
@@ -122,18 +132,19 @@ export default function App() {
   const nav = navFor();
   const def = isTenant() ? 'portal' : isUtforer() ? 'arbeidsordre' : 'oversikt';
   let v = r.v || def;
-  if (!nav.some(n => n[0] === v) && !['eiendom', 'leietaker', 'profil', 'prosjekt'].includes(v)) v = def;
+  if (!nav.some(n => n[0] === v) && !['eiendom', 'leietaker', 'profil', 'prosjekt', 'befaring'].includes(v)) v = def;
   if (v === 'prosjekt' && !canEdit()) v = def;
   if (v === 'leietaker' && !canEdit()) v = def;
   if (v === 'eiendom' && !isStaff()) v = def;
-  const cur = v === 'eiendom' ? 'eiendommer' : v === 'leietaker' ? 'leietakere' : v === 'prosjekt' ? 'prosjekter' : v;
+  if (v === 'befaring' && !isStaff()) v = def;
+  const cur = v === 'eiendom' ? 'eiendommer' : v === 'leietaker' ? 'leietakere' : v === 'prosjekt' ? 'prosjekter' : v === 'befaring' ? 'befaringer' : v;
   const forf = isStaff() ? activeTasks().filter(o => (dUntil(o.nesteFrist) as number) < 0).length : 0;
   const avv = isStaff() ? openAvvik().filter(a => (a.frist && (dUntil(a.frist) as number) < 0) || a.alv === 'Kritisk').length : 0;
   const me = state.me;
   const ini = (me.navn || me.epost || '?').split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase();
 
   let body: React.ReactNode;
-  const rm = RUTE_MODUL[v]; const rmOk = !rm || (r.id && v === 'prosjekt' ? harModul(rm, S.prosjekter.find(p => p.id === r.id)?.eiendomId) : harModul(rm));
+  const rm = RUTE_MODUL[v]; const rmOk = !rm || (r.id && v === 'prosjekt' ? harModul(rm, S.prosjekter.find(p => p.id === r.id)?.eiendomId) : r.id && v === 'befaring' && S.befaringer.some(b => b.id === r.id) ? harModul(rm, S.befaringer.find(b => b.id === r.id)?.eiendomId) : harModul(rm));
   if (!rmOk) body = <ModulSperret k={rm} />;
   else switch (v) {
     case 'oversikt': body = <Oversikt />; break;
@@ -152,6 +163,9 @@ export default function App() {
     case 'runde': body = <Kontrollrunde />; break;
     case 'prosjekter': body = <Prosjekter />; break;
     case 'prosjekt': body = <ProsjektSide id={r.id!} />; break;
+    case 'befaringer': body = <Befaringer />; break;
+    case 'befaring': body = <BefaringSide id={r.id!} />; break;
+    case 'tilsynsanalyser': body = <Tilsynsanalyser />; break;
     case 'arkiv': body = <Arkiv />; break;
     case 'vedlikehold': body = <Vedlikehold />; break;
     case 'regelverk': body = <Regelverk />; break;
@@ -190,6 +204,7 @@ export default function App() {
     </aside>
     <main id="main">
       {state.error && <div className="banner">{state.error}</div>}
+      {(state.offline || !navigator.onLine) && <div className="offline-band" role="status">Uten nett{(state as any).kopiTid ? ` – viser data fra ${new Date((state as any).kopiTid).toLocaleString('nb-NO', { dateStyle: 'short', timeStyle: 'short' })}` : ''}. Befaringer kan gjennomføres og lagres på enheten; andre endringer krever nett.</div>}
       {state.loading && !S.eiendommer.length ? <div className="empty"><b>Laster data …</b></div> : body}
     </main>
     <ModalHost /><Toast /><Tip />

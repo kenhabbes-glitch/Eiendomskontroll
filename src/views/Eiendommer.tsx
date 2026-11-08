@@ -6,7 +6,8 @@ import { eierRapport } from './EierRapport';
 import { capexRapport } from './CapexRapport';
 import { verdiModal } from './Verdivurdering';
 import { harModul } from '../lib/moduler';
-import { S, canEdit, isAdmin, isPlattform, orgNavn, useStore, mineOrg } from '../lib/store';
+import { S, canEdit, isAdmin, isPlattform, orgNavn, useStore, mineOrg, kanDrifteE } from '../lib/store';
+import { Befaringer, nyBefaringDialog } from './Befaring';
 import { activeTasks, byId, dUntil, openAvvik, sortBy } from '../lib/utils';
 import { autoTfm, editAnlegg, editAvvik, editDok, editEiendom, editKomponent, editLeietaker, editOppgave, generatePlan, importTfm, visOppgave } from '../lib/actions';
 import { AvvikTable, CoverageTable, DokTable, LeieTable, ServiceavtaleTable, TaskTable, TfmTree } from '../components/tables';
@@ -55,6 +56,7 @@ export function Eiendom({ id }: { id: string }) {
   if (harModul('brannvern', id)) tabs.push(['brann', 'Brannvern', ed ? L.filter(l => bvStatus(l).o >= 1 || mangelAnsvarlig(l)).length + aktiveMidl(e).length || '' : aktiveMidl(e).length || '']);
   if (ed) tabs.push(['leie', 'Leietakere', L.length]);
   tabs.push(['areal', 'Tegninger og arealer', S.tegninger.filter(t => t.eiendomId === id).length]);
+  if (harModul('befaring', id) && kanDrifteE(id)) tabs.push(['bef', 'Befaringer', S.befaringer.filter(b => b.eiendomId === id).length]);
   const cur = tabs.some(t => t[0] === tab) ? tab : 'info';
   let c: React.ReactNode = null;
   if (cur === 'info') {
@@ -84,6 +86,7 @@ export function Eiendom({ id }: { id: string }) {
   if (cur === 'leie') c = <><div className="toolbar"><button className="btn pri" onClick={() => editLeietaker(undefined, { eiendomId: id })}>+ Leietaker</button></div><LeieTable list={L} showE={false} /></>;
   if (cur === 'areal') c = <ArealSection eid={id} />;
   if (cur === 'brann') c = <BrannvernSection eid={id} />;
+  if (cur === 'bef') c = <><div className="toolbar"><button className="btn pri" onClick={() => nyBefaringDialog({ eiendomId: id })}>+ Ny befaring</button></div><Befaringer eiendomId={id} kompakt /></>;
   return <>
     <p className="small" style={{ margin: '0 0 6px' }}><a href="#/eiendommer">← Eiendommer</a></p>
     <div className="head"><div className="grow"><h1>{e.navn}</h1><p className="sub">{[e.adresse, e.poststed, e.kategori].filter(Boolean).join(' · ')}</p></div>{ed && harModul('rapporter', id) && <button className="btn" onClick={() => verdiModal(id)} title="Enkelt verdianslag etter avkastningsmetoden">Verdivurdering</button>}{ed && harModul('vedlikehold', id) && <button className="btn" onClick={() => capexRapport(id)} title="Utskiftingsbehov og langtidsvedlikehold for valgfri periode">Capex-rapport</button>}{ed && harModul('rapporter', id) && <button className="btn" onClick={() => eierRapport(id)} title="Status på eiers lovpålagte oppgaver og dokumenter">Statusrapport til eier</button>}{ed && <button className="btn" onClick={() => editEiendom(id)}>Rediger</button>}<button className="btn" onClick={() => editAvvik(undefined, { eiendomId: id })}>+ Avvik</button></div>

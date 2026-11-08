@@ -48,6 +48,19 @@ Klikk på en rad for å gå rett til saken.` },
 - DWG leses automatisk med målestokk. Lag i tegningen kan slås av og på.
 - Plasser systemer, komponenter og avvik på tegningen. Filtrer på tagg eller tilstandsgrad.
 - Arealrapporten (PDF) viser leieareal, fordelt fellesareal og over- eller underdekning mot kontrakt.` },
+  'side.befaringer': { gruppe: 'Sider', tittel: 'Befaringer', tekst: `Befaringer gjennomføres på mobil, nettbrett eller PC – også uten nett.
+
+• Typer: forbefaring før leieavtale, overtakelse, leietakertilpasning, leietakers vedlikeholdsplikt (sjekkpunkter fra ansvarsfordelingen i leieavtalen), tilbakelevering (sammenlignes med overtakelsen), Fang energityven, tilfeldig runde, systemregistrering i nytt bygg, HMS-befaring og garantibefaring.
+• Sjekkpunkter: svar OK, Avvik, Merknad eller IA (ikke aktuelt), med kommentar og bilder. «Avvik» åpner et funn.
+• Tegning og funn: velg «Nytt funn» og trykk på etasjeplanen. Mål avstand og areal, tegn, sett piler og tekst. Mangler tegningen målestokk, settes den med to punkter og kjent avstand.
+• Funn av typen avvik blir vanlige avvik med ansvar (eier/drift, leietaker, felles, leverandør), frist og status, og kan sendes som arbeidsordre. Systemregistrering legger systemet i TFM-registeret.
+• Rapport og signering: lag PDF, og send til signering på e-post (personlig lenke og engangskode) eller signer på stedet. Når alle har signert, lagres signert rapport under Dokumenter.
+• Uten nett: alt lagres på enheten og synkes automatisk når nettet er tilbake. Bruk «Gjør klar uten nett» for å laste ned tegningene på forhånd. Logger du ut, slettes data på enheten – usynkede befaringer varsles først.` },
+  'side.tilsynsanalyser': { gruppe: 'Sider', tittel: 'Tilsynsanalyser', tekst: `Samlet oversikt over befaringsrapporter som er overført hit (fra «Rapport og signering» på befaringen), eller alle fullførte befaringer.
+
+• Nøkkeltall: antall rapporter, avvik, åpne, forfalte, andel lukket og snitt antall dager fra oppdaget til lukket.
+• Fordeling per alvorlighet, ansvar, fagområde (NS 3451 ut fra systemet avviket er knyttet til), befaringstype og eiendom.
+• Status hentes fortløpende fra avviksregisteret.` },
   'side.prosjekter': { gruppe: 'Sider', tittel: 'Prosjekter', tekst: `Prosjekter fra små vedlikeholdsjobber til store rehabiliteringer.
 
 • Faser: behov og idé → planlegging og prosjektering → anbud og kontrahering → utførelse → overlevering og ferdigstillelse → garantiperiode. Hver fase har standardoppgaver som kan endres, og datoer for en enkel fremdriftsplan.
