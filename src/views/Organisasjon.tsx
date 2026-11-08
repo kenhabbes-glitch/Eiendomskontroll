@@ -169,6 +169,28 @@ function redigerOppdrag(eierOrg: string, o?: any) {
 }
 
 // ---------- Kunder (plattformadmin)
+function endreOrg(o: any) {
+  formModal({
+    title: 'Endre kunde',
+    fields: [{ k: 'navn', label: 'Navn', req: true, half: true }, { k: 'orgnr', label: 'Org.nr.', half: true, mono: true },
+      { k: 'type', label: 'Type', type: 'select', options: ORG_TYPER, half: true }],
+    values: { navn: o.navn, orgnr: o.orgnr || '', type: o.type },
+    extraFoot: close => <button type="button" className="btn danger" style={{ marginRight: 'auto' }} onClick={() => { close(); slettOrg(o); }}>Slett kunde</button>,
+    onSave: async v => { const orgnr = String(v.orgnr || '').replace(/\D/g, '');
+      if (orgnr && orgnr.length !== 9) { toast('Org.nr. må ha 9 siffer'); return false; }
+      const { error } = await sb.from('organisasjoner').update({ navn: String(v.navn).trim(), orgnr: orgnr || null, type: v.type }).eq('id', o.id);
+      if (error) { toast(feiltekst(error)); return false; } toast('Kunden er oppdatert'); await reloadAdmin(); },
+  });
+}
+function slettOrg(o: any) {
+  formModal({
+    title: `Slette «${o.navn}»?`, saveTxt: 'Slett for godt',
+    top: <div className="note" style={{ color: 'var(--ink)' }}>Organisasjonen, medlemskap, porteføljer, oppdrag, innstillinger og moduler slettes. Brukere som <b>bare</b> var med i denne organisasjonen, slettes også, slik at e-postadressen kan brukes på nytt. Eier organisasjonen eiendommer, stoppes slettingen – da må eiendommene slettes eller flyttes først. <b>Dette kan ikke angres.</b></div>,
+    fields: [{ k: 'bekreft', label: `Skriv «${o.navn}» for å bekrefte`, req: true }],
+    onSave: async v => { if (String(v.bekreft).trim() !== String(o.navn).trim()) { toast('Navnet stemte ikke'); return false; }
+      try { const r = await adminApi({ action: 'slett_org', org_id: o.id }); toast(`«${o.navn}» er slettet${r.brukere ? ` – ${r.brukere} bruker${r.brukere > 1 ? 'e' : ''} fjernet` : ''}`); await reloadAdmin(); } catch (e: any) { toast(e.message); return false; } },
+  });
+}
 function nyOrg() {
   formModal({
     title: 'Ny kunde / organisasjon',
@@ -248,7 +270,7 @@ export function Organisasjon() {
     c = <><div className="toolbar"><span className="muted small">{O.length} organisasjoner. Som plattformadministrator administrerer du kunder, men ser ikke deres data med mindre du er medlem.</span><button className="btn pri" style={{ marginLeft: 'auto' }} onClick={nyOrg}>+ Ny kunde</button></div>
       <div className="tbl-wrap"><table><thead><tr><th>Organisasjon</th><th>Type</th><th>Org.nr.</th><th>Opprettet</th><th>Status</th><th /></tr></thead><tbody>
         {O.map(o => <tr key={o.id}><td><b style={{ fontWeight: 600 }}>{o.navn}</b>{o.data?.selvregistrert && <div className="small muted">Selvregistrert {fd(String(o.data.registrert || '').slice(0, 10))} av {o.data.registrertAv?.navn} · {o.data.registrertAv?.epost}</div>}</td><td className="small">{typeNavn(o.type)}</td><td className="mono small">{o.orgnr || '–'}</td><td className="small">{fd(String(o.opprettet || '').slice(0, 10))}</td><td>{o.aktiv ? <Chip c="green">Aktiv</Chip> : <Chip c="red">Sperret</Chip>}</td>
-          <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" style={{ marginRight: 6 }} onClick={() => modulAdmin(o)}>Moduler</button><button className="btn sm" onClick={async () => { if (!(await confirmBox(o.aktiv ? `Sperre «${o.navn}»? Alle brukere i organisasjonen mister tilgangen umiddelbart.` : `Gjenåpne «${o.navn}»?`, o.aktiv ? 'Sperr' : 'Gjenåpne'))) return; const { error } = await sb.from('organisasjoner').update({ aktiv: !o.aktiv }).eq('id', o.id); if (error) toast(feiltekst(error)); else { o.aktiv = !o.aktiv; bump(); } }}>{o.aktiv ? 'Sperr' : 'Gjenåpne'}</button></td></tr>)}
+          <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" style={{ marginRight: 6 }} onClick={() => modulAdmin(o)}>Moduler</button><button className="btn sm" style={{ marginRight: 6 }} onClick={() => endreOrg(o)}>Endre</button><button className="btn sm" onClick={async () => { if (!(await confirmBox(o.aktiv ? `Sperre «${o.navn}»? Alle brukere i organisasjonen mister tilgangen umiddelbart.` : `Gjenåpne «${o.navn}»?`, o.aktiv ? 'Sperr' : 'Gjenåpne'))) return; const { error } = await sb.from('organisasjoner').update({ aktiv: !o.aktiv }).eq('id', o.id); if (error) toast(feiltekst(error)); else { o.aktiv = !o.aktiv; bump(); } }}>{o.aktiv ? 'Sperr' : 'Gjenåpne'}</button></td></tr>)}
       </tbody></table></div></>;
   }
   return <>

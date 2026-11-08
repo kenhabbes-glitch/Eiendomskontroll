@@ -78,6 +78,26 @@ const handler = async (req: Request) => {
     }
   };
 
+  // ---------- Slett organisasjon (plattformadministrator). Stopper hvis den eier eiendommer.
+  if (body.action === 'slett_org') {
+    if (!plattform) return json(403, { error: 'Bare plattformadministrator kan slette organisasjoner' });
+    const id = String(body.org_id || ''); const { data: org } = await admin.from('organisasjoner').select('id, navn, orgnr').eq('id', id).maybeSingle();
+    if (!org) return json(404, { error: 'Fant ikke organisasjonen' });
+    const { count: ne } = await admin.from('eiendommer').select('id', { count: 'exact', head: true }).eq('eier_org_id', id);
+    if (ne) return json(409, { error: `«${org.navn}» eier ${ne} eiendom${ne > 1 ? 'mer' : ''}. Slett eller flytt eiendommene først, eller sperr kunden i stedet.` });
+    const { data: med } = await admin.from('org_medlem').select('user_id').eq('org_id', id);
+    if ((med || []).some((m: any) => m.user_id === me.id)) return json(400, { error: 'Du er selv medlem av organisasjonen – meld deg ut først, så du ikke sletter din egen tilgang' });
+    const { error } = await admin.from('organisasjoner').delete().eq('id', id); if (error) return json(500, { error: error.message });
+    let brukere = 0;
+    for (const m of med || []) { // fjern brukere som ikke lenger hører til noe sted
+      const { count: andre } = await admin.from('org_medlem').select('org_id', { count: 'exact', head: true }).eq('user_id', m.user_id);
+      const { data: p } = await admin.from('profiles').select('rolle, plattform_admin, leietaker_id').eq('id', m.user_id).maybeSingle();
+      if (!andre && p && !p.plattform_admin && !p.leietaker_id && (p.rolle === 'ingen' || !p.rolle)) { const { error: de } = await admin.auth.admin.deleteUser(m.user_id); if (!de) { await admin.from('profiles').delete().eq('id', m.user_id); brukere++; } }
+    }
+    await logg(null, `Organisasjon «${org.navn}» (${org.orgnr || 'uten org.nr.'}) slettet av plattformadministrator. ${brukere} bruker(e) fjernet.`);
+    return json(200, { ok: true, brukere });
+  }
+
   // ---------- Ny organisasjon (plattformadministrator)
   if (body.action === 'ny_org') {
     if (!plattform) return json(403, { error: 'Bare plattformadministrator kan opprette organisasjoner' });
