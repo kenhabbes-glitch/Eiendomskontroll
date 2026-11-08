@@ -183,6 +183,7 @@ export function AoLenke({ token }: { token: string }) {
 }
 
 // ---------------- Hendelseslogg (admin/forvalter)
+import { NyheterListe } from '../components/Nyheter';
 export function Hendelseslogg() {
   useStore();
   const [f, setF] = useFilter('hlogg', { e: '', t: '', q: '' }); const [L, setL] = useState<any[] | null>(null); const [n, setN] = useState(300);
@@ -193,6 +194,7 @@ export function Hendelseslogg() {
   let R = L || []; if (f.q) { const q = f.q.toLowerCase(); R = R.filter(h => JSON.stringify(h).toLowerCase().includes(q)); }
   return <>
     <div className="head"><div className="grow"><h1>{tt("Hendelseslogg")}<Hjelp id="side.logg" /></h1><p className="sub">{tt("Alle endringer i databasen logges automatisk med tid og bruker, i tillegg til hendelser som e-post sendt og PDF lastet ned.")}</p></div></div>
+    <details className="card" style={{ marginBottom: 12 }}><summary><b>{tt("Oppdateringer i appen")}</b></summary><div style={{ marginTop: 8 }}><NyheterListe /></div></details>
     <div className="toolbar"><input placeholder={tt("Søk …")} value={f.q} onChange={e => setF({ q: e.target.value })} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px', width: 220 }} />
       <Sel value={f.e} onChange={e => setF({ e })} opts={sortBy(S.eiendommer, e => e.navn).map(e => [e.id, e.navn] as [string, string])} empty={tt("Alle eiendommer")} />
       <Sel value={f.t} onChange={t => setF({ t })} opts={Object.entries(TAB)} empty={tt("Alle typer")} /><span className="small muted">{R.length} {tt("hendelser")}</span></div>
