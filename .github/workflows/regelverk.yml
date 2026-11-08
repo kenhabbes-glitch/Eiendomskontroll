@@ -21,6 +21,14 @@ on:
         description: 'Mexico: malene er kontrollert – gjør gjeldende status til ny grunnlinje'
         type: boolean
         default: false
+      godkjenn_se:
+        description: 'Sverige: malene er kontrollert – ny grunnlinje'
+        type: boolean
+        default: false
+      godkjenn_dk:
+        description: 'Danmark: malene er kontrollert – ny grunnlinje'
+        type: boolean
+        default: false
       testvarsel:
         description: 'Send et testvarsel (e-post til utvikler og hendelseslogg) for å sjekke oppsettet'
         type: boolean
@@ -82,12 +90,28 @@ jobs:
           NR=$(gh issue list --label regelverk-mx --state open --json number --jq '.[0].number' || true)
           if [ -n "$NR" ]; then gh issue comment "$NR" --body-file regelverk/rapport-mx.md
           else gh issue create --title "Regelverk Mexico: endringer ($(date +%d.%m.%Y))" --label regelverk-mx --body-file regelverk/rapport-mx.md; fi
+      - name: Sjekk Sverige og Danmark
+        continue-on-error: true
+        run: |
+          node scripts/regelverkssjekk-land.mjs se ${{ inputs.godkjenn_se && '--godkjenn' || '' }} || true
+          node scripts/regelverkssjekk-land.mjs dk ${{ inputs.godkjenn_dk && '--godkjenn' || '' }} || true
+      - name: GitHub-saker for Sverige og Danmark
+        if: hashFiles('regelverk/varsel-se.json', 'regelverk/varsel-dk.json') != ''
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          for L in se dk; do
+            [ -f regelverk/varsel-$L.json ] || continue
+            gh label create regelverk-$L --color B60205 --description "Endringer i regelverk ($L)" 2>/dev/null || true
+            NR=$(gh issue list --label regelverk-$L --state open --json number --jq '.[0].number' || true)
+            if [ -n "$NR" ]; then gh issue comment "$NR" --body-file regelverk/rapport-$L.md
+            else gh issue create --title "Regelverk ${L^^}: endringer ($(date +%d.%m.%Y))" --label regelverk-$L --body-file regelverk/rapport-$L.md; fi
+          done
       - name: Lagre status og grunnlinje
         if: always()
         run: |
           # Feilet varslingen, beholdes ikke fingeravtrykket – da prøves varselet igjen neste uke
           if [ "${{ steps.varsle.outcome }}" = "failure" ]; then git checkout -- regelverk/varslet.json 2>/dev/null || rm -f regelverk/varslet.json; fi
-          rm -f regelverk/varsel.json regelverk/varsel-mx.json
+          rm -f regelverk/varsel.json regelverk/varsel-mx.json regelverk/varsel-se.json regelverk/varsel-dk.json
           git config user.name "regelverkssjekk"; git config user.email "actions@users.noreply.github.com"
-          git add regelverk public/regelverk-status.json public/regelverk-status-mx.json 2>/dev/null || git add regelverk public/regelverk-status.json
+          git add regelverk public/regelverk-status*.json 2>/dev/null || git add regelverk public/regelverk-status.json
           git diff --cached --quiet || (git commit -m "Regelverkssjekk $(date +%Y-%m-%d)" && git push)

@@ -3,7 +3,7 @@
 // Fordelingen kan justeres per leietaker etter hva kontrakten faktisk sier, og lagres som egen mal.
 import { S } from './store';
 import { STD_PLIKTER } from './catalog';
-import { landFor, stdPlikter } from './land';
+import { landFor, stdPlikter, virksomhetPlikter } from './land';
 
 export type Ans = 'Eier' | 'Leietaker' | 'Delt' | 'Eier – viderefaktureres' | 'Ikke aktuelt';
 export type Celle = { v: Ans; u: Ans; p?: string };
@@ -109,7 +109,7 @@ export function avledetPlikter(l: any): string[] {
   return k;
 }
 export function pliktKeysFor(l: any): string[] {
-  if (landFor(l.eiendomId) === 'MX') { const k = stdPlikter('MX').slice(); if (l.virksomhet === 'Servering') k.push('mx_gas_arr'); return k; }
+  { const ld = landFor(l.eiendomId); if (ld !== 'NO') return [...new Set([...stdPlikter(ld), ...virksomhetPlikter(ld, l.virksomhet)])]; }
   const keys = STD_PLIKTER.slice();
   if (l.virksomhet === 'Servering') keys.push('fett', 'fgass_egen'); else if (l.virksomhet === 'Butikk/handel') keys.push('fgass_egen');
   return [...new Set([...keys, ...avledetPlikter(l)])];

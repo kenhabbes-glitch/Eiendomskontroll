@@ -104,3 +104,12 @@ export const SEK_MX: [string, string[]][] = [
   ['Electricidad, gas y equipos', ['<b>NOM-001-SEDE-2012</b>: instalaciones eléctricas; dictamen de Unidad de Verificación (UVIE) en instalaciones nuevas o modificadas y en lugares de concentración pública.', '<b>NOM-029-STPS-2011</b> (mantenimiento eléctrico) y <b>NOM-022-STPS-2015</b> (tierras y pararrayos).', '<b>NOM-004-SEDG-2004</b> (gas LP) y NOM-002-SECRE-2010 (gas natural); <b>NOM-020-STPS-2011</b> (recipientes a presión y calderas).', '<b>NOM-207-SCFI-2018</b> mantenimiento de elevadores y escaleras eléctricas; NOM-053-SCFI-2000 seguridad de elevadores.']],
   ['Arrendatarios', ['El arrendatario, como patrón, cumple la NOM-002-STPS-2010 y demás NOM en su centro de trabajo y mantiene su PIPC cuando aplique.', 'El propietario coordina el PIPC del inmueble con los arrendatarios y solicita evidencia de brigadas, simulacros y revisiones.', 'Código Civil de la entidad: reparaciones necesarias a cargo del arrendador; las de deterioro por uso ordinario según contrato.']],
 ];
+
+import type { Pakke } from './pakke';
+export const PAKKE_MX: Pakke = {
+  maler: MALER_MX, prop: PROP_MX, komp: KOMP_MX, plikter: PLIKTER_MX, stdPlikter: STD_PLIKTER_MX, pliktVirksomhet: { Servering: ['mx_gas_arr'] },
+  dok: DOK_MX, dokPaakrevd: DOK_MX_PAAKREVD, tilsyn: TILSYN_MX, mynd: MYND_MX,
+  kilder: KILDER_MX.map(k => ({ ...k, sjekk: k.niva === 'CDMX' ? 'manuell' as const : k.lenke.includes('platiica') ? 'nom' as const : 'ley' as const })),
+  sek: SEK_MX, sekLeietaker: ['Arrendatarios', 'Prevención de incendios (NOM-002-STPS-2010)'],
+  merknad: 'Regelverket for Mexico er satt sammen fra offisielle kilder (DOF, Secretaría de Economía, Gaceta Oficial CDMX), men er ikke kvalitetssikret av lokal fagperson ennå. Bruk det som sjekkliste og kontroller kravene for eiendommens delstat og bruk.',
+};

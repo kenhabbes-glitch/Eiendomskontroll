@@ -15,8 +15,7 @@ import { sysSjekkFor, sysSjekkAvvik } from './komponentsjekk';
 import { aktivtProsjektFor, opprettUtskifting } from './prosjekt';
 import { rapportFor, gjentatte, GJENTATT_MIN, GJENTATT_MND } from './avvikLenker';
 import { TILSYN_KILDER, TS_TYPER, MYND } from './tilsyn';
-import { TILSYN_MX as TILSYN_MX_K } from './land/mx';
-import { alleTilsynKilder, kompMaler, myndighet, propMaler, landFor, LAND, landInfo, hovedLand } from './land';
+import { tilsynKilder, alleTilsynKilder, kompMaler, myndighet, propMaler, landFor, LAND, landInfo, hovedLand } from './land';
 import { lesRapport, pdfKilder } from '../views/RapportLeser';
 import { MEDIER, MAALER_KODER, sisteAvl, enhet as mEnhet, grenseTekst, tall as mTall, fmt as mFmt } from './maaler';
 import { SysSjekkVelger, SysSjekkKort } from '../components/SysSjekk';
@@ -58,7 +57,7 @@ const tgFelt = (): Field[] => [
 // ================= EIENDOM =================
 export function editEiendom(id?: string, etter?: (nid: string) => void, preset?: Rec) {
   const eierOrg = mineOrg(['admin', 'forvalter']);
-  const e = id ? byId('eiendommer', id)! : { land: sprak() === 'es-MX' ? 'MX' : hovedLand(), eierOrgId: (eierOrg.find(o => o.id === S.primarOrg) || eierOrg.find(o => o.type === 'eier') || eierOrg[0])?.id, ...(preset || {}) } as Rec;
+  const e = id ? byId('eiendommer', id)! : { land: ({ 'es-MX': 'MX', sv: 'SE', da: 'DK' } as Rec)[sprak()] || hovedLand(), eierOrgId: (eierOrg.find(o => o.id === S.primarOrg) || eierOrg.find(o => o.type === 'eier') || eierOrg[0])?.id, ...(preset || {}) } as Rec;
   if (!id && !eierOrg.length) { toast(tt("Du må være administrator eller forvalter i en organisasjon for å opprette eiendommer")); return; }
   const kanEie = id ? mineOrg(['admin']).some(o => o.id === e.eierOrgId) : true;
   const flyttTil = mineOrg(['admin']).filter(o => o.type === 'eier' || o.id === e.eierOrgId); const flyttbar = !!id && kanEie && flyttTil.length > 1;
@@ -737,7 +736,7 @@ export function editAvvik(id?: string, preset: any = {}) {
     { k: 'anleggId', label: tt("System"), type: 'select', options: () => S.anlegg.map(x => [x.id, eNavn(x.eiendomId) + ' – ' + aNavn(x.id)] as [string, string]), empty: '–', half: true, hint: tt("Hovedsystemet avviket gjelder – følger med i arbeidsordren") },
     { k: 'komponentId', label: tt("Komponent (TFM)"), type: 'select', options: () => sortBy(S.komponenter, c => kNavn(c.id)).map(c => [c.id, eNavn(c.eiendomId) + ' – ' + kNavn(c.id)] as [string, string]), empty: '–' },
     { k: 'alv', label: tt("Alvorlighet"), type: 'select', options: AV_ALV, half: true }, { k: 'status', label: tt("Status"), type: 'select', options: AV_STATUS, half: true },
-    { k: 'kilde', label: tt("Kilde"), type: 'select', options: (x: Rec) => landFor(x.eiendomId) === 'MX' ? ['Befaring', ...TILSYN_MX_K, 'Eier/drift', 'Annet'] : AV_KILDE, half: true }, { k: 'meldtAv', label: tt("Meldt av / referanse"), half: true, ph: tt("Navn, rapportnr., tilsynsref.") },
+    { k: 'kilde', label: tt("Kilde"), type: 'select', options: (x: Rec) => landFor(x.eiendomId) !== 'NO' ? ['Befaring', ...tilsynKilder(x.eiendomId), 'Eier/drift', 'Annet'] : AV_KILDE, half: true }, { k: 'meldtAv', label: tt("Meldt av / referanse"), half: true, ph: tt("Navn, rapportnr., tilsynsref.") },
     { k: 'secTs', label: tt("Tilsyn"), type: 'sec', show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType) },
     { k: 'tsType', label: tt("Type"), type: 'select', options: TS_TYPER, empty: '–', half: true, show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType), hint: tt("Pålegg er et vedtak med frist – klarer dere ikke fristen, be skriftlig om utsettelse før den går ut") },
     { k: 'tsPunkt', label: tt("Punkt i tilsynsrapporten"), half: true, show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType) },
