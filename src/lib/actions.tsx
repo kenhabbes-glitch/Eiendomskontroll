@@ -28,7 +28,7 @@ import { openPlan, plasserteFor } from '../views/Arealer';
 import { AoPanel, HendelseListe, aoSnapshot } from './arbeidsordre';
 import { adresseFelter, brregData, enhetStatus, seEiendomUrl, virksomhetFraNaering, rensOrgnr } from './oppslag';
 import { confirmBox, formModal, showModal, openModal, copyText, FileLink, StChip, DueChip, TaggChips, TaggVelger, Chip, type Field } from '../components/ui';
-import { tt, lokale, sprak } from './i18n';
+import { tt, lokale, sprak, SPRAK } from './i18n';
 
 const go = (p: string) => { location.hash = '#/' + p; };
 const eOpts = () => sortBy(S.eiendommer, e => e.navn).map(e => [e.id, e.navn] as [string, string]);
@@ -68,6 +68,7 @@ export function editEiendom(id?: string, etter?: (nid: string) => void, preset?:
     { k: 'land', label: tt("Land (styrer regelverket)"), type: 'select', options: LAND.map(l => [l.k, l.navn] as [string, string]), half: true, hint: tt("Kontroller, plikter og dokumentkrav følger landet") },
     { k: 'region', label: tt("Delstat / region"), type: 'select', options: (v: Rec) => landInfo(v.land).regioner || [], half: true, show: v => !!landInfo(v.land).regioner, hint: tt("Regler for Ciudad de México er lagt inn. Andre delstater får de føderale reglene.") },
     { k: 'grado', label: tt("Brannrisiko (NOM-002-STPS-2010)"), type: 'select', options: [['', '–'], ['ordinario', 'Ordinario'], ['alto', 'Alto']], half: true, show: v => v.land === 'MX', hint: tt("Høy risiko gir to øvelser i året") },
+    { k: 'epostSprak', label: tt("Språk i e-post"), type: 'select', options: SPRAK.map(x => [x.k, x.navn] as [string, string]), empty: tt("(følger landet)"), half: true, hint: tt("Språket i e-post til leverandører, leietakere og andre fra denne eiendommen") },
     { k: 'sokAdr', type: 'custom', show: (v: Rec) => (v.land || 'NO') === 'NO', label: tt("Hent fra Kartverket"), render: (v, set) => <AdresseSok onPick={a => set({ ...adresseFelter(a), navn: v.navn || a.adressetekst })} /> },
     { k: 'navn', label: tt("Navn på eiendom/bygg"), req: true },
     { k: 'adresse', label: tt("Adresse"), half: true }, { k: 'poststed', label: tt("Postnr. og sted"), half: true },

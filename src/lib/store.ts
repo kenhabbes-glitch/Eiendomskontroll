@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { useSyncExternalStore } from 'react';
+import { sprak, tt } from './i18n';
 
 // Tåler at adressen er limt inn med /rest/v1, /auth/v1 eller skråstrek til slutt
 const rensUrl = (u?: string) => (u || '').trim().replace(/\/(rest|auth|storage)\/v1.*$/i, '').replace(/\/+$/, '');
@@ -98,9 +99,9 @@ export function varsle(t: string, lenke?: string) {
 export async function aoApi(body: any, medInnlogging = true) {
   const headers: any = { 'Content-Type': 'application/json' };
   if (medInnlogging) { const { data: { session } } = await sb.auth.getSession(); if (session) headers.Authorization = 'Bearer ' + session.access_token; }
-  const r = await fetch('/.netlify/functions/arbeidsordre', { method: 'POST', headers, body: JSON.stringify(body) });
+  const r = await fetch('/.netlify/functions/arbeidsordre', { method: 'POST', headers, body: JSON.stringify({ sprak: sprak(), ...body }) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw Object.assign(new Error(j.error || 'Feil ' + r.status), j, { status: r.status });
+  if (!r.ok) throw Object.assign(new Error(j.error ? tt(j.error) : tt('Feil {0}', r.status)), j, { status: r.status });
   return j;
 }
 /** Fører en egen hendelse i hendelsesloggen (i tillegg til de automatiske) */

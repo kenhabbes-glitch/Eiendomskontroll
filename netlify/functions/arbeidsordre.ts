@@ -6,6 +6,11 @@
 // Uten nøkkel returneres teksten, og appen åpner brukerens eget e-postprogram.
 import { createClient } from '@supabase/supabase-js';
 import { kompForKontroll, nyRunde, malIRunde, renKompSvar, sjekkMaler, punkterFor, sysSjekkFor, renSysSjekk, sysSjekkAvvik } from '../../src/lib/komponentsjekk';
+import enOrd from '../../src/i18n/en.json';
+import svOrd from '../../src/i18n/sv.json';
+import daOrd from '../../src/i18n/da.json';
+import esMxOrd from '../../src/i18n/es-MX.json';
+import esEsOrd from '../../src/i18n/es-ES.json';
 import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 // Lagringen godtar bare ASCII i filbanen
 const asciiNavn = (n: any) => String(n || 'fil').replace(/[æÆ]/g, m => m === 'æ' ? 'ae' : 'Ae').replace(/[øØ]/g, m => m === 'ø' ? 'o' : 'O').replace(/[åÅ]/g, m => m === 'å' ? 'a' : 'A')
@@ -72,6 +77,37 @@ const handler = async (req: Request) => {
     await admin.from(m.tabell).update({ data: { ...d, tgForslag: forslag } }).eq('id', m.rad.id);
     await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: av, tabell: 'hendelse', rad_id: m.rad.id, eiendom_id: m.rad.eiendom_id, handling: 'tilstand', tekst: `Forslag til endret tilstand ${d.tg || 'ikke vurdert'}${d.kg ? '/' + d.kg : ''} → ${t.tg}${t.kg ? '/' + t.kg : ''} (${kilde})` });
     return true;
+  };
+  // ---------- Språk i e-post: eiendommens valg (data.epostSprak), ellers ut fra landet. Samme ordbøker som appen.
+  const ORDBOK: Record<string, any> = { en: enOrd, sv: svOrd, da: daOrd, 'es-MX': esMxOrd, 'es-ES': esEsOrd };
+  const ordbok = async (sp: string) => ORDBOK[sp] || null;
+  const SPRAK_OK = ['nb', 'en', 'sv', 'da', 'es-MX', 'es-ES'];
+  const LAND_SPRAK: Record<string, string> = { SE: 'sv', DK: 'da', MX: 'es-MX' };
+  const LOKALE: Record<string, string> = { nb: 'nb-NO', en: 'en-GB', sv: 'sv-SE', da: 'da-DK', 'es-MX': 'es-MX', 'es-ES': 'es-ES' };
+  const VALUTA: Record<string, string> = { NO: 'kr', SE: 'kr', DK: 'kr.', MX: '$' };
+  const lagSp = async (sp0: string, land = 'NO') => {
+    const sp = SPRAK_OK.includes(sp0) ? sp0 : 'nb'; const d = await ordbok(sp);
+    const t = (s0: any, ...a: any[]) => { const s1 = String(s0 ?? ''); let r = (d && s1 && (d[s1] || d[s1.replace(/\s+/g, ' ').trim()])) || s1; a.forEach((v, i) => { r = r.split('{' + i + '}').join(String(v ?? '')); }); return r; };
+    const dato = (x?: string) => { if (!x) return ''; const [y, m, dd] = String(x).slice(0, 10).split('-'); return sp === 'sv' ? `${y}-${m}-${dd}` : sp === 'nb' || sp === 'da' ? `${dd}.${m}.${y}` : `${dd}/${m}/${y}`; };
+    const kr = (v: any) => { const n = new Intl.NumberFormat(LOKALE[sp], { maximumFractionDigits: 0 }).format(Math.round(+v || 0)); return land === 'MX' ? '$' + n : n + ' ' + (VALUTA[land] || 'kr'); };
+    const tz = ({ SE: 'Europe/Stockholm', DK: 'Europe/Copenhagen', MX: 'America/Mexico_City' } as any)[land] || 'Europe/Oslo';
+    const tid = (x: any) => new Date(x).toLocaleString(LOKALE[sp], { timeZone: tz });
+    return { t, sp, lok: LOKALE[sp], dato, kr, tid };
+  };
+  type Sp = Awaited<ReturnType<typeof lagSp>>;
+  const spCache: Record<string, Sp> = {};
+  const sprakFor = async (eid?: string | null, overstyr?: string): Promise<Sp> => {
+    const k = (eid || '') + '|' + (overstyr || ''); if (spCache[k]) return spCache[k];
+    const { data: e } = eid ? await admin.from('eiendommer').select('data').eq('id', eid).maybeSingle() : { data: null as any };
+    const land = e?.data?.land || 'NO'; const sp = (overstyr && SPRAK_OK.includes(overstyr) ? overstyr : '') || e?.data?.epostSprak || LAND_SPRAK[land] || 'nb';
+    return (spCache[k] = await lagSp(sp, land));
+  };
+  /** Språk for organisasjonen (purringer og varsler til eier): det vanligste blant eiendommene */
+  const sprakForOrg = async (org: string, overstyr?: string): Promise<Sp> => {
+    if (overstyr && SPRAK_OK.includes(overstyr)) return lagSp(overstyr);
+    const { data: E } = await admin.from('eiendommer').select('data').eq('eier_org_id', org); const n: Record<string, number> = {};
+    (E || []).forEach((e: any) => { const sp = e.data?.epostSprak || LAND_SPRAK[e.data?.land] || 'nb'; n[sp] = (n[sp] || 0) + 1; });
+    return lagSp(Object.entries(n).sort((a, b) => b[1] - a[1])[0]?.[0] || 'nb');
   };
   const orgNavnFor = async (eid: string) => { const { data: e } = await admin.from('eiendommer').select('eier_org_id').eq('id', eid).maybeSingle(); if (!e?.eier_org_id) return ''; const { data: o } = await admin.from('organisasjoner').select('navn').eq('id', e.eier_org_id).maybeSingle(); return o?.navn || ''; };
 
@@ -154,31 +190,32 @@ const handler = async (req: Request) => {
       return json(200, { ok: true });
     }
     const o = await hentOppsett(org);
-    const r = await sendEpost(p.epost, 'Test fra Eiendomskontroll', `<p>Dette er en test av e-postoppsettet.</p><p>Avsender: ${esc(o.fraNavn)} &lt;${esc(o.fraEpost)}&gt;<br>Svar går til: ${esc(o.svarTil || p.epost)}</p>`, `Dette er en test av e-postoppsettet.\nAvsender: ${o.fraNavn} <${o.fraEpost}>`, undefined, p.epost, o);
+    const { t } = await sprakForOrg(org || '', body.sprak);
+    const r = await sendEpost(p.epost, t('Test fra Eiendomskontroll'), `<p>${esc(t('Dette er en test av e-postoppsettet.'))}</p><p>${esc(t('Avsender'))}: ${esc(o.fraNavn)} &lt;${esc(o.fraEpost)}&gt;<br>${esc(t('Svar går til'))}: ${esc(o.svarTil || p.epost)}</p>`, `${t('Dette er en test av e-postoppsettet.')}\n${t('Avsender')}: ${o.fraNavn} <${o.fraEpost}>`, undefined, p.epost, o);
     return json(200, { ...r, til: p.epost });
   }
 
-  const aoTekst = (a: any, lenke: string, melding: string, avsender: string) => {
-    const d = a.data || {}; const ao = d.ao || {};
+  const aoTekst = (a: any, lenke: string, melding: string, avsender: string, L: Sp) => {
+    const { t } = L; const d = a.data || {}; const ao = d.ao || {}; const frist = d.frist ? L.dato(d.frist) : '';
     const linjer = [
-      `Arbeidsordre – avvik #${a.nr}: ${d.tittel || ''}`, '',
+      t('Arbeidsordre – avvik #{0}: {1}', a.nr, d.tittel || ''), '',
       melding ? melding + '\n' : '',
-      `Eiendom: ${ao.eiendom || ''}${ao.adresse ? ', ' + ao.adresse : ''}`,
-      ao.system ? `System: ${ao.system}` : '', ao.komponent ? `Komponent: ${ao.komponent}` : '',
-      ao.tegning ? `Plassering: ${ao.tegning}${ao.plassering ? ' – ' + ao.plassering : ''} (se markering på tegning i lenken/vedlegget)` : ao.plassering ? `Plassering: ${ao.plassering}` : '',
-      `Alvorlighet: ${d.alv || ''}${d.frist ? ' · Frist: ' + d.frist.split('-').reverse().join('.') : ''}`,
-      d.beskrivelse ? '\nBeskrivelse:\n' + d.beskrivelse : '', '',
-      `Åpne arbeidsordren, kvitter ut og last opp bilder/dokumentasjon her:\n${lenke}`, '',
-      `Sendt av ${avsender}`].filter(x => x !== '');
+      `${t('Eiendom')}: ${ao.eiendom || ''}${ao.adresse ? ', ' + ao.adresse : ''}`,
+      ao.system ? `${t('System')}: ${ao.system}` : '', ao.komponent ? `${t('Komponent')}: ${ao.komponent}` : '',
+      ao.tegning ? `${t('Plassering')}: ${ao.tegning}${ao.plassering ? ' – ' + ao.plassering : ''} (${t('se markering på tegning i lenken/vedlegget')})` : ao.plassering ? `${t('Plassering')}: ${ao.plassering}` : '',
+      `${t('Alvorlighet')}: ${t(d.alv || '')}${frist ? ' · ' + t('Frist') + ': ' + frist : ''}`,
+      d.beskrivelse ? '\n' + t('Beskrivelse') + ':\n' + d.beskrivelse : '', '',
+      `${t('Åpne arbeidsordren, kvitter ut og last opp bilder/dokumentasjon her:')}\n${lenke}`, '',
+      t('Sendt av {0}', avsender)].filter(x => x !== '');
     const tekst = linjer.join('\n');
     const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1d2320">
-      <p style="font-size:12px;color:#6b736d;margin:0">ARBEIDSORDRE</p><h2 style="margin:4px 0 12px">Avvik #${a.nr}: ${esc(d.tittel)}</h2>
+      <p style="font-size:12px;color:#6b736d;margin:0">${esc(t('ARBEIDSORDRE'))}</p><h2 style="margin:4px 0 12px">${esc(t('Avvik #{0}: {1}', a.nr, d.tittel || ''))}</h2>
       ${melding ? `<p>${esc(melding).replace(/\n/g, '<br>')}</p>` : ''}
-      <table style="border-collapse:collapse;font-size:14px">${[['Eiendom', (ao.eiendom || '') + (ao.adresse ? ', ' + ao.adresse : '')], ['System', ao.system], ['Komponent', ao.komponent], ['Plassering', [ao.tegning, ao.plassering].filter(Boolean).join(' – ')], ['Alvorlighet', d.alv], ['Frist', d.frist ? d.frist.split('-').reverse().join('.') : '']].filter(r => r[1]).map(r => `<tr><td style="padding:3px 14px 3px 0;color:#6b736d">${r[0]}</td><td style="padding:3px 0">${esc(r[1])}</td></tr>`).join('')}</table>
-      ${d.beskrivelse ? `<p style="margin-top:12px"><b>Beskrivelse</b><br>${esc(d.beskrivelse).replace(/\n/g, '<br>')}</p>` : ''}
-      <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Åpne arbeidsordren</a></p>
-      <p style="font-size:12px;color:#6b736d">Via lenken kan du opprette bruker (eller logge inn), se plasseringen på tegningen, kvittere ut jobben og laste opp bilder og dokumentasjon.<br>Sendt av ${esc(avsender)}.</p></div>`;
-    return { emne: `Arbeidsordre – avvik #${a.nr}: ${d.tittel || ''}`, tekst, html };
+      <table style="border-collapse:collapse;font-size:14px">${[['Eiendom', (ao.eiendom || '') + (ao.adresse ? ', ' + ao.adresse : '')], ['System', ao.system], ['Komponent', ao.komponent], ['Plassering', [ao.tegning, ao.plassering].filter(Boolean).join(' – ')], ['Alvorlighet', t(d.alv || '')], ['Frist', frist]].filter(r => r[1]).map(r => `<tr><td style="padding:3px 14px 3px 0;color:#6b736d">${esc(t(r[0]))}</td><td style="padding:3px 0">${esc(r[1])}</td></tr>`).join('')}</table>
+      ${d.beskrivelse ? `<p style="margin-top:12px"><b>${esc(t('Beskrivelse'))}</b><br>${esc(d.beskrivelse).replace(/\n/g, '<br>')}</p>` : ''}
+      <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${esc(t('Åpne arbeidsordren'))}</a></p>
+      <p style="font-size:12px;color:#6b736d">${esc(t('Via lenken kan du opprette bruker (eller logge inn), se plasseringen på tegningen, kvittere ut jobben og laste opp bilder og dokumentasjon.'))}<br>${esc(t('Sendt av {0}.', avsender))}</p></div>`;
+    return { emne: t('Arbeidsordre – avvik #{0}: {1}', a.nr, d.tittel || ''), tekst, html };
   };
 
   // ---------- Ansatt sender arbeidsordre til e-post (inviterer)
@@ -200,8 +237,8 @@ const handler = async (req: Request) => {
       if (!til) return json(400, { error: 'Mottakeren mangler e-post' });
       lenke = `${base}/#/arbeidsordre/${a.id}`;
     }
-    const m = aoTekst(a, lenke, String(body.melding || ''), p.navn || p.epost);
-    const vedlegg = typeof body.pdf === 'string' && body.pdf.length < 8_000_000 ? { navn: `Arbeidsordre avvik ${a.nr}.pdf`, base64: body.pdf } : undefined;
+    const m = aoTekst(a, lenke, String(body.melding || ''), p.navn || p.epost, await sprakFor(a.eiendom_id, body.mottakerSprak));
+    const vedlegg = typeof body.pdf === 'string' && body.pdf.length < 8_000_000 ? { navn: (await sprakFor(a.eiendom_id, body.mottakerSprak)).t('Arbeidsordre avvik {0}.pdf', a.nr), base64: body.pdf } : undefined;
     const r = await sendEpost(til, m.emne, m.html, m.tekst, vedlegg, p.epost || undefined, await oppsettFor(a.eiendom_id, await minOrg(p)));
     const hva = body.action === 'inviter' ? `Arbeidsordre ${r.sendt ? 'sendt' : 'klargjort'} på e-post til ${til}` : `Varsel om tildeling ${r.sendt ? 'sendt' : 'klargjort'} på e-post til ${til}`;
     await logg(p, a, hva); if (r.sendt) await leggTilAvvikLogg(a, hva, p.navn || p.epost);
@@ -292,7 +329,7 @@ const handler = async (req: Request) => {
     await admin.from('ao_invitasjon').update({ kvittert: t, svar: { navn, firma, komm, filer, samtykke: sam, tilstand: tl, nyttForslag } }).eq('token', inv.token);
     await logg_(a, av, `Arbeidsordre for avvik #${a.nr} kvittert ut via lenke av ${av} <${inv.epost}> – til kontroll`);
     if (inv.opprettet_av) { const { data: avs } = await admin.from('profiles').select('epost').eq('id', inv.opprettet_av).maybeSingle();
-      if (avs?.epost) await sendEpost(avs.epost, `Utført: avvik #${a.nr} ${d.tittel || ''}`, `<p>${esc(av)} har kvittert ut avvik <b>#${a.nr} ${esc(d.tittel)}</b> som utført:</p><p>${esc(komm).replace(/\n/g, '<br>')}</p><p>${filer.length} vedlegg. Avviket står som «Utført – til kontroll» i Eiendomskontroll.</p>`, `${av} har kvittert ut avvik #${a.nr} ${d.tittel || ''} som utført: ${komm}`, undefined, undefined, await oppsettFor(a.eiendom_id)); }
+      if (avs?.epost) { const { t } = await sprakFor(a.eiendom_id); await sendEpost(avs.epost, t('Utført: avvik #{0} {1}', a.nr, d.tittel || ''), `<p>${esc(t('{0} har kvittert ut avvik #{1} {2} som utført:', av, a.nr, d.tittel || ''))}</p><p>${esc(komm).replace(/\n/g, '<br>')}</p><p>${esc(t('{0} vedlegg. Avviket står som «Utført – til kontroll» i Eiendomskontroll.', filer.length))}</p>`, `${t('{0} har kvittert ut avvik #{1} {2} som utført:', av, a.nr, d.tittel || '')} ${komm}`, undefined, undefined, await oppsettFor(a.eiendom_id)); } }
     return json(200, { ok: true });
   }
 
@@ -318,17 +355,20 @@ const handler = async (req: Request) => {
     }
     const d = l.data || {}; const { data: e } = await admin.from('eiendommer').select('data').eq('id', l.eiendom_id).maybeSingle(); const en = e?.data?.navn || '';
     const pl = (d.plikter || []).filter((x: any) => !x.ikkeRelevant);
-    const frist = body.frist ? String(body.frist).split('-').reverse().join('.') : '';
-    const melding = String(body.melding || ''); const avs = p.navn || p.epost;
-    const emne = `Sjekkliste brann og internkontroll – ${d.navn || ''}${en ? ' (' + en + ')' : ''}`;
-    const filTekst = 'Vedlagt ligger en ZIP-fil med sjekklisten (Excel) og én mappe per punkt. Fyll ut Excel-arket, legg dokumentasjonen i riktig mappe, zip mappen og send den tilbake som svar på denne e-posten.';
-    const tekst = [`Hei,`, '', melding || `Som utleier følger vi opp at leietakerne i ${en || 'bygget'} ivaretar sine plikter etter forskrift om brannforebygging og internkontrollforskriften. Vi ber dere fylle ut sjekklisten og legge ved dokumentasjon.`, frist ? `\nFrist: ${frist}` : '', '', 'Punkter:', ...pl.map((x: any) => '- ' + x.navn), '', maate !== 'lenke' ? filTekst : '', lenke ? `${maate === 'begge' ? 'Eller fyll ut på nett' : 'Fyll ut her'}:\n${lenke}` : '', '', `Hilsen ${avs}`].filter(x => x !== null).join('\n');
-    const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1d2320"><p style="font-size:12px;color:#6b736d;margin:0">SJEKKLISTE</p><h2 style="margin:4px 0 12px">Brann og internkontroll – ${esc(d.navn)}</h2>
-      <p>${esc(melding || `Som utleier følger vi opp at leietakerne i ${en || 'bygget'} ivaretar sine plikter etter forskrift om brannforebygging og internkontrollforskriften. Vi ber dere fylle ut sjekklisten og laste opp dokumentasjon.`).replace(/\n/g, '<br>')}</p>
-      ${frist ? `<p><b>Frist: ${esc(frist)}</b></p>` : ''}<ul>${pl.map((x: any) => `<li>${esc(x.navn)}</li>`).join('')}</ul>
-      ${maate !== 'lenke' ? `<p style="background:#fff8e1;padding:10px 12px;border-radius:8px"><b>Vedlagt sjekkliste (ZIP):</b> ${esc(filTekst)}</p>` : ''}
-      ${lenke ? `<p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${maate === 'begge' ? 'Eller fyll ut på nett' : 'Åpne sjekklisten'}</a></p>
-      <p style="font-size:12px;color:#6b736d">Via lenken oppretter du bruker (eller logger inn), krysser av for dokumentasjonen og laster opp filer. Utleier går gjennom og godkjenner.</p>` : ''}<p style="font-size:12px;color:#6b736d">Sendt av ${esc(avs)}.</p></div>`;
+    const L = await sprakFor(l.eiendom_id, body.mottakerSprak); const { t } = L; const erNO = (e?.data?.land || 'NO') === 'NO';
+    const frist = body.frist ? L.dato(String(body.frist)) : '';
+    const melding = String(body.melding || ''); const avs = p.navn || p.epost; const bygg = en || t('bygget');
+    const emne = `${t('Sjekkliste brann og internkontroll')} – ${d.navn || ''}${en ? ' (' + en + ')' : ''}`;
+    const filTekst = t('Vedlagt ligger en ZIP-fil med sjekklisten (Excel) og én mappe per punkt. Fyll ut Excel-arket, legg dokumentasjonen i riktig mappe, zip mappen og send den tilbake som svar på denne e-posten.');
+    const standard = erNO ? t('Som utleier følger vi opp at leietakerne i {0} ivaretar sine plikter etter forskrift om brannforebygging og internkontrollforskriften. Vi ber dere fylle ut sjekklisten og legge ved dokumentasjon.', bygg)
+      : t('Som utleier følger vi opp at leietakerne i {0} ivaretar sine plikter innen brannsikkerhet og HMS. Vi ber dere fylle ut sjekklisten og legge ved dokumentasjon.', bygg);
+    const tekst = [t('Hei,'), '', melding || standard, frist ? `\n${t('Frist')}: ${frist}` : '', '', t('Punkter:'), ...pl.map((x: any) => '- ' + t(x.navn)), '', maate !== 'lenke' ? filTekst : '', lenke ? `${maate === 'begge' ? t('Eller fyll ut på nett') : t('Fyll ut her')}:\n${lenke}` : '', '', t('Hilsen {0}', avs)].filter(x => x !== null).join('\n');
+    const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1d2320"><p style="font-size:12px;color:#6b736d;margin:0">${esc(t('SJEKKLISTE'))}</p><h2 style="margin:4px 0 12px">${esc(t('Brann og internkontroll'))} – ${esc(d.navn)}</h2>
+      <p>${esc(melding || standard).replace(/\n/g, '<br>')}</p>
+      ${frist ? `<p><b>${esc(t('Frist'))}: ${esc(frist)}</b></p>` : ''}<ul>${pl.map((x: any) => `<li>${esc(t(x.navn))}</li>`).join('')}</ul>
+      ${maate !== 'lenke' ? `<p style="background:#fff8e1;padding:10px 12px;border-radius:8px"><b>${esc(t('Vedlagt sjekkliste (ZIP):'))}</b> ${esc(filTekst)}</p>` : ''}
+      ${lenke ? `<p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${esc(maate === 'begge' ? t('Eller fyll ut på nett') : t('Åpne sjekklisten'))}</a></p>
+      <p style="font-size:12px;color:#6b736d">${esc(t('Via lenken oppretter du bruker (eller logger inn), krysser av for dokumentasjonen og laster opp filer. Utleier går gjennom og godkjenner.'))}</p>` : ''}<p style="font-size:12px;color:#6b736d">${esc(t('Sendt av {0}.', avs))}</p></div>`;
     const vedlegg = maate !== 'lenke' && body.vedlegg && typeof body.vedlegg.base64 === 'string' && body.vedlegg.base64.length < 4_000_000 ? { navn: String(body.vedlegg.navn || 'Sjekkliste.zip').slice(0, 120), base64: body.vedlegg.base64, type: 'application/zip' } : undefined;
     const r = await sendEpost(til, emne, html, tekst, vedlegg, p.epost || undefined, await oppsettFor(l.eiendom_id, await minOrg(p)));
     await ltLogg(p, l, `Sjekkliste (${maate === 'fil' ? 'Excel-pakke' : maate === 'begge' ? 'lenke og Excel-pakke' : 'lenke'}) ${r.sendt ? 'sendt' : 'klargjort'} til ${til} (${d.navn || ''})`);
@@ -432,23 +472,23 @@ const handler = async (req: Request) => {
     const kr = await koRunde(o).catch(() => null); const sj = kr ? null : await koSysSjekk(o).catch(() => null);
     return { sjekkN: sj?.punkter.length || 0, sjekkNavn: sj?.navn || '', komp: kr?.K.length || 0, org: e?.eier_org_id || null, orgNavn: org?.navn || '', eiendom: ed.navn || '', adresse: [ed.adresse, [ed.postnr, ed.poststed].filter(Boolean).join(' ')].filter(Boolean).join(', '), system: sys, kontakt: ed.kontaktLeverandor || ed.driftsansvarlig || '' };
   };
-  const koTekst = (o: any, sn: any, lenke: string, melding: string, avsender: string, bilder = false) => {
-    const d = o.data || {}; const b = d.aoBilder;
-    const rader: [string, string][] = [['Eiendom', [sn.eiendom, sn.adresse].filter(Boolean).join(', ')], ['System', sn.system], ['Oppdrag', d.navn], ['Sjekkliste', sn.komp ? `${sn.komp} komponenter – kontrolleres og kvitteres ut én og én i lenken` : sn.sjekkN ? `${sn.sjekkNavn} – ${sn.sjekkN} punkter fylles ut i lenken` : ''], ['Type', [d.type, d.kategori].filter(Boolean).join(' · ')], ['Planlagt / frist', datoNo(d.nesteFrist)], ['Grunnlag', d.hjemmel || ''], ['Kontakt på stedet', sn.kontakt]];
-    const tekst = [`Arbeidsordre – ${d.navn}`, '', melding ? melding + '\n' : '', ...rader.filter(r => r[1]).map(r => `${r[0]}: ${r[1]}`), d.notat ? '\nSjekkpunkter / merknader:\n' + d.notat : '', bilder && b ? `\nLokasjon: se vedlagte bilder fra tegningen ${b.tegning}.` : '', '',
-      `Når jobben er utført: registrer dato, resultat og last opp servicerapport her (ingen innlogging):\n${lenke}`, '', `Sendt av ${avsender}`].filter(x => x !== '').join('\n');
+  const koTekst = (o: any, sn: any, lenke: string, melding: string, avsender: string, bilder = false, L: Sp) => {
+    const { t } = L; const d = o.data || {}; const b = d.aoBilder; const navn = t(d.navn || '');
+    const rader: [string, string][] = [['Eiendom', [sn.eiendom, sn.adresse].filter(Boolean).join(', ')], ['System', sn.system], ['Oppdrag', navn], ['Sjekkliste', sn.komp ? t('{0} komponenter – kontrolleres og kvitteres ut én og én i lenken', sn.komp) : sn.sjekkN ? t('{0} – {1} punkter fylles ut i lenken', t(sn.sjekkNavn), sn.sjekkN) : ''], ['Type', [t(d.type || ''), t(d.kategori || '')].filter(Boolean).join(' · ')], ['Planlagt / frist', L.dato(d.nesteFrist)], ['Grunnlag', t(d.hjemmel || '')], ['Kontakt på stedet', sn.kontakt]];
+    const tekst = [`${t('Arbeidsordre')} – ${navn}`, '', melding ? melding + '\n' : '', ...rader.filter(r => r[1]).map(r => `${t(r[0])}: ${r[1]}`), d.notat ? '\n' + t('Sjekkpunkter / merknader') + ':\n' + d.notat : '', bilder && b ? '\n' + t('Lokasjon: se vedlagte bilder fra tegningen {0}.', b.tegning) : '', '',
+      `${t('Når jobben er utført: registrer dato, resultat og last opp servicerapport her (ingen innlogging):')}\n${lenke}`, '', t('Sendt av {0}', avsender)].filter(x => x !== '').join('\n');
     const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1d2320">
-      <p style="font-size:12px;color:#6b736d;margin:0">ARBEIDSORDRE – ${esc((d.type || 'kontroll').toUpperCase())}</p><h2 style="margin:4px 0 12px">${esc(d.navn)}</h2>
+      <p style="font-size:12px;color:#6b736d;margin:0">${esc(t('ARBEIDSORDRE'))} – ${esc(t(d.type || 'kontroll').toUpperCase())}</p><h2 style="margin:4px 0 12px">${esc(navn)}</h2>
       ${melding ? `<p>${esc(melding).replace(/\n/g, '<br>')}</p>` : ''}
-      <table style="border-collapse:collapse;font-size:14px">${rader.filter(r => r[1]).map(r => `<tr><td style="padding:3px 14px 3px 0;color:#6b736d;vertical-align:top">${r[0]}</td><td style="padding:3px 0">${esc(r[1])}</td></tr>`).join('')}</table>
-      ${d.notat ? `<p style="margin-top:12px"><b>Sjekkpunkter / merknader</b><br>${esc(d.notat).replace(/\n/g, '<br>')}</p>` : ''}
-      ${bilder && b ? `<p style="margin:16px 0 4px"><b>Lokasjon – ${esc(b.tegning)}</b>${b.andre?.length ? ` <span style="color:#6b736d">(også plassert på ${esc(b.andre.join(', '))})</span>` : ''}</p>
-        <p style="margin:4px 0"><img src="cid:lokasjon-zoom" alt="Lokasjon (zoom)" style="max-width:100%;border:1px solid #d9ddd8;border-radius:6px"></p>
-        <p style="margin:4px 0"><img src="cid:lokasjon-oversikt" alt="Lokasjon (oversikt)" style="max-width:100%;border:1px solid #d9ddd8;border-radius:6px"></p>
-        <p style="font-size:12px;color:#6b736d;margin:2px 0 0">Grønn markering viser plasseringen. Rød stiplet ramme i oversikten viser utsnittet. Bildene ligger også som vedlegg.</p>` : ''}
-      <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Registrer utført og last opp rapport</a></p>
-      <p style="font-size:12px;color:#6b736d">Lenken krever ingen innlogging. Oppdragsgiver går gjennom rapporten før kontrollen registreres som utført.<br>Sendt av ${esc(avsender)}.</p></div>`;
-    return { emne: `Arbeidsordre: ${d.navn}${sn.eiendom ? ' – ' + sn.eiendom : ''}${d.nesteFrist ? ' (' + datoNo(d.nesteFrist) + ')' : ''}`, tekst, html };
+      <table style="border-collapse:collapse;font-size:14px">${rader.filter(r => r[1]).map(r => `<tr><td style="padding:3px 14px 3px 0;color:#6b736d;vertical-align:top">${esc(t(r[0]))}</td><td style="padding:3px 0">${esc(r[1])}</td></tr>`).join('')}</table>
+      ${d.notat ? `<p style="margin-top:12px"><b>${esc(t('Sjekkpunkter / merknader'))}</b><br>${esc(d.notat).replace(/\n/g, '<br>')}</p>` : ''}
+      ${bilder && b ? `<p style="margin:16px 0 4px"><b>${esc(t('Lokasjon'))} – ${esc(b.tegning)}</b>${b.andre?.length ? ` <span style="color:#6b736d">(${esc(t('også plassert på {0}', b.andre.join(', ')))})</span>` : ''}</p>
+        <p style="margin:4px 0"><img src="cid:lokasjon-zoom" alt="${esc(t('Lokasjon (zoom)'))}" style="max-width:100%;border:1px solid #d9ddd8;border-radius:6px"></p>
+        <p style="margin:4px 0"><img src="cid:lokasjon-oversikt" alt="${esc(t('Lokasjon (oversikt)'))}" style="max-width:100%;border:1px solid #d9ddd8;border-radius:6px"></p>
+        <p style="font-size:12px;color:#6b736d;margin:2px 0 0">${esc(t('Grønn markering viser plasseringen. Rød stiplet ramme i oversikten viser utsnittet. Bildene ligger også som vedlegg.'))}</p>` : ''}
+      <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${esc(t('Registrer utført og last opp rapport'))}</a></p>
+      <p style="font-size:12px;color:#6b736d">${esc(t('Lenken krever ingen innlogging. Oppdragsgiver går gjennom rapporten før kontrollen registreres som utført.'))}<br>${esc(t('Sendt av {0}.', avsender))}</p></div>`;
+    return { emne: `${t('Arbeidsordre')}: ${navn}${sn.eiendom ? ' – ' + sn.eiendom : ''}${d.nesteFrist ? ' (' + L.dato(d.nesteFrist) + ')' : ''}`, tekst, html };
   };
   // Lager lenke, sender e-post og merker kontrollen som sendt for gjeldende frist
   const koSend = async (o: any, til: string, melding: string, base: string, p: any | null) => {
@@ -460,11 +500,11 @@ const handler = async (req: Request) => {
     const avsender = p ? `${p.navn || p.epost}${sn.orgNavn ? ', ' + sn.orgNavn : ''}` : (sn.orgNavn || 'Eiendomskontroll');
     // Lokasjonsbilder fra tegningen (laget i appen og lagret på kontrollen)
     const vedl: Vedlegg[] = [];
-    for (const [k, cid, navn] of [['zoom', 'lokasjon-zoom', 'Lokasjon - zoom.jpg'], ['oversikt', 'lokasjon-oversikt', 'Lokasjon - oversikt.jpg']] as const) {
+    for (const [k, cid, navn] of [['zoom', 'lokasjon-zoom', 'Lokasjon - zoom.jpg'], ['oversikt', 'lokasjon-oversikt', 'Lokasjon - oversikt.jpg']] as const) { // filnavn holdes ASCII/norsk
       const path = d.aoBilder?.[k]?.path; if (!path || !String(path).startsWith(o.eiendom_id + '/')) continue;
       const { data: bl } = await admin.storage.from('filer').download(path); if (bl) vedl.push({ navn, base64: Buffer.from(await bl.arrayBuffer()).toString('base64'), type: 'image/jpeg', cid });
     }
-    const m = koTekst(o, sn, lenke, melding, avsender, vedl.length === 2);
+    const L = await sprakFor(o.eiendom_id, (o as any)._sprak); const m = koTekst(o, sn, lenke, melding, avsender, vedl.length === 2, L);
     const r = await sendEpost(til, m.emne, m.html, m.tekst, vedl, p?.epost || undefined, await oppsettFor(o.eiendom_id, sn.org || (p ? await minOrg(p) : null)));
     const fersk = (await hentOppg(o.id))?.data || d;
     if (r.sendt) await admin.from('oppgaver').update({ data: { ...fersk, aoSendt: { frist: d.nesteFrist || '', dato: new Date().toISOString(), til, auto: !p, av: p ? (p.navn || p.epost) : 'Automatisk' } } }).eq('id', o.id);
@@ -556,24 +596,24 @@ const handler = async (req: Request) => {
     }
     return ut;
   };
-  const purreTekst = (a: any, m: { navn: string; lenke: string }, etter: boolean, nr: number) => {
-    const d = a.data || {}; const ao = d.ao || {}; const dg = d.frist ? dagerTil(d.frist) : 0;
-    const emne = `${etter ? (nr > 1 ? `${nr}. purring` : 'Purring') : 'Påminnelse'}: avvik #${a.nr} ${d.tittel || ''}${d.frist ? ` – frist ${fdN(d.frist)}` : ''}`.slice(0, 180);
-    const linje = etter ? `Fristen for å utbedre avviket gikk ut ${fdN(d.frist)} (${-dg} dager siden), og avviket er ikke meldt utført.` : `Fristen for å utbedre avviket er ${fdN(d.frist)} (om ${dg} dager).`;
-    const rader = [['Eiendom', [ao.eiendom, ao.adresse].filter(Boolean).join(', ')], ['System', ao.system], ['Komponent', ao.komponent], ['Plassering', d.plassering], ['Alvorlighet', d.alv], ['Status', d.status]].filter(x => x[1]);
-    const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:620px;color:#1d2521"><h2 style="margin:0 0 8px">${esc(emne)}</h2>${m.navn ? `<p>Hei ${esc(m.navn)},</p>` : ''}<p>${esc(linje)}</p>
-      <table style="border-collapse:collapse;font-size:14px">${rader.map(x => `<tr><td style="padding:3px 14px 3px 0;color:#6b736d">${x[0]}</td><td>${esc(x[1])}</td></tr>`).join('')}</table>
-      ${d.beskrivelse ? `<p style="margin-top:12px"><b>Beskrivelse</b><br>${esc(d.beskrivelse).replace(/\n/g, '<br>')}</p>` : ''}
-      ${m.lenke ? `<p style="margin:20px 0"><a href="${esc(m.lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Åpne avviket og kvitter ut</a></p>` : '<p>Gi beskjed til eier når avviket er utbedret.</p>'}
-      <p style="font-size:12px;color:#6b736d">Er avviket allerede utbedret, kvitter det ut via lenken, så stopper påminnelsene. Ta kontakt dersom fristen ikke kan holdes.</p></div>`;
-    return { emne, html, tekst: `${emne}\n\n${linje}\n${rader.map(x => x[0] + ': ' + x[1]).join('\n')}\n\n${m.lenke ? 'Åpne: ' + m.lenke : ''}` };
+  const purreTekst = (a: any, m: { navn: string; lenke: string }, etter: boolean, nr: number, L: Sp) => {
+    const { t } = L; const d = a.data || {}; const ao = d.ao || {}; const dg = d.frist ? dagerTil(d.frist) : 0;
+    const emne = `${etter ? (nr > 1 ? t('{0}. purring', nr) : t('Purring')) : t('Påminnelse')}: ${t('avvik #{0} {1}', a.nr, d.tittel || '')}${d.frist ? ` – ${t('frist {0}', L.dato(d.frist))}` : ''}`.slice(0, 180);
+    const linje = etter ? t('Fristen for å utbedre avviket gikk ut {0} ({1} dager siden), og avviket er ikke meldt utført.', L.dato(d.frist), -dg) : t('Fristen for å utbedre avviket er {0} (om {1} dager).', L.dato(d.frist), dg);
+    const rader = [['Eiendom', [ao.eiendom, ao.adresse].filter(Boolean).join(', ')], ['System', ao.system], ['Komponent', ao.komponent], ['Plassering', d.plassering], ['Alvorlighet', t(d.alv || '')], ['Status', t(d.status || '')]].filter(x => x[1]).map(x => [t(x[0]), x[1]]);
+    const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:620px;color:#1d2521"><h2 style="margin:0 0 8px">${esc(emne)}</h2>${m.navn ? `<p>${esc(t('Hei {0},', m.navn))}</p>` : ''}<p>${esc(linje)}</p>
+      <table style="border-collapse:collapse;font-size:14px">${rader.map(x => `<tr><td style="padding:3px 14px 3px 0;color:#6b736d">${esc(x[0])}</td><td>${esc(x[1])}</td></tr>`).join('')}</table>
+      ${d.beskrivelse ? `<p style="margin-top:12px"><b>${esc(t('Beskrivelse'))}</b><br>${esc(d.beskrivelse).replace(/\n/g, '<br>')}</p>` : ''}
+      ${m.lenke ? `<p style="margin:20px 0"><a href="${esc(m.lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${esc(t('Åpne avviket og kvitter ut'))}</a></p>` : `<p>${esc(t('Gi beskjed til eier når avviket er utbedret.'))}</p>`}
+      <p style="font-size:12px;color:#6b736d">${esc(t('Er avviket allerede utbedret, kvitter det ut via lenken, så stopper påminnelsene. Ta kontakt dersom fristen ikke kan holdes.'))}</p></div>`;
+    return { emne, html, tekst: `${emne}\n\n${linje}\n${rader.map(x => x[0] + ': ' + x[1]).join('\n')}\n\n${m.lenke ? t('Åpne') + ': ' + m.lenke : ''}` };
   };
   const SYS = { id: null, navn: 'Automatisk purring' };
   async function purrEn(a: any, base: string, etter: boolean, manuelt?: any) {
     const M = await purreMottakere(a, base); if (!M.length) return { sendt: 0, grunn: 'ingen mottaker (ikke tildelt, ingen åpen arbeidsordre-lenke eller leietakerkontakt)' };
     const d = a.data || {}; const pu = d.purring || {}; const nr = etter ? (pu.antall || 0) + 1 : 0; const o = await oppsettFor(a.eiendom_id, null);
     let sendt = 0; const til: string[] = [];
-    for (const m of M) { const t = purreTekst(a, m, etter, nr); const r = await sendEpost(m.epost, t.emne, t.html, t.tekst, undefined, undefined, o).catch(() => ({ sendt: false })); if ((r as any).sendt) { sendt++; til.push(m.epost); } }
+    const Lp = await sprakFor(a.eiendom_id); for (const m of M) { const t = purreTekst(a, m, etter, nr, Lp); const r = await sendEpost(m.epost, t.emne, t.html, t.tekst, undefined, undefined, o).catch(() => ({ sendt: false })); if ((r as any).sendt) { sendt++; til.push(m.epost); } }
     if (sendt) { const tid = new Date().toISOString(); const k = `${manuelt ? 'Purring sendt manuelt' : etter ? `Purring ${nr} sendt automatisk` : 'Påminnelse før frist sendt automatisk'} til ${til.join(', ')}`;
       const { data: fersk } = await admin.from('avvik').select('data').eq('id', a.id).single(); const fd0 = fersk?.data || d;
       await admin.from('avvik').update({ data: { ...fd0, purring: { ...(fd0.purring || {}), sist: tid, ...(etter ? { antall: (fd0.purring?.antall || 0) + 1 } : { forFrist: d.frist }), til }, logg: [...(fd0.logg || []), { t: tid, s: fd0.status, k, av: manuelt?.navn || SYS.navn }] } }).eq('id', a.id);
@@ -588,14 +628,16 @@ const handler = async (req: Request) => {
     if (!erAdm) return json(403, { error: 'Ingen tilgang' });
     const { data: o } = await admin.from('organisasjoner').select('navn, lisenser').eq('id', org).maybeSingle();
     const { count: bygg } = await admin.from('eiendommer').select('id', { count: 'exact', head: true }).eq('eier_org_id', org);
-    const hva = body.type === 'bygg' ? `Et nytt bygg er lagt til${body.navn ? ` («${String(body.navn).slice(0, 120)}»)` : ''}.` : `Antall brukere er økt fra ${+body.fra || '?'} til ${o?.lisenser ?? '?'}${body.navn ? ` fordi ${String(body.navn).slice(0, 120)} ble lagt til` : ''}.`;
-    const pris = Number.isFinite(+body.ny) && +body.ny > 0 ? `Ny månedspris for aktive moduler er ${Math.round(+body.ny).toLocaleString('nb-NO')} kr eks. mva.${Number.isFinite(+body.gml) && +body.gml > 0 ? ` (før: ${Math.round(+body.gml).toLocaleString('nb-NO')} kr).` : ''}` : '';
-    const tekst = `${hva}\n\nAbonnementet for ${o?.navn || 'organisasjonen'} er justert i henhold til antall bygg og brukere: nå ${bygg ?? '?'} bygg og ${o?.lisenser ?? '?'} brukere. ${pris}\n\nEndringen ble gjort av ${p?.navn || p?.epost || 'en administrator'}. Du ser abonnementet under Organisasjon og tilgang → Abonnement.`;
+    const L = await sprakForOrg(org, body.sprak); const { t } = L; const kr = (v: number) => Math.round(v).toLocaleString(L.lok) + ' kr';
+    const hva = body.type === 'bygg' ? (body.navn ? t('Et nytt bygg er lagt til («{0}»).', String(body.navn).slice(0, 120)) : t('Et nytt bygg er lagt til.'))
+      : body.navn ? t('Antall brukere er økt fra {0} til {1} fordi {2} ble lagt til.', +body.fra || '?', o?.lisenser ?? '?', String(body.navn).slice(0, 120)) : t('Antall brukere er økt fra {0} til {1}.', +body.fra || '?', o?.lisenser ?? '?');
+    const pris = Number.isFinite(+body.ny) && +body.ny > 0 ? t('Ny månedspris for aktive moduler er {0} eks. mva.', kr(+body.ny)) + (Number.isFinite(+body.gml) && +body.gml > 0 ? ' ' + t('(før: {0}).', kr(+body.gml)) : '') : '';
+    const tekst = `${hva}\n\n${t('Abonnementet for {0} er justert i henhold til antall bygg og brukere: nå {1} bygg og {2} brukere.', o?.navn || t('organisasjonen'), bygg ?? '?', o?.lisenser ?? '?')} ${pris}\n\n${t('Endringen ble gjort av {0}. Du ser abonnementet under Organisasjon og tilgang → Abonnement.', p?.navn || p?.epost || t('en administrator'))}`;
     const html = tekst.split('\n\n').map(x => `<p>${x.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' } as any)[c])}</p>`).join('');
     const adm = (med || []).filter((m: any) => m.aktiv && m.rolle === 'admin').map((m: any) => m.user_id);
     const { data: prof } = adm.length ? await admin.from('profiles').select('epost').in('id', adm) : { data: [] as any[] };
     const opps = await hentOppsett(org); let sendt = 0; const feil: string[] = [];
-    for (const r of prof || []) { if (!r.epost) continue; const res: any = await sendEpost(r.epost, `Abonnementet er justert – ${o?.navn || ''}`.trim(), html, tekst, undefined, undefined, opps); if (res.sendt) sendt++; else if (res.grunn) feil.push(res.grunn); }
+    for (const r of prof || []) { if (!r.epost) continue; const res: any = await sendEpost(r.epost, `${t('Abonnementet er justert')} – ${o?.navn || ''}`.trim(), html, tekst, undefined, undefined, opps); if (res.sendt) sendt++; else if (res.grunn) feil.push(res.grunn); }
     await admin.from('hendelseslogg').insert({ bruker_id: p.id, bruker: p?.navn || p?.epost, tabell: 'hendelse', handling: 'abonnement', org_id: org, tekst: hva + ' ' + pris + ` Varsel sendt til ${sendt} administrator(er).` });
     return json(200, { ok: true, sendt, feil: feil.slice(0, 1) });
   }
@@ -633,12 +675,13 @@ const handler = async (req: Request) => {
       }
       // Eskalering til eier (bare når bryteren er på): én samlet e-post med avvik som har passert fristen med X dager
       const adminEpost = async () => { const { data: m } = await admin.from('org_medlem').select('rolle, profiles(epost)').eq('org_id', org.id).eq('rolle', 'admin').eq('aktiv', true); return (m || []).map((x: any) => x.profiles?.epost).filter(Boolean); };
-      const tabell = (L: any[]) => `<table style="border-collapse:collapse;font-size:13px;width:100%"><tr style="background:#f4f5f2"><th align="left" style="padding:4px">Avvik</th><th align="left">Eiendom</th><th align="left">Ansvar</th><th align="left">Frist</th><th align="left">Status</th></tr>${L.map((a: any) => `<tr><td style="padding:4px;border-top:1px solid #e3e6e1">#${a.nr} ${esc(a.data.tittel)}</td><td style="border-top:1px solid #e3e6e1">${esc(a.data.ao?.eiendom || (E || []).find((e: any) => e.id === a.eiendom_id)?.data?.navn || '')}</td><td style="border-top:1px solid #e3e6e1">${esc(a.data.ansvar || 'Eier')}</td><td style="border-top:1px solid #e3e6e1;color:${dagerTil(a.data.frist) < 0 ? '#c0392b' : '#1d2521'}">${fdN(a.data.frist)}${dagerTil(a.data.frist) < 0 ? ` (${-dagerTil(a.data.frist)} d over)` : ''}</td><td style="border-top:1px solid #e3e6e1">${esc(a.data.status)}</td></tr>`).join('')}</table>`;
+      const Lo = await sprakForOrg(org.id); const to = Lo.t;
+      const tabell = (L: any[]) => `<table style="border-collapse:collapse;font-size:13px;width:100%"><tr style="background:#f4f5f2">${['Avvik', 'Eiendom', 'Ansvar', 'Frist', 'Status'].map((h, i) => `<th align="left"${i ? '' : ' style="padding:4px"'}>${esc(to(h))}</th>`).join('')}</tr>${L.map((a: any) => `<tr><td style="padding:4px;border-top:1px solid #e3e6e1">#${a.nr} ${esc(a.data.tittel)}</td><td style="border-top:1px solid #e3e6e1">${esc(a.data.ao?.eiendom || (E || []).find((e: any) => e.id === a.eiendom_id)?.data?.navn || '')}</td><td style="border-top:1px solid #e3e6e1">${esc(to(a.data.ansvar || 'Eier'))}</td><td style="border-top:1px solid #e3e6e1;color:${dagerTil(a.data.frist) < 0 ? '#c0392b' : '#1d2521'}">${Lo.dato(a.data.frist)}${dagerTil(a.data.frist) < 0 ? ` (${esc(to('{0} d over', -dagerTil(a.data.frist)))})` : ''}</td><td style="border-top:1px solid #e3e6e1">${esc(to(a.data.status))}</td></tr>`).join('')}</table>`;
       if (c.eier) {
         const L = ventende.filter((a: any) => dagerTil(a.data.frist) <= -Math.max(0, +c.eierEtter || 0) && !a.data.purring?.eierSendt);
         const til = epostListe(c.eierEpost).length ? epostListe(c.eierEpost) : await adminEpost();
-        if (L.length && til.length) { const o = await oppsettFor(null, org.id); const emne = `${L.length} avvik har passert fristen med mer enn ${c.eierEtter} dager`;
-          for (const t of til) await sendEpost(t, emne, `<div style="font-family:system-ui,Arial,sans-serif;max-width:760px"><h2>${esc(emne)}</h2><p>Avvikene er ikke meldt utført, og ansvarlig er purret der det finnes en mottaker.</p>${tabell(L)}<p><a href="${base}/#/avvik">Åpne avvikslisten</a></p></div>`, `${emne}\n\n${L.map((a: any) => `#${a.nr} ${a.data.tittel} – frist ${fdN(a.data.frist)}`).join('\n')}`, undefined, undefined, o).catch(() => null);
+        if (L.length && til.length) { const o = await oppsettFor(null, org.id); const emne = to('{0} avvik har passert fristen med mer enn {1} dager', L.length, c.eierEtter);
+          for (const t of til) await sendEpost(t, emne, `<div style="font-family:system-ui,Arial,sans-serif;max-width:760px"><h2>${esc(emne)}</h2><p>${esc(to('Avvikene er ikke meldt utført, og ansvarlig er purret der det finnes en mottaker.'))}</p>${tabell(L)}<p><a href="${base}/#/avvik">${esc(to('Åpne avvikslisten'))}</a></p></div>`, `${emne}\n\n${L.map((a: any) => `#${a.nr} ${a.data.tittel} – ${to('frist {0}', Lo.dato(a.data.frist))}`).join('\n')}`, undefined, undefined, o).catch(() => null);
           for (const a of L) { const { data: fr } = await admin.from('avvik').select('data').eq('id', a.id).single(); await admin.from('avvik').update({ data: { ...fr!.data, purring: { ...(fr!.data.purring || {}), eierSendt: new Date().toISOString() } } }).eq('id', a.id); }
           await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: SYS.navn, tabell: 'hendelse', rad_id: null, eiendom_id: null, org_id: org.id, handling: 'purring', tekst: `Eskalering til eier: ${L.length} avvik over frist sendt til ${til.join(', ')}` }); }
       }
@@ -646,8 +689,8 @@ const handler = async (req: Request) => {
       if (c.ukentlig && mandag) {
         const L = apne.filter((a: any) => dagerTil(a.data.frist) <= 14).sort((x: any, y: any) => x.data.frist.localeCompare(y.data.frist));
         const til = epostListe(c.ukentligEpost).length ? epostListe(c.ukentligEpost) : await adminEpost();
-        if (L.length && til.length) { const o = await oppsettFor(null, org.id); const over = L.filter((a: any) => dagerTil(a.data.frist) < 0).length; const emne = `Ukeoversikt avvik: ${over} over frist, ${L.length - over} med frist innen 14 dager`;
-          for (const t of til) await sendEpost(t, emne, `<div style="font-family:system-ui,Arial,sans-serif;max-width:760px"><h2>${esc(emne)}</h2>${tabell(L)}<p><a href="${base}/#/avvik">Åpne avvikslisten</a></p></div>`, emne, undefined, undefined, o).catch(() => null); }
+        if (L.length && til.length) { const o = await oppsettFor(null, org.id); const over = L.filter((a: any) => dagerTil(a.data.frist) < 0).length; const emne = to('Ukeoversikt avvik: {0} over frist, {1} med frist innen 14 dager', over, L.length - over);
+          for (const t of til) await sendEpost(t, emne, `<div style="font-family:system-ui,Arial,sans-serif;max-width:760px"><h2>${esc(emne)}</h2>${tabell(L)}<p><a href="${base}/#/avvik">${esc(to('Åpne avvikslisten'))}</a></p></div>`, emne, undefined, undefined, o).catch(() => null); }
       }
       rapport.push({ org: org.navn, purret: n });
     }
@@ -729,7 +772,8 @@ const handler = async (req: Request) => {
     await koLogg({ id: null, navn: `${rapport.av || inv.epost}${rapport.firma ? ' (' + rapport.firma + ')' : ''}` }, o, `Servicerapport mottatt for «${fersk.navn}»: ${res}${rapport.avvik.length ? `, ${rapport.avvik.length} avvik` : ''}, ${filer.length} vedlegg – venter på godkjenning`, sn.org);
     // Varsle den som sendte arbeidsordren (eller ingen, hvis automatisk og uten mottaker)
     if (inv.opprettet_av) { const { data: av } = await admin.from('profiles').select('epost').eq('id', inv.opprettet_av).maybeSingle();
-      if (av?.epost) await sendEpost(av.epost, `Rapport mottatt: ${fersk.navn} – ${sn.eiendom}`, `<p>${esc(rapport.av || inv.epost)}${rapport.firma ? ' (' + esc(rapport.firma) + ')' : ''} har registrert <b>${esc(fersk.navn)}</b> på ${esc(sn.eiendom)} som utført ${esc(datoNo(dato))}: ${esc(res)}.</p><p>Gå til kontrollen i Eiendomskontroll for å godkjenne.</p>`, `${rapport.av || inv.epost} har registrert ${fersk.navn} på ${sn.eiendom} som utført ${datoNo(dato)}: ${res}. Gå til kontrollen i Eiendomskontroll for å godkjenne.`, undefined, undefined, await oppsettFor(o.eiendom_id, sn.org)); }
+      if (av?.epost) { const { t } = await sprakFor(o.eiendom_id); const hvemR = `${rapport.av || inv.epost}${rapport.firma ? ' (' + rapport.firma + ')' : ''}`; const L2 = await sprakFor(o.eiendom_id); const linje = t('{0} har registrert {1} på {2} som utført {3}: {4}.', hvemR, t(fersk.navn), sn.eiendom, L2.dato(dato), t(res)) + ' ' + t('Gå til kontrollen i Eiendomskontroll for å godkjenne.');
+        await sendEpost(av.epost, `${t('Rapport mottatt')}: ${t(fersk.navn)} – ${sn.eiendom}`, `<p>${esc(linje)}</p>`, linje, undefined, undefined, await oppsettFor(o.eiendom_id, sn.org)); } }
     return json(200, { ok: true });
   }
 
@@ -753,17 +797,18 @@ const handler = async (req: Request) => {
     const navn = String(body.navn || '').slice(0, 120); const melding = String(body.melding || '').slice(0, 4000);
     const base = typeof body.lenkeBase === 'string' && /^https?:\/\//.test(body.lenkeBase) ? body.lenkeBase.replace(/\/+$/, '') : (process.env.URL || '');
     const { randomBytes } = await import('node:crypto'); const tok = randomBytes(24).toString('hex'); const lenke = `${base}/#/pr/${tok}`;
-    const s = r.snap || {}; const fase = r.type === 'fase';
-    const emne = fase ? `Til godkjenning: ${s.prosjekt?.navn} – ${s.fase?.navn}` : `Statusrapport: ${s.prosjekt?.navn}${s.periode?.til ? ' per ' + s.periode.til.split('-').reverse().join('.') : ''}`;
-    const rader: [string, string][] = [['Eiendom', s.prosjekt?.eiendom || ''], ['Prosjekt', s.prosjekt?.navn || ''], ['Fase', s.fase?.navn || ''], ['Budsjett', krN(s.okonomi?.tot?.budsjett)], ['Prognose', krN(s.okonomi?.tot?.prognose)], ['Fremdrift', (s.fremdrift ?? 0) + ' %']];
+    const s = r.snap || {}; const fase = r.type === 'fase'; const L = await sprakFor(p.eiendom_id, body.mottakerSprak); const { t: tr } = L;
+    const fNavn = tr(s.fase?.navn || '');
+    const emne = fase ? `${tr('Til godkjenning')}: ${s.prosjekt?.navn} – ${fNavn}` : `${tr('Statusrapport')}: ${s.prosjekt?.navn}${s.periode?.til ? ' ' + tr('per {0}', L.dato(s.periode.til)) : ''}`;
+    const rader: [string, string][] = [['Eiendom', s.prosjekt?.eiendom || ''], ['Prosjekt', s.prosjekt?.navn || ''], ['Fase', fNavn], ['Budsjett', L.kr(s.okonomi?.tot?.budsjett)], ['Prognose', L.kr(s.okonomi?.tot?.prognose)], ['Fremdrift', (s.fremdrift ?? 0) + ' %']];
     if (fase && s.beslutning) rader.push(['Det bes om', s.beslutning]);
     const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:620px;color:#1d2521">
-      <h2 style="margin:0 0 6px">${esc(s.tittel || emne)}</h2><p style="color:#6b736d;margin:0 0 14px">${esc(s.prosjekt?.navn)} · ${esc(s.prosjekt?.eiendom)}</p>
-      ${navn ? `<p>Hei ${esc(navn)},</p>` : ''}${melding ? `<p>${esc(melding).replace(/\n/g, '<br>')}</p>` : ''}
-      <table style="border-collapse:collapse;font-size:14px">${rader.filter(x => x[1]).map(x => `<tr><td style="padding:3px 14px 3px 0;color:#6b736d;vertical-align:top">${x[0]}</td><td style="padding:3px 0">${esc(x[1])}</td></tr>`).join('')}</table>
-      <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${fase ? 'Les notatet og gi svar' : 'Åpne rapporten'}</a></p>
-      <p style="font-size:12px;color:#6b736d">Lenken er personlig og gjelder i 90 dager. Du trenger ikke bruker i appen.<br>Sendt av ${esc(u.navn || u.epost)}.</p></div>`;
-    const tekst = `${s.tittel || emne}\n${s.prosjekt?.navn} – ${s.prosjekt?.eiendom}\n\n${melding ? melding + '\n\n' : ''}${rader.map(x => x[0] + ': ' + x[1]).join('\n')}\n\nÅpne: ${lenke}`;
+      <h2 style="margin:0 0 6px">${esc(s.tittel ? tr(s.tittel) : emne)}</h2><p style="color:#6b736d;margin:0 0 14px">${esc(s.prosjekt?.navn)} · ${esc(s.prosjekt?.eiendom)}</p>
+      ${navn ? `<p>${esc(tr('Hei {0},', navn))}</p>` : ''}${melding ? `<p>${esc(melding).replace(/\n/g, '<br>')}</p>` : ''}
+      <table style="border-collapse:collapse;font-size:14px">${rader.filter(x => x[1]).map(x => `<tr><td style="padding:3px 14px 3px 0;color:#6b736d;vertical-align:top">${esc(tr(x[0]))}</td><td style="padding:3px 0">${esc(x[1])}</td></tr>`).join('')}</table>
+      <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${esc(fase ? tr('Les notatet og gi svar') : tr('Åpne rapporten'))}</a></p>
+      <p style="font-size:12px;color:#6b736d">${esc(tr('Lenken er personlig og gjelder i 90 dager. Du trenger ikke bruker i appen.'))}<br>${esc(tr('Sendt av {0}.', u.navn || u.epost))}</p></div>`;
+    const tekst = `${s.tittel ? tr(s.tittel) : emne}\n${s.prosjekt?.navn} – ${s.prosjekt?.eiendom}\n\n${melding ? melding + '\n\n' : ''}${rader.map(x => tr(x[0]) + ': ' + x[1]).join('\n')}\n\n${tr('Åpne')}: ${lenke}`;
     const res = await sendEpost(til, emne, html, tekst, undefined, u.epost || undefined, await oppsettFor(p.eiendom_id, await minOrg(u)));
     const t = new Date().toISOString(); const ny = { ...r, tokenHash: await sha(tok), utloper: new Date(Date.now() + 90 * 864e5).toISOString(), sendtTil: { navn, epost: til }, sendt: t, sendtAv: u.navn || u.epost, sendtAvEpost: u.epost,
       status: fase ? 'Sendt' : 'Til orientering', svar: null };
@@ -798,9 +843,11 @@ const handler = async (req: Request) => {
     }
     await admin.from('prosjekter').update({ data: { ...d, fase, status: status2, logg, rapporter: d.rapporter.map((x: any) => x.id === f.r.id ? { ...x, status, svar: beslutning === 'Kommentar' ? x.svar : svar, kommentarer } : x) } }).eq('id', f.p.id);
     await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: navn, tabell: 'hendelse', rad_id: f.p.id, eiendom_id: f.p.eiendom_id, handling: 'prosjekt', tekst: logg[logg.length - (fase !== d.fase ? 2 : 1)].k });
-    if (f.r.sendtAvEpost) await sendEpost(f.r.sendtAvEpost, `${beslutning}: ${d.navn}${f.r.type === 'fase' ? ' – ' + (FASENAVN[f.r.fase] || '') : ''}`,
-      `<p><b>${esc(navn)}</b> har svart på ${f.r.type === 'fase' ? 'beslutningsnotatet' : 'statusrapporten'} for <b>${esc(d.navn)}</b>: <b>${esc(beslutning)}</b>.</p>${komm ? `<p>${esc(komm).replace(/\n/g, '<br>')}</p>` : ''}${fase !== d.fase ? `<p>Prosjektet er flyttet til fasen «${esc(FASENAVN[fase])}».</p>` : ''}`,
-      `${navn} har svart: ${beslutning}\n${komm}`, undefined, undefined, await oppsettFor(f.p.eiendom_id, null)).catch(() => null);
+    if (f.r.sendtAvEpost) { const { t: tr } = await sprakFor(f.p.eiendom_id); const fn = (k: string) => tr(FASENAVN[k] || '');
+      const linje = f.r.type === 'fase' ? tr('{0} har svart på beslutningsnotatet for {1}: {2}.', navn, d.navn, tr(beslutning)) : tr('{0} har svart på statusrapporten for {1}: {2}.', navn, d.navn, tr(beslutning));
+      await sendEpost(f.r.sendtAvEpost, `${tr(beslutning)}: ${d.navn}${f.r.type === 'fase' ? ' – ' + fn(f.r.fase) : ''}`,
+      `<p>${esc(linje)}</p>${komm ? `<p>${esc(komm).replace(/\n/g, '<br>')}</p>` : ''}${fase !== d.fase ? `<p>${esc(tr('Prosjektet er flyttet til fasen «{0}».', fn(fase)))}</p>` : ''}`,
+      `${linje}\n${komm}`, undefined, undefined, await oppsettFor(f.p.eiendom_id, null)).catch(() => null); }
     return json(200, { ok: true, status, nyFase: fase !== d.fase ? FASENAVN[fase] : null });
   }
 
@@ -838,21 +885,22 @@ const handler = async (req: Request) => {
     const pdf = await PDFDocument.load(R.buf); const f = await pdf.embedFont(StandardFonts.Helvetica); const fb = await pdf.embedFont(StandardFonts.HelveticaBold);
     const safe = (x: any) => String(x ?? '').replace(/[^\x20-\x7E -ÿ–—‘’“”•…€]/g, '');
     const { data: S } = await admin.from('bef_signatur').select('*').eq('befaring_id', b.id).eq('dok_hash', R.hash).order('signert_at');
+    const L = await sprakFor(b.eiendom_id); const tr = L.t; const tittel = b.data.tittel || tr('Befaringsrapport');
     let pg = pdf.addPage([595.28, 841.89]); let y = 790; const M = 44; const INK = rgb(.11, .14, .13), MUT = rgb(.42, .45, .43);
     const t = (s: string, x: number, yy: number, z = 9, bold = false, c = INK) => pg.drawText(safe(s), { x, y: yy, size: z, font: bold ? fb : f, color: c });
-    t('SIGNERINGSSIDE', M, y, 8.5, true, rgb(.12, .44, .36)); y -= 22; t(b.data.tittel || 'Befaringsrapport', M, y, 16, true); y -= 18;
-    t(`Dokumentets fingeravtrykk (SHA-256): ${R.hash}`, M, y, 7.5, false, MUT); y -= 12; t(`Rapportversjon ${R.r.versjon || 1}, laget ${String(R.r.laget || '').slice(0, 16).replace('T', ' ')}`, M, y, 7.5, false, MUT); y -= 24;
+    t(tr('SIGNERINGSSIDE'), M, y, 8.5, true, rgb(.12, .44, .36)); y -= 22; t(tittel, M, y, 16, true); y -= 18;
+    t(tr('Dokumentets fingeravtrykk (SHA-256): {0}', R.hash), M, y, 7.5, false, MUT); y -= 12; t(tr('Rapportversjon {0}, laget {1}', R.r.versjon || 1, R.r.laget ? L.tid(R.r.laget) : ''), M, y, 7.5, false, MUT); y -= 24;
     const sist = new Map<string, any>(); (S || []).forEach((x: any) => sist.set(x.part_id, x));
     for (const p of b.data.signering.parter || []) { const x = sist.get(p.id); if (!x) continue;
       if (y < 160) { pg = pdf.addPage([595.28, 841.89]); y = 790; }
       pg.drawRectangle({ x: M, y: y - 104, width: 595.28 - 2 * M, height: 104, borderColor: rgb(.85, .86, .84), borderWidth: .6 });
       t(`${x.navn} – ${x.rolle || ''}${p.firma ? ', ' + p.firma : ''}`, M + 10, y - 16, 10.5, true);
-      const forb = p.signert?.forbehold ? 'Forbehold: ' + p.signert.forbehold : 'Uten forbehold';
-      [`Signert ${new Date(x.signert_at).toLocaleString('nb-NO', { timeZone: 'Europe/Oslo' })}`, x.metode === 'epost_kode' ? `Metode: personlig lenke og engangskode til ${x.epost || ''}` : `Metode: ${x.metode}`, x.ip ? `IP-adresse: ${x.ip}` : '', forb.slice(0, 110)].filter(Boolean).forEach((l, i) => t(l, M + 10, y - 32 - i * 12, 8.2, false, MUT));
+      const forb = p.signert?.forbehold ? tr('Forbehold') + ': ' + p.signert.forbehold : tr('Uten forbehold');
+      [tr('Signert {0}', L.tid(x.signert_at)), x.metode === 'epost_kode' ? tr('Metode: personlig lenke og engangskode til {0}', x.epost || '') : tr('Metode: {0}', x.metode), x.ip ? tr('IP-adresse: {0}', x.ip) : '', forb.slice(0, 110)].filter(Boolean).forEach((l, i) => t(l, M + 10, y - 32 - i * 12, 8.2, false, MUT));
       if (x.signatur_bilde) { try { const im = await pdf.embedPng(Buffer.from(x.signatur_bilde.split(',')[1], 'base64')); const h = 60, w = Math.min(190, h * im.width / im.height); pg.drawImage(im, { x: 595.28 - M - w - 10, y: y - 90, width: w, height: h }); } catch { } }
       y -= 116; }
-    t('Signeringen er gjort i Eiendomskontroll. Signaturene er knyttet til fingeravtrykket over – endres dokumentet, stemmer det ikke lenger.', M, 50, 7.5, false, MUT);
-    const ut = await pdf.save(); const navn = `Befaringsrapport signert ${(b.data.dato || '').slice(0, 10)}.pdf`;
+    t(tr('Signeringen er gjort i Eiendomskontroll. Signaturene er knyttet til fingeravtrykket over – endres dokumentet, stemmer det ikke lenger.'), M, 50, 7.5, false, MUT);
+    const ut = await pdf.save(); const navn = `${tr('Befaringsrapport signert')} ${(b.data.dato || '').slice(0, 10)}.pdf`;
     const path = `${b.eiendom_id}/befaring/${b.id}/${Date.now()}-${asciiNavn(navn)}`;
     const { error: ue } = await admin.storage.from('filer').upload(path, ut, { contentType: 'application/pdf', upsert: false }); if (ue) { console.error('signert pdf', ue); return; }
     const fil = { path, navn, type: 'application/pdf', str: ut.length }; const tid = new Date().toISOString();
@@ -862,7 +910,7 @@ const handler = async (req: Request) => {
     await befLogg(b, 'System', 'Befaringsrapporten er signert av alle parter');
     const o = await oppsettFor(b.eiendom_id, null); const e = await eiendomInfo(b.eiendom_id); const b64 = ut.length < 9_000_000 ? Buffer.from(ut).toString('base64') : null;
     for (const p of b.data.signering.parter || []) { if (!p.epost) continue;
-      await sendEpost(p.epost, `Signert: ${b.data.tittel || 'Befaringsrapport'}`, `<div style="font-family:system-ui,Arial,sans-serif;max-width:620px"><p>Alle parter har signert befaringsrapporten for ${esc(e.navn)}.</p><p>Den signerte rapporten med signeringsside ${b64 ? 'ligger vedlagt' : 'kan hentes via lenken du fikk tidligere'}.</p></div>`, `Alle parter har signert befaringsrapporten for ${e.navn}.`, b64 ? { navn, base64: b64, type: 'application/pdf' } : undefined, undefined, o).catch(() => null); }
+      await sendEpost(p.epost, `${tr('Signert')}: ${tittel}`, `<div style="font-family:system-ui,Arial,sans-serif;max-width:620px"><p>${esc(tr('Alle parter har signert befaringsrapporten for {0}.', e.navn))}</p><p>${esc(b64 ? tr('Den signerte rapporten med signeringsside ligger vedlagt.') : tr('Den signerte rapporten med signeringsside kan hentes via lenken du fikk tidligere.'))}</p></div>`, tr('Alle parter har signert befaringsrapporten for {0}.', e.navn), b64 ? { navn, base64: b64, type: 'application/pdf' } : undefined, undefined, o).catch(() => null); }
   };
 
   if (body.action === 'bef_sign_send') {
@@ -882,12 +930,13 @@ const handler = async (req: Request) => {
     for (const p of P) { const g = gml?.parter?.find((x: any) => x.id === p.id); let ny = { ...(g || {}), ...p, signert: g?.signert || null };
       if (send.includes(p.id) && !ny.signert && /^\S+@\S+\.\S+$/.test(p.epost)) {
         const tok = randomBytes(24).toString('hex'); const lenke = `${base}/#/sg/${tok}`; ny = { ...ny, tokenHash: await sha(tok), utloper: new Date(Date.now() + 30 * 864e5).toISOString(), sendt: t, lest: null, kodeHash: undefined, koder: [] };
-        const emne = `Til signering: ${b.data?.tittel || 'Befaringsrapport'} – ${e.navn}`;
-        const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:620px;color:#1d2521"><h2 style="margin:0 0 6px">${esc(b.data?.tittel || 'Befaringsrapport')}</h2><p style="color:#6b736d;margin:0 0 14px">${esc(BTYPE[b.data?.type] || 'Befaring')} · ${esc(e.navn)} · ${esc(String(b.data?.dato || '').split('-').reverse().join('.'))}</p>
-          ${p.navn ? `<p>Hei ${esc(p.navn)},</p>` : ''}<p>Du er bedt om å signere befaringsrapporten som ${esc(p.rolle || 'part')}.</p>${melding ? `<p>${esc(melding).replace(/\n/g, '<br>')}</p>` : ''}
-          <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Les og signer rapporten</a></p>
-          <p style="font-size:12px;color:#6b736d">Lenken er personlig og gjelder i 30 dager. Du bekrefter signaturen med en engangskode som sendes til denne e-postadressen. Du trenger ikke bruker i appen.<br>Sendt av ${esc(u.navn || u.epost)}.</p></div>`;
-        const res = await sendEpost(p.epost, emne, html, `${emne}\n\n${melding ? melding + '\n\n' : ''}Les og signer: ${lenke}\n\nLenken gjelder i 30 dager.`, undefined, u.epost || undefined, o);
+        const L = await sprakFor(b.eiendom_id, body.mottakerSprak); const tr = L.t; const tittel = b.data?.tittel || tr('Befaringsrapport');
+        const emne = `${tr('Til signering')}: ${tittel} – ${e.navn}`;
+        const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:620px;color:#1d2521"><h2 style="margin:0 0 6px">${esc(tittel)}</h2><p style="color:#6b736d;margin:0 0 14px">${esc(tr(BTYPE[b.data?.type] || 'Befaring'))} · ${esc(e.navn)} · ${esc(L.dato(b.data?.dato))}</p>
+          ${p.navn ? `<p>${esc(tr('Hei {0},', p.navn))}</p>` : ''}<p>${esc(tr('Du er bedt om å signere befaringsrapporten som {0}.', tr(p.rolle || 'part')))}</p>${melding ? `<p>${esc(melding).replace(/\n/g, '<br>')}</p>` : ''}
+          <p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${esc(tr('Les og signer rapporten'))}</a></p>
+          <p style="font-size:12px;color:#6b736d">${esc(tr('Lenken er personlig og gjelder i 30 dager. Du bekrefter signaturen med en engangskode som sendes til denne e-postadressen. Du trenger ikke bruker i appen.'))}<br>${esc(tr('Sendt av {0}.', u.navn || u.epost))}</p></div>`;
+        const res = await sendEpost(p.epost, emne, html, `${emne}\n\n${melding ? melding + '\n\n' : ''}${tr('Les og signer')}: ${lenke}\n\n${tr('Lenken gjelder i 30 dager.')}`, undefined, u.epost || undefined, o);
         if (res.sendt) sendt++; else { grunn = res.grunn || grunn; lenker.push({ navn: p.navn || p.epost, lenke }); } }
       parter.push(ny); }
     await oppdaterSignering(b.id, d => ({ ...d, status: d.status === 'Signert' && gml ? d.status : 'Til signering', signering: { dokHash: R.hash, rapportPath: R.r.fil.path, versjon: R.r.versjon || 1, sendt: t, sendtAv: u.navn || u.epost, parter, ferdig: gml?.ferdig || null },
@@ -915,7 +964,7 @@ const handler = async (req: Request) => {
     await oppdaterSignering(f.b.id, x => ({ ...x, signering: { ...x.signering, parter: x.signering.parter.map((p: any) => p.id === f.part.id ? { ...p, kodeHash: null, koder: [...koder, naa] } : p) } }));
     const kh = await sha(String(body.token) + ':' + kode);
     await oppdaterSignering(f.b.id, x => ({ ...x, signering: { ...x.signering, parter: x.signering.parter.map((p: any) => p.id === f.part.id ? { ...p, kodeHash: kh, kodeUtloper: naa + 10 * 60e3, forsok: 0 } : p) } }));
-    const res = await sendEpost(f.part.epost, `Engangskode for signering: ${kode}`, `<div style="font-family:system-ui,Arial,sans-serif"><p>Koden for å signere befaringsrapporten er:</p><p style="font-size:28px;font-weight:700;letter-spacing:4px;font-family:monospace">${kode}</p><p style="font-size:12px;color:#6b736d">Koden gjelder i 10 minutter. Har du ikke bedt om den, kan du se bort fra e-posten.</p></div>`, `Koden for å signere befaringsrapporten er ${kode}. Den gjelder i 10 minutter.`, undefined, undefined, await oppsettFor(f.b.eiendom_id, null));
+    const { t: tr } = await sprakFor(f.b.eiendom_id, body.sprak); const res = await sendEpost(f.part.epost, `${tr('Engangskode for signering')}: ${kode}`, `<div style="font-family:system-ui,Arial,sans-serif"><p>${esc(tr('Koden for å signere befaringsrapporten er:'))}</p><p style="font-size:28px;font-weight:700;letter-spacing:4px;font-family:monospace">${kode}</p><p style="font-size:12px;color:#6b736d">${esc(tr('Koden gjelder i 10 minutter. Har du ikke bedt om den, kan du se bort fra e-posten.'))}</p></div>`, tr('Koden for å signere befaringsrapporten er {0}. Den gjelder i 10 minutter.', kode), undefined, undefined, await oppsettFor(f.b.eiendom_id, null));
     if (!res.sendt) return json(503, { error: 'Kunne ikke sende koden på e-post' + (res.holdt ? ' (e-post er i testmodus hos avsenderen)' : '') + '. Kontakt den som sendte rapporten.' });
     const [a, dom] = String(f.part.epost).split('@'); return json(200, { ok: true, til: `${a.slice(0, 2)}…@${dom}` });
   }
