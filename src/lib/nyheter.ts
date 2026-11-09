@@ -1,6 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-14', dato: '2026-11-14', tittel: 'Import fra BIM-modell (IFC)', punkter: [
+    'Last opp en IFC-modell (.ifc eller .ifczip) under «Importer systemer». Appen leser vinduer, dører, fasader, trapper, rekkverk og tekniske komponenter med etasje og NS 3451-kode, og foreslår systemer du kontrollerer før de lagres.',
+  ] },
   { id: '2026-11-13', dato: '2026-11-13', tittel: 'Saksnummer for alle leietakersaker', punkter: [
     'Leietaker trykker «Meld ny sak» og får et saksnummer (samme som arbeidsordre-nr). Samtaler er knyttet til saken, sorteres etter saksnummer og kan søkes.',
   ] },

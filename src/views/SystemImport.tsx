@@ -7,6 +7,7 @@ import { editEiendom, generatePlan } from '../lib/actions';
 import { KOMP } from '../lib/catalog';
 import { lesXlsx, lesCsv, tolkData, tolkGenerell, foreslaKolonner, GEN_FELT, tilSystem, type ImportRad } from '../lib/systemImport';
 import { tt, lokale } from '../lib/i18n';
+import { lesIfc, ifcAntall, ifcTilTabell, IFC_KAT, type IfcModell } from '../lib/ifc';
 
 export function importerSystemer(eid?: string) { openModal({ wide: true, render: close => <Dialog eid0={eid} close={close} /> }); }
 
@@ -17,7 +18,8 @@ const typeValg = sortBy(Object.entries(KOMP).map(([k, v]) => [k, `${v.g.split(' 
 function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
   useStore();
   const [ark, setArk] = useState<Record<string, any[][]> | null>(null); const [navn, setNavn] = useState(''); const [feil, setFeil] = useState('');
-  const [eid, setEid] = useState(eid0 || ''); const [steg, setSteg] = useState<'fil' | 'kolonner' | 'bygg' | 'sjekk' | 'ferdig'>('fil');
+  const [eid, setEid] = useState(eid0 || ''); const [steg, setSteg] = useState<'fil' | 'ifc' | 'kolonner' | 'bygg' | 'sjekk' | 'ferdig'>('fil');
+  const [ifcM, setIfcM] = useState<IfcModell | null>(null); const [ifcVal, setIfcVal] = useState<Set<string>>(new Set()); const [ifcEt, setIfcEt] = useState(true); const [ifcPct, setIfcPct] = useState(0); const [ifcTyper, setIfcTyper] = useState<Record<number, string>>({});
   const [gen, setGen] = useState<{ ark: Record<string, any[][]>; ark1: string; hode: number; map: Record<string, number> } | null>(null);
   const [endr, setEndr] = useState<Record<number, Partial<ImportRad>>>({}); const [eks, setEks] = useState<'oppdater' | 'hopp'>('oppdater');
   const [busy, setBusy] = useState(false); const [res, setRes] = useState<{ ny: number; opp: number; hopp: number } | null>(null);
@@ -25,7 +27,7 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
   const kanNy = mineOrg(['admin', 'forvalter']).length > 0;
   const genR = gen ? gen.ark[gen.ark1] || [] : [];
   const tolket = useMemo(() => gen && eid ? { rader: tolkGenerell(genR, gen.hode, gen.map, eid), feil: '' } : ark && eid ? tolkData(ark, eid) : null, [ark, gen, eid, S.anlegg.length]);
-  const rader: ImportRad[] = (tolket?.rader || []).map(r => ({ ...r, ...(endr[r.rad] || {}) }));
+  const rader: ImportRad[] = (tolket?.rader || []).map(r => ({ ...r, ...(ifcTyper[r.rad] ? { type: ifcTyper[r.rad] } : {}), ...(endr[r.rad] || {}) }));
   const settR = (rad: number, p: Partial<ImportRad>) => setEndr(x => ({ ...x, [rad]: { ...(x[rad] || {}), ...p } }));
 
   const velgFil = async (f?: File | null) => {
@@ -48,6 +50,16 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
     catch (e: any) { setFeil(tt("Kunne ikke lese filen: ") + (e?.message || e) + tt(". Lagre den som .xlsx eller .csv og prøv igjen.")); }
     setBusy(false);
   };
+  const velgIfc = async (f?: File | null) => {
+    if (!f) return; setFeil(''); setBusy(true); setIfcPct(0);
+    try { const m = await lesIfc(f, setIfcPct); if (!m.elementer.length) { setFeil(tt("Fant ingen bygningsdeler eller utstyr i modellen.")); setBusy(false); return; }
+      setIfcM(m); setNavn(filNavn(f.name)); setIfcVal(new Set(IFC_KAT.filter(k => k.standard && ifcAntall(m)[k.id] > 0).map(k => k.id)));
+      if (!eid) { const n = norm(m.byggNavn || filNavn(f.name)); const x = E.find(e => n && (norm(e.navn || '').includes(n) || n.includes(norm(e.navn || '')))); if (x) setEid(x.id); }
+      setSteg('ifc'); }
+    catch (e: any) { setFeil(tt("Kunne ikke lese modellen: ") + (e?.message || e)); }
+    setBusy(false);
+  };
+  const fraIfc = () => { if (!ifcM) return; const { R, typer } = ifcTilTabell(ifcM, ifcVal, ifcEt); setIfcTyper(typer); setEndr({}); setArk(null); setGen({ ark: { IFC: R }, ark1: 'IFC', hode: 0, map: { navn: 0, type: 1, kode: 2, plassering: 3, komm: 4 } }); setSteg(eid ? 'sjekk' : 'bygg'); };
   const velgArk = (n: string) => { const fk = foreslaKolonner(gen!.ark[n]); setGen({ ...gen!, ark1: n, hode: fk.hode, map: fk.map }); };
   const nyEiendom = () => editEiendom(undefined, nid => { setEid(nid); setSteg('sjekk'); }, { navn });
   const importer = async () => {
@@ -60,10 +72,11 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
     setBusy(false);
   };
   const e = eid ? byId('eiendommer', eid) : null; const valgt = rader.filter(r => r.ta); const sumKost = valgt.reduce((s, r) => s + (r.kost || 0), 0);
-  const tittel = steg === 'fil' ? 'Importer systemer fra Excel' : steg === 'kolonner' ? 'Koble kolonnene i filen' : steg === 'bygg' ? 'Hvilket bygg tilhører dataene?' : steg === 'sjekk' ? `Kontroller og importer – ${e?.navn || ''}` : 'Import fullført';
+  const tittel = steg === 'fil' ? 'Importer systemer fra Excel' : steg === 'ifc' ? 'Importer fra IFC-modell' : steg === 'kolonner' ? 'Koble kolonnene i filen' : steg === 'bygg' ? 'Hvilket bygg tilhører dataene?' : steg === 'sjekk' ? `Kontroller og importer – ${e?.navn || ''}` : 'Import fullført';
   return <ModalFrame title={tittel} close={close} foot={<>
+    {steg === 'ifc' && <><button className="btn" onClick={() => { setIfcM(null); setSteg('fil'); }}>{tt("← Tilbake")}</button><span className="grow" /><button className="btn pri" disabled={!ifcVal.size} onClick={fraIfc}>{tt("Neste →")}</button></>}
     {steg === 'kolonner' && <><button className="btn" onClick={() => { setGen(null); setSteg('fil'); }}>{tt("← Tilbake")}</button><span className="grow" /><button className="btn pri" disabled={gen?.map.navn == null && gen?.map.type == null} onClick={() => setSteg(eid ? 'sjekk' : 'bygg')}>{tt("Neste →")}</button></>}
-    {steg === 'bygg' && <><button className="btn" onClick={() => setSteg(gen ? 'kolonner' : 'fil')}>{tt("← Tilbake")}</button><span className="grow" /><button className="btn pri" disabled={!eid} onClick={() => setSteg('sjekk')}>{tt("Neste →")}</button></>}
+    {steg === 'bygg' && <><button className="btn" onClick={() => setSteg(ifcM && gen?.ark1 === 'IFC' ? 'ifc' : gen ? 'kolonner' : 'fil')}>{tt("← Tilbake")}</button><span className="grow" /><button className="btn pri" disabled={!eid} onClick={() => setSteg('sjekk')}>{tt("Neste →")}</button></>}
     {steg === 'sjekk' && <><button className="btn" onClick={() => setSteg('bygg')}>{tt("← Bytt bygg")}</button><span className="grow" /><span className="small muted">{valgt.length} {tt("systemer ·")} {nok(sumKost)}</span><button className="btn pri" disabled={busy || !valgt.length} onClick={importer}>{busy ? tt("Importerer …") : tt("Importer {0} systemer", valgt.filter(r => !(r.finnes && eks === 'hopp')).length)}</button></>}
     {steg === 'ferdig' && <><span className="grow" /><button className="btn" onClick={() => { close(); location.hash = '#/eiendom/' + eid; }}>{tt("Gå til eiendommen")}</button><button className="btn pri" onClick={() => { close(); generatePlan(eid); }}>{tt("Lag kontrollplan for systemene →")}</button></>}
     {steg === 'fil' && <><span className="grow" /><button className="btn" onClick={close}>{tt("Avbryt")}</button></>}</>}>
@@ -74,8 +87,17 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
       <p style={{ marginBottom: 6 }}><b>{tt("Fra et annet system (Dalux, Plania, Facilit, Propely …) eller egen liste")}</b></p>
       <p className="small muted" style={{ marginTop: 0 }}>{tt("Eksporter systemene som Excel eller CSV fra det gamle systemet. Du kobler kolonnene selv i neste steg, og appen foreslår koblingen ut fra overskriftene.")}</p>
       <label className="btn" style={{ display: 'inline-flex' }}>{busy ? tt("Leser filen …") : tt("Velg Excel- eller CSV-fil")}<input type="file" accept=".xlsx,.csv,.txt,text/csv" style={{ display: 'none' }} onChange={x => { velgGenerell(x.target.files?.[0]); x.target.value = ''; }} /></label>
+      <hr style={{ margin: '14px 0', border: 0, borderTop: '1px solid var(--line)' }} />
+      <p style={{ marginBottom: 6 }}><b>{tt("Fra en BIM-modell (IFC)")}</b></p>
+      <p className="small muted" style={{ marginTop: 0 }}>{tt("Leser vinduer, dører, fasader, trapper, rekkverk og tekniske komponenter med etasje og klassifisering. Geometrien lastes ikke. Støtter .ifc og .ifczip, også store filer.")}</p>
+      <label className="btn" style={{ display: 'inline-flex' }}>{busy ? tt("Leser modellen … {0} %", Math.round(ifcPct * 100)) : tt("Velg IFC-modell (.ifc / .ifczip)")}<input type="file" accept=".ifc,.ifczip,.zip" style={{ display: 'none' }} onChange={x => { velgIfc(x.target.files?.[0]); x.target.value = ''; }} /></label>
       {feil && <p style={{ color: 'var(--red)' }}>{feil}</p>}
       <p className="small muted">{tt("Filen leses her i nettleseren. Bare systemene du velger å importere, lagres i Eiendomskontroll.")}</p></div>}
+    {steg === 'ifc' && ifcM && (() => { const ant = ifcAntall(ifcM); const tom = Object.values(ifcM.tellinger).reduce((a, b) => a + b, 0); return <div>
+      <p style={{ marginTop: 0 }}><b>{ifcM.byggNavn || ifcM.filnavn}</b> · {ifcM.schema} · {ifcM.etasjer.length} {tt("etasjer")}<br /><span className="small muted">{tt("Laget i {0}", (ifcM.program || '').slice(0, 70))}</span></p>
+      <p className="small muted">{tt("Modellen har {0} objekter totalt. Konstruksjon (vegger, dekker, søyler, bjelker) tas ikke med – dem følger du opp som bygningsdeler og tilstandsgrad, ikke som systemer. Velg hva som skal bli systemer:", tom.toLocaleString(lokale()))}</p>
+      {IFC_KAT.filter(k => ant[k.id] > 0).map(k => <label key={k.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '5px 0' }}><input type="checkbox" checked={ifcVal.has(k.id)} onChange={x => setIfcVal(v => { const n = new Set(v); x.target.checked ? n.add(k.id) : n.delete(k.id); return n; })} /><span><b>{tt(k.navn)}</b> <span className="muted">· {ant[k.id]} {tt("stk")}</span><br /><span className="small muted">{tt(k.hint)}</span></span></label>)}
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}><input type="checkbox" checked={ifcEt} onChange={x => setIfcEt(x.target.checked)} />{tt("Én rad per etasje (anbefalt). Av = én rad per type for hele bygget.")}</label></div>; })()}
     {steg === 'kolonner' && gen && (() => { const hdr = (genR[gen.hode] || []).map((h: any, i: number) => String(h ?? '').trim() || tt("Kolonne {0}", i + 1)); const ant = genR.length - gen.hode - 1;
       return <div>
         <p style={{ marginTop: 0 }}>{tt("Filen")} <b>{navn}</b> {tt("har")} {ant} {tt("rader. Velg hvilken kolonne som inneholder hva. Trenger du bare navn eller type, er det nok. Resten fylles inn der det finnes.")}</p>
