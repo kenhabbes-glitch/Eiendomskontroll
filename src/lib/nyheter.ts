@@ -1,6 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-16', dato: '2026-11-16', tittel: 'Nytt utseende på utskrifter', punkter: [
+    'Nøkkelkvitteringer og returkvitteringer har fått ny, felles dokumentmal med utleiers navn i toppen, faktabokser, signaturfelt og sidetall. Arbeidsordre og rapporter får samme utseende etter hvert.',
+  ] },
   { id: '2026-11-15', dato: '2026-11-15', tittel: 'Nøkkeladministrasjon', punkter: [
     'Nytt menyvalg «Nøkler»: opprett nøkkelsystemer (f.eks. 1SL 1058) med nøkkeltyper (HN, K1, K2 …), låsplan og nummererte nøkler.',
     'Utkvitter nøkler til en person og skriv ut skjema med system, type, løpenummer og regler. Ved innlevering får personen en returkvittering. Under «Hvem har nøkler» ser du alt som er ute.',

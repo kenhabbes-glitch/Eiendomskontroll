@@ -4,6 +4,7 @@ import { S, state, sb, toast, loggHendelse, kanDrifteE, useStore } from '../lib/
 import { showModal, formModal, confirmBox, textModal } from '../components/ui';
 import { byId, sortBy } from '../lib/utils';
 import { tt } from '../lib/i18n';
+import { skrivDok, esc, fakta, faktaPar, seksjon, tabell, regler, signatur, utfylling } from '../lib/dokument';
 
 type Person = { navn: string; firma?: string; tlf?: string; epost?: string };
 type Syl = { id: string; navn: string; sted?: string; typer: string[] };
@@ -23,7 +24,6 @@ Utleier kan kreve kostnader ved ombytting av sylindere og nye nøkler dekket nå
 
 const iDag = () => new Date().toISOString().slice(0, 10);
 const dNo = (d?: string) => d ? d.slice(0, 10).split('-').reverse().join('.') : '';
-const esc = (s: any) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as any)[c]);
 const meg = () => state.me?.navn || state.me?.epost || '';
 const lagId = () => crypto.randomUUID();
 const forfalt = (n: Nok) => n.status === 'ute' && !!n.data.forventetRetur && n.data.forventetRetur < iDag();
@@ -38,29 +38,27 @@ function useNokler(eid: string) {
   return { d, reload: useCallback(() => setVer(x => x + 1), []) };
 }
 
-function skrivHtml(tittel: string, body: string) {
-  const w = window.open('', '_blank'); if (!w) return toast(tt("Nettleseren blokkerte utskriftsvinduet"));
-  w.document.write(`<!doctype html><meta charset="utf-8"><title>${esc(tittel)}</title><style>body{font-family:system-ui,Arial,sans-serif;margin:18mm;color:#111;font-size:12px}h1{font-size:20px;margin:0 0 4px}h2{font-size:13px;margin:16px 0 4px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #888;padding:5px 7px;text-align:left}th{background:#eee}.m{color:#555}ol{padding-left:18px;margin:4px 0}li{margin:3px 0}.sig{display:flex;gap:30px;margin-top:36px}.sig div{flex:1;border-top:1px solid #000;padding-top:4px;font-size:11px}.nr{float:right;font-size:13px}@media print{.noprint{display:none}}</style><body>${body}<p class="noprint"><button onclick="print()">Skriv ut</button></p><script>setTimeout(()=>print(),400)</script></body>`); w.document.close();
+const nokkelTabell = (sys: Sys | undefined, n: UtkNok[], medRetur = false) => { const sy = sys?.data.sylindere || [];
+  return tabell([tt("Nøkkelsystem"), tt("Nøkkeltype"), tt("Løpenr"), tt("Passer til"), ...(medRetur ? [tt("Levert tilbake")] : [])],
+    sortBy(n, x => x.type + String(x.lopenr).padStart(6, '0')).map(x => { const pass = sy.filter(c => c.typer.includes(x.type)).map(c => c.navn + (c.sted ? ' ' + c.sted : '')).join(', ');
+      return [esc(sys?.navn || ''), `<b>${esc(x.type)}</b>`, `<b>${x.lopenr}</b>`, esc(pass || '–'), ...(medRetur ? [x.retur ? esc(dNo(x.retur.dato)) + (x.retur.tapt ? ' (' + esc(tt("tapt")) + ')' : '') : ''] : [])]; }), [2]); };
+const personRader = (p: Person): [string, unknown][] => [[tt("Navn"), p.navn], [tt("Firma"), p.firma], [tt("Telefon"), p.tlf], [tt("E-post"), p.epost]];
+export function skrivUtkvittering(u: Utk, sys: Sys | undefined, eid: string) {
+  const retur = u.data.nokler.some(k => k.retur);
+  skrivDok({ type: tt("Nøkkelkvittering"), nr: u.nr, eiendomId: eid, tittel: tt("Kvittering for utlevert nøkkel"), undertittel: `${tt("Nøkkelsystem")} ${u.data.systemNavn} · ${tt("utlevert")} ${dNo(u.data.dato)}`, filnavn: `Nøkkelkvittering ${u.nr}`,
+    innhold: [faktaPar(fakta(tt("Mottaker"), personRader(u.data.person)), fakta(tt("Utlevering"), [[tt("Utlevert av"), u.data.utlevertAv], [tt("Formål"), u.data.formal], [tt("Forventet retur"), dNo(u.data.forventetRetur)]])),
+      seksjon(tt("Utleverte nøkler"), nokkelTabell(sys, u.data.nokler, retur)),
+      regler(tt("Regler for behandling av nøkkel"), u.data.regler.split('\n')),
+      `<p style="margin-top:18px">${esc(tt("Jeg bekrefter å ha mottatt nøklene over og forplikter meg til å følge reglene."))}</p>`,
+      signatur([tt("Sted og dato"), tt("Mottakers underskrift"), tt("Utlevert av")]),
+      utfylling(tt("Retur – fylles ut ved innlevering"), signatur([tt("Dato levert"), tt("Mottatt av"), tt("Underskrift")]))] });
 }
-function nokkelRader(S0: Sys | undefined, T: Typ[], n: UtkNok[], medRetur = false) {
-  const sy = S0?.data.sylindere || [];
-  return `<table><thead><tr><th>${esc(tt("Nøkkelsystem"))}</th><th>${esc(tt("Nøkkeltype"))}</th><th>${esc(tt("Løpenr"))}</th><th>${esc(tt("Passer til"))}</th>${medRetur ? `<th>${esc(tt("Levert tilbake"))}</th>` : ''}</tr></thead><tbody>${sortBy(n, x => x.type + String(x.lopenr).padStart(6, '0')).map(x => { const pass = sy.filter(s => s.typer.includes(x.type)).map(s => s.navn).join(', ');
-    return `<tr><td>${esc(S0?.navn || '')}</td><td><b>${esc(x.type)}</b></td><td><b>${x.lopenr}</b></td><td>${esc(pass || '–')}</td>${medRetur ? `<td>${x.retur ? esc(dNo(x.retur.dato)) + (x.retur.tapt ? ' (' + esc(tt("tapt")) + ')' : '') : ''}</td>` : ''}</tr>`; }).join('')}</tbody></table>`; void T;
-}
-const personHtml = (p: Person) => `<p><b>${esc(p.navn)}</b>${p.firma ? ' · ' + esc(p.firma) : ''}${p.tlf ? ' · ' + esc(p.tlf) : ''}${p.epost ? ' · ' + esc(p.epost) : ''}</p>`;
-export function skrivUtkvittering(u: Utk, sys: Sys | undefined, T: Typ[], eNavn: string) {
-  skrivHtml(`Nøkkelkvittering ${u.nr}`, `<span class="nr">${esc(tt("Skjema nr"))} ${u.nr}</span><h1>${esc(tt("Kvittering for utlevert nøkkel"))}</h1><div class="m">${esc(eNavn)} · ${esc(tt("Utlevert"))} ${esc(dNo(u.data.dato))} ${esc(tt("av"))} ${esc(u.data.utlevertAv)}</div>
-  <h2>${esc(tt("Mottaker"))}</h2>${personHtml(u.data.person)}${u.data.formal ? `<p class="m">${esc(tt("Formål:"))} ${esc(u.data.formal)}</p>` : ''}${u.data.forventetRetur ? `<p class="m">${esc(tt("Forventet levert tilbake:"))} ${esc(dNo(u.data.forventetRetur))}</p>` : ''}
-  <h2>${esc(tt("Nøkler"))}</h2>${nokkelRader(sys, T, u.data.nokler, u.data.nokler.some(k => k.retur))}
-  <h2>${esc(tt("Regler for behandling av nøkkel"))}</h2><ol>${u.data.regler.split('\n').filter(Boolean).map(r => `<li>${esc(r)}</li>`).join('')}</ol>
-  <p>${esc(tt("Jeg bekrefter å ha mottatt nøklene over og forplikter meg til å følge reglene."))}</p>
-  <div class="sig"><div>${esc(tt("Dato og underskrift mottaker"))}</div><div>${esc(tt("Utlevert av"))}</div></div>`);
-}
-export function skrivRetur(p: Person, sys: Sys | undefined, T: Typ[], n: UtkNok[], dato: string, mottattAv: string, eNavn: string, utkNr: number[]) {
-  skrivHtml('Returkvittering', `<h1>${esc(tt("Kvittering for returnert nøkkel"))}</h1><div class="m">${esc(eNavn)} · ${esc(tt("Mottatt"))} ${esc(dNo(dato))} ${esc(tt("av"))} ${esc(mottattAv)}</div>
-  <h2>${esc(tt("Levert av"))}</h2>${personHtml(p)}<h2>${esc(tt("Returnerte nøkler"))}</h2>${nokkelRader(sys, T, n)}
-  <p class="m">${esc(tt("Gjelder utkvittering nr"))} ${esc(utkNr.join(', '))}</p><p>${esc(tt("Nøklene er registrert som returnert og er ikke lenger på ditt ansvar."))}</p>
-  <div class="sig"><div>${esc(tt("Dato og underskrift mottaker av nøkkel"))}</div><div>${esc(tt("Underskrift den som leverte"))}</div></div>`);
+export function skrivRetur(p: Person, sys: Sys | undefined, n: UtkNok[], dato: string, mottattAv: string, eid: string, utkNr: number[]) {
+  skrivDok({ type: tt("Returkvittering"), nr: utkNr.join(', '), eiendomId: eid, tittel: tt("Kvittering for returnert nøkkel"), undertittel: `${tt("Nøkkelsystem")} ${sys?.navn || ''} · ${tt("mottatt")} ${dNo(dato)}`, filnavn: `Returkvittering ${utkNr.join('-')}`,
+    innhold: [faktaPar(fakta(tt("Levert av"), personRader(p)), fakta(tt("Mottak"), [[tt("Dato"), dNo(dato)], [tt("Mottatt av"), mottattAv], [tt("Gjelder utkvittering nr"), utkNr.join(', ')]])),
+      seksjon(tt("Returnerte nøkler"), nokkelTabell(sys, n)),
+      `<p style="margin-top:18px">${esc(tt("Nøklene er registrert som returnert og er ikke lenger på ditt ansvar."))}</p>`,
+      signatur([tt("Mottatt av (underskrift)"), tt("Levert av (underskrift)")])] });
 }
 
 const logg = (n: Nok, tekst: string): Logg[] => [...(n.data.logg || []), { dato: new Date().toISOString(), tekst, av: meg() }];
@@ -116,7 +114,7 @@ export function NoeklerView() {
         const person: Person = { navn: v.navn.trim(), firma: v.firma.trim(), tlf: v.tlf.trim(), epost: v.epost.trim() };
         const data = { person, dato: v.dato || iDag(), utlevertAv: meg(), formal: v.formal, forventetRetur: v.forventetRetur, regler: s.data.regler || STANDARD_REGLER, systemNavn: s.navn };
         const r = await sb.rpc('nokkel_utkvitter', { p_eiendom: eid, p_system: s.id, p_nokler: val, p_data: data }); if (r.error || !r.data) { toast(r.error?.message || tt("Utkvitteringen ble ikke lagret")); reload(); return false; }
-        const u = r.data as Utk; loggHendelse(`Utkvitterte ${u.data.nokler.length} nøkler (${s.navn}) til ${person.navn}, skjema ${u.nr}`, undefined, eid); reload(); skrivUtkvittering(u, s, T, e?.navn || ''); } });
+        const u = r.data as Utk; loggHendelse(`Utkvitterte ${u.data.nokler.length} nøkler (${s.navn}) til ${person.navn}, skjema ${u.nr}`, undefined, eid); reload(); skrivUtkvittering(u, s, eid); } });
   };
 
   const leverInn = (keys: Nok[]) => { if (!keys.length) return toast(tt("Velg nøklene som leveres tilbake"));
@@ -127,7 +125,7 @@ export function NoeklerView() {
         const r = await sb.rpc('nokkel_avslutt', { p_nokler: keys.map(n => n.id), p_status: 'inne', p_dato: v.dato || iDag(), p_av: v.mottattAv || meg(), p_merknad: v.merknad || '' }); if (r.error) { toast(r.error.message); reload(); return false; }
         loggHendelse(`Mottok ${keys.length} nøkler fra ${p.navn}`, undefined, eid); reload();
         const sys0 = sysAv(keys[0].system_id); const rader: UtkNok[] = keys.map(n => ({ id: n.id, type: T.find(t => t.id === n.type_id)?.kode || '', lopenr: n.lopenr }));
-        skrivRetur(p, sys0, T, rader, v.dato, v.mottattAv, e?.navn || '', utkNr); } });
+        skrivRetur(p, sys0, rader, v.dato, v.mottattAv, eid, utkNr); } });
   };
   const markerTapt = async (n: Nok, st: 'tapt' | 'kassert') => { if (!(await confirmBox(st === 'tapt' ? tt("Registrere nøkkelen som tapt? Vurder ombytting av sylindere.") : tt("Registrere nøkkelen som kassert?"), tt("Registrer")))) return;
     if (n.status === 'ute') { const r = await sb.rpc('nokkel_avslutt', { p_nokler: [n.id], p_status: 'tapt', p_dato: iDag(), p_av: meg(), p_merknad: '' }); if (r.error) return toast(r.error.message); loggHendelse(`Nøkkel ${nokNavn(n, d!.typ)} meldt tapt (hos ${n.data.innehaver?.navn || '?'})`, undefined, eid); return reload(); }
@@ -165,7 +163,7 @@ export function NoeklerView() {
           <div className="tbl-wrap"><table><tbody>{sortBy(l, n => nokNavn(n, d.typ)).map(n => <tr key={n.id}><td><b>{nokNavn(n, d.typ)}</b></td><td className="small">{sysAv(n.system_id)?.navn}</td><td className="small">{tt("siden")} {dNo(n.data.dato)} · {tt("skjema")} {n.data.utkvNr}{forfalt(n) && <> <span className="chip red">{tt("Retur forfalt {0}", dNo(n.data.forventetRetur))}</span></>}</td><td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}><button className="btn sm" onClick={() => markerTapt(n, 'tapt')}>{tt("Tapt")}</button> <button className="btn sm" onClick={() => leverInn([n])}>{tt("Lever inn")}</button></td></tr>)}</tbody></table></div></div>; })}
         {!grupper.length && <p className="muted">{ute.length ? tt("Ingen treff.") : tt("Ingen nøkler er utkvittert.")}</p>}</>
       : <><p><input placeholder={tt("Søk på skjemanr, person, firma eller nøkkel …")} value={sok} onChange={x => setSok(x.target.value)} style={{ minWidth: 280 }} /></p><div className="tbl-wrap"><table><thead><tr><th>{tt("Skjema")}</th><th>{tt("Dato")}</th><th>{tt("Mottaker")}</th><th>{tt("Nøkler")}</th><th>{tt("Status")}</th><th /></tr></thead><tbody>{d.utk.filter(u => !sokL || String(u.nr) === sokL || JSON.stringify(u.data.person).toLowerCase().includes(sokL) || u.data.nokler.some(k => `${k.type} ${k.lopenr}`.toLowerCase().includes(sokL))).map(u => { const igjen = u.data.nokler.filter(k => !k.retur).length; return <tr key={u.id}><td><b>{u.nr}</b></td><td>{dNo(u.data.dato)}</td><td>{u.data.person.navn}<br /><span className="small muted">{u.data.person.firma}</span></td><td className="small">{u.data.systemNavn}: {u.data.nokler.map(k => `${k.type} ${k.lopenr}`).join(', ')}</td><td>{igjen ? <span className="chip amber">{igjen} {tt("ute")}</span> : u.data.nokler.some(k => k.retur?.tapt) ? <span className="chip">{tt("Avsluttet – {0} tapt", u.data.nokler.filter(k => k.retur?.tapt).length)}</span> : <span className="chip green">{tt("Alle levert")}</span>}</td>
-        <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" onClick={() => skrivUtkvittering(u, sysAv(u.system_id), d.typ, e?.navn || '')}>{tt("Skriv ut skjema")}</button></td></tr>; })}{!d.utk.length && <tr><td colSpan={6} className="muted">{tt("Ingen utkvitteringer ennå.")}</td></tr>}</tbody></table></div></>}
+        <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" onClick={() => skrivUtkvittering(u, sysAv(u.system_id), eid)}>{tt("Skriv ut skjema")}</button></td></tr>; })}{!d.utk.length && <tr><td colSpan={6} className="muted">{tt("Ingen utkvitteringer ennå.")}</td></tr>}</tbody></table></div></>}
   </div>;
 }
 
