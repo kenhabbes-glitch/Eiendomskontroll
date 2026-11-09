@@ -34,7 +34,7 @@ export type DokOpts = { type: string; nr?: string | number; eiendomId?: string; 
 function topp(o: DokOpts) {
   const e = o.eiendomId ? byId('eiendommer', o.eiendomId) : null;
   const eier = (e && orgNavn(e.eierOrgId)) || e?.navn || '';
-  const adr = [e?.navn !== eier ? e?.navn : '', [e?.adresse, [e?.postnr, e?.poststed].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
+  const adr = [e?.navn !== eier && !(e?.adresse || '').toLowerCase().startsWith((e?.navn || '').toLowerCase()) ? e?.navn : '', [e?.adresse, [e?.postnr, e?.poststed].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
   return `<header class="band"><div><div class="eier">${esc(eier)}</div>${adr ? `<div class="adr">${esc(adr)}</div>` : ''}</div><div class="hoyre"><div class="type">${esc(o.type)}</div>${o.nr != null && o.nr !== '' ? `<div class="nr">${esc(tt("Nr."))} ${esc(o.nr)}</div>` : ''}</div></header><div class="linje"></div>`;
 }
 

@@ -1,7 +1,7 @@
 // Arealrapport som PDF: arealoppgave, dekning av fellesareal og plantegninger med arealer.
 import React, { useState } from 'react';
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-import { S, fileUrl, toast } from './store';
+import { S, fileUrl, toast, orgNavn } from './store';
 import { AREAL_KAT, KAT_FARGE, arealCalc, avtaleTekst, byId, centroid, lNavn, ltColor, mpp, sortBy, zoneArea, type Rec } from './utils';
 import { openModal } from '../components/ui';
 import { tt, tu, lokale } from './i18n';
@@ -54,7 +54,13 @@ const navn = (k: string) => k === '_ledig' ? 'Ledig areal' : k === '_ukjent' ? '
 // ---------- PDF
 type Opt = { tids: string[]; lids: string[]; medTegn: boolean; medDek: boolean; kost: number };
 export const A4 = [595.28, 841.89]; export const M = 44;
-export const INK = rgb(0.11, 0.14, 0.13), MUTED = rgb(0.42, 0.45, 0.43), LINE = rgb(0.85, 0.86, 0.84), ACC = rgb(0.12, 0.44, 0.36), RED = rgb(0.71, 0.14, 0.09), GREEN = rgb(0.12, 0.44, 0.36), SOFT = rgb(0.96, 0.96, 0.95);
+export const INK = rgb(0.11, 0.14, 0.13), MUTED = rgb(0.42, 0.45, 0.43), LINE = rgb(0.85, 0.86, 0.84), ACC = rgb(0.118, 0.302, 0.341), RED = rgb(0.71, 0.14, 0.09), GREEN = rgb(0.12, 0.44, 0.36), SOFT = rgb(0.933, 0.953, 0.957);
+// Felles dokumentprofil (samme som src/lib/dokument.ts): petrolbånd, messinglinje, lys undertekst
+export const BAND = rgb(0.118, 0.302, 0.341), MESSING = rgb(0.788, 0.651, 0.42), UNDERTEKST = rgb(0.812, 0.878, 0.89);
+export type Profil = { eier?: string; adr?: string; type?: string; nr?: string | number };
+/** Utleiers navn og adresse for en eiendom, til toppen av dokumenter. */
+export function profilFor(eid: string | undefined, type: string, nr?: string | number): Profil { const e = eid ? byId('eiendommer', eid) : null; const eier = (e && orgNavn(e.eierOrgId)) || e?.navn || '';
+  return { eier, adr: [e?.navn !== eier && !(e?.adresse || '').toLowerCase().startsWith((e?.navn || '').toLowerCase()) ? e?.navn : '', [e?.adresse, [e?.postnr, e?.poststed].filter(Boolean).join(' ')].filter(Boolean).join(', ')].filter(Boolean).join(' · '), type, nr }; }
 export const hex = (h: string) => { const n = parseInt(h.replace('#', ''), 16); return rgb((n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255); };
 /** Bare tegn som standardfontene (WinAnsi) kan vise */
 export const safe = (s: any) => String(typeof s === 'string' ? tu(s) : s ?? '').replace(/−/g, '-').replace(/[   ]/g, ' ').replace(/[^\x20-\x7E -ÿ–—‘’“”•…€]/g, '');
@@ -64,15 +70,48 @@ const kr = (v: number) => Math.round(v).toLocaleString(lokale()) + ' kr';
 const pst = (v: number) => (v * 100).toLocaleString(lokale(), { maximumFractionDigits: 1 }) + ' %';
 
 export class Doc {
-  pdf!: PDFDocument; f!: PDFFont; b!: PDFFont; page!: PDFPage; y = 0; side = 0; tittel = '';
-  static async ny(tittel: string) { const d = new Doc(); d.pdf = await PDFDocument.create(); d.f = await d.pdf.embedFont(StandardFonts.Helvetica); d.b = await d.pdf.embedFont(StandardFonts.HelveticaBold); d.tittel = tittel; d.pdf.setTitle(tittel); d.pdf.setCreator('Eiendomskontroll'); return d; }
-  nyside(liggende = false) { this.page = this.pdf.addPage(liggende ? [A4[1], A4[0]] : [A4[0], A4[1]]); this.side++; this.y = this.page.getHeight() - M; this.fot(); return this.page; }
-  fot() { const p = this.page; p.drawLine({ start: { x: M, y: 30 }, end: { x: p.getWidth() - M, y: 30 }, thickness: 0.5, color: LINE }); this.t(this.tittel, M, 18, 7.5, MUTED); const s = tu('Side {0}', this.side); this.t(s, p.getWidth() - M - this.f.widthOfTextAtSize(s, 7.5), 18, 7.5, MUTED); }
+  pdf!: PDFDocument; f!: PDFFont; b!: PDFFont; serif!: PDFFont; page!: PDFPage; y = 0; side = 0; tittel = ''; profil: Profil = {}; sider: PDFPage[] = []; private ferdig = false;
+  static async ny(tittel: string) { const d = new Doc(); d.pdf = await PDFDocument.create(); d.f = await d.pdf.embedFont(StandardFonts.Helvetica); d.b = await d.pdf.embedFont(StandardFonts.HelveticaBold); d.tittel = tittel; d.pdf.setTitle(tittel); d.pdf.setCreator('Eiendomskontroll'); d.serif = await d.pdf.embedFont(StandardFonts.TimesRomanBold); d.profil = { type: tittel.split(' – ')[0] };
+    const lagre = d.pdf.save.bind(d.pdf); (d.pdf as any).__doc = d; (d.pdf as any).save = async (o?: any) => { ((d.pdf as any).__doc as Doc).avslutt(); return lagre(o); }; return d; }
+  nyside(liggende = false) { this.page = this.pdf.addPage(liggende ? [A4[1], A4[0]] : [A4[0], A4[1]]); this.side++; this.sider.push(this.page); this.y = this.page.getHeight() - (this.side === 1 ? 104 : M); return this.page; }
+  fot() { /* tegnes samlet i avslutt(), når antall sider er kjent */ }
+  /** Tegner bånd øverst og bunntekst med «Side x av y» på alle sider laget med nyside(). Kalles automatisk ved lagring. */
+  avslutt() { if (this.ferdig) return; this.ferdig = true; const N = this.sider.length; const P = this.profil; const eier = P.eier || 'Eiendomskontroll'; const type = (P.type || this.tittel).toUpperCase();
+    const laget = new Date(); const lagetTxt = `${laget.toLocaleDateString(lokale())} ${laget.toTimeString().slice(0, 5)}`;
+    this.sider.forEach((p, i) => { const W = p.getWidth(), H = p.getHeight(); const pr = this.page; this.page = p;
+      if (i === 0) { const bh = 70; p.drawRectangle({ x: 0, y: H - bh, width: W, height: bh, color: BAND }); p.drawRectangle({ x: 0, y: H - bh - 3, width: W, height: 3, color: MESSING });
+        const nr = P.nr != null && P.nr !== '' ? `${tu('Nr.')} ${P.nr}` : ''; const hb = Math.max(this.w(type, 7, true), nr ? this.w(nr, 14, true) : 0);
+        p.drawText(safe(this.fitS(eier, W - 2 * M - hb - 24, 16)), { x: M, y: H - (P.adr ? 34 : 42), size: 16, font: this.serif, color: rgb(1, 1, 1) });
+        if (P.adr) this.t(this.fit(P.adr, W - 2 * M - hb - 24, 8), M, H - 50, 8, UNDERTEKST);
+        this.t(type, W - M - this.w(type, 7, true), H - (nr ? 32 : 40), 7, UNDERTEKST, true); if (nr) this.t(nr, W - M - this.w(nr, 14, true), H - 50, 14, rgb(1, 1, 1), true);
+      } else { const bh = 24; p.drawRectangle({ x: 0, y: H - bh, width: W, height: bh, color: BAND }); p.drawRectangle({ x: 0, y: H - bh - 2, width: W, height: 2, color: MESSING });
+        p.drawText(safe(this.fitS(eier, W / 2, 9.5)), { x: M, y: H - 16, size: 9.5, font: this.serif, color: rgb(1, 1, 1) }); this.t(type, W - M - this.w(type, 6.5, true), H - 15, 6.5, UNDERTEKST, true); }
+      p.drawLine({ start: { x: M, y: 30 }, end: { x: W - M, y: 30 }, thickness: 0.5, color: LINE });
+      const s = `${tu('Side {0}', i + 1)} ${tu('av')} ${N}`; this.t(s, W - M - this.w(s, 7, false), 18, 7, MUTED);
+      this.t(this.fit(`Eiendomskontroll · ${this.tittel} · ${lagetTxt}`, W - 2 * M - this.w(s, 7) - 20, 7), M, 18, 7, MUTED); this.page = pr; });
+  }
+  fitS(s: any, max: number, size: number) { let x = safe(s); while (x.length > 1 && this.serif.widthOfTextAtSize(x, size) > max) x = x.slice(0, -1); return x; }
+  /** Dokumenttittel i serif. */
+  tittelSerif(s: string, size = 19) { this.plass(size + 14); const L = s.length ? [s] : []; L.forEach(l => { this.page.drawText(safe(this.fitS(l, this.page.getWidth() - 2 * M, size)), { x: M, y: this.y - size, size, font: this.serif, color: INK }); this.y -= size + 8; }); }
+  /** Merker (status, alvorlighet, frist) på én linje. */
+  merker(L: [string, any?][]) { this.plass(22); let x = M; for (const [s, c] of L) { if (!s) continue; const w = this.w(s, 8) + (c ? 22 : 14); this.page.drawRectangle({ x, y: this.y - 16, width: w, height: 15, borderColor: LINE, borderWidth: 0.8, color: rgb(1, 1, 1) }); if (c) this.page.drawCircle({ x: x + 9, y: this.y - 8.5, size: 2.6, color: c }); this.t(s, x + (c ? 15 : 7), this.y - 11.5, 8, INK); x += w + 6; } this.y -= 26; }
+  /** To faktabokser side om side med etikett/verdi-par. */
+  faktaPar(a: [string, [string, any][]], b: [string, [string, any][]]) { const W = this.page.getWidth() - 2 * M; const bw = (W - 12) / 2; const ra = a[1].filter(r => r[1]), rb = b[1].filter(r => r[1]); const h = 26 + Math.max(ra.length, rb.length, 1) * 13;
+    this.plass(h + 8); [[a[0], ra], [b[0], rb]].forEach(([t, rr]: any, i) => { const x = M + i * (bw + 12); this.page.drawRectangle({ x, y: this.y - h, width: bw, height: h, borderColor: LINE, borderWidth: 0.8 });
+      this.t(String(t).toUpperCase(), x + 10, this.y - 15, 6.8, ACC, true); const lw = Math.max(60, ...rr.map((r: any) => this.w(r[0], 8)) ) + 10;
+      rr.forEach((r: any, j: number) => { this.t(r[0], x + 10, this.y - 30 - j * 13, 8, MUTED); this.t(this.fit(r[1], bw - lw - 20, 8), x + 10 + lw, this.y - 30 - j * 13, 8, INK); }); });
+    this.y -= h + 12; }
+  /** Stiplet felt for utfylling for hånd. */
+  utfylling(tittel: string, linjer: string[], sign: string[]) { const W = this.page.getWidth() - 2 * M; const h = 24 + linjer.length * 20 + (sign.length ? 42 : 0); this.plass(h + 8);
+    this.page.drawRectangle({ x: M, y: this.y - h, width: W, height: h, borderColor: MUTED, borderWidth: 0.7, borderDashArray: [3, 2] }); this.t(tittel.toUpperCase(), M + 10, this.y - 15, 6.8, MUTED, true);
+    linjer.forEach((l, i) => { const y = this.y - 34 - i * 20; this.t(l, M + 10, y + 3, 8, MUTED); this.page.drawLine({ start: { x: M + 100, y }, end: { x: M + W - 10, y }, thickness: 0.5, color: LINE }); });
+    if (sign.length) { const sw = (W - 20 - (sign.length - 1) * 18) / sign.length; sign.forEach((l, i) => { const x = M + 10 + i * (sw + 18), y = this.y - h + 16; this.page.drawLine({ start: { x, y }, end: { x: x + sw, y }, thickness: 0.6, color: INK }); this.t(l, x, y - 9, 7, MUTED); }); }
+    this.y -= h + 12; }
   t(s: any, x: number, y: number, size = 9, color = INK, bold = false) { this.page.drawText(safe(s), { x, y, size, font: bold ? this.b : this.f, color }); }
   w(s: any, size = 9, bold = false) { return (bold ? this.b : this.f).widthOfTextAtSize(safe(s), size); }
   fit(s: any, max: number, size = 9, bold = false) { let x = safe(s); if (this.w(x, size, bold) <= max) return x; while (x.length > 1 && this.w(x + '…', size, bold) > max) x = x.slice(0, -1); return x + '…'; }
   plass(h: number) { if (this.y - h < 46) this.nyside(); }
-  h1(s: string) { this.plass(40); this.t(s, M, this.y - 16, 16, INK, true); this.y -= 28; }
+  h1(s: string) { this.plass(40); this.page.drawText(safe(this.fitS(s, this.page.getWidth() - 2 * M, 17)), { x: M, y: this.y - 17, size: 17, font: this.serif, color: INK }); this.y -= 29; }
   h2(s: string) { this.plass(60); this.y -= 6; this.t(s, M, this.y - 11, 11.5, ACC, true); this.y -= 20; }
   p(s: string, size = 8.5, color = MUTED) { const max = this.page.getWidth() - 2 * M; const ord = safe(s).split(' '); let l = ''; const lines: string[] = []; ord.forEach(o => { const n = l ? l + ' ' + o : o; if (this.w(n, size) > max) { lines.push(l); l = o; } else l = n; }); if (l) lines.push(l); lines.forEach(x => { this.plass(size + 4); this.t(x, M, this.y - size, size, color); this.y -= size + 3.5; }); this.y -= 3; }
   /** Tabell. cols: [tittel, bredde(andel), høyrejustert] */
@@ -99,7 +138,7 @@ export class Doc {
 async function byggPdf(eid: string, o: Opt, status: (s: string) => void) {
   const e = byId('eiendommer', eid)!; const C: any = arealCalc(eid); const d = C.dekning;
   const dato = new Date().toLocaleDateString(lokale(), { day: 'numeric', month: 'long', year: 'numeric' });
-  const D = await Doc.ny('Arealrapport – ' + e.navn + ' – ' + dato);
+  const D = await Doc.ny('Arealrapport – ' + e.navn + ' – ' + dato); D.profil = profilFor(eid, 'Arealrapport');
   const T = sortBy(S.tegninger.filter(t => o.tids.includes(t.id)), t => +t.etasje || 0);
   const L = o.lids.filter(k => C.per[k]);
   const delvis = o.lids.length < Object.keys(C.per).length;

@@ -17,7 +17,7 @@ import { PDFDocument } from 'pdf-lib';
 import { S, canEdit, fileUrl, kanRedigereE, loggHendelse, save, sb, state, toast, feiltekst , uploadFile } from './store';
 import { AV_LUKKET } from './catalog';
 import { aNavn, addDays, byId, fd, kNavn, sortBy, taggerFor, today, type Rec } from './utils';
-import { Doc, M, INK, MUTED, ACC, RED } from './arealRapport';
+import { Doc, M, INK, MUTED, ACC, RED, profilFor } from './arealRapport';
 import { Chip, Empty, FileLink, confirmBox, formModal, showModal } from '../components/ui';
 import { Hjelp } from '../components/Hjelp';
 import { editAvvik, editOppgave } from './actions';
@@ -203,7 +203,7 @@ export function publiser(eid: string) {
 
 export async function lagPakkePdf(e: Rec, l: Rec): Promise<Uint8Array> {
   const b = bv(e); const v = bvVersjon(e); const dato = new Date().toLocaleDateString(lokale(), { day: 'numeric', month: 'long', year: 'numeric' });
-  const D = await Doc.ny(`Brannverninformasjon – ${e.navn} – ${l.navn} – v${v}`);
+  const D = await Doc.ny(`Brannverninformasjon – ${e.navn} – ${l.navn} – v${v}`); D.profil = profilFor(e.id, 'Brannverninformasjon', 'v' + v);
   const linjer = (s: string, size = 9, c = INK) => String(s || '').split('\n').map(x => x.trim()).filter(Boolean).forEach(x => D.p(x, size, c));
   const pkt = (s: string) => D.p('•  ' + s, 9, INK);
   D.nyside();

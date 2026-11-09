@@ -99,8 +99,8 @@ function Rapport({ c, kommentar, maxRader, forrige }: { c: Capex; kommentar: str
 }
 
 async function lagPdf(c: Capex, kommentar: string, maxRader: number) {
-  const { ArkivDoc } = await import('../lib/prosjektArkiv'); const { hex, M } = await import('../lib/arealRapport');
-  const d: any = await ArkivDoc.lag('Capex-rapport – langtidsvedlikehold'); const v = c.v; const navn = v.eid ? S.eiendommer.find(e => e.id === v.eid)?.navn : 'Alle eiendommer';
+  const { ArkivDoc } = await import('../lib/prosjektArkiv'); const { hex, M, profilFor } = await import('../lib/arealRapport');
+  const d: any = await ArkivDoc.lag('Capex-rapport – langtidsvedlikehold'); d.profil = profilFor(c.v.eid || undefined, 'Capex-rapport'); const v = c.v; const navn = v.eid ? S.eiendommer.find(e => e.id === v.eid)?.navn : 'Alle eiendommer';
   d.t(`Utskiftingsbehov ${v.fra}–${v.fra + v.aar - 1} · ${v.pris === 'dagens' ? YEAR + '-kroner' : 'KPI-justert'} · ${fd(today())}`, M, d.y - 8, 8, hex('#5b645f')); d.y -= 14; d.h1(navn);
   d.tab([['Nøkkeltall', 3], ['MNOK', 1.2, true], ['', 3]], [
     { c: [`Sum ${v.aar} år`, mnok(c.tot), `${c.P.length} tiltak`] }, ...(c.korteste < v.aar ? [{ c: [`Første ${c.korteste} år`, mnok(c.kortSum), `snitt ${mnok(c.kortSum / c.korteste)} per år`] }] : []),

@@ -4,7 +4,8 @@ import { KOMP } from './catalog';
 import { S, aoApi, canEdit, fileUrl, isStaff, loggHendelse, save, sb, state, toast, uploadFile, useStore, type Fil } from './store';
 import { byId, fd, fdU, sortBy, tfmKomp, tfmSys, today, type Rec } from './utils';
 import { openModal, useFileUrl } from '../components/ui';
-import { Doc, INK, MUTED, RED, LINE } from './arealRapport';
+import { Doc, INK, MUTED, RED, LINE, ACC, profilFor } from './arealRapport';
+import { rgb } from 'pdf-lib';
 import { openPlan } from '../views/Arealer';
 import { tt, tu, lokale, medUtSprak } from './i18n';
 import { MottakerSprak, sprakForEiendom } from '../components/MottakerSprak';
@@ -79,14 +80,14 @@ async function tegnUtsnitt(t: Rec, pos: { x: number; y: number }, zoom: boolean)
 export async function aoPdf(id: string) {
   // Tekstene går gjennom tu()/safe(), så PDF-en følger mottakerens språk når den lages i medUtSprak()
   const a = byId('avvik', id)!; const ao = aoSnapshot(a); const t = a.pos ? byId('tegninger', a.pos.tegningId) : null;
-  const D = await Doc.ny(tu('Arbeidsordre – avvik #{0}', a.nr)); D.nyside(); const W = D.page.getWidth(); const M = 44;
-  D.t('ARBEIDSORDRE', M, D.y - 10, 8.5, RED, true); D.y -= 18;
-  D.t(D.fit(tu('Avvik #{0}: {1}', a.nr, a.tittel || ''), W - 2 * M, 17, true), M, D.y - 17, 17, INK, true); D.y -= 30;
-  const rader: [string, string][] = [['Eiendom', [ao.eiendom, ao.adresse].filter(Boolean).join(', ')], ['System', ao.system], ['Komponent', ao.komponent], ['Plassering', [ao.tegning, ao.plassering].filter(Boolean).join(' – ')],
-    ['Alvorlighet', tu(a.alv || '')], ['Status', tu(a.status || '')], ['Frist', a.frist ? fdU(a.frist) : ''], ['Utbedres av', tu(a.ansvar === 'Leverandør/entreprenør' ? a.utbedresAv || 'Leverandør' : a.ansvar === 'Leietaker' ? 'Leietaker' : a.ansvar === 'Felles' ? 'Felles (eier og leietaker)' : 'Eier / drift')],
-    ['Tildelt', navnPaa(a.tildeltId)], ['Oppdaget', a.oppdaget ? fdU(a.oppdaget) : ''], ['Meldt av / kilde', [a.meldtAv, tu(a.kilde || '')].filter(Boolean).join(' · ')]];
-  D.tabell([[tu('Detaljer'), 1.3], ['', 4]], rader.filter(r => r[1]).map(r => ({ c: [tu(r[0]), r[1]] })));
-  if (a.beskrivelse) { D.h2('Beskrivelse og tiltak'); D.p(a.beskrivelse, 9.5, INK); }
+  const D = await Doc.ny(tu('Arbeidsordre – avvik #{0}', a.nr)); D.profil = profilFor(a.eiendomId, tu('Arbeidsordre'), a.nr); D.nyside(); const W = D.page.getWidth(); const M = 44;
+  D.tittelSerif(a.tittel || tu('Arbeidsordre'));
+  const ALV: Record<string, any> = { Kritisk: RED, 'Høy': rgb(0.75, 0.34, 0.13), Middels: rgb(0.72, 0.5, 0.1), Lav: ACC };
+  D.merker([[`${tu('Status')}: ${tu(a.status || '')}`, ACC], [a.alv ? `${tu('Alvorlighet')}: ${tu(a.alv)}` : '', ALV[a.alv] || MUTED], [a.frist ? `${tu('Frist')}: ${fdU(a.frist)}` : '']]);
+  const utbedres = tu(a.ansvar === 'Leverandør/entreprenør' ? a.utbedresAv || 'Leverandør' : a.ansvar === 'Leietaker' ? 'Leietaker' : a.ansvar === 'Felles' ? 'Felles (eier og leietaker)' : 'Eier / drift');
+  D.faktaPar([tu('Sted og objekt'), [[tu('Eiendom'), ao.eiendom], [tu('Adresse'), ao.adresse], [tu('System'), ao.system], [tu('Komponent'), ao.komponent], [tu('Plassering'), [ao.tegning, ao.plassering].filter(Boolean).join(' – ')]]],
+    [tu('Oppdrag'), [[tu('Meldt av'), [a.meldtAv, tu(a.kilde || '')].filter(Boolean).join(' · ')], [tu('Oppdaget'), a.oppdaget ? fdU(a.oppdaget) : ''], [tu('Tildelt'), navnPaa(a.tildeltId)], [tu('Utbedres av'), utbedres]]]);
+  if (a.beskrivelse) { D.h2(tu('Beskrivelse og tiltak')); D.p(a.beskrivelse, 9.5, INK); D.y -= 4; }
   if (t) {
     try {
       const z = await tegnUtsnitt(t, a.pos, true); const o = await tegnUtsnitt(t, a.pos, false);
@@ -98,9 +99,10 @@ export async function aoPdf(id: string) {
       D.page.drawImage(oi, { x: M, y: D.y - oh, width: ow, height: oh }); D.page.drawRectangle({ x: M, y: D.y - oh, width: ow, height: oh, borderColor: LINE, borderWidth: 0.6 }); D.y -= oh + 8;
     } catch { D.p('Tegningen kunne ikke hentes.', 9, RED); }
   }
-  D.h2('Utført');
-  D.p(tu('Kvitter ut digitalt (med bilder og dokumentasjon) via lenken: {0}', aoLenke(a.id)), 9, INK);
-  D.plass(70); ['Utført dato', 'Utført av', 'Kommentar'].forEach((l, i) => { const y = D.y - 22 - i * 22; D.t(l, M, y + 4, 8.5, MUTED); D.page.drawLine({ start: { x: M + 90, y }, end: { x: W - M, y }, thickness: 0.5, color: LINE }); }); D.y -= 80;
+  const L = (a.logg || []).slice(-12);
+  if (L.length) { D.h2(tu('Hendelser')); D.tabell([[tu('Tidspunkt'), 1.3], [tu('Hendelse'), 4], [tu('Av'), 1.6]], L.map((l: Rec) => ({ c: [`${fdU(String(l.t).slice(0, 10))} ${String(l.t).slice(11, 16)}`, tu(l.k || ''), l.av || ''] }))); }
+  D.p(tu('Kvitter ut digitalt (med bilder og dokumentasjon) via lenken: {0}', aoLenke(a.id)), 8.5, MUTED); D.y -= 4;
+  D.utfylling(tu('Utført arbeid – fylles ut av utførende'), [tu('Utført arbeid'), '', tu('Materiell / timer')], [tu('Dato utført'), tu('Utført av'), tu('Underskrift')]);
   return await D.pdf.save();
 }
 export async function lastNedAoPdf(id: string) {

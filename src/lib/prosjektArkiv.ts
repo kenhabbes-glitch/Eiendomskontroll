@@ -79,7 +79,7 @@ export function kontrollFerdigstill(p: Rec): Mangel[] {
 
 // ---------------- PDF med brytning av lange tekster i tabeller og avsnitt
 export class ArkivDoc extends Doc {
-  static async lag(tittel: string) { const d = Object.assign(new ArkivDoc(), await Doc.ny(tittel)) as ArkivDoc; d.nyside(); return d; }
+  static async lag(tittel: string) { const d = Object.assign(new ArkivDoc(), await Doc.ny(tittel)) as ArkivDoc; (d.pdf as any).__doc = d; d.nyside(); return d; }
   linjer(s: any, max: number, size = 8.5, bold = false) { const ut: string[] = []; for (const avs of safe(s).split('\n')) { let l = ''; for (const o of avs.split(' ')) { const nn = l ? l + ' ' + o : o; if (this.w(nn, size, bold) > max && l) { ut.push(l); l = o; } else l = nn; } ut.push(l); } return ut; }
   tekst(s: any, size = 9, color = INK) { if (!String(s ?? '').trim()) return; const L = this.linjer(s, this.page.getWidth() - 2 * M, size); for (const l of L) { this.plass(size + 4); this.t(l, M, this.y - size, size, color); this.y -= size + 3.5; } this.y -= 4; }
   kv(rader: [string, any][]) { const W = this.page.getWidth() - 2 * M; for (const [k, v] of rader.filter(r => r[1] !== '' && r[1] != null)) { const L = this.linjer(v, W * 0.64, 8.8); const h = L.length * 12 + 4; this.plass(h); this.t(k, M, this.y - 10, 8.5, MUTED); L.forEach((l, i) => this.t(l, M + W * 0.34, this.y - 10 - i * 12, 8.8)); this.y -= h; this.page.drawLine({ start: { x: M, y: this.y + 1 }, end: { x: M + W, y: this.y + 1 }, thickness: 0.3, color: LINE }); } this.y -= 8; }

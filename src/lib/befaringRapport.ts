@@ -1,5 +1,5 @@
 // Befaringsrapport som PDF (lages i nettleseren, også uten nett). Fingeravtrykket (SHA-256) brukes ved signering.
-import { Doc, M, INK, MUTED, RED, GREEN, LINE, ACC } from './arealRapport';
+import { Doc, M, INK, MUTED, RED, GREEN, LINE, ACC, profilFor } from './arealRapport';
 import { fileUrl } from './store';
 import { byId, fd, lNavn, type Rec } from './utils';
 import { btype, erLokal, funnStatus, ART_NAVN, type Funn, type Punkt, type BFil } from './befaring';
@@ -24,7 +24,7 @@ export async function sha256(b: Uint8Array) { const h = await crypto.subtle.dige
 
 export async function befaringPdf(b: Rec, status: (s: string) => void = () => { }): Promise<Uint8Array> {
   const T = btype(b.type); const e = byId('eiendommer', b.eiendomId); const F: Funn[] = b.funn || []; const P: Punkt[] = b.punkter || [];
-  const D = await Doc.ny(`${T.navn} – ${e?.navn || ''} – ${fd(b.dato)}`); D.nyside(); const W = D.page.getWidth();
+  const D = await Doc.ny(`${T.navn} – ${e?.navn || ''} – ${fd(b.dato)}`); D.profil = profilFor(b.eiendomId, T.navn); D.nyside(); const W = D.page.getWidth();
   D.t(tt('BEFARINGSRAPPORT'), M, D.y - 10, 8.5, ACC, true); D.y -= 18;
   D.t(D.fit(b.tittel || T.navn, W - 2 * M, 20, true), M, D.y - 20, 20, INK, true); D.y -= 30;
   const info = [T.navn, [e?.navn, e?.adresse, e?.poststed].filter(Boolean).join(', '), b.leietakerId ? tt('Leietaker') + ': ' + lNavn(b.leietakerId) + (b.lokale ? ' – ' + b.lokale : '') : '', tt('Dato') + ': ' + fd(b.dato) + (b.tid ? ' · ' + b.tid : ''), b.status ? tt('Status') + ': ' + tt(b.status) : ''].filter(Boolean);

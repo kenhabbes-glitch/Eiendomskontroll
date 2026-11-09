@@ -27,9 +27,9 @@ export function tilstandData(eid: string) {
 }
 
 async function lagPdf(eid: string, kommentar: string, utarbeidet: string) {
-  const { ArkivDoc } = await import('../lib/prosjektArkiv'); const { hex, M } = await import('../lib/arealRapport');
+  const { ArkivDoc } = await import('../lib/prosjektArkiv'); const { hex, M, profilFor } = await import('../lib/arealRapport');
   const e = byId('eiendommer', eid)!; const D = tilstandData(eid);
-  const d: any = await ArkivDoc.lag('Tilstandsrapport');
+  const d: any = await ArkivDoc.lag('Tilstandsrapport'); d.profil = profilFor(eid, 'Tilstandsrapport');
   d.t(`${[e.adresse, e.poststed].filter(Boolean).join(', ')} · ${fdU(today())}`, M, d.y - 8, 8, hex('#5b645f')); d.y -= 14; d.h1(e.navn);
   d.kv([['Eiendom', e.navn], ['Adresse', [e.adresse, e.poststed].filter(Boolean).join(', ')], ['Byggeår', e.byggeaar], ['Bruttoareal (BTA)', e.bta ? e.bta + ' m2' : ''], ['Dato for rapporten', fdU(today())], ['Utarbeidet av', utarbeidet], ['Antall systemer', String(D.rader.length)]]);
   d.h2('Formål og metode');
