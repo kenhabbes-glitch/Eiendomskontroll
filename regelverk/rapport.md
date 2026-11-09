@@ -1,4 +1,4 @@
-# Regelverkssjekk 2026-11-08
+# Regelverkssjekk 2026-11-09
 
 Kontrollert mot grunnlinje fra 2026-11-08. Kilde: Lovdata, gjeldende lover og sentrale forskrifter (NLOD 2.0).
 

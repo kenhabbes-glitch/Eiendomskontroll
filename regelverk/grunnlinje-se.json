@@ -1,0 +1,45 @@
+{
+  "godkjent": "2026-11-09T13:53:41.794Z",
+  "kilder": {
+    "Lag (2003:778) om skydd mot olyckor": {
+      "status": "gällande",
+      "sistEndret": "",
+      "fp": "23ff578ba1651e0f"
+    },
+    "Plan- och byggförordning (2011:338)": {
+      "status": "gällande",
+      "sistEndret": "",
+      "fp": "4ded5cfeb07534e0"
+    },
+    "Lag (2006:985) om energideklaration för byggnader": {
+      "status": "gällande",
+      "sistEndret": "",
+      "fp": "d7876e7cfdd2c40b"
+    },
+    "Arbetsmiljölag (1977:1160)": {
+      "status": "gällande",
+      "sistEndret": "",
+      "fp": "69cd4ffaff682f0a"
+    },
+    "Elsäkerhetslag (2016:732)": {
+      "status": "gällande",
+      "sistEndret": "",
+      "fp": "73f4d28acd7557f5"
+    },
+    "BFS 2011:16 OVK (funktionskontroll av ventilationssystem)": {
+      "status": "hentet",
+      "sistEndret": "",
+      "fp": "437f1d16b2771cfa"
+    },
+    "Boverkets föreskrifter om motordrivna anordningar (BFS 2011:12, BFS 2025:11–13)": {
+      "status": "hentet",
+      "sistEndret": "",
+      "fp": "858863be5a3213a1"
+    },
+    "Förordning (EU) 2024/573 om fluorerade växthusgaser": {
+      "status": "hentet",
+      "sistEndret": "",
+      "fp": "e3b0c44298fc1c14"
+    }
+  }
+}

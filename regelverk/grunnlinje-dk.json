@@ -1,0 +1,40 @@
+{
+  "godkjent": "2026-11-09T13:53:48.887Z",
+  "kilder": {
+    "Bygningsreglementet (BR18) §§ 137–158 og vejledning kapitel 7": {
+      "status": "hentet",
+      "sistEndret": "",
+      "fp": "1596168d50d561f7"
+    },
+    "Bekendtgørelse om brandsyn (BEK nr. 2341 af 9.12.2021)": {
+      "status": "ukjent",
+      "sistEndret": "",
+      "fp": "|"
+    },
+    "Bekendtgørelse om anvendelse m.v. af elevatorer (BEK nr. 461 af 23.5.2016)": {
+      "status": "ukjent",
+      "sistEndret": "",
+      "fp": "|"
+    },
+    "Bekendtgørelse om energimærkning af bygninger (BEK nr. 549 af 15.5.2023)": {
+      "status": "ukjent",
+      "sistEndret": "",
+      "fp": "|"
+    },
+    "Beredskabsloven": {
+      "status": "ukjent",
+      "sistEndret": "",
+      "fp": "|"
+    },
+    "Arbejdsmiljøloven": {
+      "status": "ukjent",
+      "sistEndret": "",
+      "fp": "|"
+    },
+    "Forordning (EU) 2024/573 om fluorholdige drivhusgasser": {
+      "status": "hentet",
+      "sistEndret": "",
+      "fp": "e3b0c44298fc1c14"
+    }
+  }
+}

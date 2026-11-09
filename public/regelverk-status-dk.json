@@ -1,0 +1,72 @@
+{
+  "sjekket": "2026-11-09T13:53:48.887Z",
+  "kontrollertMot": "2026-11-09T13:53:48.887Z",
+  "antallKilder": 8,
+  "endringer": [],
+  "kilder": [
+    {
+      "navn": "Bygningsreglementet (BR18) §§ 137–158 og vejledning kapitel 7",
+      "lenke": "https://www.bygningsreglementet.dk/",
+      "niva": "bekendtgørelse",
+      "sjekk": "side",
+      "status": "hentet",
+      "sistEndret": ""
+    },
+    {
+      "navn": "Bekendtgørelse om brandsyn (BEK nr. 2341 af 9.12.2021)",
+      "lenke": "https://www.retsinformation.dk/eli/lta/2021/2341",
+      "niva": "bekendtgørelse",
+      "sjekk": "side",
+      "status": "ukjent",
+      "sistEndret": ""
+    },
+    {
+      "navn": "Bekendtgørelse om anvendelse m.v. af elevatorer (BEK nr. 461 af 23.5.2016)",
+      "lenke": "https://www.retsinformation.dk/eli/lta/2016/461",
+      "niva": "bekendtgørelse",
+      "sjekk": "side",
+      "status": "ukjent",
+      "sistEndret": ""
+    },
+    {
+      "navn": "Bekendtgørelse om energimærkning af bygninger (BEK nr. 549 af 15.5.2023)",
+      "lenke": "https://www.retsinformation.dk/eli/lta/2023/549",
+      "niva": "bekendtgørelse",
+      "sjekk": "side",
+      "status": "ukjent",
+      "sistEndret": ""
+    },
+    {
+      "navn": "Beredskabsloven",
+      "lenke": "https://www.retsinformation.dk/eli/lta/2017/314",
+      "niva": "lov",
+      "sjekk": "side",
+      "status": "ukjent",
+      "sistEndret": ""
+    },
+    {
+      "navn": "Arbejdsmiljøloven",
+      "lenke": "https://www.retsinformation.dk/eli/lta/2021/2062",
+      "niva": "lov",
+      "sjekk": "side",
+      "status": "ukjent",
+      "sistEndret": ""
+    },
+    {
+      "navn": "Forordning (EU) 2024/573 om fluorholdige drivhusgasser",
+      "lenke": "https://eur-lex.europa.eu/legal-content/DA/TXT/?uri=CELEX:32024R0573",
+      "niva": "EU",
+      "sjekk": "side",
+      "status": "hentet",
+      "sistEndret": ""
+    },
+    {
+      "navn": "DBI-retningslinjer (232 ABA, 251 sprinkler)",
+      "lenke": "https://brandogsikring.dk/",
+      "niva": "standard",
+      "sjekk": "manuell",
+      "status": "manuell kontroll"
+    }
+  ],
+  "feil": []
+}

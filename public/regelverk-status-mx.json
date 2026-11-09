@@ -1,8 +1,19 @@
 {
-  "sjekket": "2026-11-08T14:23:05.615Z",
+  "sjekket": "2026-11-09T13:53:30.091Z",
   "kontrollertMot": "2026-11-08T14:23:05.615Z",
   "antallKilder": 15,
-  "endringer": [],
+  "endringer": [
+    {
+      "navn": "NOM-001-SEDE-2012 Instalaciones eléctricas (utilización)",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-001-sede-2012/",
+      "tekst": "normen er eller blir kansellert – maler som viser til den må oppdateres"
+    },
+    {
+      "navn": "NOM-020-STPS-2011 Recipientes sujetos a presión y calderas",
+      "lenke": "https://platiica.economia.gob.mx/normalizacion/nom-020-stps-2011/",
+      "tekst": "normen er eller blir kansellert – maler som viser til den må oppdateres"
+    }
+  ],
   "kilder": [
     {
       "navn": "Ley General de Protección Civil",

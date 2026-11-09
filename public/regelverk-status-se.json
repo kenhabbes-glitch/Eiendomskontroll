@@ -1,0 +1,96 @@
+{
+  "sjekket": "2026-11-09T13:53:41.794Z",
+  "kontrollertMot": "2026-11-09T13:53:41.794Z",
+  "antallKilder": 11,
+  "endringer": [],
+  "kilder": [
+    {
+      "navn": "Lag (2003:778) om skydd mot olyckor",
+      "lenke": "https://www.riksdagen.se/sv/dokument-och-lagar/dokument/svensk-forfattningssamling/lag-2003778-om-skydd-mot-olyckor_sfs-2003-778/",
+      "niva": "lag",
+      "sjekk": "side",
+      "status": "gällande",
+      "sistEndret": ""
+    },
+    {
+      "navn": "Plan- och byggförordning (2011:338)",
+      "lenke": "https://www.riksdagen.se/sv/dokument-och-lagar/dokument/svensk-forfattningssamling/plan-och-byggforordning-2011338_sfs-2011-338/",
+      "niva": "förordning",
+      "sjekk": "side",
+      "status": "gällande",
+      "sistEndret": ""
+    },
+    {
+      "navn": "Lag (2006:985) om energideklaration för byggnader",
+      "lenke": "https://www.riksdagen.se/sv/dokument-och-lagar/dokument/svensk-forfattningssamling/lag-2006985-om-energideklaration-for-byggnader_sfs-2006-985/",
+      "niva": "lag",
+      "sjekk": "side",
+      "status": "gällande",
+      "sistEndret": ""
+    },
+    {
+      "navn": "Arbetsmiljölag (1977:1160)",
+      "lenke": "https://www.riksdagen.se/sv/dokument-och-lagar/dokument/svensk-forfattningssamling/arbetsmiljolag-19771160_sfs-1977-1160/",
+      "niva": "lag",
+      "sjekk": "side",
+      "status": "gällande",
+      "sistEndret": ""
+    },
+    {
+      "navn": "Elsäkerhetslag (2016:732)",
+      "lenke": "https://www.riksdagen.se/sv/dokument-och-lagar/dokument/svensk-forfattningssamling/elsakerhetslag-2016732_sfs-2016-732/",
+      "niva": "lag",
+      "sjekk": "side",
+      "status": "gällande",
+      "sistEndret": ""
+    },
+    {
+      "navn": "BFS 2011:16 OVK (funktionskontroll av ventilationssystem)",
+      "lenke": "https://www.boverket.se/sv/lag--ratt/forfattningssamling/gallande/ovk---bfs-201116/",
+      "niva": "föreskrift",
+      "sjekk": "side",
+      "status": "hentet",
+      "sistEndret": ""
+    },
+    {
+      "navn": "Boverkets föreskrifter om motordrivna anordningar (BFS 2011:12, BFS 2025:11–13)",
+      "lenke": "https://www.boverket.se/sv/byggande/sakerhet/hissar-portar-rulltrappor-och-skidliftar/",
+      "niva": "föreskrift",
+      "sjekk": "side",
+      "status": "hentet",
+      "sistEndret": ""
+    },
+    {
+      "navn": "MSB – systematiskt brandskyddsarbete",
+      "lenke": "https://www.msb.se/sv/amnesomraden/skydd-mot-olyckor-och-farliga-amnen/brandskydd/systematiskt-brandskyddsarbete/",
+      "niva": "vägledning",
+      "sjekk": "side",
+      "status": "ikke nådd"
+    },
+    {
+      "navn": "Arbetsmiljöverkets föreskrifter (AFS 2023:1 m.fl.)",
+      "lenke": "https://www.av.se/arbetsmiljoarbete-och-inspektioner/publikationer/foreskrifter/",
+      "niva": "föreskrift",
+      "sjekk": "manuell",
+      "status": "manuell kontroll"
+    },
+    {
+      "navn": "Förordning (EU) 2024/573 om fluorerade växthusgaser",
+      "lenke": "https://eur-lex.europa.eu/legal-content/SV/TXT/?uri=CELEX:32024R0573",
+      "niva": "EU",
+      "sjekk": "side",
+      "status": "hentet",
+      "sistEndret": ""
+    },
+    {
+      "navn": "SBF 110 / SBF 120 (Brandskyddsföreningen)",
+      "lenke": "https://www.brandskyddsforeningen.se/",
+      "niva": "försäkring",
+      "sjekk": "manuell",
+      "status": "manuell kontroll"
+    }
+  ],
+  "feil": [
+    "MSB – systematiskt brandskyddsarbete: HTTP 404"
+  ]
+}
