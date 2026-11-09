@@ -71,6 +71,7 @@ const I: Record<string, string> = {
   befaringer: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 14l2 2 4-4',
   tilsynsanalyser: 'M3 3v18h18M8 17V11M13 17V7M18 17v-4',
   arkiv: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
+  nokler: 'M15.5 7.5a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM12 11v10M12 15h3M12 18h2',
   meldinger: 'M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z',
   innboks: 'M22 12h-6l-2 3h-4l-2-3H2M5.5 5.1L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.5-6.9A2 2 0 0016.7 4H7.3a2 2 0 00-1.8 1.1z',
   tilsyn: 'M9 11l3 3 8-8M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9',
