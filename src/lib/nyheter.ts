@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-15', dato: '2026-11-15', tittel: 'Nøkkeladministrasjon', punkter: [
+    'Nytt menyvalg «Nøkler»: opprett nøkkelsystemer (f.eks. 1SL 1058) med nøkkeltyper (HN, K1, K2 …), låsplan og nummererte nøkler.',
+    'Utkvitter nøkler til en person og skriv ut skjema med system, type, løpenummer og regler. Ved innlevering får personen en returkvittering. Under «Hvem har nøkler» ser du alt som er ute.',
+  ] },
   { id: '2026-11-14', dato: '2026-11-14', tittel: 'Import fra BIM-modell (IFC)', punkter: [
     'Last opp en IFC-modell (.ifc eller .ifczip) under «Importer systemer». Appen leser vinduer, dører, fasader, trapper, rekkverk og tekniske komponenter med etasje og NS 3451-kode, og foreslår systemer du kontrollerer før de lagres.',
   ] },

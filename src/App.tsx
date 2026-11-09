@@ -1,3 +1,4 @@
+import { NoeklerView } from './views/Noekler';
 import { PrLenke } from './views/ProsjektRapport';
 import { Registrer } from './views/Registrer';
 import { OrgnrVarsel } from './components/OrgnrVarsel';
@@ -100,6 +101,7 @@ function navFor(): [string, string][] {
   n.push(['maalere', 'Målere'], ['tfm', 'TFM-register'], ['arealer', 'Tegninger og arealer'], ['dokumenter', 'Dokumenter']);
   if (S.eiendommer.some(e => kanDrifteE(e.id) && harModul('dokumentlesing', e.id))) n.push(['innboks', 'Dokumentinnboks']);
   if (S.leietakere.length && S.eiendommer.some(e => kanDrifteE(e.id))) n.push(['meldinger', 'Meldinger']);
+  if (S.eiendommer.some(e => kanDrifteE(e.id))) n.push(['nokler', 'Nøkler']);
   if (canEdit() && harModul('vedlikehold')) n.push(['vedlikehold', 'Vedlikeholdsplan']);
   if (canEdit() && harModul('prosjekter')) n.push(['prosjekter', 'Prosjekter']);
   n.push(['regelverk', 'Regelverk og plikter']);
@@ -167,6 +169,7 @@ export default function App() {
     case 'tilsyn': body = <TilsynView />; break;
     case 'innboks': body = <Innboks />; break;
     case 'meldinger': body = <MeldingerView />; break;
+    case 'nokler': body = <NoeklerView />; break;
     case 'leietakere': body = <Leietakere />; break;
     case 'leietaker': body = <LeietakerView id={r.id!} />; break;
     case 'tfm': body = <TfmRegister />; break;
