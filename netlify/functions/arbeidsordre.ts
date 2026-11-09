@@ -346,6 +346,32 @@ const handler = async (req: Request) => {
   const ltLogg = (p: any, l: any, tekst: string) => admin.from('hendelseslogg').insert({ bruker_id: p?.id || null, bruker: p ? (p.navn || p.epost) : 'System', tabell: 'hendelse', rad_id: l.id, eiendom_id: l.eiendom_id, handling: 'sjekkliste', tekst });
 
   // Eier/forvalter sender sjekklisten til leietaker på e-post (lenke til portalen, evt. med registrering)
+  // Nøkkelkvittering sendt på nytt (f.eks. når mottakeren har mistet skjemaet). Vedleggene lages i nettleseren.
+  if (body.action === 'nokkel_send') {
+    const p = await hvem(); if (!p) return json(401, { error: 'Ikke innlogget' });
+    const { data: u } = await admin.from('nokkelutkvitteringer').select('*').eq('id', String(body.utkvittering_id || '')).maybeSingle(); if (!u) return json(404, { error: 'Fant ikke utkvitteringen' });
+    if (!(await harEiendom(p, u.eiendom_id))) return json(403, { error: 'Du har ikke tilgang til eiendommen' });
+    const til = String(body.epost || '').trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(til)) return json(400, { error: 'Ugyldig e-postadresse' });
+    const V = (Array.isArray(body.vedlegg) ? body.vedlegg : []).filter((v: any) => v && typeof v.base64 === 'string').slice(0, 6);
+    if (V.reduce((s: number, v: any) => s + v.base64.length, 0) > 5_500_000) return json(413, { error: 'Vedleggene er for store til å sendes på e-post' });
+    const vedlegg = V.map((v: any) => ({ navn: String(v.navn || 'vedlegg.pdf').slice(0, 120), base64: v.base64, type: String(v.type || 'application/pdf') }));
+    const { data: e } = await admin.from('eiendommer').select('data').eq('id', u.eiendom_id).maybeSingle(); const en = e?.data?.navn || '';
+    const { t } = await sprakFor(u.eiendom_id, body.mottakerSprak); const d = u.data || {}; const avs = p.navn || p.epost;
+    const nokler = (d.nokler || []).map((k: any) => `${k.type} ${k.lopenr}`).join(', ');
+    const emne = `${t('Nøkkelkvittering nr {0}', u.nr)}${en ? ' – ' + en : ''}`;
+    const melding = String(body.melding || '').slice(0, 4000);
+    const standard = t('Vedlagt er kopi av kvitteringen for nøklene du har fått utlevert.');
+    const tekst = [t('Hei {0},', d.person?.navn || ''), '', melding || standard, '', `${t('Nøkkelsystem')}: ${d.systemNavn || ''}`, `${t('Nøkler')}: ${nokler}`, `${t('Utlevert')}: ${String(d.dato || '').split('-').reverse().join('.')}`, '', t('Hilsen {0}', avs)].join('\n');
+    const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1A1F2B"><div style="background:#1E4D57;color:#fff;padding:14px 18px;border-bottom:3px solid #C9A66B"><div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#CFE0E3">${esc(t('Nøkkelkvittering'))}</div><div style="font-size:18px;font-weight:bold">${esc(t('Nr.'))} ${esc(u.nr)}${en ? ' · ' + esc(en) : ''}</div></div>
+      <div style="padding:16px 4px"><p>${esc(t('Hei {0},', d.person?.navn || ''))}</p><p>${esc(melding || standard).replace(/\n/g, '<br>')}</p>
+      <table style="border-collapse:collapse;font-size:13px"><tr><td style="color:#566170;padding:3px 14px 3px 0">${esc(t('Nøkkelsystem'))}</td><td>${esc(d.systemNavn || '')}</td></tr><tr><td style="color:#566170;padding:3px 14px 3px 0">${esc(t('Nøkler'))}</td><td><b>${esc(nokler)}</b></td></tr><tr><td style="color:#566170;padding:3px 14px 3px 0">${esc(t('Utlevert'))}</td><td>${esc(String(d.dato || '').split('-').reverse().join('.'))}</td></tr></table>
+      ${vedlegg.length ? `<p style="font-size:12px;color:#566170">${esc(t('Vedlegg: {0}', vedlegg.map((v: any) => v.navn).join(', ')))}</p>` : ''}<p style="font-size:12px;color:#566170">${esc(t('Sendt av {0}.', avs))}</p></div></div>`;
+    const r = await sendEpost(til, emne, html, tekst, vedlegg, p.epost || undefined, await oppsettFor(u.eiendom_id, await minOrg(p)));
+    await admin.from('hendelseslogg').insert({ bruker_id: p.id, bruker: avs, tabell: 'hendelse', rad_id: u.id, eiendom_id: u.eiendom_id, handling: 'nokler', tekst: `Nøkkelkvittering nr ${u.nr} ${r.sendt ? 'sendt' : 'klargjort'} på e-post til ${til}${vedlegg.length ? ' (' + vedlegg.map((v: any) => v.navn).join(', ') + ')' : ''}` });
+    await admin.from('nokkelutkvitteringer').update({ data: { ...d, sendt: [...(d.sendt || []), { tid: new Date().toISOString(), til, av: avs, sendt: !!r.sendt }] } }).eq('id', u.id);
+    return json(200, { ...r, til, emne, tekst });
+  }
+
   if (body.action === 'lt_send') {
     const p = await hvem(); if (!p) return json(401, { error: 'Ikke innlogget' });
     const l = await hentLt(body.leietaker_id); if (!l) return json(404, { error: 'Fant ikke leietakeren' });

@@ -1,6 +1,6 @@
 // Nøkkeladministrasjon: nøkkelsystemer med låsplan og nøkkeltyper, nummererte nøkler, utkvittering og innlevering med utskrivbare skjemaer.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { S, state, sb, toast, loggHendelse, kanDrifteE, useStore, uploadFile, deleteFile, fileUrl, type Fil } from '../lib/store';
+import { S, state, sb, toast, loggHendelse, kanDrifteE, useStore, uploadFile, deleteFile, fileUrl, aoApi, type Fil } from '../lib/store';
 import { showModal, formModal, confirmBox } from '../components/ui';
 import { byId, sortBy } from '../lib/utils';
 import { tt } from '../lib/i18n';
@@ -127,6 +127,9 @@ export function NoeklerView() {
   const signertVis = (u?: Utk, kort = false) => { if (!u) return null; const F = u.data.signert || [];
     const opp = <label className="btn sm" style={{ display: 'inline-flex' }} title={tt("Skann eller ta bilde av det signerte skjemaet")}>{F.length ? '+' : tt("Last opp signert")}<input type="file" accept="application/pdf,image/*" multiple style={{ display: 'none' }} onChange={x => { lastOppSignert(u, x.target.files); x.target.value = ''; }} /></label>;
     return <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>{F.length ? F.map((f, i) => <button key={f.path} className="btn sm" onClick={() => apneFil(f)} title={f.navn}>✓ {kort ? tt("Signert") : F.length > 1 ? tt("Signert {0}", i + 1) : tt("Signert skjema")}</button>) : <span className="chip amber">{tt("Ikke signert")}</span>} {opp}</span>; };
+  const sendSkjema = (u: Utk) => showModal(tt("Send utkvitteringsskjema nr {0}", u.nr), close => <SendSkjema u={u} sys={sysAv(u.system_id)} eid={eid} close={close} ferdig={reload} />, {});
+  /** Åpne / send skjema for en utkvittering. */
+  const skjemaKnapper = (u?: Utk) => u ? <><button className="btn sm" onClick={() => skrivUtkvittering(u, sysAv(u.system_id), eid)}>{tt("Åpne skjema")}</button> <button className="btn sm" onClick={() => sendSkjema(u)}>{tt("Send på nytt")}</button></> : null;
   const leietakerRapport = () => showModal(tt("Nøkkelrapport per leietaker"), close => <LeietakerRapport eid={eid} d={d!} close={close} />, {});
 
   const utkvitter = (s: Sys, forvalgt: string[] = []) => {
@@ -162,7 +165,7 @@ export function NoeklerView() {
   const gjenopprett = async (n: Nok) => { const x = await sb.from('nokler').update({ status: 'inne', data: { ...n.data, innehaver: undefined, logg: logg(n, n.status === 'tapt' ? 'Funnet – tilbake på lager' : 'Tatt i bruk igjen') } }).eq('id', n.id).in('status', ['tapt', 'kassert']); if (x.error) return toast(x.error.message); reload(); };
   const historikk = (n: Nok) => showModal(tt("Historikk – {0}", nokNavn(n, d!.typ)), () => { const U = d!.utk.filter(u => u.data.nokler.some(k => k.id === n.id));
     return <div><h3 style={{ marginTop: 0 }}>{tt("Utkvitteringsskjemaer for nøkkelen")}</h3>
-      {U.length ? <div className="tbl-wrap"><table><tbody>{U.map(u => { const k = u.data.nokler.find(x => x.id === n.id)!; return <tr key={u.id}><td><b>{tt("Skjema")} {u.nr}</b></td><td>{u.data.person.navn}<br /><span className="small muted">{u.data.person.firma}</span></td><td className="small">{dNo(u.data.dato)} – {k.retur ? dNo(k.retur.dato) + (k.retur.tapt ? ' (' + tt("tapt") + ')' : '') : tt("ute nå")}</td><td>{signertVis(u, true)}</td><td><button className="btn sm" onClick={() => skrivUtkvittering(u, sysAv(u.system_id), eid)}>{tt("Skjema")}</button></td></tr>; })}</tbody></table></div> : <p className="muted">{tt("Nøkkelen har ikke vært utkvittert.")}</p>}
+      {U.length ? <div className="tbl-wrap"><table><tbody>{U.map(u => { const k = u.data.nokler.find(x => x.id === n.id)!; return <tr key={u.id}><td><b>{tt("Skjema")} {u.nr}</b></td><td>{u.data.person.navn}<br /><span className="small muted">{u.data.person.firma}</span></td><td className="small">{dNo(u.data.dato)} – {k.retur ? dNo(k.retur.dato) + (k.retur.tapt ? ' (' + tt("tapt") + ')' : '') : tt("ute nå")}</td><td>{signertVis(u, true)}</td><td style={{ whiteSpace: 'nowrap' }}>{skjemaKnapper(u)}</td></tr>; })}</tbody></table></div> : <p className="muted">{tt("Nøkkelen har ikke vært utkvittert.")}</p>}
       <h3>{tt("Logg")}</h3><pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: 0 }}>{(n.data.logg || []).slice().reverse().map(l => `${dNo(l.dato)} ${l.dato.slice(11, 16)}  ${l.tekst}${l.av ? ' (' + l.av + ')' : ''}`).join('\n') || '–'}</pre></div>; }, { wide: true });
 
   const nokRad = (n: Nok) => <tr key={n.id}><td><b>{nokNavn(n, d!.typ)}</b></td><td><span className={'chip ' + ({ inne: 'green', ute: 'amber', tapt: 'red', kassert: '' } as any)[n.status]}>{tt(({ inne: 'På lager', ute: 'Utkvittert', tapt: 'Tapt', kassert: 'Kassert' } as any)[n.status])}</span></td>
@@ -192,10 +195,10 @@ export function NoeklerView() {
       : fane === 'hvem' ? <>
         <p><input placeholder={tt("Søk på person, firma eller nøkkel …")} value={sok} onChange={x => setSok(x.target.value)} style={{ minWidth: 280 }} /></p>
         {grupper.map(([k, l]) => { const p = l[0].data.innehaver || { navn: '?' }; return <div className="card" key={k} style={{ marginBottom: 10 }}><div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><b>{p.navn}</b><span className="small muted">{[p.firma, p.tlf, p.epost].filter(Boolean).join(' · ')}</span><span className="grow" /><button className="btn sm pri" onClick={() => leverInn(l)}>{tt("Lever inn alle")} ({l.length})</button></div>
-          <div className="tbl-wrap"><table><tbody>{sortBy(l, n => nokNavn(n, d.typ)).map(n => <tr key={n.id}><td><b>{nokNavn(n, d.typ)}</b></td><td className="small">{sysAv(n.system_id)?.navn}</td><td className="small">{tt("siden")} {dNo(n.data.dato)} · {tt("skjema")} {n.data.utkvNr}{forfalt(n) && <> <span className="chip red">{tt("Retur forfalt {0}", dNo(n.data.forventetRetur))}</span></>}</td><td>{signertVis(utkAv(n.data.utkvitteringId), true)}</td><td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}><button className="btn sm" onClick={() => markerTapt(n, 'tapt')}>{tt("Tapt")}</button> <button className="btn sm" onClick={() => leverInn([n])}>{tt("Lever inn")}</button></td></tr>)}</tbody></table></div></div>; })}
+          <div className="tbl-wrap"><table><tbody>{sortBy(l, n => nokNavn(n, d.typ)).map(n => <tr key={n.id}><td><b>{nokNavn(n, d.typ)}</b></td><td className="small">{sysAv(n.system_id)?.navn}</td><td className="small">{tt("siden")} {dNo(n.data.dato)} · {tt("skjema")} {n.data.utkvNr}{forfalt(n) && <> <span className="chip red">{tt("Retur forfalt {0}", dNo(n.data.forventetRetur))}</span></>}</td><td>{signertVis(utkAv(n.data.utkvitteringId), true)}</td><td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{skjemaKnapper(utkAv(n.data.utkvitteringId))} <button className="btn sm" onClick={() => markerTapt(n, 'tapt')}>{tt("Tapt")}</button> <button className="btn sm" onClick={() => leverInn([n])}>{tt("Lever inn")}</button></td></tr>)}</tbody></table></div></div>; })}
         {!grupper.length && <p className="muted">{ute.length ? tt("Ingen treff.") : tt("Ingen nøkler er utkvittert.")}</p>}</>
       : <><p><input placeholder={tt("Søk på skjemanr, person, firma eller nøkkel …")} value={sok} onChange={x => setSok(x.target.value)} style={{ minWidth: 280 }} /></p><div className="tbl-wrap"><table><thead><tr><th>{tt("Skjema")}</th><th>{tt("Dato")}</th><th>{tt("Mottaker")}</th><th>{tt("Nøkler")}</th><th>{tt("Status")}</th><th>{tt("Signert skjema")}</th><th /></tr></thead><tbody>{d.utk.filter(u => !sokL || String(u.nr) === sokL || JSON.stringify(u.data.person).toLowerCase().includes(sokL) || u.data.nokler.some(k => `${k.type} ${k.lopenr}`.toLowerCase().includes(sokL))).map(u => { const igjen = u.data.nokler.filter(k => !k.retur).length; return <tr key={u.id}><td><b>{u.nr}</b></td><td>{dNo(u.data.dato)}</td><td>{u.data.person.navn}<br /><span className="small muted">{u.data.person.firma}</span></td><td className="small">{u.data.systemNavn}: {u.data.nokler.map(k => `${k.type} ${k.lopenr}`).join(', ')}</td><td>{igjen ? <span className="chip amber">{igjen} {tt("ute")}</span> : u.data.nokler.some(k => k.retur?.tapt) ? <span className="chip">{tt("Avsluttet – {0} tapt", u.data.nokler.filter(k => k.retur?.tapt).length)}</span> : <span className="chip green">{tt("Alle levert")}</span>}</td><td>{signertVis(u)}</td>
-        <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" onClick={() => skrivUtkvittering(u, sysAv(u.system_id), eid)}>{tt("Skriv ut skjema")}</button></td></tr>; })}{!d.utk.length && <tr><td colSpan={7} className="muted">{tt("Ingen utkvitteringer ennå.")}</td></tr>}</tbody></table></div></>}
+        <td style={{ whiteSpace: 'nowrap' }}>{skjemaKnapper(u)}</td></tr>; })}{!d.utk.length && <tr><td colSpan={7} className="muted">{tt("Ingen utkvitteringer ennå.")}</td></tr>}</tbody></table></div></>}
   </div>;
 }
 
@@ -276,5 +279,54 @@ function LeietakerRapport({ eid, d, close }: { eid: string; d: Data; close: () =
     <label style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '6px 0' }}><input type="checkbox" checked={ved} onChange={x => setVed(x.target.checked)} />{tt("Legg ved signerte utkvitteringsskjemaer")}</label>
     <label style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '6px 0' }}><input type="checkbox" checked={hist} onChange={x => setHist(x.target.checked)} />{tt("Ta med tidligere utlån (levert tilbake eller tapt)")}</label>
     <p style={{ textAlign: 'right', marginBottom: 0 }}><button className="btn" onClick={close}>{tt("Avbryt")}</button> <button className="btn pri" disabled={busy || !m} onClick={lag}>{busy ? tt("Lager rapport …") : tt("Last ned PDF")}</button></p>
+  </div>;
+}
+
+// ---------- Utkvitteringsskjema som PDF (til e-post og nedlasting) og utsending på nytt
+const tilBase64 = (b: Uint8Array) => { let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(s); };
+export async function utkvitteringPdf(u: Utk, sys: Sys | undefined, eid: string): Promise<Uint8Array> {
+  const { ArkivDoc } = await import('../lib/prosjektArkiv'); const { profilFor, INK, MUTED } = await import('../lib/arealRapport');
+  const D: any = await ArkivDoc.lag(`${tt("Nøkkelkvittering")} ${u.nr}`); D.profil = profilFor(eid, tt("Nøkkelkvittering"), u.nr);
+  D.tittelSerif(tt("Kvittering for utlevert nøkkel")); D.t(`${tt("Nøkkelsystem")} ${u.data.systemNavn} · ${tt("utlevert")} ${dNo(u.data.dato)}`, 44, D.y - 4, 9, MUTED); D.y -= 20;
+  const p = u.data.person;
+  D.faktaPar([tt("Mottaker"), [[tt("Navn"), p.navn], [tt("Firma"), p.firma], [tt("Telefon"), p.tlf], [tt("E-post"), p.epost]]], [tt("Utlevering"), [[tt("Utlevert av"), u.data.utlevertAv], [tt("Formål"), u.data.formal], [tt("Forventet retur"), dNo(u.data.forventetRetur)]]]);
+  const sy = sys?.data.sylindere || []; const retur = u.data.nokler.some(k => k.retur);
+  D.h2(tt("Utleverte nøkler"));
+  D.tab([[tt("Nøkkelsystem"), 1.3], [tt("Nøkkeltype"), 0.9], [tt("Løpenr"), 0.7, true], [tt("Passer til"), 2.6], ...(retur ? [[tt("Levert tilbake"), 1.2] as [string, number]] : [])],
+    sortBy(u.data.nokler, k => k.type + String(k.lopenr).padStart(6, '0')).map(k => ({ c: [u.data.systemNavn, k.type, String(k.lopenr), sy.filter(c => c.typer.includes(k.type)).map(c => c.navn + (c.sted ? ' ' + c.sted : '')).join(', ') || '–', ...(retur ? [k.retur ? dNo(k.retur.dato) + (k.retur.tapt ? ' (' + tt("tapt") + ')' : '') : ''] : [])] })));
+  D.h2(tt("Regler for behandling av nøkkel"));
+  u.data.regler.split('\n').filter(Boolean).forEach((r, i) => D.tekst(`${i + 1}. ${r}`, 8.8, INK));
+  D.tekst(tt("Jeg bekrefter å ha mottatt nøklene over og forplikter meg til å følge reglene."), 9.5, INK);
+  D.utfylling(tt("Signatur"), [], [tt("Sted og dato"), tt("Mottakers underskrift"), tt("Utlevert av")]);
+  D.utfylling(tt("Retur – fylles ut ved innlevering"), [], [tt("Dato levert"), tt("Mottatt av"), tt("Underskrift")]);
+  return await D.pdf.save() as Uint8Array;
+}
+const lastNed = (b: Uint8Array, navn: string, type = 'application/pdf') => { const url = URL.createObjectURL(new Blob([b as any], { type })); const a = document.createElement('a'); a.href = url; a.download = navn; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 20000); };
+
+function SendSkjema({ u, sys, eid, close, ferdig }: { u: Utk; sys?: Sys; eid: string; close: () => void; ferdig: () => void }) {
+  const F = u.data.signert || [];
+  const [til, setTil] = useState(u.data.person.epost || ''); const [mld, setMld] = useState(''); const [skjema, setSkjema] = useState<boolean>(true); const [sign, setSign] = useState(F.length > 0); const [busy, setBusy] = useState(''); const [svar, setSvar] = useState<any>(null);
+  const navn = `Nøkkelkvittering ${u.nr}.pdf`;
+  const send = async () => { if (!/^\S+@\S+\.\S+$/.test(til.trim())) return toast(tt("Skriv inn en gyldig e-postadresse")); setBusy(tt("Sender …"));
+    try { const vedlegg: { navn: string; base64: string; type: string }[] = [];
+      if (skjema) vedlegg.push({ navn, base64: tilBase64(await utkvitteringPdf(u, sys, eid)), type: 'application/pdf' });
+      if (sign) for (const [i, f] of F.entries()) { const b = new Uint8Array(await (await fetch(await fileUrl(f.path))).arrayBuffer()); const pdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.navn);
+        vedlegg.push({ navn: `Nøkkelkvittering ${u.nr} signert${F.length > 1 ? ' ' + (i + 1) : ''}.${pdf ? 'pdf' : 'jpg'}`, base64: tilBase64(b), type: pdf ? 'application/pdf' : 'image/jpeg' }); }
+      const r = await aoApi({ action: 'nokkel_send', utkvittering_id: u.id, epost: til.trim(), melding: mld, vedlegg });
+      if (r.sendt) { toast(tt("Skjemaet er sendt til {0}", r.til)); ferdig(); close(); return; }
+      setSvar(r); }
+    catch (e: any) { toast(tt("Kunne ikke sende: ") + (e?.message || e)); }
+    setBusy(''); };
+  const ned = async () => { setBusy(tt("Lager PDF …")); try { lastNed(await utkvitteringPdf(u, sys, eid), navn); } catch (e: any) { toast(String(e?.message || e)); } setBusy(''); };
+  if (svar) return <div><p className="banner">{svar.grunn || tt("E-post er ikke satt opp.")}</p><p className="small">{tt("Last ned PDF-en og send den fra ditt eget e-postprogram, eller kopier teksten under.")}</p>
+    <textarea readOnly value={svar.tekst || ''} rows={8} style={{ width: '100%' }} /><p style={{ textAlign: 'right' }}><button className="btn" onClick={ned}>{tt("Last ned PDF")}</button> <a className="btn pri" href={`mailto:${encodeURIComponent(svar.til || til)}?subject=${encodeURIComponent(svar.emne || '')}&body=${encodeURIComponent(svar.tekst || '')}`}>{tt("Åpne i e-postprogram")}</a></p></div>;
+  return <div className="form">
+    <p className="small muted" style={{ marginTop: 0 }}>{tt("Send kopi av utkvitteringsskjemaet, for eksempel hvis mottakeren har mistet det.")} {u.data.person.navn}{u.data.person.firma ? ' · ' + u.data.person.firma : ''} · {u.data.nokler.map(k => `${k.type} ${k.lopenr}`).join(', ')}</p>
+    <div className="fld"><label htmlFor="ss_til">{tt("Send til (e-post)")}</label><input id="ss_til" type="email" value={til} onChange={x => setTil(x.target.value)} /></div>
+    <div className="fld"><label htmlFor="ss_m">{tt("Melding (valgfritt)")}</label><textarea id="ss_m" value={mld} onChange={x => setMld(x.target.value)} placeholder={tt("Vedlagt er kopi av kvitteringen for nøklene du har fått utlevert.")} /></div>
+    <div className="fld cb"><input type="checkbox" id="ss_s" checked={skjema} onChange={x => setSkjema(x.target.checked)} /><label htmlFor="ss_s">{tt("Legg ved utkvitteringsskjemaet (PDF)")}</label></div>
+    <div className="fld cb"><input type="checkbox" id="ss_g" checked={sign} disabled={!F.length} onChange={x => setSign(x.target.checked)} /><label htmlFor="ss_g">{F.length ? tt("Legg ved signert kopi ({0} fil)", F.length) : tt("Legg ved signert kopi (ikke lastet opp)")}</label></div>
+    {(u.data as any).sendt?.length > 0 && <p className="small muted">{tt("Sendt tidligere:")} {(u.data as any).sendt.map((x: any) => `${dNo(x.tid)} ${x.til}`).join(', ')}</p>}
+    <p style={{ textAlign: 'right', marginBottom: 0 }}><button className="btn" onClick={ned} disabled={!!busy}>{tt("Last ned PDF")}</button> <button className="btn" onClick={close}>{tt("Avbryt")}</button> <button className="btn pri" onClick={send} disabled={!!busy || (!skjema && !sign)}>{busy || tt("Send")}</button></p>
   </div>;
 }

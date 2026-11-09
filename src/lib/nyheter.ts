@@ -4,6 +4,7 @@ export const NYHETER: Nyhet[] = [
   { id: '2026-11-17', dato: '2026-11-17', tittel: 'Signerte nøkkelskjemaer og nøkkelrapport', punkter: [
     'Last opp det signerte utkvitteringsskjemaet (PDF eller bilde fra mobilen). Det lagres på utkvitteringen og vises på hver nøkkel og i nøkkelens historikk.',
     'Ny «Nøkkelrapport per leietaker»: PDF med alle nøkler leietakeren har ute, fordelt på type, med de signerte skjemaene som vedlegg. Velg leietaker ved utkvittering, så kobles nøklene til leietakeren.',
+    'Utkvitteringsskjemaer kan åpnes igjen («Åpne skjema») og sendes på nytt på e-post («Send på nytt»), med skjemaet som PDF og eventuelt den signerte kopien.',
   ] },
   { id: '2026-11-16', dato: '2026-11-16', tittel: 'Nytt utseende på utskrifter', punkter: [
     'Nøkkelkvitteringer, arbeidsordre og PDF-rapportene (tilstand, areal, befaring, brannvern, capex, eier- og prosjektrapporter) har fått felles utseende: utleiers navn i et farget bånd øverst, og «Side x av y» nederst.',
