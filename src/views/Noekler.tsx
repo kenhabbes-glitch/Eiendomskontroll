@@ -1,19 +1,19 @@
 // Nøkkeladministrasjon: nøkkelsystemer med låsplan og nøkkeltyper, nummererte nøkler, utkvittering og innlevering med utskrivbare skjemaer.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { S, state, sb, toast, loggHendelse, kanDrifteE, useStore } from '../lib/store';
-import { showModal, formModal, confirmBox, textModal } from '../components/ui';
+import { S, state, sb, toast, loggHendelse, kanDrifteE, useStore, uploadFile, deleteFile, fileUrl, type Fil } from '../lib/store';
+import { showModal, formModal, confirmBox } from '../components/ui';
 import { byId, sortBy } from '../lib/utils';
 import { tt } from '../lib/i18n';
 import { skrivDok, esc, fakta, faktaPar, seksjon, tabell, regler, signatur, utfylling } from '../lib/dokument';
 
-type Person = { navn: string; firma?: string; tlf?: string; epost?: string };
+type Person = { navn: string; firma?: string; tlf?: string; epost?: string; leietakerId?: string };
 type Syl = { id: string; navn: string; sted?: string; typer: string[] };
 type Sys = { id: string; eiendom_id: string; navn: string; data: { beskrivelse?: string; produsent?: string; sylindere?: Syl[]; regler?: string; arkivert?: boolean } };
 type Typ = { id: string; system_id: string; eiendom_id: string; kode: string; data: { beskrivelse?: string } };
 type Logg = { dato: string; tekst: string; av?: string };
 type Nok = { id: string; type_id: string; system_id: string; eiendom_id: string; lopenr: number; status: 'inne' | 'ute' | 'tapt' | 'kassert'; data: { innehaver?: Person; sistHos?: Person; utkvitteringId?: string; utkvNr?: number; dato?: string; forventetRetur?: string; merknad?: string; logg?: Logg[] } };
 type UtkNok = { id: string; type: string; lopenr: number; retur?: { dato: string; mottattAv: string; tapt?: boolean } };
-type Utk = { id: string; eiendom_id: string; system_id: string | null; nr: number; created_at: string; data: { person: Person; nokler: UtkNok[]; dato: string; utlevertAv: string; formal?: string; forventetRetur?: string; regler: string; systemNavn: string } };
+type Utk = { id: string; eiendom_id: string; system_id: string | null; nr: number; created_at: string; data: { person: Person; nokler: UtkNok[]; dato: string; utlevertAv: string; formal?: string; forventetRetur?: string; regler: string; systemNavn: string; signert?: Fil[]; signertDato?: string; signertAv?: string } };
 
 export const STANDARD_REGLER = `Nøkkelen er personlig og utleveres kun til den som har kvittert for den.
 Nøkkelen må ikke kopieres, lånes bort eller overleveres til andre uten skriftlig samtykke fra utleier.
@@ -26,6 +26,18 @@ const iDag = () => new Date().toISOString().slice(0, 10);
 const dNo = (d?: string) => d ? d.slice(0, 10).split('-').reverse().join('.') : '';
 const meg = () => state.me?.navn || state.me?.epost || '';
 const lagId = () => crypto.randomUUID();
+/** Bilder skaleres ned og lagres som JPEG (så de kan legges inn i PDF); PDF lagres som den er. */
+async function tilLagring(f: File): Promise<File | null> {
+  if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) return f;
+  if (!f.type.startsWith('image/')) return null;
+  try { const bmp = await createImageBitmap(f); const sk = Math.min(1, 2200 / Math.max(bmp.width, bmp.height)); const c = document.createElement('canvas'); c.width = Math.round(bmp.width * sk); c.height = Math.round(bmp.height * sk);
+    const g = c.getContext('2d')!; g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+    const b: Blob = await new Promise((ok, feil) => c.toBlob(x => x ? ok(x) : feil(new Error('bilde')), 'image/jpeg', 0.85)); return new File([b], f.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' }); }
+  catch { return null; }
+}
+const apneFil = async (f: Fil) => { const u = await fileUrl(f.path); if (u) window.open(u, '_blank', 'noopener'); else toast(tt("Fant ikke filen")); };
+/** Hører utkvitteringen til leietakeren? Koblet direkte, eller (eldre skjemaer) samme firmanavn. */
+const gjelderLeietaker = (u: Utk, l: { id: string; navn?: string }) => u.data.person.leietakerId ? u.data.person.leietakerId === l.id : !!l.navn && (u.data.person.firma || '').trim().toLowerCase() === l.navn.trim().toLowerCase();
 const forfalt = (n: Nok) => n.status === 'ute' && !!n.data.forventetRetur && n.data.forventetRetur < iDag();
 
 function useNokler(eid: string) {
@@ -102,19 +114,36 @@ export function NoeklerView() {
 
   const laasplan = (s: Sys) => showModal(tt("Låsplan – {0}", s.navn), close => <Laasplan s={s} T={d!.typ.filter(t => t.system_id === s.id)} onSaved={() => { reload(); close(); }} />, { wide: true });
 
+  const lts = sortBy(S.leietakere.filter((l: any) => l.eiendomId === eid), (l: any) => l.navn || '').map((l: any) => [l.id, l.navn] as [string, string]);
+  const utkAv = (id?: string) => id ? d?.utk.find(u => u.id === id) : undefined;
+  const lastOppSignert = async (u: Utk, filer: FileList | null) => { if (!filer?.length) return; const nye: Fil[] = [];
+    for (const [i, f0] of Array.from(filer).entries()) { const f = await tilLagring(f0); if (!f) { toast(tt("{0}: bare PDF og bilder kan lastes opp", f0.name)); continue; }
+      const r = await uploadFile(f, eid, undefined, `Nokkelkvittering ${u.nr} signert${filer.length > 1 ? ' ' + (i + 1) : ''}.${f.type === 'application/pdf' ? 'pdf' : 'jpg'}`, 'intern/nokler'); if (r) nye.push(r); }
+    if (!nye.length) return; const r = await sb.from('nokkelutkvitteringer').update({ data: { ...u.data, signert: [...(u.data.signert || []), ...nye], signertDato: iDag(), signertAv: meg() } }).eq('id', u.id);
+    if (r.error) return toast(r.error.message); loggHendelse(`Signert nøkkelkvittering nr ${u.nr} lastet opp (${u.data.person.navn})`, undefined, eid); toast(tt("Signert skjema lagret")); reload(); };
+  const fjernSignert = async (u: Utk, f: Fil) => { if (!(await confirmBox(tt("Fjerne «{0}» fra utkvittering nr {1}?", f.navn, u.nr), tt("Fjern")))) return; const rest = (u.data.signert || []).filter(x => x.path !== f.path);
+    const r = await sb.from('nokkelutkvitteringer').update({ data: { ...u.data, signert: rest, ...(rest.length ? {} : { signertDato: undefined }) } }).eq('id', u.id); if (r.error) return toast(r.error.message); await deleteFile(f); reload(); };
+  /** Status for signert skjema: lenker til filene, eller knapp for å laste opp. */
+  const signertVis = (u?: Utk, kort = false) => { if (!u) return null; const F = u.data.signert || [];
+    const opp = <label className="btn sm" style={{ display: 'inline-flex' }} title={tt("Skann eller ta bilde av det signerte skjemaet")}>{F.length ? '+' : tt("Last opp signert")}<input type="file" accept="application/pdf,image/*" multiple style={{ display: 'none' }} onChange={x => { lastOppSignert(u, x.target.files); x.target.value = ''; }} /></label>;
+    return <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>{F.length ? F.map((f, i) => <button key={f.path} className="btn sm" onClick={() => apneFil(f)} title={f.navn}>✓ {kort ? tt("Signert") : F.length > 1 ? tt("Signert {0}", i + 1) : tt("Signert skjema")}</button>) : <span className="chip amber">{tt("Ikke signert")}</span>} {opp}</span>; };
+  const leietakerRapport = () => showModal(tt("Nøkkelrapport per leietaker"), close => <LeietakerRapport eid={eid} d={d!} close={close} />, {});
+
   const utkvitter = (s: Sys, forvalgt: string[] = []) => {
     const T = sortBy(d!.typ.filter(t => t.system_id === s.id), t => t.kode); const ledige = d!.nok.filter(n => n.system_id === s.id && n.status === 'inne'); if (!ledige.length) return toast(tt("Ingen ledige nøkler i dette systemet"));
     formModal({ title: tt("Utkvitter nøkler – {0}", s.navn), wide: true, saveTxt: tt("Utkvitter og skriv ut skjema"),
-      onChange: (k, v, prev) => { if (k !== 'navn') return; const p = personer.get(String(v.navn).trim().toLowerCase()); if (p && !prev.firma && !prev.tlf && !prev.epost) return { firma: p.firma || '', tlf: p.tlf || '', epost: p.epost || '' }; },
-      fields: [{ k: 'navn', label: tt("Mottaker (navn)"), req: true, half: true, dl: [...personer.values()].map(p => [p.navn, p.firma || ''] as [string, string]) }, { k: 'firma', label: tt("Firma / leietaker"), half: true, dl: sortBy(S.leietakere.filter((l: any) => l.eiendomId === eid), (l: any) => l.navn || '').map((l: any) => [l.navn, ''] as [string, string]) }, { k: 'tlf', label: tt("Telefon"), half: true }, { k: 'epost', label: tt("E-post"), type: 'email', half: true },
+      onChange: (k, v, prev) => { if (k === 'leietakerId') { const l = byId('leietakere', v.leietakerId); return l && !prev.firma ? { firma: l.navn || '' } : undefined; }
+        if (k === 'firma' && !prev.leietakerId) { const l = S.leietakere.find((x: any) => x.eiendomId === eid && (x.navn || '').toLowerCase() === String(v.firma).trim().toLowerCase()); if (l) return { leietakerId: l.id }; }
+        if (k !== 'navn') return; const p = personer.get(String(v.navn).trim().toLowerCase()); if (p && !prev.firma && !prev.tlf && !prev.epost) return { firma: p.firma || '', tlf: p.tlf || '', epost: p.epost || '', leietakerId: p.leietakerId || prev.leietakerId || '' }; },
+      fields: [{ k: 'navn', label: tt("Mottaker (navn)"), req: true, half: true, dl: [...personer.values()].map(p => [p.navn, p.firma || ''] as [string, string]) }, { k: 'firma', label: tt("Firma / leietaker"), half: true, dl: sortBy(S.leietakere.filter((l: any) => l.eiendomId === eid), (l: any) => l.navn || '').map((l: any) => [l.navn, ''] as [string, string]) }, { k: 'leietakerId', label: tt("Leietaker (for nøkkelrapport)"), type: 'select', half: true, empty: tt("– ikke leietaker –"), options: lts }, { k: 'tlf', label: tt("Telefon"), half: true }, { k: 'epost', label: tt("E-post"), type: 'email', half: true },
         { k: 'formal', label: tt("Formål"), ph: tt("F.eks. leietaker, vaktmester, renhold, håndverker"), half: true }, { k: 'forventetRetur', label: tt("Forventet levert tilbake"), type: 'date', half: true }, { k: 'dato', label: tt("Utlevert dato"), type: 'date', half: true },
         { k: 'valgt', label: tt("Velg nøkler"), type: 'custom', render: (v, set) => { const val: string[] = v.valgt || []; return <div>{T.map(t => { const l = sortBy(ledige.filter(n => n.type_id === t.id), n => n.lopenr); if (!l.length) return null; return <div key={t.id} style={{ marginBottom: 6 }}><b>{t.kode}</b> <span className="small muted">{t.data.beskrivelse || ''} · {l.length} {tt("ledige")}</span><br />{l.map(n => { const på = val.includes(n.id); return <button type="button" key={n.id} className={'btn sm' + (på ? ' pri' : '')} style={{ margin: '2px 3px 2px 0', minWidth: 38 }} onClick={() => set({ valgt: på ? val.filter(x => x !== n.id) : [...val, n.id] })}>{n.lopenr}</button>; })}</div>; })}<div className="small muted">{val.length} {tt("valgt")}</div></div>; } }],
-      values: { navn: '', firma: '', tlf: '', epost: '', formal: '', forventetRetur: '', dato: iDag(), valgt: forvalgt },
+      values: { navn: '', firma: '', leietakerId: '', tlf: '', epost: '', formal: '', forventetRetur: '', dato: iDag(), valgt: forvalgt },
       onSave: async v => { const val: string[] = v.valgt || []; if (!val.length) { toast(tt("Velg minst én nøkkel")); return false; }
-        const person: Person = { navn: v.navn.trim(), firma: v.firma.trim(), tlf: v.tlf.trim(), epost: v.epost.trim() };
+        const person: Person = { navn: v.navn.trim(), firma: v.firma.trim(), tlf: v.tlf.trim(), epost: v.epost.trim(), ...(v.leietakerId ? { leietakerId: v.leietakerId } : {}) };
         const data = { person, dato: v.dato || iDag(), utlevertAv: meg(), formal: v.formal, forventetRetur: v.forventetRetur, regler: s.data.regler || STANDARD_REGLER, systemNavn: s.navn };
         const r = await sb.rpc('nokkel_utkvitter', { p_eiendom: eid, p_system: s.id, p_nokler: val, p_data: data }); if (r.error || !r.data) { toast(r.error?.message || tt("Utkvitteringen ble ikke lagret")); reload(); return false; }
-        const u = r.data as Utk; loggHendelse(`Utkvitterte ${u.data.nokler.length} nøkler (${s.navn}) til ${person.navn}, skjema ${u.nr}`, undefined, eid); reload(); skrivUtkvittering(u, s, eid); } });
+        const u = r.data as Utk; loggHendelse(`Utkvitterte ${u.data.nokler.length} nøkler (${s.navn}) til ${person.navn}, skjema ${u.nr}`, undefined, eid); reload(); skrivUtkvittering(u, s, eid); toast(tt("Last opp det signerte skjemaet under «Utkvitteringer» når det er signert")); } });
   };
 
   const leverInn = (keys: Nok[]) => { if (!keys.length) return toast(tt("Velg nøklene som leveres tilbake"));
@@ -131,10 +160,13 @@ export function NoeklerView() {
     if (n.status === 'ute') { const r = await sb.rpc('nokkel_avslutt', { p_nokler: [n.id], p_status: 'tapt', p_dato: iDag(), p_av: meg(), p_merknad: '' }); if (r.error) return toast(r.error.message); loggHendelse(`Nøkkel ${nokNavn(n, d!.typ)} meldt tapt (hos ${n.data.innehaver?.navn || '?'})`, undefined, eid); return reload(); }
     const x = await sb.from('nokler').update({ status: st, data: { ...n.data, logg: logg(n, st === 'tapt' ? 'Meldt tapt' : 'Kassert') } }).eq('id', n.id).eq('status', 'inne'); if (x.error) return toast(x.error.message); loggHendelse(`Nøkkel ${nokNavn(n, d!.typ)} markert ${st}`, undefined, eid); reload(); };
   const gjenopprett = async (n: Nok) => { const x = await sb.from('nokler').update({ status: 'inne', data: { ...n.data, innehaver: undefined, logg: logg(n, n.status === 'tapt' ? 'Funnet – tilbake på lager' : 'Tatt i bruk igjen') } }).eq('id', n.id).in('status', ['tapt', 'kassert']); if (x.error) return toast(x.error.message); reload(); };
-  const historikk = (n: Nok) => textModal(tt("Historikk – {0}", nokNavn(n, d!.typ)), (n.data.logg || []).slice().reverse().map(l => `${dNo(l.dato)} ${l.dato.slice(11, 16)}  ${l.tekst}${l.av ? ' (' + l.av + ')' : ''}`).join('\n') || '–');
+  const historikk = (n: Nok) => showModal(tt("Historikk – {0}", nokNavn(n, d!.typ)), () => { const U = d!.utk.filter(u => u.data.nokler.some(k => k.id === n.id));
+    return <div><h3 style={{ marginTop: 0 }}>{tt("Utkvitteringsskjemaer for nøkkelen")}</h3>
+      {U.length ? <div className="tbl-wrap"><table><tbody>{U.map(u => { const k = u.data.nokler.find(x => x.id === n.id)!; return <tr key={u.id}><td><b>{tt("Skjema")} {u.nr}</b></td><td>{u.data.person.navn}<br /><span className="small muted">{u.data.person.firma}</span></td><td className="small">{dNo(u.data.dato)} – {k.retur ? dNo(k.retur.dato) + (k.retur.tapt ? ' (' + tt("tapt") + ')' : '') : tt("ute nå")}</td><td>{signertVis(u, true)}</td><td><button className="btn sm" onClick={() => skrivUtkvittering(u, sysAv(u.system_id), eid)}>{tt("Skjema")}</button></td></tr>; })}</tbody></table></div> : <p className="muted">{tt("Nøkkelen har ikke vært utkvittert.")}</p>}
+      <h3>{tt("Logg")}</h3><pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: 0 }}>{(n.data.logg || []).slice().reverse().map(l => `${dNo(l.dato)} ${l.dato.slice(11, 16)}  ${l.tekst}${l.av ? ' (' + l.av + ')' : ''}`).join('\n') || '–'}</pre></div>; }, { wide: true });
 
   const nokRad = (n: Nok) => <tr key={n.id}><td><b>{nokNavn(n, d!.typ)}</b></td><td><span className={'chip ' + ({ inne: 'green', ute: 'amber', tapt: 'red', kassert: '' } as any)[n.status]}>{tt(({ inne: 'På lager', ute: 'Utkvittert', tapt: 'Tapt', kassert: 'Kassert' } as any)[n.status])}</span></td>
-    <td className="small">{n.data.innehaver ? <>{n.data.innehaver.navn}{n.data.innehaver.firma ? ' · ' + n.data.innehaver.firma : ''}<br /><span className="muted">{tt("siden")} {dNo(n.data.dato)} · {tt("skjema")} {n.data.utkvNr}</span>{forfalt(n) && <> <span className="chip red">{tt("Retur forfalt {0}", dNo(n.data.forventetRetur))}</span></>}</> : n.status === 'tapt' && n.data.sistHos ? <span className="muted">{tt("Sist hos {0}", n.data.sistHos.navn)}</span> : n.data.merknad ? <span className="muted">{n.data.merknad}</span> : ''}</td>
+    <td className="small">{n.data.innehaver ? <>{n.data.innehaver.navn}{n.data.innehaver.firma ? ' · ' + n.data.innehaver.firma : ''}<br /><span className="muted">{tt("siden")} {dNo(n.data.dato)} · {tt("skjema")} {n.data.utkvNr}</span> {signertVis(utkAv(n.data.utkvitteringId), true)}{forfalt(n) && <> <span className="chip red">{tt("Retur forfalt {0}", dNo(n.data.forventetRetur))}</span></>}</> : n.status === 'tapt' && n.data.sistHos ? <span className="muted">{tt("Sist hos {0}", n.data.sistHos.navn)}</span> : n.data.merknad ? <span className="muted">{n.data.merknad}</span> : ''}</td>
     <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{n.status === 'ute' && <button className="btn sm" onClick={() => leverInn([n])}>{tt("Lever inn")}</button>} {n.status === 'inne' && <><button className="btn sm" onClick={() => utkvitter(sysAv(n.system_id)!, [n.id])}>{tt("Utkvitter")}</button> <button className="btn sm" onClick={() => markerTapt(n, 'kassert')}>{tt("Kasser")}</button></>} {(n.status === 'ute' || n.status === 'inne') && <button className="btn sm" onClick={() => markerTapt(n, 'tapt')}>{tt("Tapt")}</button>} {(n.status === 'tapt' || n.status === 'kassert') && <button className="btn sm" onClick={() => gjenopprett(n)}>{tt("Gjenopprett")}</button>} <button className="btn sm ghost" onClick={() => historikk(n)}>{tt("Historikk")}</button></td></tr>;
 
   const sysKort = (s: Sys) => { const T = sortBy(d!.typ.filter(t => t.system_id === s.id), t => t.kode); const N = d!.nok.filter(n => n.system_id === s.id); const vis = vf[s.id]?.vis || '', filt = vf[s.id]?.filt || ''; const setVis = (x: string) => setVf(o => ({ ...o, [s.id]: { ...o[s.id], vis: x } })); const setFilt = (x: string) => setVf(o => ({ ...o, [s.id]: { ...o[s.id], filt: x } }));
@@ -155,15 +187,15 @@ export function NoeklerView() {
 
   return <div>
     <div className="head"><div className="grow"><h1>{tt("Nøkler")}</h1><p className="sub">{tt("Nøkkelsystemer, låsplan og hvem som har hvilke nøkler")}</p></div>{E.length > 1 && <select value={eid} onChange={x => setEid(x.target.value)}>{E.map(x => <option key={x.id} value={x.id}>{x.navn}</option>)}</select>}</div>
-    <p><button className={'btn' + (fane === 'sys' ? ' pri' : '')} onClick={() => setFane('sys')}>{tt("Nøkkelsystemer")}</button> <button className={'btn' + (fane === 'hvem' ? ' pri' : '')} onClick={() => setFane('hvem')}>{tt("Hvem har nøkler")} ({ute.length}){ute.some(forfalt) && <span className="chip red" style={{ marginLeft: 6 }}>{ute.filter(forfalt).length} {tt("forfalt")}</span>}</button> <button className={'btn' + (fane === 'utk' ? ' pri' : '')} onClick={() => setFane('utk')}>{tt("Utkvitteringer")}</button></p>
+    <p><button className={'btn' + (fane === 'sys' ? ' pri' : '')} onClick={() => setFane('sys')}>{tt("Nøkkelsystemer")}</button> <button className={'btn' + (fane === 'hvem' ? ' pri' : '')} onClick={() => setFane('hvem')}>{tt("Hvem har nøkler")} ({ute.length}){ute.some(forfalt) && <span className="chip red" style={{ marginLeft: 6 }}>{ute.filter(forfalt).length} {tt("forfalt")}</span>}</button> <button className={'btn' + (fane === 'utk' ? ' pri' : '')} onClick={() => setFane('utk')}>{tt("Utkvitteringer")}</button> <button className="btn" onClick={leietakerRapport} disabled={!d}>{tt("Nøkkelrapport per leietaker")}</button></p>
     {!d ? <p className="muted">{tt("Laster …")}</p> : fane === 'sys' ? <>{d.sys.map(sysKort)}{!d.sys.length && <p className="muted">{tt("Ingen nøkkelsystemer ennå. Opprett det første, for eksempel «1SL 1058».")}</p>}<button className="btn pri" onClick={() => redigerSys()}>{tt("+ Nytt nøkkelsystem")}</button></>
       : fane === 'hvem' ? <>
         <p><input placeholder={tt("Søk på person, firma eller nøkkel …")} value={sok} onChange={x => setSok(x.target.value)} style={{ minWidth: 280 }} /></p>
         {grupper.map(([k, l]) => { const p = l[0].data.innehaver || { navn: '?' }; return <div className="card" key={k} style={{ marginBottom: 10 }}><div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><b>{p.navn}</b><span className="small muted">{[p.firma, p.tlf, p.epost].filter(Boolean).join(' · ')}</span><span className="grow" /><button className="btn sm pri" onClick={() => leverInn(l)}>{tt("Lever inn alle")} ({l.length})</button></div>
-          <div className="tbl-wrap"><table><tbody>{sortBy(l, n => nokNavn(n, d.typ)).map(n => <tr key={n.id}><td><b>{nokNavn(n, d.typ)}</b></td><td className="small">{sysAv(n.system_id)?.navn}</td><td className="small">{tt("siden")} {dNo(n.data.dato)} · {tt("skjema")} {n.data.utkvNr}{forfalt(n) && <> <span className="chip red">{tt("Retur forfalt {0}", dNo(n.data.forventetRetur))}</span></>}</td><td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}><button className="btn sm" onClick={() => markerTapt(n, 'tapt')}>{tt("Tapt")}</button> <button className="btn sm" onClick={() => leverInn([n])}>{tt("Lever inn")}</button></td></tr>)}</tbody></table></div></div>; })}
+          <div className="tbl-wrap"><table><tbody>{sortBy(l, n => nokNavn(n, d.typ)).map(n => <tr key={n.id}><td><b>{nokNavn(n, d.typ)}</b></td><td className="small">{sysAv(n.system_id)?.navn}</td><td className="small">{tt("siden")} {dNo(n.data.dato)} · {tt("skjema")} {n.data.utkvNr}{forfalt(n) && <> <span className="chip red">{tt("Retur forfalt {0}", dNo(n.data.forventetRetur))}</span></>}</td><td>{signertVis(utkAv(n.data.utkvitteringId), true)}</td><td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}><button className="btn sm" onClick={() => markerTapt(n, 'tapt')}>{tt("Tapt")}</button> <button className="btn sm" onClick={() => leverInn([n])}>{tt("Lever inn")}</button></td></tr>)}</tbody></table></div></div>; })}
         {!grupper.length && <p className="muted">{ute.length ? tt("Ingen treff.") : tt("Ingen nøkler er utkvittert.")}</p>}</>
-      : <><p><input placeholder={tt("Søk på skjemanr, person, firma eller nøkkel …")} value={sok} onChange={x => setSok(x.target.value)} style={{ minWidth: 280 }} /></p><div className="tbl-wrap"><table><thead><tr><th>{tt("Skjema")}</th><th>{tt("Dato")}</th><th>{tt("Mottaker")}</th><th>{tt("Nøkler")}</th><th>{tt("Status")}</th><th /></tr></thead><tbody>{d.utk.filter(u => !sokL || String(u.nr) === sokL || JSON.stringify(u.data.person).toLowerCase().includes(sokL) || u.data.nokler.some(k => `${k.type} ${k.lopenr}`.toLowerCase().includes(sokL))).map(u => { const igjen = u.data.nokler.filter(k => !k.retur).length; return <tr key={u.id}><td><b>{u.nr}</b></td><td>{dNo(u.data.dato)}</td><td>{u.data.person.navn}<br /><span className="small muted">{u.data.person.firma}</span></td><td className="small">{u.data.systemNavn}: {u.data.nokler.map(k => `${k.type} ${k.lopenr}`).join(', ')}</td><td>{igjen ? <span className="chip amber">{igjen} {tt("ute")}</span> : u.data.nokler.some(k => k.retur?.tapt) ? <span className="chip">{tt("Avsluttet – {0} tapt", u.data.nokler.filter(k => k.retur?.tapt).length)}</span> : <span className="chip green">{tt("Alle levert")}</span>}</td>
-        <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" onClick={() => skrivUtkvittering(u, sysAv(u.system_id), eid)}>{tt("Skriv ut skjema")}</button></td></tr>; })}{!d.utk.length && <tr><td colSpan={6} className="muted">{tt("Ingen utkvitteringer ennå.")}</td></tr>}</tbody></table></div></>}
+      : <><p><input placeholder={tt("Søk på skjemanr, person, firma eller nøkkel …")} value={sok} onChange={x => setSok(x.target.value)} style={{ minWidth: 280 }} /></p><div className="tbl-wrap"><table><thead><tr><th>{tt("Skjema")}</th><th>{tt("Dato")}</th><th>{tt("Mottaker")}</th><th>{tt("Nøkler")}</th><th>{tt("Status")}</th><th>{tt("Signert skjema")}</th><th /></tr></thead><tbody>{d.utk.filter(u => !sokL || String(u.nr) === sokL || JSON.stringify(u.data.person).toLowerCase().includes(sokL) || u.data.nokler.some(k => `${k.type} ${k.lopenr}`.toLowerCase().includes(sokL))).map(u => { const igjen = u.data.nokler.filter(k => !k.retur).length; return <tr key={u.id}><td><b>{u.nr}</b></td><td>{dNo(u.data.dato)}</td><td>{u.data.person.navn}<br /><span className="small muted">{u.data.person.firma}</span></td><td className="small">{u.data.systemNavn}: {u.data.nokler.map(k => `${k.type} ${k.lopenr}`).join(', ')}</td><td>{igjen ? <span className="chip amber">{igjen} {tt("ute")}</span> : u.data.nokler.some(k => k.retur?.tapt) ? <span className="chip">{tt("Avsluttet – {0} tapt", u.data.nokler.filter(k => k.retur?.tapt).length)}</span> : <span className="chip green">{tt("Alle levert")}</span>}</td><td>{signertVis(u)}</td>
+        <td style={{ whiteSpace: 'nowrap' }}><button className="btn sm" onClick={() => skrivUtkvittering(u, sysAv(u.system_id), eid)}>{tt("Skriv ut skjema")}</button></td></tr>; })}{!d.utk.length && <tr><td colSpan={7} className="muted">{tt("Ingen utkvitteringer ennå.")}</td></tr>}</tbody></table></div></>}
   </div>;
 }
 
@@ -181,5 +213,68 @@ function Laasplan({ s, T, onSaved }: { s: Sys; T: Typ[]; onSaved: () => void }) 
     <p><button className="btn sm" onClick={() => setRader(r => [...r, { id: lagId(), navn: '', sted: '', typer: [] }])}>{tt("+ Ny sylinder")}</button></p>
     <details><summary className="small" style={{ cursor: 'pointer' }}>{tt("Lim inn flere sylindere")}</summary><p className="small muted">{tt("Én per linje: navn;sted. Kryss av nøkkeltyper etterpå.")}</p><textarea value={lim} onChange={e => setLim(e.target.value)} rows={5} style={{ width: '100%' }} /><p><button className="btn sm" disabled={!lim.trim()} onClick={importer}>{tt("Legg til")}</button></p></details>
     <p style={{ textAlign: 'right' }}><button className="btn pri" disabled={busy} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre låsplan")}</button></p>
+  </div>;
+}
+
+// ---------- Nøkkelrapport per leietaker (PDF med signerte utkvitteringsskjemaer som vedlegg)
+type Data = { sys: Sys[]; typ: Typ[]; nok: Nok[]; utk: Utk[] };
+type Mottaker = { id: string; navn: string; firma?: boolean };
+const matcher = (m: Mottaker) => (u: Utk) => m.firma ? !u.data.person.leietakerId && (u.data.person.firma || '').trim().toLowerCase() === m.navn.toLowerCase() : gjelderLeietaker(u, m);
+
+async function nokkelRapportPdf(eid: string, m: Mottaker, d: Data, medHist: boolean, medVedlegg: boolean) {
+  const { ArkivDoc } = await import('../lib/prosjektArkiv'); const { profilFor, M } = await import('../lib/arealRapport'); const { PDFDocument } = await import('pdf-lib');
+  const e = byId('eiendommer', eid); const U = sortBy(d.utk.filter(matcher(m)), u => u.nr); const aktive = U.filter(u => u.data.nokler.some(k => !k.retur)); const ids = new Set(U.map(u => u.id));
+  const ute = sortBy(d.nok.filter(n => n.status === 'ute' && ids.has(n.data.utkvitteringId || '')), n => nokNavn(n, d.typ).padEnd(8) + String(n.lopenr).padStart(6, '0'));
+  const relevante = medHist ? U : aktive; const mangler = relevante.filter(u => !(u.data.signert || []).length);
+  const perType = new Map<string, number>(); ute.forEach(n => { const k = d.typ.find(t => t.id === n.type_id)?.kode || '?'; perType.set(k, (perType.get(k) || 0) + 1); });
+  const D: any = await ArkivDoc.lag(`${tt("Nøkkeloversikt")} – ${m.navn}`); D.profil = profilFor(eid, tt("Nøkkeloversikt"));
+  D.h1(tt("Nøkler utlevert til {0}", m.navn));
+  D.kv([[tt("Leietaker"), m.navn], [tt("Eiendom"), e?.navn || ''], [tt("Dato"), dNo(iDag())], [tt("Nøkler utlevert nå"), String(ute.length)],
+    [tt("Fordelt på nøkkeltype"), [...perType.entries()].sort().map(([k, n]) => `${k}: ${n}`).join(', ')], [tt("Utkvitteringsskjemaer"), String(relevante.length)], [tt("Mangler signert skjema"), mangler.length ? mangler.map(u => tt("nr {0}", u.nr)).join(', ') : tt("Ingen")]]);
+  D.h2(tt("Nøkler som er utlevert nå"));
+  if (ute.length) D.tab([[tt("System"), 1.3], [tt("Type"), 0.7], [tt("Løpenr"), 0.7, true], [tt("Mottaker"), 2], [tt("Utlevert"), 1], [tt("Skjema"), 0.7, true], [tt("Signert"), 0.8]],
+    ute.map(n => { const u = d.utk.find(x => x.id === n.data.utkvitteringId); return { c: [d.sys.find(s => s.id === n.system_id)?.navn || '', d.typ.find(t => t.id === n.type_id)?.kode || '', String(n.lopenr), n.data.innehaver?.navn || '', dNo(n.data.dato), String(n.data.utkvNr || ''), (u?.data.signert || []).length ? tt("Ja") : tt("Mangler")] }; }));
+  else D.tekst(tt("Ingen nøkler er utlevert nå."));
+  if (medHist) { const H = U.flatMap(u => u.data.nokler.filter(k => k.retur).map(k => ({ u, k })));
+    D.h2(tt("Tidligere utlån"));
+    if (H.length) D.tab([[tt("System"), 1.3], [tt("Type"), 0.7], [tt("Løpenr"), 0.7, true], [tt("Mottaker"), 2], [tt("Utlevert"), 1], [tt("Avsluttet"), 1.3], [tt("Skjema"), 0.7, true]],
+      H.map(({ u, k }) => ({ c: [u.data.systemNavn, k.type, String(k.lopenr), u.data.person.navn, dNo(u.data.dato), dNo(k.retur!.dato) + (k.retur!.tapt ? ' (' + tt("tapt") + ')' : ''), String(u.nr)] })));
+    else D.tekst(tt("Ingen tidligere utlån."));
+  }
+  D.h2(tt("Vedlegg: signerte utkvitteringsskjemaer"));
+  if (relevante.length) D.tab([[tt("Skjema"), 0.7, true], [tt("Mottaker"), 2], [tt("Utlevert"), 1], [tt("Nøkler"), 2.4], [tt("Signert skjema"), 1.2]],
+    relevante.map(u => ({ c: [String(u.nr), u.data.person.navn, dNo(u.data.dato), u.data.nokler.map(k => `${k.type} ${k.lopenr}`).join(', '), (u.data.signert || []).length ? (medVedlegg ? tt("Vedlagt") : tt("Ja")) : tt("Mangler")] })));
+  else D.tekst(tt("Ingen utkvitteringer."));
+  if (medVedlegg) for (const u of relevante) for (const f of u.data.signert || []) {
+    try { const buf = await (await fetch(await fileUrl(f.path))).arrayBuffer(); const pdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.navn);
+      if (pdf) { const src = await PDFDocument.load(buf, { ignoreEncryption: true }); (await D.pdf.copyPages(src, src.getPageIndices())).forEach((p: any) => D.pdf.addPage(p)); continue; }
+      const img = /\.png$/i.test(f.navn) || f.type === 'image/png' ? await D.pdf.embedPng(buf) : await D.pdf.embedJpg(buf); const pg = D.nyside(img.width > img.height);
+      D.t(`${tt("Vedlegg")} – ${tt("utkvittering nr {0}", u.nr)} (${u.data.person.navn}, ${dNo(u.data.dato)})`, M, D.y - 10, 10, undefined, true);
+      const W = pg.getWidth() - 2 * M, H = D.y - 26 - 46; const sk = Math.min(W / img.width, H / img.height); pg.drawImage(img, { x: M + (W - img.width * sk) / 2, y: 46 + (H - img.height * sk) / 2, width: img.width * sk, height: img.height * sk });
+    } catch (err) { console.error(err); toast(tt("Kunne ikke legge ved {0}", f.navn)); }
+  }
+  return await D.pdf.save() as Uint8Array;
+}
+
+function LeietakerRapport({ eid, d, close }: { eid: string; d: Data; close: () => void }) {
+  const M0: Mottaker[] = useMemo(() => { const L: Mottaker[] = sortBy(S.leietakere.filter((l: any) => l.eiendomId === eid), (l: any) => l.navn || '').map((l: any) => ({ id: l.id, navn: l.navn || '?' }));
+    const firma = new Set<string>(); d.utk.forEach(u => { const f = (u.data.person.firma || '').trim(); if (f && !u.data.person.leietakerId && !L.some(l => l.navn.toLowerCase() === f.toLowerCase())) firma.add(f); });
+    return [...L, ...[...firma].sort().map(f => ({ id: 'firma:' + f, navn: f, firma: true }))]; }, [eid, d]);
+  const tall = (m: Mottaker) => { const U = d.utk.filter(matcher(m)); const ids = new Set(U.map(u => u.id)); return { ute: d.nok.filter(n => n.status === 'ute' && ids.has(n.data.utkvitteringId || '')).length, skjema: U.filter(u => u.data.nokler.some(k => !k.retur)).length, mangler: U.filter(u => u.data.nokler.some(k => !k.retur) && !(u.data.signert || []).length).length }; };
+  const [vid, setVid] = useState(() => M0.find(m => tall(m).ute > 0)?.id || M0[0]?.id || ''); const [hist, setHist] = useState(false); const [ved, setVed] = useState(true); const [busy, setBusy] = useState(false);
+  const m = M0.find(x => x.id === vid); const t = m ? tall(m) : null;
+  const lag = async () => { if (!m) return; setBusy(true);
+    try { const b = await nokkelRapportPdf(eid, m, d, hist, ved); const u = URL.createObjectURL(new Blob([b as any], { type: 'application/pdf' })); const a = document.createElement('a'); a.href = u; a.download = `Nøkkeloversikt ${m.navn} ${iDag()}.pdf`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 20000);
+      loggHendelse(`Nøkkelrapport for ${m.navn} lastet ned`, undefined, eid); close(); }
+    catch (e: any) { toast(tt("Kunne ikke lage rapporten: ") + (e?.message || e)); }
+    setBusy(false); };
+  if (!M0.length) return <p className="muted">{tt("Ingen leietakere på eiendommen, og ingen utkvitteringer med firmanavn.")}</p>;
+  return <div>
+    <p className="small muted" style={{ marginTop: 0 }}>{tt("Rapporten viser hvilke nøkler leietakeren har kvittert ut, med de signerte utkvitteringsskjemaene som vedlegg.")}</p>
+    <div className="form"><div className="fld"><label htmlFor="nr_lt">{tt("Leietaker")}</label><select id="nr_lt" value={vid} onChange={x => setVid(x.target.value)}>{M0.map(x => { const n = tall(x); return <option key={x.id} value={x.id}>{x.navn}{x.firma ? ' ' + tt("(firma, ikke koblet til leietaker)") : ''} – {n.ute} {tt("nøkler ute")}</option>; })}</select></div></div>
+    {t && <p>{tt("{0} nøkler utlevert nå, på {1} utkvitteringsskjemaer.", t.ute, t.skjema)} {t.mangler > 0 && <span className="chip amber">{tt("{0} mangler signert skjema", t.mangler)}</span>}</p>}
+    <label style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '6px 0' }}><input type="checkbox" checked={ved} onChange={x => setVed(x.target.checked)} />{tt("Legg ved signerte utkvitteringsskjemaer")}</label>
+    <label style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '6px 0' }}><input type="checkbox" checked={hist} onChange={x => setHist(x.target.checked)} />{tt("Ta med tidligere utlån (levert tilbake eller tapt)")}</label>
+    <p style={{ textAlign: 'right', marginBottom: 0 }}><button className="btn" onClick={close}>{tt("Avbryt")}</button> <button className="btn pri" disabled={busy || !m} onClick={lag}>{busy ? tt("Lager rapport …") : tt("Last ned PDF")}</button></p>
   </div>;
 }
