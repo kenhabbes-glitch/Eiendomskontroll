@@ -80,7 +80,7 @@ export function PersonvernNotat({ org }: { org: string }) {
       <h2>4. Formål og behandlingsgrunnlag (slik vi har vurdert det)</h2>
       <T hode={['Formål', 'Grunnlag vi har lagt til grunn']} rader={[
         ['Gi brukere tilgang og styre hva den enkelte kan se og endre', 'Art. 6 nr. 1 b (avtale med kunden/brukeren) og f (berettiget interesse i sikker tilgangsstyring)'],
-        ['Dokumentere kontroller, service og vedlikehold som kreves etter forskrift om brannforebygging, internkontrollforskriften, el-tilsyn, heisforskrift, FDV-krav m.m.', 'Art. 6 nr. 1 c (rettslig forpliktelse) for eier/virksomhet, supplert med f'],
+        ['Dokumentere kontroller, service og vedlikehold som kreves etter forskrift om brannforebygging, internkontrollforskriften, el-tilsyn, TEK17 (heis), FDV-krav m.m.', 'Art. 6 nr. 1 c (rettslig forpliktelse) for eier/virksomhet, supplert med f'],
         ['Sende arbeidsordre og kontrolloppdrag til serviceselskap og ta imot utkvittering', 'Art. 6 nr. 1 b (oppdragsavtale) og f'],
         ['Følge opp leietakers plikter etter leiekontrakten (internkontroll, brannvern)', 'Art. 6 nr. 1 b (leieavtale) og c'],
         ['Hendelseslogg (hvem gjorde hva, når)', 'Art. 6 nr. 1 f (sporbarhet og dokumentasjon) og c'],

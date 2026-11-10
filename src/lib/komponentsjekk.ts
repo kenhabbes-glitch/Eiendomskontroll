@@ -87,7 +87,7 @@ export const STD_SYSTEMMALER: SjekkMal[] = [
     'Pumpen starter og stopper riktig (test med nivåvippe/sensor)', 'Nivåvippe/sensor beveger seg fritt', 'Høynivåalarm testet – varsel mottatt',
     'Ingen unormal lyd eller vibrasjon', 'Pumpekum fri for slam og rusk', 'Tilbakeslagsventil tett', 'Strømforsyning og jordfeilbryter i orden'], [
     'Pumpekum tømt og rengjort', 'Reservepumpe/alternering testet', 'Pumpe og løpehjul inspisert', 'Alarmoverføring til mottak testet']),
-  sm('s_heis', 'Heis', ['heis', 'loft'], 'Eiers egenkontroll. Periodisk kontroll av akkreditert kontrollorgan etter heisforskriften.', [
+  sm('s_heis', 'Heis', ['heis', 'loft'], 'Eiers egenkontroll. Sikkerhetskontroll av godkjent kontrollorgan minst hvert annet år (TEK17 § 16-1).', [
     'Heisen går normalt og stopper i nivå med etasjene', 'Dører åpner og lukker uten slag – dørkant/lysgardin reverserer', 'Nødtelefon/alarmknapp testet – svar fra mottak',
     'Nødlys i heisstol fungerer', 'Belysning, knapper og display virker', 'Ingen skader i stol eller på dører', 'Maskinrom/sjakttopp låst, ryddig og uten lekkasje',
     'Kontrollskilt og driftsinstruks synlig'], [
