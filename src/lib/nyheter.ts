@@ -1,6 +1,12 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-18', dato: '2026-11-18', tittel: 'Brannbok', punkter: [
+    'Ny fane «Brannbok» på eiendommen: samler brannsikkerheten i syv–åtte kapitler (ansvar, bygg, installasjoner, kontroll, avvik, leietakere, fyring, årlig gjennomgang) fra data som allerede finnes. Hvert kapittel får status «I orden», «Følg opp» eller «Mangler».',
+    'Del brannboken med brannvesenet via en lenke uten innlogging. Lenken har utløpsdato, kan sendes på e-post og trekkes tilbake. Du ser når den er åpnet.',
+    'Brannvesenet kan legge inn merknader under hvert kapittel eller samlet nederst. Du får e-post, kan svare og lukke merknadene, og svarene vises for mottakeren.',
+    'Brannboken kan lastes ned som PDF med statusside, alle kapitler og dokumentene som vedlegg. Registrer årlig gjennomgang direkte i fanen.',
+  ] },
   { id: '2026-11-17', dato: '2026-11-17', tittel: 'Signerte nøkkelskjemaer og nøkkelrapport', punkter: [
     'Last opp det signerte utkvitteringsskjemaet (PDF eller bilde fra mobilen). Det lagres på utkvitteringen og vises på hver nøkkel og i nøkkelens historikk.',
     'Ny «Nøkkelrapport per leietaker»: PDF med alle nøkler leietakeren har ute, fordelt på type, med de signerte skjemaene som vedlegg. Velg leietaker ved utkvittering, så kobles nøklene til leietakeren.',

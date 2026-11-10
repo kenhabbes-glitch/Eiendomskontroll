@@ -16,6 +16,7 @@ import { autoTfm, editAnlegg, editAvvik, editDok, editEiendom, editKomponent, ed
 import { AvvikTable, CoverageTable, DokTable, LeieTable, ServiceavtaleTable, TaskTable, TfmTree } from '../components/tables';
 import { Chip, DueChip, Empty } from '../components/ui';
 import { ArealSection } from './Arealer';
+import { BrannbokSeksjon } from './Brannbok';
 import { BrannvernSection, bvStatus, mangelAnsvarlig, aktiveMidl } from '../lib/brannvern';
 import { kartUrl, seEiendomUrl, enhetStatus } from '../lib/oppslag';
 import { tt } from '../lib/i18n';
@@ -58,6 +59,7 @@ export function Eiendom({ id }: { id: string }) {
   const T = S.oppgaver.filter(o => o.eiendomId === id); const A = S.avvik.filter(a => a.eiendomId === id); const D = S.dokumenter.filter(d => d.eiendomId === id); const AN = S.anlegg.filter(a => a.eiendomId === id); const L = S.leietakere.filter(l => l.eiendomId === id);
   const tabs: [string, string, number | ''][] = [['info', 'Oversikt', ''], ['anlegg', 'Systemer og komponenter (TFM)', AN.length], ['kontroll', 'Kontrollplan', T.filter(o => o.aktiv !== false).length], ['avvik', 'Avvik', A.filter(a => !AV_LUKKET.includes(a.status)).length], ['dok', 'Dokumenter', D.length]];
   if (harModul('brannvern', id)) tabs.push(['brann', 'Brannvern', ed ? L.filter(l => bvStatus(l).o >= 1 || mangelAnsvarlig(l)).length + aktiveMidl(e).length || '' : aktiveMidl(e).length || '']);
+  if (harModul('brannvern', id)) tabs.push(['brannbok', 'Brannbok', '']);
   if (ed) tabs.push(['leie', 'Leietakere', L.length]);
   tabs.push(['areal', 'Tegninger og arealer', S.tegninger.filter(t => t.eiendomId === id).length]);
   if (harModul('befaring', id) && kanDrifteE(id)) tabs.push(['bef', 'Befaringer', S.befaringer.filter(b => b.eiendomId === id).length]);
@@ -90,6 +92,7 @@ export function Eiendom({ id }: { id: string }) {
   if (cur === 'leie') c = <><div className="toolbar"><button className="btn pri" onClick={() => editLeietaker(undefined, { eiendomId: id })}>{tt("+ Leietaker")}</button></div><LeieTable list={L} showE={false} /></>;
   if (cur === 'areal') c = <ArealSection eid={id} />;
   if (cur === 'brann') c = <BrannvernSection eid={id} />;
+  if (cur === 'brannbok') c = <BrannbokSeksjon eid={id} />;
   if (cur === 'bef') c = <><div className="toolbar"><button className="btn pri" onClick={() => nyBefaringDialog({ eiendomId: id })}>{tt("+ Ny befaring")}</button></div><Befaringer eiendomId={id} kompakt /></>;
   return <>
     <p className="small" style={{ margin: '0 0 6px' }}><a href="#/eiendommer">{tt("← Eiendommer")}</a></p>

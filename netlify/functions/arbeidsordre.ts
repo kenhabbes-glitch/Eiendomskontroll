@@ -346,6 +346,60 @@ const handler = async (req: Request) => {
   const ltLogg = (p: any, l: any, tekst: string) => admin.from('hendelseslogg').insert({ bruker_id: p?.id || null, bruker: p ? (p.navn || p.epost) : 'System', tabell: 'hendelse', rad_id: l.id, eiendom_id: l.eiendom_id, handling: 'sjekkliste', tekst });
 
   // Eier/forvalter sender sjekklisten til leietaker på e-post (lenke til portalen, evt. med registrering)
+  // ---------- Brannbok delt med brannvesenet (lenke uten innlogging, bare lesing + merknader)
+  if (['bb_hent', 'bb_fil', 'bb_merknad'].includes(body.action)) {
+    const tok = String(body.token || ''); if (tok.length < 20) return json(404, { error: 'Ugyldig lenke' });
+    const { data: L } = await admin.from('brannbok_lenker').select('*').eq('token', tok).maybeSingle();
+    const d = L?.data || {}; const idag = new Date().toISOString().slice(0, 10);
+    if (!L || d.trukket) return json(404, { error: 'Lenken finnes ikke eller er trukket tilbake' });
+    if (d.utloper && String(d.utloper) < idag) return json(410, { error: 'Lenken er utløpt. Be eier om en ny lenke.' });
+    const inn = d.innhold || {};
+    if (body.action === 'bb_hent') {
+      await admin.from('brannbok_lenker').update({ data: { ...d, apnet: [...(d.apnet || []), { tid: new Date().toISOString() }].slice(-100) } }).eq('id', L.id);
+      const { data: M } = await admin.from('brannbok_merknader').select('id, seksjon, data, created_at').eq('lenke_id', L.id).order('created_at');
+      return json(200, { innhold: inn, lenke: { til: d.til || '', utloper: d.utloper || '', merknader: d.merknader !== false, oppdatert: d.oppdatert || L.created_at, pdf: d.pdfPath || '' }, merknader: (M || []).map((m: any) => ({ id: m.id, seksjon: m.seksjon, tid: m.created_at, tekst: m.data?.tekst, navn: m.data?.navn, etat: m.data?.etat, status: m.data?.status || 'ny', svar: m.data?.svar, svarAv: m.data?.svarAv, svarTid: m.data?.svarTid })) });
+    }
+    if (body.action === 'bb_fil') {
+      const path = String(body.path || ''); const lov = new Set([d.pdfPath, ...((inn.vedlegg || []).map((v: any) => v.path))].filter(Boolean));
+      if (!lov.has(path)) return json(403, { error: 'Filen er ikke en del av brannboken' });
+      const { data: u, error } = await admin.storage.from('filer').createSignedUrl(path, 600); if (error || !u) return json(404, { error: 'Fant ikke filen' });
+      return json(200, { url: u.signedUrl });
+    }
+    // bb_merknad
+    if (d.merknader === false) return json(403, { error: 'Merknader er ikke slått på for denne lenken' });
+    const tekst = String(body.tekst || '').trim().slice(0, 5000); const navn = String(body.navn || '').trim().slice(0, 120); const etat = String(body.etat || '').trim().slice(0, 160);
+    const seksjon = String(body.seksjon || 'samlet'); const sek = (inn.sek || []).find((x: any) => x.key === seksjon);
+    if (!tekst || !navn) return json(400, { error: 'Skriv inn navn og merknad' });
+    if (seksjon !== 'samlet' && !sek) return json(400, { error: 'Ukjent seksjon' });
+    const { count } = await admin.from('brannbok_merknader').select('id', { count: 'exact', head: true }).eq('lenke_id', L.id); if ((count || 0) >= 300) return json(429, { error: 'Grensen for antall merknader på lenken er nådd' });
+    const epost = String(body.epost || '').trim().slice(0, 160);
+    const { data: m, error } = await admin.from('brannbok_merknader').insert({ eiendom_id: L.eiendom_id, lenke_id: L.id, seksjon, data: { tekst, navn, etat, epost, status: 'ny' } }).select().single();
+    if (error) return json(500, { error: error.message });
+    const hvor = seksjon === 'samlet' ? 'samlet merknad' : `«${sek?.tittel || seksjon}»`;
+    await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: `${navn}${etat ? ' (' + etat + ')' : ''}`, tabell: 'hendelse', rad_id: L.id, eiendom_id: L.eiendom_id, handling: 'brannbok', tekst: `Merknad på brannboken (${hvor}): ${tekst.slice(0, 300)}` });
+    if (d.opprettetAvEpost) { try { const en = inn.eiendom?.navn || ''; await sendEpost(d.opprettetAvEpost, `Ny merknad på brannboken${en ? ' – ' + en : ''}`, `<div style="font-family:Arial,sans-serif;font-size:14px"><p><b>${esc(navn)}</b>${etat ? ' (' + esc(etat) + ')' : ''} har lagt inn en merknad på brannboken${en ? ' for ' + esc(en) : ''} (${esc(hvor)}):</p><blockquote style="border-left:3px solid #C9A66B;margin:0;padding:6px 12px">${esc(tekst).replace(/\n/g, '<br>')}</blockquote><p style="font-size:12px;color:#566170">Svar på merknaden i appen under Brannbok.</p></div>`, `${navn}${etat ? ' (' + etat + ')' : ''} har lagt inn en merknad på brannboken (${hvor}):\n\n${tekst}`, undefined, undefined, await oppsettFor(L.eiendom_id, null)); } catch { /* varsling er ikke kritisk */ } }
+    return json(200, { ok: true, merknad: { id: m.id, seksjon, tid: m.created_at, tekst, navn, etat, status: 'ny' } });
+  }
+  if (body.action === 'bb_send') {
+    const p = await hvem(); if (!p) return json(401, { error: 'Ikke innlogget' });
+    const { data: L } = await admin.from('brannbok_lenker').select('*').eq('id', String(body.lenke_id || '')).maybeSingle(); if (!L) return json(404, { error: 'Fant ikke lenken' });
+    if (!(await harEiendom(p, L.eiendom_id))) return json(403, { error: 'Du har ikke tilgang til eiendommen' });
+    const til = String(body.epost || '').trim().toLowerCase(); if (!/^\S+@\S+\.\S+$/.test(til)) return json(400, { error: 'Ugyldig e-postadresse' });
+    const base = typeof body.lenkeBase === 'string' && /^https?:\/\//.test(body.lenkeBase) ? body.lenkeBase.replace(/\/+$/, '') : '';
+    const d = L.data || {}; const en = d.innhold?.eiendom?.navn || ''; const lenke = `${base}/#/bb/${L.token}`; const avs = p.navn || p.epost;
+    const utl = d.utloper ? String(d.utloper).split('-').reverse().join('.') : '';
+    const melding = String(body.melding || '').slice(0, 4000) || `Vedlagt lenke til brannboken for ${en || 'bygget'} til gjennomgang.`;
+    const emne = `Brannbok${en ? ' – ' + en : ''}`;
+    const tekst = ['Hei,', '', melding, '', `Åpne brannboken: ${lenke}`, utl ? `Lenken gjelder til ${utl}.` : '', d.merknader !== false ? 'Dere kan legge inn merknader per kapittel eller samlet nederst i brannboken.' : '', '', `Hilsen ${avs}`].filter(x => x !== '').join('\n');
+    const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1A1F2B"><div style="background:#1E4D57;color:#fff;padding:14px 18px;border-bottom:3px solid #C9A66B"><div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#CFE0E3">Brannbok</div><div style="font-size:18px;font-weight:bold">${esc(en)}</div></div>
+      <div style="padding:16px 4px"><p>Hei,</p><p>${esc(melding).replace(/\n/g, '<br>')}</p><p style="margin:20px 0"><a href="${esc(lenke)}" style="background:#1E4D57;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block">Åpne brannboken</a></p>
+      <p style="font-size:12px;color:#566170">${utl ? `Lenken gjelder til ${esc(utl)}. ` : ''}${d.merknader !== false ? 'Dere kan legge inn merknader per kapittel eller samlet nederst. ' : ''}Ingen innlogging er nødvendig.</p><p style="font-size:12px;color:#566170">Sendt av ${esc(avs)}.</p></div></div>`;
+    const r = await sendEpost(til, emne, html, tekst, undefined, p.epost || undefined, await oppsettFor(L.eiendom_id, await minOrg(p)));
+    await admin.from('brannbok_lenker').update({ data: { ...d, sendt: [...(d.sendt || []), { tid: new Date().toISOString(), til, av: avs, sendt: !!r.sendt }] } }).eq('id', L.id);
+    await admin.from('hendelseslogg').insert({ bruker_id: p.id, bruker: avs, tabell: 'hendelse', rad_id: L.id, eiendom_id: L.eiendom_id, handling: 'brannbok', tekst: `Lenke til brannboken ${r.sendt ? 'sendt' : 'klargjort'} til ${til}` });
+    return json(200, { ...r, til, emne, tekst, lenke });
+  }
+
   // Nøkkelkvittering sendt på nytt (f.eks. når mottakeren har mistet skjemaet). Vedleggene lages i nettleseren.
   if (body.action === 'nokkel_send') {
     const p = await hvem(); if (!p) return json(401, { error: 'Ikke innlogget' });

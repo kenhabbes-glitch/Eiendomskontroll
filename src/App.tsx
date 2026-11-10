@@ -46,6 +46,7 @@ import { KoLenke } from './views/KontrollAo';
 import { PersonvernTekst } from './components/Personvern';
 import { AoLenke, ArbeidsordreListe, Hendelseslogg, mineAo } from './views/Arbeidsordre';
 import { LtLenke } from './views/Sjekkliste';
+import { BbLenke } from './views/Brannbok';
 import { Befaringer, BefaringSide } from './views/Befaring';
 import { Tilsynsanalyser } from './views/Tilsynsanalyser';
 import { SignerLenke } from './views/SignerLenke';
@@ -129,14 +130,15 @@ export default function App() {
   // Kvitter ut eierkontroller automatisk når alle leietakere har dokumentert (sjekkes når data endres)
   useEffect(() => { if (state.ready && state.me && canEdit()) { const t = setTimeout(() => autoKvitterIK(), 800); return () => clearTimeout(t); } }, [state.version, state.ready]);
   // Purreoversikt ved pålogging (én gang per dag, styres i Innstillinger → Purring på avvik)
-  useEffect(() => { if (state.ready && state.me && !state.mfa && !state.loading && !['ao', 'lt', 'ko', 'pr', 'personvern', 'portal'].includes(r.v)) { const t = setTimeout(() => visPurringVedPalogging(), 1200); return () => clearTimeout(t); } }, [state.ready, state.loading, state.mfa]);
+  useEffect(() => { if (state.ready && state.me && !state.mfa && !state.loading && !['ao', 'lt', 'bb', 'ko', 'pr', 'personvern', 'portal'].includes(r.v)) { const t = setTimeout(() => visPurringVedPalogging(), 1200); return () => clearTimeout(t); } }, [state.ready, state.loading, state.mfa]);
   if (!configured) return <Setup />;
   if (!state.ready) return <div className="login"><div className="card"><p>{tt("Laster …")}</p></div></div>;
-  if (state.mfa && !['ao', 'lt', 'ko', 'pr', 'personvern'].includes(r.v)) return <><MfaSkjerm /><Toast /></>;
+  if (state.mfa && !['ao', 'lt', 'bb', 'ko', 'pr', 'personvern'].includes(r.v)) return <><MfaSkjerm /><Toast /></>;
   if (state.recovery && state.me) return <SetPassword />;
   if (r.v === 'qr' && r.id) return <><QrLenke token={r.id} /><Toast /></>;
   if (r.v === 'ao' && r.id) return <><AoLenke token={r.id} /><Toast /></>;
   if (r.v === 'lt' && r.id) return <><LtLenke token={r.id} /><Toast /></>;
+  if (r.v === 'bb' && r.id) return <><BbLenke token={r.id} /><Toast /></>;
   if (r.v === 'ko' && r.id) return <><KoLenke token={r.id} /><Toast /></>;
   if (r.v === 'pr' && r.id) return <><PrLenke token={r.id} /><ModalHost /><Toast /></>;
   if (r.v === 'sg' && r.id) return <><SignerLenke token={r.id} /><Toast /></>;
