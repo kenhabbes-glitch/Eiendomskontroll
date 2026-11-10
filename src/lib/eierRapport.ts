@@ -19,9 +19,9 @@ export const DOK_GRUNNLAG: Record<string, { h: string; krav: 'lov' | 'tiltak' | 
   'Brannkonsept/brannteknisk dokumentasjon': { h: 'Forskrift om brannforebygging §§ 4–5 – eier skal ha og holde oppdatert dokumentasjon av brannsikkerheten', krav: 'lov' },
   'Branntegninger/rømningsplaner': { h: 'Forskrift om brannforebygging §§ 4–5 – del av den branntekniske dokumentasjonen', krav: 'lov' },
   'FDV-dokumentasjon': { h: 'TEK17 § 4-1 – dokumentasjon for forvaltning, drift og vedlikehold skal foreligge og holdes oppdatert', krav: 'lov' },
-  'Energiattest': { h: 'Energimerkeforskriften – yrkesbygg over 1000 m² skal ha gyldig energiattest synlig oppslått (gyldig i 10 år)', krav: 'lov' },
+  'Energiattest': { h: 'Energimerkeforskriften for bygninger – energiattest ved utleie, salg og nybygg (gyldig i 10 år)', krav: 'lov' },
   'Samsvarserklæring el-anlegg': { h: 'Forskrift om elektriske lavspenningsanlegg § 12 – samsvarserklæring for nye og endrede installasjoner', krav: 'lov' },
-  'Tilstandsrapport': { h: 'Anbefalt (NS 3424) – grunnlag for vedlikeholdsplan; byggverk skal holdes i forsvarlig stand (pbl. § 31-3)', krav: 'anbefalt' },
+  'Tilstandsrapport': { h: 'Anbefalt (NS 3424) – grunnlag for vedlikeholdsplan; byggverk skal holdes i forsvarlig stand (pbl. § 31-1)', krav: 'anbefalt' },
   'Miljøkartlegging (asbest/PCB)': { h: 'TEK17 § 9-7 – påkrevd før rehabilitering og riving', krav: 'tiltak' },
   'Forsikringspolise': { h: 'Forsikringsvilkår / lånevilkår – ikke lovkrav', krav: 'avtale' },
 };

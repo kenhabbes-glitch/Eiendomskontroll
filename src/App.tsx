@@ -36,6 +36,7 @@ import { Vedlikehold } from './views/Vedlikehold';
 import { TfmRegister } from './views/Tfm';
 import { Arealer } from './views/Arealer';
 import { Regelverk } from './views/Regelverk';
+import { Handbok } from './views/Handbok';
 import { HjelpSide } from './views/HjelpSide';
 import { Brukere, DataAdmin } from './views/Brukere';
 import { Portal } from './views/Portal';
@@ -81,6 +82,7 @@ const I: Record<string, string> = {
   arealer: 'M3 3h18v18H3zM3 12h9M12 3v18M12 16h9',
   dokumenter: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M8 13h8M8 17h8',
   vedlikehold: 'M3 3v18h18M7 15l4-4 3 3 5-6',
+  handbok: 'M2 4h6a4 4 0 014 4v13a3 3 0 00-3-3H2zM22 4h-6a4 4 0 00-4 4v13a3 3 0 013-3h7z',
   regelverk: 'M4 19.5A2.5 2.5 0 016.5 17H20V2H6.5A2.5 2.5 0 004 4.5zM4 19.5A2.5 2.5 0 006.5 22H20v-5',
   brukere: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4',
   portal: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z',
@@ -105,7 +107,7 @@ function navFor(): [string, string][] {
   if (S.eiendommer.some(e => kanDrifteE(e.id))) n.push(['nokler', 'Nøkler']);
   if (canEdit() && harModul('vedlikehold')) n.push(['vedlikehold', 'Vedlikeholdsplan']);
   if (canEdit() && harModul('prosjekter')) n.push(['prosjekter', 'Prosjekter']);
-  n.push(['regelverk', 'Regelverk og plikter']);
+  n.push(['handbok', 'Håndbok'], ['regelverk', 'Regelverk og plikter']);
   if (canEdit()) n.push(['innstillinger', 'Innstillinger']);
   if (canEdit()) n.push(['logg', 'Hendelseslogg'], ['arkiv', 'Arkiv']);
   if (isAdmin() || mineOrg(['admin', 'forvalter']).length) n.push(['brukere', 'Organisasjon og tilgang']);
@@ -186,6 +188,7 @@ export default function App() {
     case 'arkiv': body = <Arkiv />; break;
     case 'vedlikehold': body = <Vedlikehold />; break;
     case 'regelverk': body = <Regelverk />; break;
+    case 'handbok': body = <Handbok />; break;
     case 'hjelp': body = <HjelpSide id={r.id} />; break;
     case 'brukere': body = <Brukere />; break;
     case 'data': body = <DataAdmin />; break;
