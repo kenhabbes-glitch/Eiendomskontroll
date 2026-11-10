@@ -1,6 +1,12 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-19', dato: '2026-11-19', tittel: '3D-modell av bygget', punkter: [
+    'Ny fane «3D-modell» på eiendommen. Last opp IFC-filen (.ifc eller .ifczip), så konverteres den til en kompakt modell som du kan snu, zoome og flytte i – også på mobil og nettbrett.',
+    'Vis og skjul etasjer, lag et snitt i valgfri høyde, og klikk på en bygningsdel for å se type, etasje, merke og egenskaper fra IFC-filen. Terreng og omgivelser ligger i en egen gruppe som kan slås på.',
+    'Koble bygningsdeler til systemer i appen (alle dører i en etasje på én gang, om du vil). I Status-visning farges de koblede delene etter kontrollstatus, og du kan gå fra et system til «Vis i 3D».',
+    'Registrer avvik direkte i modellen. Avviket får en markør på stedet og vises i listen.',
+  ] },
   { id: '2026-11-18', dato: '2026-11-18', tittel: 'Brannbok', punkter: [
     'Ny fane «Brannbok» på eiendommen: samler brannsikkerheten i syv–åtte kapitler (ansvar, bygg, installasjoner, kontroll, avvik, leietakere, fyring, årlig gjennomgang) fra data som allerede finnes. Hvert kapittel får status «I orden», «Følg opp» eller «Mangler».',
     'Del brannboken med brannvesenet via en lenke uten innlogging. Lenken har utløpsdato, kan sendes på e-post og trekkes tilbake. Du ser når den er åpnet.',

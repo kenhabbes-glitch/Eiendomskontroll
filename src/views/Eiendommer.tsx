@@ -17,6 +17,7 @@ import { AvvikTable, CoverageTable, DokTable, LeieTable, ServiceavtaleTable, Tas
 import { Chip, DueChip, Empty } from '../components/ui';
 import { ArealSection } from './Arealer';
 import { BrannbokSeksjon } from './Brannbok';
+const ModellSeksjon = React.lazy(() => import('./Modell3D'));
 import { BrannvernSection, bvStatus, mangelAnsvarlig, aktiveMidl } from '../lib/brannvern';
 import { kartUrl, seEiendomUrl, enhetStatus } from '../lib/oppslag';
 import { tt } from '../lib/i18n';
@@ -52,7 +53,8 @@ export function Eiendommer() {
 const tabMem: Record<string, string> = {};
 export function Eiendom({ id }: { id: string }) {
   useStore();
-  const [tab, setTabS] = useState(tabMem.e || 'info'); const setTab = (t: string) => { tabMem.e = t; setTabS(t); };
+  const [tab, setTabS] = useState((() => { try { return sessionStorage.getItem('ek.3dfokus') ? 'modell' : ''; } catch { return ''; } })() || tabMem.e || 'info'); const setTab = (t: string) => { tabMem.e = t; setTabS(t); };
+  React.useEffect(() => { const f = () => setTab('modell'); window.addEventListener('ek3d-fokus', f); return () => window.removeEventListener('ek3d-fokus', f); }, []);
   const [q, setQ] = useState('');
   const e = byId('eiendommer', id); const ed = canEdit();
   if (!e) return <Empty t="Fant ikke eiendommen"><a href="#/eiendommer">{tt("Tilbake")}</a></Empty>;
@@ -61,6 +63,7 @@ export function Eiendom({ id }: { id: string }) {
   if (harModul('brannvern', id)) tabs.push(['brann', 'Brannvern', ed ? L.filter(l => bvStatus(l).o >= 1 || mangelAnsvarlig(l)).length + aktiveMidl(e).length || '' : aktiveMidl(e).length || '']);
   if (harModul('brannvern', id)) tabs.push(['brannbok', 'Brannbok', '']);
   if (ed) tabs.push(['leie', 'Leietakere', L.length]);
+  tabs.push(['modell', '3D-modell', '']);
   tabs.push(['areal', 'Tegninger og arealer', S.tegninger.filter(t => t.eiendomId === id).length]);
   if (harModul('befaring', id) && kanDrifteE(id)) tabs.push(['bef', 'Befaringer', S.befaringer.filter(b => b.eiendomId === id).length]);
   const cur = tabs.some(t => t[0] === tab) ? tab : 'info';
@@ -93,6 +96,7 @@ export function Eiendom({ id }: { id: string }) {
   if (cur === 'areal') c = <ArealSection eid={id} />;
   if (cur === 'brann') c = <BrannvernSection eid={id} />;
   if (cur === 'brannbok') c = <BrannbokSeksjon eid={id} />;
+  if (cur === 'modell') c = <React.Suspense fallback={<div className="card">{tt("Laster …")}</div>}><ModellSeksjon eid={id} /></React.Suspense>;
   if (cur === 'bef') c = <><div className="toolbar"><button className="btn pri" onClick={() => nyBefaringDialog({ eiendomId: id })}>{tt("+ Ny befaring")}</button></div><Befaringer eiendomId={id} kompakt /></>;
   return <>
     <p className="small" style={{ margin: '0 0 6px' }}><a href="#/eiendommer">{tt("← Eiendommer")}</a></p>

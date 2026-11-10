@@ -223,10 +223,13 @@ function PlasseringFelt({ kind, id, eiendomId, close }: { kind: 'a' | 'k'; id?: 
   const o = id ? byId(kind === 'a' ? 'anlegg' : 'komponenter', id) : null; const T = sortBy(S.tegninger.filter(t => t.eiendomId === eiendomId), t => +t.etasje || 0);
   const [tid, setTid] = React.useState(o?.pos?.tegningId || T[0]?.id || '');
   if (!id) return <div className="small muted">{tt("Lagre først – deretter kan du plassere den på en tegning.")}</div>;
+  const n3d = kind === 'a' ? (o?.ifcGuider || []).length : 0;
+  const vis3d = n3d > 0 && <><span className="small">{n3d} {tt("objekter i 3D-modellen")}</span><button type="button" className="btn sm" onClick={() => { try { sessionStorage.setItem('ek.3dfokus', id); } catch { /* ignorer */ } close(); location.hash = '#/eiendom/' + eiendomId; window.dispatchEvent(new Event('ek3d-fokus')); }}>{tt("Vis i 3D")}</button></>;
+  if (!T.length && n3d) return <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>{vis3d}</div>;
   if (!T.length) return <div className="small muted">{tt("Ingen tegninger for eiendommen. Last opp under «Tegninger og arealer».")}</div>;
   const t = o?.pos ? byId('tegninger', o.pos.tegningId) : null;
   return <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-    {t ? <span className="small">{tt("Plassert på")} <b>{t.navn}</b></span> : <span className="small muted">{tt("Ikke plassert")}</span>}
+    {vis3d}{t ? <span className="small">{tt("Plassert på")} <b>{t.navn}</b></span> : <span className="small muted">{tt("Ikke plassert")}</span>}
     {t && <button type="button" className="btn sm" onClick={() => { close(); openPlan(t.id, { mode: 'tfm', focus: id }); }}>{tt("Vis på tegning")}</button>}
     {canEdit() && <>{T.length > 1 && <select value={tid} onChange={e => setTid(e.target.value)} style={{ border: '1px solid var(--line2)', borderRadius: 7, padding: '5px 6px', width: 'auto' }}>{T.map(x => <option key={x.id} value={x.id}>{x.navn}</option>)}</select>}
       <button type="button" className="btn sm" onClick={() => { close(); openPlan(tid, { mode: 'tfm', placeId: id }); }}>{t ? tt("Flytt") : tt("Plasser på tegning")}</button></>}
