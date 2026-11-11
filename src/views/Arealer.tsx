@@ -50,7 +50,7 @@ function loadPdfjs() {
   if (!pdfjsP) pdfjsP = (async () => { const b = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/'; await loadScript(b + 'pdf.min.js'); await loadScript(b + 'pdf.worker.min.js'); const L = (window as any).pdfjsLib; L.GlobalWorkerOptions.workerSrc = b + 'pdf.worker.min.js'; return L; })();
   pdfjsP.catch(() => { pdfjsP = null; }); return pdfjsP;
 }
-async function pdfToImage(file: File, page: number) {
+export async function pdfToImage(file: File, page: number) {
   const L = await loadPdfjs(); const doc = await L.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise;
   const pg = await doc.getPage(Math.min(Math.max(1, +page || 1), doc.numPages)); const v0 = pg.getViewport({ scale: 1 }); const sc = Math.min(5, 5000 / Math.max(v0.width, v0.height)); const v = pg.getViewport({ scale: sc });
   const c = document.createElement('canvas'); c.width = Math.round(v.width); c.height = Math.round(v.height); const ctx = c.getContext('2d')!; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
@@ -58,7 +58,7 @@ async function pdfToImage(file: File, page: number) {
   let blob: Blob = await new Promise(r => c.toBlob(b => r(b!), 'image/png')); if (blob.size > 40e6) blob = await new Promise(r => c.toBlob(b => r(b!), 'image/jpeg', .85));
   return { blob, w: c.width, h: c.height };
 }
-function imgSize(blob: Blob): Promise<{ w: number; h: number }> { return new Promise((res, rej) => { const u = URL.createObjectURL(blob); const i = new Image(); i.onload = () => { res({ w: i.naturalWidth, h: i.naturalHeight }); URL.revokeObjectURL(u); }; i.onerror = () => rej(new Error('Kunne ikke lese bildet')); i.src = u; }); }
+export function imgSize(blob: Blob): Promise<{ w: number; h: number }> { return new Promise((res, rej) => { const u = URL.createObjectURL(blob); const i = new Image(); i.onload = () => { res({ w: i.naturalWidth, h: i.naturalHeight }); URL.revokeObjectURL(u); }; i.onerror = () => rej(new Error('Kunne ikke lese bildet')); i.src = u; }); }
 
 export function editTegning(id?: string, eid?: string) {
   const t: Rec = id ? byId('tegninger', id)! : { eiendomId: eid || S.eiendommer[0]?.id, etasje: 1, navn: tt("1. etasje"), side: 1 } as any;
@@ -66,13 +66,14 @@ export function editTegning(id?: string, eid?: string) {
     { k: 'navn', label: tt("Navn på tegning / etasje"), req: true, half: true, ph: tt("1. etasje") }, { k: 'etasje', label: tt("Etasjenummer (sortering)"), type: 'number', half: true, hint: tt("Kjeller = -1, U1 = 0 osv.") }];
   if (id && t.kilde) fields.push({ k: 'kildeInfo', type: 'custom', render: () => <div className="note small" style={{ color: 'var(--ink)' }}>{tt("Original DWG:")} <FileLink fil={t.kilde} />{t.cad?.enhet ? tt(" · enhet {0}", t.cad.enhet) : ''}{t.cad?.bredde ? tt(" · ca. {0} × {1} m", Math.round(t.cad.bredde * 10) / 10, Math.round(t.cad.hoyde * 10) / 10) : ''}{t.cad?.advarsler?.length ? <div style={{ color: 'var(--amber)', marginTop: 4 }}>{tt("Ikke vist:")} {t.cad.advarsler.join('; ')}</div> : null}
     <div style={{ marginTop: 6 }}>{t.cad?.svg && <><button type="button" className="btn sm pri" onClick={() => dwgLag(t.id)}>{tt("Lag i DWG (")}{(t.cad.lag || []).length})</button> </>}<button type="button" className="btn sm" onClick={() => lesDwgPaaNytt(t.id)}>{tt("Les inn DWG på nytt")}</button> <span className="muted">{tt("Bruker siste versjon av DWG-leseren.")}</span></div></div> });
+  if (id && (t.versjoner || []).length) fields.push({ k: 'versjonerInfo', type: 'custom', render: () => <div className="small muted">{tt("Tidligere versjoner:")} {(t.versjoner as Rec[]).map((v, i) => <span key={i}>{i > 0 && ', '}<FileLink fil={v.fil} /> <span>({new Date(v.dato).toLocaleDateString(lokale())})</span></span>)}</div> });
   const erCad = (x: any) => /\.dwg$/i.test(x?.fil?.name || '');
   if (!id) fields.push({ k: 'fil', label: tt("Plantegning (DWG, PDF, PNG eller JPG)"), type: 'file', req: true, accept: '.dwg,.pdf,.png,.jpg,.jpeg,.webp' },
     { k: 'side', label: tt("Sidenummer i PDF"), type: 'number', half: true, hint: tt("Bare for PDF med flere sider"), show: (x: any) => /\.pdf$/i.test(x?.fil?.name || '') },
     { k: 'enhet', label: tt("Tegningsenhet i DWG"), type: 'select', options: ENHETER.map(e => [e[0], e[1]]), half: true, def: 'auto', show: erCad, hint: tt("Målestokken settes automatisk ut fra enheten. Bygningstegninger er nesten alltid i mm.") });
   formModal({
     title: id ? tt("Rediger tegning") : tt("Last opp plantegning"), fields, values: t, saveTxt: id ? tt("Lagre") : tt("Last opp"),
-    extraFoot: close => id ? <button className="btn danger" onClick={async () => { if (await confirmBox(tt("Slette tegningen «{0}» med {1} oppmålte arealer?", t.navn, (t.soner || []).length))) { await deleteFile(t.fil); if (t.kilde) await deleteFile(t.kilde); await removeDoc('tegninger', id); await syncArealer(t.eiendomId); close(); } }}>{tt("Slett")}</button> : null,
+    extraFoot: close => id ? <><button className="btn" onClick={() => { close(); import('./ByttTegning').then(m => m.byttTegning(id)); }}>{tt("Bytt tegning (ny versjon)")}</button> <button className="btn danger" onClick={async () => { if (await confirmBox(tt("Slette tegningen «{0}» med {1} oppmålte arealer?", t.navn, (t.soner || []).length))) { await deleteFile(t.fil); if (t.kilde) await deleteFile(t.kilde); await removeDoc('tegninger', id); await syncArealer(t.eiendomId); close(); } }}>{tt("Slett")}</button></> : null,
     onSave: async x => {
       if (id) { await save('tegninger', { ...t, eiendomId: x.eiendomId, navn: x.navn, etasje: x.etasje }); await syncArealer(x.eiendomId); if (x.eiendomId !== t.eiendomId) await syncArealer(t.eiendomId); return; }
       const f: File = x.fil; const ext = (f.name.split('.').pop() || '').toLowerCase(); let blob: Blob = f, w = 0, h = 0, navn = f.name;

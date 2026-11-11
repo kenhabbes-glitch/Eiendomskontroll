@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-20', dato: '2026-11-20', tittel: 'Plassering på tegning i driften – og bytte av tegning', punkter: [
+    'Arbeidsordren viser nå et utsnitt av tegningen med systemet, komponenten eller avviket markert. Du kan zoome og flytte i utsnittet, også på mobil.',
+    'Avvik kan plasseres (eller flyttes) på tegningen med ett trykk – enten fra arbeidsordren eller fra avviket. Plasseringen vises på planen for alle.',
+    'Ny funksjon «Bytt tegning (ny versjon)» på tegningen: last opp oppdatert DWG, PDF eller bilde, så regnes alle plasseringer og oppmålte arealer om automatisk. Er begge DWG, går det av seg selv; ellers peker du på to like punkter. Gammel versjon arkiveres.',
+  ] },
   { id: '2026-11-19', dato: '2026-11-19', tittel: '3D-modell av bygget', punkter: [
     'Ny fane «3D-modell» på eiendommen. Last opp IFC-filen (.ifc eller .ifczip), så konverteres den til en kompakt modell som du kan snu, zoome og flytte i – også på mobil og nettbrett.',
     'Vis og skjul etasjer, lag et snitt i valgfri høyde, og klikk på en bygningsdel for å se type, etasje, merke og egenskaper fra IFC-filen. Terreng og omgivelser ligger i en egen gruppe som kan slås på.',

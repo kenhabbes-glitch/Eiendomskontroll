@@ -7,6 +7,8 @@ import { openModal, useFileUrl } from '../components/ui';
 import { Doc, INK, MUTED, RED, LINE, ACC, profilFor } from './arealRapport';
 import { rgb } from 'pdf-lib';
 import { openPlan } from '../views/Arealer';
+import { PlanKart } from '../components/PlanKart';
+import { PosVelger } from '../components/PosVelger';
 import { tt, tu, lokale, medUtSprak } from './i18n';
 import { MottakerSprak, sprakForEiendom } from '../components/MottakerSprak';
 
@@ -42,20 +44,39 @@ export async function lastOppAo(id: string, filer: FileList | File[]) {
 }
 export const aoLenke = (id: string) => `${location.origin}/#/arbeidsordre/${id}`;
 
-// ---------------- Tegningsutsnitt (SVG, brukes i appen)
+// ---------------- Planutsnitt i appen: avvik, system og komponent på etasjeplanen (zoom, klyp, trykk for å flytte)
+export function kanPlassereAvvik(a: Rec) { return canEdit() || isStaff() || (state.me?.rolle === 'utforer' && a.tildeltId === state.me?.id); }
 export function AoKart({ a, h = 260 }: { a: Rec; h?: number }) {
-  const t = a.pos ? byId('tegninger', a.pos.tegningId) : null; const u = useFileUrl(t?.fil?.path);
-  if (!a.pos) return <div className="note small muted">{tt("Avviket er ikke plassert på tegning.")}{a.ao?.plassering ? tt(" Plassering: ") + a.ao.plassering : ''}</div>;
+  useStore();
+  const kc = a.komponentId ? byId('komponenter', a.komponentId) : null; const sys = byId('anlegg', kc?.anleggId || a.anleggId);
+  const pos = a.pos || kc?.pos || sys?.pos || null; const t = pos ? byId('tegninger', pos.tegningId) : null; const u = useFileUrl(t?.fil?.path);
+  const knapp = kanPlassereAvvik(a) ? <button type="button" className="btn sm pri" onClick={() => plasserAvvik(a.id)}>{a.pos ? tt("Flytt avviket på plan") : tt("Plasser avviket på plan")}</button> : null;
+  if (!pos) return <div className="note small muted">{tt("Avviket er ikke plassert på tegning.")}{a.ao?.plassering ? tt(" Plassering: ") + a.ao.plassering : ''}{knapp && <div style={{ marginTop: 6 }}>{knapp}</div>}</div>;
   if (!t) return <div className="note small muted">{tt("Plassert på")} {a.ao?.tegning || tt("tegning")} {tt("(tegningen er ikke tilgjengelig).")}</div>;
-  const W = t.w || 1000, H = t.h || 800; const s = Math.max(W, H) * 0.32; const x0 = Math.max(0, Math.min(W - s, a.pos.x - s / 2)), y0 = Math.max(0, Math.min(H - s * 0.6, a.pos.y - s * 0.3)); const R0 = s / 38;
-  return <div style={{ position: 'relative', border: '1px solid var(--line2)', borderRadius: 8, overflow: 'hidden', background: '#fff', cursor: 'zoom-in' }} onClick={() => openPlan(t.id, { mode: 'tfm', focus: a.id })} title={tt("Åpne hele tegningen")}>
-    <svg viewBox={`${x0} ${y0} ${s} ${s * 0.6}`} style={{ width: '100%', height: h, display: 'block' }} preserveAspectRatio="xMidYMid meet">
-      {u && <image href={u} x={0} y={0} width={W} height={H} />}
-      <circle cx={a.pos.x} cy={a.pos.y} r={R0 * 3.2} fill="#b42318" fillOpacity={.15} />
-      <path d={`M${a.pos.x} ${a.pos.y - R0 * 1.25} L${a.pos.x + R0 * 1.15} ${a.pos.y + R0 * .75} L${a.pos.x - R0 * 1.15} ${a.pos.y + R0 * .75} Z`} fill="#b42318" stroke="#fff" strokeWidth={R0 * .2} />
-    </svg>
-    <div className="small" style={{ position: 'absolute', left: 8, bottom: 6, background: 'rgba(255,255,255,.9)', padding: '2px 8px', borderRadius: 6 }}>{t.navn} {tt("· klikk for hele tegningen")}</div>
+  const W = t.w || 1000, H = t.h || 800; const her = (o?: Rec | null) => o?.pos?.tegningId === t.id ? o.pos : null;
+  return <div>
+    <PlanKart url={u} W={W} H={H} h={h} fokus={{ x: pos.x, y: pos.y, bredde: Math.max(W, H) * 0.3 }}>
+      {px => <>
+        {her(sys) && !her(kc) && <g><rect x={her(sys).x - px * 7} y={her(sys).y - px * 7} width={px * 14} height={px * 14} fill="#1f6f5c" fillOpacity={.7} stroke="#fff" strokeWidth={px * 1.5} /></g>}
+        {her(kc) && <circle cx={her(kc).x} cy={her(kc).y} r={px * 7} fill="#1f6f5c" fillOpacity={.75} stroke="#fff" strokeWidth={px * 1.5} />}
+        {a.pos && <g><circle cx={a.pos.x} cy={a.pos.y} r={px * 22} fill="#b42318" fillOpacity={.15} /><path d={`M${a.pos.x} ${a.pos.y - px * 14} L${a.pos.x + px * 12} ${a.pos.y + px * 8} L${a.pos.x - px * 12} ${a.pos.y + px * 8} Z`} fill="#b42318" stroke="#fff" strokeWidth={px * 2} /></g>}
+      </>}
+    </PlanKart>
+    <div className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 }}><span className="muted">{t.navn}{!a.pos ? ' · ' + tt("plassering fra") + ' ' + (kc?.pos ? tt("komponenten") : tt("systemet")) : ''}</span>{a.pos && <span className="muted">▲ {tt("avvik")}</span>}{(her(kc) || her(sys)) && <span className="muted">● {tt("system / komponent")}</span>}
+      <span className="grow" />{knapp}<button type="button" className="btn sm" onClick={() => openPlan(t.id, { mode: 'tfm', focus: a.pos ? a.id : (kc?.id || sys?.id) })}>{tt("Hele tegningen")}</button></div>
   </div>;
+}
+
+/** Plasser eller flytt avviket på etasjeplanen (mobilvennlig: zoom, trykk der avviket er). */
+export function plasserAvvik(id: string) { openModal({ wide: true, render: close => <PlasserAvvik id={id} close={close} /> }); }
+function PlasserAvvik({ id, close }: { id: string; close: () => void }) {
+  const a = byId('avvik', id)!; const [pos, setPos] = useState<any>(a.pos || null); const [busy, setBusy] = useState(false);
+  const kc = a.komponentId ? byId('komponenter', a.komponentId) : null; const sys = byId('anlegg', kc?.anleggId || a.anleggId);
+  const merker = [kc, sys].filter((o: any) => o?.pos).map((o: any) => ({ x: o.pos.x, y: o.pos.y, tegningId: o.pos.tegningId, t: (o === kc ? 'Komponent ' : 'System ') + (o.navn || '') }));
+  const lagre = async () => { setBusy(true); try { const tn = pos ? byId('tegninger', pos.tegningId)?.navn || '' : ''; await lagreAvvik(id, x => ({ ...x, pos, logg: nyLogg(x, pos ? (x.pos ? 'Flyttet på tegning ' : 'Plassert på tegning ') + tn : 'Fjernet fra tegning') })); toast(pos ? tt("Avviket er plassert") : tt("Plasseringen er fjernet")); close(); } catch (e: any) { toast(e?.message || tt("Kunne ikke lagre")); setBusy(false); } };
+  return <><div className="mh"><h2>{tt("Plasser avviket på plan")}</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
+    <div className="mb"><PosVelger eiendomId={a.eiendomId} value={pos} set={setPos} merker={merker} hoyde="min(64vh, 620px)" /></div>
+    <div className="mf"><button className="btn" onClick={close}>{tt("Avbryt")}</button><button className="btn pri" disabled={busy || (!pos && !a.pos)} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre plassering")}</button></div></>;
 }
 
 // ---------------- Tegningsutsnitt (JPEG, brukes i PDF)

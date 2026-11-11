@@ -4,39 +4,32 @@ import React, { useEffect, useRef, useState } from 'react';
 import { S } from '../lib/store';
 import { byId, sortBy } from '../lib/utils';
 import { useFileUrl, FileLink } from './ui';
+import { PlanKart } from './PlanKart';
 import { tt } from '../lib/i18n';
 
 export type Pos = { tegningId: string; x: number; y: number } | null;
 
-export function PosVelger({ eiendomId, value, set, ro, merker = [] }: { eiendomId: string; value: Pos; set: (p: Pos) => void; ro?: boolean; merker?: { x: number; y: number; tegningId: string; t: string }[] }) {
+export function PosVelger({ eiendomId, value, set, ro, merker = [], hoyde }: { eiendomId: string; value: Pos; set: (p: Pos) => void; ro?: boolean; hoyde?: string | number; merker?: { x: number; y: number; tegningId: string; t: string }[] }) {
   const T = sortBy(S.tegninger.filter(t => t.eiendomId === eiendomId && t.fil?.path), t => +t.etasje || 0);
   const [tid, setTid] = useState<string>(value?.tegningId || T[0]?.id || '');
   useEffect(() => { if (value?.tegningId) setTid(value.tegningId); else if (!T.some(t => t.id === tid)) setTid(T[0]?.id || ''); }, [eiendomId, value?.tegningId]);
   const t = byId('tegninger', tid); const url = useFileUrl(t?.fil?.path);
-  const img = useRef<HTMLImageElement>(null); const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
+  const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => { if (!url) return; const i = new Image(); i.onload = () => setNat({ w: i.naturalWidth, h: i.naturalHeight }); i.src = url; }, [url]);
   if (!T.length) return <div className="small muted">{tt("Ingen etasjeplaner for eiendommen ennå. Last opp under «Tegninger og arealer».")}</div>;
   const W = t?.w || nat?.w || 1000, H = t?.h || nat?.h || 800;
-  const klikk = (e: React.MouseEvent) => {
-    if (ro || !img.current) return; const r = img.current.getBoundingClientRect();
-    set({ tegningId: tid, x: Math.round(((e.clientX - r.left) / r.width) * W * 10) / 10, y: Math.round(((e.clientY - r.top) / r.height) * H * 10) / 10 });
-  };
   const her = value && value.tegningId === tid ? value : null;
   return <div>
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
       {T.length > 1 && <select value={tid} onChange={e => setTid(e.target.value)} style={{ border: '1px solid var(--line2)', borderRadius: 7, padding: '5px 6px', width: 'auto' }}>
         {T.map(x => <option key={x.id} value={x.id}>{x.navn}{value?.tegningId === x.id ? ' ●' : ''}</option>)}</select>}
-      <span className="small muted">{ro ? '' : value ? (her ? tt("Klikk for å flytte markeringen.") : tt("Plassert på {0}.", byId('tegninger', value.tegningId)?.navn || 'annen tegning')) : tt("Klikk på tegningen der avviket er.")}</span>
+      <span className="small muted">{ro ? '' : value ? (her ? tt("Trykk på tegningen for å flytte markeringen. Klyp eller bruk + / − for å zoome.") : tt("Plassert på {0}.", byId('tegninger', value.tegningId)?.navn || 'annen tegning')) : tt("Trykk på tegningen der avviket er. Klyp eller bruk + / − for å zoome.")}</span>
       {value && !ro && <button type="button" className="btn sm ghost" onClick={() => set(null)}>{tt("Fjern plassering")}</button>}
     </div>
-    <div style={{ position: 'relative', border: '1px solid var(--line2)', borderRadius: 8, overflow: 'hidden', background: '#fff', cursor: ro ? 'default' : 'crosshair' }} onClick={klikk}>
-      {url ? <img ref={img} src={url} onLoad={e => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} style={{ width: '100%', display: 'block', maxHeight: 460, objectFit: 'contain' }} draggable={false} />
-        : <div className="muted small" style={{ padding: 30, textAlign: 'center' }}>{tt("Laster tegning …")}</div>}
-      {url && <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-        {merker.filter(m => m.tegningId === tid).map((m, i) => <circle key={i} cx={m.x} cy={m.y} r={Math.max(W, H) / 140} fill="#1f6f5c" fillOpacity={.55}><title>{m.t}</title></circle>)}
-        {her && <g><circle cx={her.x} cy={her.y} r={Math.max(W, H) / 40} fill="#b42318" fillOpacity={.15} />
-          <path d={(() => { const R = Math.max(W, H) / 90; return `M${her.x} ${her.y - R * 1.25} L${her.x + R * 1.15} ${her.y + R * .75} L${her.x - R * 1.15} ${her.y + R * .75} Z`; })()} fill="#b42318" stroke="#fff" strokeWidth={Math.max(W, H) / 600} /></g>}
-      </svg>}
-    </div>
+    <PlanKart key={tid} url={url} W={W} H={H} h={hoyde} onTap={ro ? undefined : (x, y) => set({ tegningId: tid, x, y })} fokus={her ? { x: her.x, y: her.y } : (merker.find(m => m.tegningId === tid) ? { x: merker.find(m => m.tegningId === tid)!.x, y: merker.find(m => m.tegningId === tid)!.y } : null)}>
+      {px => <>{merker.filter(m => m.tegningId === tid).map((m, i) => <g key={i}><circle cx={m.x} cy={m.y} r={px * 7} fill="#1f6f5c" fillOpacity={.6} stroke="#fff" strokeWidth={px * 1.5}><title>{m.t}</title></circle></g>)}
+        {her && <g><circle cx={her.x} cy={her.y} r={px * 22} fill="#b42318" fillOpacity={.15} /><path d={`M${her.x} ${her.y - px * 14} L${her.x + px * 12} ${her.y + px * 8} L${her.x - px * 12} ${her.y + px * 8} Z`} fill="#b42318" stroke="#fff" strokeWidth={px * 2} /></g>}</>}
+    </PlanKart>
     {merker.some(m => m.tegningId === tid) && <div className="small muted" style={{ marginTop: 4 }}>{tt("Grønne punkter viser systemet/komponentene avviket er koblet til.")}</div>}
   </div>;
 }
