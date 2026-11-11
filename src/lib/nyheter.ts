@@ -1,6 +1,12 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-21', dato: '2026-11-21', tittel: 'Måle og tegne i 3D – og tegninger koblet til modellen', punkter: [
+    'Nye verktøy i 3D-modellen: mål avstand (med vannrett og høydeforskjell), areal (også på vegger og skrå flater) og vinkel. Punktene fester seg til nærmeste hjørne. Målene kan lagres i modellen.',
+    'Tegn linjer og sett notater direkte i modellen. De lagres, kan skjules og vises for alle som åpner modellen.',
+    'Koble en etasjetegning til modellen med to punkter, så vises alle systemer, komponenter og avvik du har plassert på tegningen som markører i 3D. Klikk på en markør for å åpne den.',
+    'Ny IFC-modell? Appen sjekker koblingene dine mot den nye modellen, finner dem som har mistet objektet sitt og foreslår riktig nytt objekt (samme merke, navn eller sted).',
+  ] },
   { id: '2026-11-20', dato: '2026-11-20', tittel: 'Plassering på tegning i driften – og bytte av tegning', punkter: [
     'Arbeidsordren viser nå et utsnitt av tegningen med systemet, komponenten eller avviket markert. Du kan zoome og flytte i utsnittet, også på mobil.',
     'Avvik kan plasseres (eller flyttes) på tegningen med ett trykk – enten fra arbeidsordren eller fra avviket. Plasseringen vises på planen for alle.',
