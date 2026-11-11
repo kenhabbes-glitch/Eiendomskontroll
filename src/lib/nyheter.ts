@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-21', dato: '2026-11-21', tittel: 'Store IFC-modeller kan lastes opp', punkter: [
+    '3D-modeller pakkes nå 2–3 ganger tettere, slik at de lastes opp og åpnes raskere. Nøyaktigheten er bedre enn 2 mm.',
+    'Svært store modeller deles automatisk i flere filer ved lagring, så det er ikke lenger noen grense på 50 MB. Modeller som feilet tidligere kan lastes opp på nytt.',
+  ] },
   { id: '2026-11-21', dato: '2026-11-21', tittel: 'Måle og tegne i 3D – og tegninger koblet til modellen', punkter: [
     'Nye verktøy i 3D-modellen: mål avstand (med vannrett og høydeforskjell), areal (også på vegger og skrå flater) og vinkel. Punktene fester seg til nærmeste hjørne. Målene kan lagres i modellen.',
     'Tegn linjer og sett notater direkte i modellen. De lagres, kan skjules og vises for alle som åpner modellen.',

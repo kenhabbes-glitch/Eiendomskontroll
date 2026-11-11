@@ -6,7 +6,7 @@
 export type Ek3dEtasje = { navn: string; kote: number; terreng?: boolean };
 export type Ek3dGruppe = { etasje: number; glass: boolean; nv: number; ni: number };
 export type Ek3dElement = { g: string; k: string; n: string; t: string; e: number };
-export type Ek3dHode = { v: 1; bbox: number[]; fokus: number[]; etasjer: Ek3dEtasje[]; grupper: Ek3dGruppe[]; elementer: Ek3dElement[]; nSeg: number; program?: string };
+export type Ek3dHode = { v: 1 | 2; q?: number[][]; bbox: number[]; fokus: number[]; etasjer: Ek3dEtasje[]; grupper: Ek3dGruppe[]; elementer: Ek3dElement[]; nSeg: number; program?: string };
 
 class Vekst { a: Float32Array | Int8Array | Uint32Array; n = 0; constructor(private T: any, start = 1 << 16) { this.a = new T(start); }
   skaff(m: number) { if (this.n + m > this.a.length) { const b = new this.T(Math.max(this.a.length * 2, this.n + m)); b.set(this.a); this.a = b; } }

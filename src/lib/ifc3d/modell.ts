@@ -1,6 +1,7 @@
 // Lager (konverterer og pakker) og leser 3D-modeller. Filformat .ek3d: 'EK3D', hodelengde, JSON-hode, så binærdata (se konverter.ts).
 import type { Ek3dHode } from './konverter';
 import type { IfcModell } from '../ifc';
+import { pakkV2, lesV2 } from './pakk';
 
 export type Ek3dEgenskaper = Record<string, { ns?: string; type?: string; mengder?: Record<string, number>; egenskaper?: Record<string, string> }>;
 export type Ek3dFull = Ek3dHode & { egenskaper?: Ek3dEgenskaper };
@@ -17,6 +18,7 @@ export async function lagModell(file: File, fremdrift: (p: number, t: string) =>
   });
   let ut: Uint8Array = new Uint8Array(rå);
   if (props) ut = medEgenskaper(ut, props);
+  fremdrift(0.96, 'Pakker'); ut = pakkV2(ut);
   fremdrift(0.97, 'Komprimerer');
   const gz = await new Response(new Blob([ut as BlobPart]).stream().pipeThrough(new CompressionStream('gzip'))).blob();
   return { blob: gz, hode: lesHode(ut) };
@@ -38,6 +40,11 @@ export async function lesModell(gz: ArrayBuffer): Promise<Modell> {
   const rå = new Uint8Array(await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
   if (rå[0] !== 0x45 || rå[1] !== 0x4b || rå[2] !== 0x33) throw new Error('Ukjent modellformat');
   const hode = lesHode(rå); const hl = new DataView(rå.buffer).getUint32(4, true); let o = 8 + Math.ceil(hl / 4) * 4; const grupper: Modell['grupper'] = [];
+  if (hode.v === 2) { const r = lesV2(rå, hode, o); return { hode, grupper: r.grupper, seg: r.seg }; }
   for (const g of hode.grupper) { const pos = new Float32Array(rå.buffer, o, g.nv * 3); o += g.nv * 12; const nor = new Int8Array(rå.buffer, o, g.nv * 3); o += Math.ceil(g.nv * 3 / 4) * 4; const idx = new Uint32Array(rå.buffer, o, g.ni); o += g.ni * 4; grupper.push({ pos, nor, idx }); }
   return { hode, grupper, seg: new Int32Array(rå.buffer, o, hode.nSeg * 7) };
 }
+
+/** Største bit som lagres i én fil (lagringen tar maks 50 MB pr. fil). */
+export const DELSTR = 45 * 1024 * 1024;
+export const delOpp = (b: Blob): Blob[] => { const ut: Blob[] = []; for (let i = 0; i < b.size; i += DELSTR) ut.push(b.slice(i, Math.min(b.size, i + DELSTR))); return ut; };

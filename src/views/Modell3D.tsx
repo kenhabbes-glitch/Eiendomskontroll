@@ -10,7 +10,7 @@ import { editAvvik, editAnlegg, editKomponent } from '../lib/actions';
 import { fmt } from '../lib/maaler';
 import { KalPanel, SjekkPanel, type Rad } from './Modell3DVerktoy';
 import { avst, areal, vinkel, lengde, horisontalt, midt, kalMat, tilModell, meterPerPiksel, type V3, type Kal } from '../lib/ifc3d/geom';
-import { lagModell, lesModell, type Modell } from '../lib/ifc3d/modell';
+import { lagModell, lesModell, delOpp, type Modell } from '../lib/ifc3d/modell';
 
 const KLASSE: Record<string, string> = { IFCDOOR: 'Dør', IFCWINDOW: 'Vindu', IFCWALL: 'Vegg', IFCWALLSTANDARDCASE: 'Vegg', IFCSLAB: 'Dekke / plate', IFCCOLUMN: 'Søyle', IFCBEAM: 'Bjelke', IFCMEMBER: 'Profil / list', IFCPLATE: 'Plate', IFCRAILING: 'Rekkverk', IFCSTAIR: 'Trapp', IFCSTAIRFLIGHT: 'Trappeløp', IFCROOF: 'Tak', IFCCURTAINWALL: 'Glassfasade', IFCCOVERING: 'Kledning / himling', IFCFURNISHINGELEMENT: 'Inventar', IFCBUILDINGELEMENTPROXY: 'Bygningsdel', IFCFLOWTERMINAL: 'Terminal', IFCALARM: 'Alarm', IFCSANITARYTERMINAL: 'Sanitærutstyr', IFCLIGHTFIXTURE: 'Armatur', IFCTRANSPORTELEMENT: 'Heis / transport', IFCRAMP: 'Rampe', IFCFOOTING: 'Fundament', IFCOPENINGELEMENT: 'Åpning' };
 const klNavn = (k: string) => KLASSE[k] ? tt(KLASSE[k]) : k.replace(/^IFC/, '').toLowerCase().replace(/^./, c => c.toUpperCase());
@@ -41,12 +41,18 @@ export default function ModellSeksjon({ eid }: { eid: string }) {
       const { blob, hode } = await lagModell(f, (p, t) => { setPct(p); const mm = t.match(/^(.*) \((\d+) objekter\)$/); setBusy(mm ? tt("Bygger 3D ({0} objekter)", mm[2]) : tt(t)); }, props);
       setBusy(tt("Laster opp")); setPct(0.98);
       const navn = f.name.replace(/\.(ifczip|ifc|zip)$/i, '');
-      const fil = await uploadFile(new File([blob], navn + '.ek3d.gz'), eid, undefined, navn + '.ek3d.gz', 'intern/modell'); if (!fil) throw new Error(tt("Opplastingen feilet"));
-      const { error } = await sb.from('modeller3d').insert({ eiendom_id: eid, data: { navn, filnavn: f.name, path: fil.path, str: blob.size, tid: new Date().toISOString(), antall: hode.elementer.length, etasjer: hode.etasjer.map(e => e.navn), opprettetAv: state.me?.navn || '' } }); if (error) throw error;
+      const biter = delOpp(blob); const deler: string[] = [];
+      for (let i = 0; i < biter.length; i++) {
+        if (biter.length > 1) setBusy(tt("Laster opp del {0} av {1}", i + 1, biter.length));
+        const fn = navn + '.ek3d.gz' + (biter.length > 1 ? '.' + (i + 1) : ''); const fil = await uploadFile(new File([biter[i]], fn), eid, undefined, fn, 'intern/modell');
+        if (!fil) { if (deler.length) await sb.storage.from('filer').remove(deler); throw new Error(tt("Opplastingen av modellen feilet ({0} MB). Sjekk nettforbindelsen og prøv igjen.", (blob.size / 1e6).toFixed(1))); }
+        deler.push(fil.path);
+      }
+      const { error } = await sb.from('modeller3d').insert({ eiendom_id: eid, data: { navn, filnavn: f.name, path: deler[0], ...(deler.length > 1 ? { deler } : {}), str: blob.size, tid: new Date().toISOString(), antall: hode.elementer.length, etasjer: hode.etasjer.map(e => e.navn), opprettetAv: state.me?.navn || '' } }); if (error) throw error;
       toast(tt("Modellen er klar – {0} objekter", hode.elementer.length)); await last();
     } catch (e: any) { toast(feiltekst(e)); } finally { setBusy(''); }
   };
-  const slett = async (m: Rec) => { if (!await confirmBox(tt("Slette 3D-modellen? Koblinger mellom systemer og modellen beholdes."), tt("Slett"))) return; await sb.storage.from('filer').remove([m.data.path]); await sb.from('modeller3d').delete().eq('id', m.id); await last(); };
+  const slett = async (m: Rec) => { if (!await confirmBox(tt("Slette 3D-modellen? Koblinger mellom systemer og modellen beholdes."), tt("Slett"))) return; await sb.storage.from('filer').remove(m.data.deler || [m.data.path]); await sb.from('modeller3d').delete().eq('id', m.id); await last(); };
   const m = mod?.find(x => x.id === valgt);
   return <>
     {busy ? <div className="card"><b>{busy} …</b><div style={{ height: 8, background: 'var(--line2)', borderRadius: 4, marginTop: 8 }}><div style={{ height: 8, width: Math.round(pct * 100) + '%', background: '#1E4D57', borderRadius: 4, transition: 'width .3s' }} /></div><p className="small muted" style={{ marginBottom: 0 }}>{tt("Store modeller kan ta et minutt. Ikke lukk siden.")}</p></div>
@@ -80,7 +86,7 @@ function Visning({ eid, modellRad }: { eid: string; modellRad: Rec }) {
   const statusEl = (guid: string): keyof typeof ST | null => { const ids = guidAnlegg.get(guid); if (!ids) return null; const s = ids.map(statusAnlegg); return s.includes('rod') ? 'rod' : s.includes('snart') ? 'snart' : s.includes('ok') ? 'ok' : 'ingen'; };
 
   // --- last modellen
-  useEffect(() => { let av = false; (async () => { try { const u = await fileUrl(modellRad.data.path); const r = await fetch(u); if (!r.ok) throw new Error('HTTP ' + r.status); const m = await lesModell(await r.arrayBuffer()); if (!av) { setMod(m); setVis(m.hode.etasjer.map(e => !e.terreng)); } } catch (e: any) { if (!av) setFeil(feiltekst(e)); } })(); return () => { av = true; }; }, [modellRad.id]);
+  useEffect(() => { let av = false; (async () => { try { const biter = await Promise.all(((modellRad.data.deler as string[]) || [modellRad.data.path]).map(async p => { const r = await fetch(await fileUrl(p)); if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })); const m = await lesModell(await new Blob(biter).arrayBuffer()); if (!av) { setMod(m); setVis(m.hode.etasjer.map(e => !e.terreng)); } } catch (e: any) { if (!av) setFeil(feiltekst(e)); } })(); return () => { av = true; }; }, [modellRad.id]);
 
   // --- bygg scenen
   useEffect(() => {
