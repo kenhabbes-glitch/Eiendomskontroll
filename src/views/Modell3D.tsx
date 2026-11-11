@@ -11,6 +11,7 @@ import { fmt } from '../lib/maaler';
 import { KalPanel, SjekkPanel, type Rad } from './Modell3DVerktoy';
 import { avst, areal, vinkel, lengde, horisontalt, midt, kalMat, tilModell, meterPerPiksel, type V3, type Kal } from '../lib/ifc3d/geom';
 import { lagModell, lesModell, delOpp, type Modell } from '../lib/ifc3d/modell';
+import { samle, rammeFra, gjettFag, fagNavn, FAG, type Del, type Samlet } from '../lib/ifc3d/samle';
 
 const KLASSE: Record<string, string> = { IFCDOOR: 'Dør', IFCWINDOW: 'Vindu', IFCWALL: 'Vegg', IFCWALLSTANDARDCASE: 'Vegg', IFCSLAB: 'Dekke / plate', IFCCOLUMN: 'Søyle', IFCBEAM: 'Bjelke', IFCMEMBER: 'Profil / list', IFCPLATE: 'Plate', IFCRAILING: 'Rekkverk', IFCSTAIR: 'Trapp', IFCSTAIRFLIGHT: 'Trappeløp', IFCROOF: 'Tak', IFCCURTAINWALL: 'Glassfasade', IFCCOVERING: 'Kledning / himling', IFCFURNISHINGELEMENT: 'Inventar', IFCBUILDINGELEMENTPROXY: 'Bygningsdel', IFCFLOWTERMINAL: 'Terminal', IFCALARM: 'Alarm', IFCSANITARYTERMINAL: 'Sanitærutstyr', IFCLIGHTFIXTURE: 'Armatur', IFCTRANSPORTELEMENT: 'Heis / transport', IFCRAMP: 'Rampe', IFCFOOTING: 'Fundament', IFCOPENINGELEMENT: 'Åpning' };
 const klNavn = (k: string) => KLASSE[k] ? tt(KLASSE[k]) : k.replace(/^IFC/, '').toLowerCase().replace(/^./, c => c.toUpperCase());
@@ -31,12 +32,21 @@ const resultat = (ty: string, p: V3[]): string => {
 // ------------------------------------------------------------------ fane på eiendommen
 export default function ModellSeksjon({ eid }: { eid: string }) {
   useStore(); const ed = canEdit();
-  const [mod, setMod] = useState<Rec[] | null>(null); const [valgt, setValgt] = useState(''); const [busy, setBusy] = useState(''); const [pct, setPct] = useState(0);
-  const last = async () => { const { data } = await sb.from('modeller3d').select('*').eq('eiendom_id', eid).order('created_at', { ascending: false }); setMod(data || []); setValgt(v => v && (data || []).some(x => x.id === v) ? v : data?.[0]?.id || ''); };
+  const [mod, setMod] = useState<Rec[] | null>(null); const [busy, setBusy] = useState(''); const [pct, setPct] = useState(0); const [visListe, setVisListe] = useState(false);
+  const last = async () => { const { data } = await sb.from('modeller3d').select('*').eq('eiendom_id', eid).order('created_at', { ascending: true }); setMod(data || []); };
   useEffect(() => { last(); }, [eid]);
-  const velg = async (f?: File | null) => {
+  const fagAv = (r: Rec) => r.data.fag || gjettFag(r.data.filnavn || r.data.navn || '');
+  const hoved = (L: Rec[]) => L.find(r => r.data.hoved) || L.find(r => r.data.merk?.length || Object.keys(r.data.kal || {}).length || r.data.ramme) || L[0];
+  const FELLES = ['merk', 'kal', 'ramme', 'hoved'] as const;
+  const slettFiler = (r: Rec) => sb.storage.from('filer').remove(r.data.deler || [r.data.path]);
+  // Flytter felles data (mål, kalibrering, ramme) til en annen rad før en rad slettes eller byttes
+  const flyttFelles = async (fra: Rec, til: Rec) => { const d = { ...til.data }; for (const k of FELLES) if (fra.data[k] !== undefined) d[k] = fra.data[k]; await sb.from('modeller3d').update({ data: d }).eq('id', til.id); };
+  const velg = async (f?: File | null, erstatt?: Rec) => {
     if (!f) return; setBusy(tt("Leser egenskaper")); setPct(0);
     try {
+      let fag = erstatt ? fagAv(erstatt) : gjettFag(f.name);
+      if (!erstatt) { const lik = (mod || []).find(r => fagAv(r) === fag && fag !== 'ANNET');
+        if (lik) { setBusy(''); const svar = await confirmBox(tt("Det finnes allerede en {0}-modell («{1}»). Vil du erstatte den med den nye filen? Trykk Avbryt for å beholde begge.", fag, lik.data.navn), tt("Erstatt")); if (svar) erstatt = lik; setBusy(tt("Leser egenskaper")); } }
       let props: any = null; try { const { lesIfc } = await import('../lib/ifc'); props = await lesIfc(f); } catch (e) { console.error('egenskaper', e); }
       const { blob, hode } = await lagModell(f, (p, t) => { setPct(p); const mm = t.match(/^(.*) \((\d+) objekter\)$/); setBusy(mm ? tt("Bygger 3D ({0} objekter)", mm[2]) : tt(t)); }, props);
       setBusy(tt("Laster opp")); setPct(0.98);
@@ -48,25 +58,39 @@ export default function ModellSeksjon({ eid }: { eid: string }) {
         if (!fil) { if (deler.length) await sb.storage.from('filer').remove(deler); throw new Error(tt("Opplastingen av modellen feilet ({0} MB). Sjekk nettforbindelsen og prøv igjen.", (blob.size / 1e6).toFixed(1))); }
         deler.push(fil.path);
       }
-      const { error } = await sb.from('modeller3d').insert({ eiendom_id: eid, data: { navn, filnavn: f.name, path: deler[0], ...(deler.length > 1 ? { deler } : {}), str: blob.size, tid: new Date().toISOString(), antall: hode.elementer.length, etasjer: hode.etasjer.map(e => e.navn), opprettetAv: state.me?.navn || '' } }); if (error) throw error;
-      toast(tt("Modellen er klar – {0} objekter", hode.elementer.length)); await last();
+      const data: Record<string, any> = { navn, filnavn: f.name, fag, path: deler[0], ...(deler.length > 1 ? { deler } : {}), str: blob.size, tid: new Date().toISOString(), antall: hode.elementer.length, etasjer: hode.etasjer.map(e => e.navn), opprettetAv: state.me?.navn || '' };
+      if (erstatt) { for (const k of FELLES) if (erstatt.data[k] !== undefined) data[k] = erstatt.data[k]; data.versjoner = [{ navn: erstatt.data.navn, filnavn: erstatt.data.filnavn, tid: erstatt.data.tid, av: erstatt.data.opprettetAv }, ...(erstatt.data.versjoner || [])].slice(0, 20); }
+      const { error } = await sb.from('modeller3d').insert({ eiendom_id: eid, data }); if (error) throw error;
+      if (erstatt) { await slettFiler(erstatt); await sb.from('modeller3d').delete().eq('id', erstatt.id); }
+      toast(erstatt ? tt("{0}-modellen er oppdatert – {1} objekter", fag, hode.elementer.length) : tt("{0}-modellen er lagt til – {1} objekter", fag, hode.elementer.length)); await last();
     } catch (e: any) { toast(feiltekst(e)); } finally { setBusy(''); }
   };
-  const slett = async (m: Rec) => { if (!await confirmBox(tt("Slette 3D-modellen? Koblinger mellom systemer og modellen beholdes."), tt("Slett"))) return; await sb.storage.from('filer').remove(m.data.deler || [m.data.path]); await sb.from('modeller3d').delete().eq('id', m.id); await last(); };
-  const m = mod?.find(x => x.id === valgt);
+  const slett = async (r: Rec) => {
+    if (!await confirmBox(tt("Slette {0}-modellen «{1}»? Koblinger mellom systemer og modellen beholdes.", fagAv(r), r.data.navn), tt("Slett"))) return;
+    const rest = (mod || []).filter(x => x.id !== r.id); if (rest.length && hoved(mod!) === r) await flyttFelles(r, rest[0]);
+    await slettFiler(r); await sb.from('modeller3d').delete().eq('id', r.id); await last();
+  };
+  const settFag = async (r: Rec, fag: string) => { await sb.from('modeller3d').update({ data: { ...r.data, fag } }).eq('id', r.id); await last(); };
+  const L = mod || []; const sum = L.reduce((s, r) => s + (r.data.antall || 0), 0); const nokkel = L.map(r => r.id + fagAv(r)).join('|');
+  const opp = (r?: Rec) => <label className={'btn' + (r ? ' sm' : '')} style={{ display: 'inline-flex' }}>{r ? tt("Ny versjon") : L.length ? tt("Legg til fagmodell (IFC)") : tt("Last opp IFC-modell")}<input type="file" accept=".ifc,.ifczip,.zip" style={{ display: 'none' }} onChange={e => { velg(e.target.files?.[0], r); e.target.value = ''; }} /></label>;
   return <>
     {busy ? <div className="card"><b>{busy} …</b><div style={{ height: 8, background: 'var(--line2)', borderRadius: 4, marginTop: 8 }}><div style={{ height: 8, width: Math.round(pct * 100) + '%', background: '#1E4D57', borderRadius: 4, transition: 'width .3s' }} /></div><p className="small muted" style={{ marginBottom: 0 }}>{tt("Store modeller kan ta et minutt. Ikke lukk siden.")}</p></div>
-      : <div className="toolbar" style={{ marginBottom: 10 }}>{(mod || []).length > 1 && <select value={valgt} onChange={e => setValgt(e.target.value)}>{mod!.map(x => <option key={x.id} value={x.id}>{x.data.navn}</option>)}</select>}<span className="grow small muted">{m ? `${m.data.navn} · ${m.data.antall} ${tt("objekter")} · ${(m.data.str / 1e6).toFixed(1)} MB · ${tt("lastet opp")} ${fd(m.data.tid)}` : ''}</span>
-        {ed && <label className="btn" style={{ display: 'inline-flex' }}>{m ? tt("Last opp ny modell") : tt("Last opp IFC-modell")}<input type="file" accept=".ifc,.ifczip,.zip" style={{ display: 'none' }} onChange={e => { velg(e.target.files?.[0]); e.target.value = ''; }} /></label>}
-        {ed && m && <button className="btn ghost" onClick={() => slett(m)}>{tt("Slett")}</button>}</div>}
-    {mod && !mod.length && !busy && <Empty t={tt("Ingen 3D-modell er lastet opp ennå.")}><p className="small muted" style={{ maxWidth: 560, margin: '8px auto' }}>{tt("Last opp en IFC-fil (.ifc eller .ifczip) fra arkitekt- eller fagmodellen. Den konverteres til en kompakt modell du kan snu og zoome på, se data for hver bygningsdel, koble til systemer og markere avvik i.")}</p></Empty>}
-    {m && !busy && <Visning key={m.id} eid={eid} modellRad={m} />}
+      : <div className="toolbar" style={{ marginBottom: 10 }}><span className="grow small muted">{L.length ? <>{L.length > 1 ? tt("{0} fagmodeller", L.length) : L[0].data.navn} · {sum} {tt("objekter")} · {(L.reduce((s, r) => s + (r.data.str || 0), 0) / 1e6).toFixed(1)} MB <a href="#" onClick={e => { e.preventDefault(); setVisListe(!visListe); }}>{visListe ? tt("Skjul filer") : tt("Vis filer")}</a></> : ''}</span>
+        {ed && opp()}</div>}
+    {visListe && !busy && L.length > 0 && <div className="card"><div className="tbl-wrap"><table><thead><tr><th>{tt("Fag")}</th><th>{tt("Fil")}</th><th>{tt("Objekter")}</th><th>{tt("Lastet opp")}</th><th /></tr></thead><tbody>{L.map(r => <tr key={r.id}>
+      <td>{ed ? <select value={fagAv(r)} onChange={e => settFag(r, e.target.value)}>{FAG.map(f => <option key={f.k} value={f.k}>{fagNavn(f.k)}</option>)}</select> : fagNavn(fagAv(r))}</td>
+      <td className="small">{r.data.filnavn || r.data.navn}{(r.data.versjoner || []).length > 0 && <div className="muted">{tt("{0} tidligere versjon(er)", r.data.versjoner.length)}</div>}</td><td>{r.data.antall}</td><td className="small">{fd(r.data.tid)}{r.data.opprettetAv ? ' · ' + r.data.opprettetAv : ''}</td>
+      <td style={{ whiteSpace: 'nowrap' }}>{ed && opp(r)} {ed && <button className="btn sm ghost" onClick={() => slett(r)}>{tt("Slett")}</button>}</td></tr>)}</tbody></table></div>
+      <p className="small muted" style={{ marginBottom: 0 }}>{tt("Faget gjettes fra filnavnet (ARK, RIB, RIV, RIE, RIBr …). Rett det her om det ble feil. «Ny versjon» bytter ut filen og beholder mål, notater, tegningskoblinger og koblinger til systemer.")}</p></div>}
+    {mod && !L.length && !busy && <Empty t={tt("Ingen 3D-modell er lastet opp ennå.")}><p className="small muted" style={{ maxWidth: 560, margin: '8px auto' }}>{tt("Last opp IFC-filer (.ifc eller .ifczip) fra arkitekt- og fagmodellene – ARK, RIB, RIV, RIE, RIBr osv. De settes sammen til én modell du kan snu og zoome på, slå fag av og på, se data for hver bygningsdel, koble til systemer og markere avvik i.")}</p></Empty>}
+    {L.length > 0 && !busy && <Visning key={nokkel} eid={eid} modeller={L.map(r => ({ ...r, data: { ...r.data, fag: fagAv(r) } }))} hovedId={hoved(L).id} />}
   </>;
 }
 
 // ------------------------------------------------------------------ visning
-function Visning({ eid, modellRad }: { eid: string; modellRad: Rec }) {
-  useStore(); const ed = canEdit();
+function Visning({ eid, modeller, hovedId }: { eid: string; modeller: Rec[]; hovedId: string }) {
+  useStore(); const ed = canEdit(); const modellRad = modeller.find(r => r.id === hovedId) || modeller[0];
+  const [fagVis, setFagVis] = useState<boolean[]>([]); const [fagListe, setFagListe] = useState<Samlet['fag']>([]);
   const vert = useRef<HTMLDivElement>(null); const T = useRef<any>({}); // three-objekter
   const [mod, setMod] = useState<Modell | null>(null); const [feil, setFeil] = useState(''); const [lastet, setLastet] = useState(0);
   const [sel, setSel] = useState<{ el: number; p: number[] } | null>(null); const [vis, setVis] = useState<boolean[]>([]); const [modus, setModus] = useState<'utseende' | 'status'>('utseende');
@@ -86,7 +110,14 @@ function Visning({ eid, modellRad }: { eid: string; modellRad: Rec }) {
   const statusEl = (guid: string): keyof typeof ST | null => { const ids = guidAnlegg.get(guid); if (!ids) return null; const s = ids.map(statusAnlegg); return s.includes('rod') ? 'rod' : s.includes('snart') ? 'snart' : s.includes('ok') ? 'ok' : 'ingen'; };
 
   // --- last modellen
-  useEffect(() => { let av = false; (async () => { try { const biter = await Promise.all(((modellRad.data.deler as string[]) || [modellRad.data.path]).map(async p => { const r = await fetch(await fileUrl(p)); if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })); const m = await lesModell(await new Blob(biter).arrayBuffer()); if (!av) { setMod(m); setVis(m.hode.etasjer.map(e => !e.terreng)); } } catch (e: any) { if (!av) setFeil(feiltekst(e)); } })(); return () => { av = true; }; }, [modellRad.id]);
+  useEffect(() => { let av = false; (async () => { try {
+    const deler: Del[] = await Promise.all(modeller.map(async r => { const biter = await Promise.all(((r.data.deler as string[]) || [r.data.path]).map(async p => { const x = await fetch(await fileUrl(p)); if (!x.ok) throw new Error('HTTP ' + x.status); return x.blob(); })); return { mod: await lesModell(await new Blob(biter).arrayBuffer()), fag: r.data.fag, navn: r.data.navn, id: r.id }; }));
+    // Felles ramme: lagres på hovedmodellen. Har hovedmodellen ikke forskyvning (lastet opp før fagstøtte), brukes en midlertidig ramme.
+    const hd = deler.find(d => d.id === modellRad.id); const K = hd?.mod.hode.koord;
+    let ramme: number[] | null = modellRad.data.ramme || (K ? [K[12], K[13], K[14]] : rammeFra(deler));
+    if (!modellRad.data.ramme && K && ed && ramme) { modellRad.data = { ...modellRad.data, ramme }; sb.from('modeller3d').update({ data: modellRad.data }).eq('id', modellRad.id).then(() => { }); }
+    if (!K && !modellRad.data.ramme) ramme = rammeFra(deler);
+    const m = samle(deler, ramme); if (!av) { setMod(m); setFagListe(m.fag); setFagVis(m.fag.map(() => true)); setVis(m.hode.etasjer.map(e => !e.terreng)); } } catch (e: any) { if (!av) setFeil(feiltekst(e)); } })(); return () => { av = true; }; }, []);
 
   // --- bygg scenen
   useEffect(() => {
@@ -131,7 +162,7 @@ function Visning({ eid, modellRad }: { eid: string; modellRad: Rec }) {
   }, [mod, lastet, sel, modus, fokusEl, S.oppgaver, S.avvik, S.anlegg]);
 
   // --- etasjer og snitt
-  useEffect(() => { const t = T.current; if (!t.mod) return; t.meshes.forEach((m: THREE.Mesh, gi: number) => { m.visible = vis[t.mod.hode.grupper[gi].etasje] !== false && !(skjul && t.mod.hode.grupper[gi].glass); }); t.invalider(); }, [vis, skjul, lastet]);
+  useEffect(() => { const t = T.current; if (!t.mod) return; t.meshes.forEach((m: THREE.Mesh, gi: number) => { const gr = t.mod.hode.grupper[gi]; m.visible = vis[gr.etasje] !== false && fagVis[gr.fag ?? 0] !== false && !(skjul && gr.glass); }); t.invalider(); }, [vis, skjul, lastet, fagVis]);
   useEffect(() => { const t = T.current; if (!t.mod) return; t.plan.constant = snitt == null ? 1e6 : snitt; t.invalider(); }, [snitt, lastet]);
 
   // --- avvik som markører
@@ -226,7 +257,10 @@ function Visning({ eid, modellRad }: { eid: string; modellRad: Rec }) {
       <div style={{ position: 'absolute', right: 10, top: 10, display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '50%' }}>{([['velg', 'Velg'], ['avstand', 'Avstand'], ['areal', 'Areal'], ['vinkel', 'Vinkel'], ['linje', 'Tegn linje'], ['notat', 'Notat'], ['kal', 'Tegning']] as [Verk, string][]).filter(([v]) => v === 'velg' || v === 'avstand' || v === 'areal' || v === 'vinkel' || ed || v === 'kal').map(([v, n]) => <button key={v} className={'btn sm' + (verk === v ? ' pri' : '')} style={{ background: verk === v ? undefined : '#fffd' }} onClick={() => velgVerk(v)}>{tt(n)}</button>)}</div>
       <div style={{ position: 'absolute', left: 10, top: 10, display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 'calc(100% - 20px)' }}>
         <div className="seg" style={{ background: '#fffd', borderRadius: 8, padding: 4, display: 'inline-flex', gap: 4 }}><button className={'btn sm' + (modus === 'utseende' ? ' pri' : '')} onClick={() => setModus('utseende')}>{tt("Utseende")}</button><button className={'btn sm' + (modus === 'status' ? ' pri' : '')} onClick={() => setModus('status')}>{tt("Status")}</button></div>
-        <div style={{ background: '#fffd', borderRadius: 8, padding: '6px 8px', fontSize: 12 }}><b>{tt("Etasjer")}</b>
+        {fagListe.length > 1 && <div style={{ background: '#fffd', borderRadius: 8, padding: '6px 8px', fontSize: 12 }}><b>{tt("Fag")}</b>
+          {fagListe.map((f, i) => <label key={f.id} title={f.navn} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '2px 0' }}><input type="checkbox" checked={fagVis[i] !== false} onChange={x => setFagVis(v => v.map((y, j) => j === i ? x.target.checked : y))} />{fagNavn(f.k)}{f.utenKoord && <span title={tt("Lastet opp før fagstøtte – kan ligge feil i forhold til de andre fagene")} style={{ color: '#b54708' }}> ⚠</span>}</label>)}
+          <div style={{ marginTop: 4, display: 'flex', gap: 4 }}><button className="btn sm" onClick={() => setFagVis(fagListe.map(() => true))}>{tt("Alle")}</button>{sel && <button className="btn sm" onClick={() => setFagVis(fagListe.map((_, i) => i === (h.elementer[sel.el].f ?? 0)))}>{tt("Kun valgt fag")}</button>}</div></div>}
+        <div style={{ background: '#fffd', borderRadius: 8, padding: '6px 8px', fontSize: 12, maxHeight: 260, overflowY: 'auto' }}><b>{tt("Etasjer")}</b>
           {h.etasjer.map((e, i) => <label key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '2px 0' }}><input type="checkbox" checked={vis[i] !== false} onChange={x => setVis(v => v.map((y, j) => j === i ? x.target.checked : y))} />{e.navn}</label>)}
           <div style={{ marginTop: 4, display: 'flex', gap: 4 }}><button className="btn sm" onClick={() => setVis(h.etasjer.map(e => !e.terreng))}>{tt("Alle")}</button>{sel && <button className="btn sm" onClick={() => setVis(vis.map((_, i) => i === h.elementer[sel.el].e))}>{tt("Kun valgt")}</button>}</div>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}><input type="checkbox" checked={skjul} onChange={e => setSkjul(e.target.checked)} />{tt("Skjul glass")}</label></div>
@@ -234,6 +268,7 @@ function Visning({ eid, modellRad }: { eid: string; modellRad: Rec }) {
           {snitt != null && <input type="range" min={sna} max={snb} step="any" value={snitt} onChange={e => setSnitt(+e.target.value)} style={{ width: 150, display: 'block' }} />}</div></div>
       {modus === 'status' && <div style={{ position: 'absolute', left: 10, bottom: 10, background: '#fffd', borderRadius: 8, padding: '6px 10px', fontSize: 12 }}>{stat('ok')}{stat('snart')}{stat('rod')}{stat('ingen')}<span className="muted">{tt("Grå = ikke koblet til system")}</span></div>}
       <div style={{ position: 'absolute', right: 10, bottom: 8, fontSize: 11, color: '#51656b' }}>{verk === 'velg' ? tt("Dra: snu · Skroll: zoom · Høyre knapp/to fingre: flytt · Klikk: velg") : tt("Klikk i modellen for å sette punkter – de fester seg til nærmeste hjørne")}</div></div>
+    {fagListe.length > 1 && fagListe.some(f => f.utenKoord) && <div className="card" style={{ background: '#fff7e0' }}><span className="small">{tt("Disse modellene ble lastet opp før appen kunne sette sammen fag, og kan ligge forskjøvet i forhold til de andre: {0}. Last dem opp på nytt med «Ny versjon» (under «Vis filer») – mål, notater og koblinger beholdes.", fagListe.filter(f => f.utenKoord).map(f => `${f.k} «${f.navn}»`).join(', '))}</span></div>}
     {rader.length > 0 && !sjekk && <div className="card" style={{ background: '#fff7e0', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><span style={{ flex: 1 }}><b>{rader.length}</b> {tt("koblinger til systemer finner ikke objektet i denne modellen.")}</span><button className="btn sm pri" onClick={() => setSjekk(true)}>{tt("Se gjennom og flytt")}</button></div>}
     {sjekk && <SjekkPanel rader={rader} ed={ed} onBruk={bruk} onFjern={fjernKob} onLukk={() => setSjekk(false)} />}
     {verk === 'kal' && <KalPanel tegninger={tegninger} tid={kt} setTid={setKt} steg={ksteg} p={kp} sp={ksp} setSp={setKsp} onTap={kalTap} nullstill={kalNullstill} lagre={kalLagre} ferdig={ksteg >= 4} mpp={kalM ? meterPerPiksel(kalM) : null} />}
@@ -247,7 +282,7 @@ function Visning({ eid, modellRad }: { eid: string; modellRad: Rec }) {
         <button className="btn sm" onClick={() => plSel.col === 'avvik' ? editAvvik(o.id) : plSel.col === 'anlegg' ? editAnlegg(o.id) : editKomponent(o.id)}>{tt("Åpne")}</button></div>; })()}
       {el ? <>
         <div className="toolbar" style={{ marginBottom: 6 }}><h2 style={{ margin: 0, flex: 1 }}>{klNavn(el.k)}{el.n ? ` – ${el.n}` : ''}</h2><button className="btn sm ghost" onClick={() => setSel(null)}>✕</button></div>
-        <dl className="dl"><dt>{tt("Etasje")}</dt><dd>{h.etasjer[el.e]?.navn}</dd>{el.t && <><dt>{tt("Merke / tag")}</dt><dd>{el.t}</dd></>}{eg?.ns && <><dt>NS 3451</dt><dd>{eg.ns}</dd></>}{eg?.type && <><dt>{tt("Type")}</dt><dd>{eg.type}</dd></>}
+        <dl className="dl">{fagListe.length > 1 && <><dt>{tt("Fag")}</dt><dd>{fagNavn(fagListe[el.f ?? 0]?.k)} · {fagListe[el.f ?? 0]?.navn}</dd></>}<dt>{tt("Etasje")}</dt><dd>{h.etasjer[el.e]?.navn}</dd>{el.t && <><dt>{tt("Merke / tag")}</dt><dd>{el.t}</dd></>}{eg?.ns && <><dt>NS 3451</dt><dd>{eg.ns}</dd></>}{eg?.type && <><dt>{tt("Type")}</dt><dd>{eg.type}</dd></>}
           {Object.entries(eg?.egenskaper || {}).slice(0, 14).map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}{Object.entries(eg?.mengder || {}).slice(0, 6).map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{Math.round(v * 100) / 100}</dd></React.Fragment>)}
           <dt>GUID</dt><dd className="mono small">{el.g}</dd></dl>
         <h3 style={{ marginBottom: 4 }}>{tt("Koblet til i appen")}</h3>

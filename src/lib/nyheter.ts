@@ -1,6 +1,12 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-22', dato: '2026-11-22', tittel: 'Flere fagmodeller i 3D – slå fag av og på', punkter: [
+    'Last opp alle IFC-filene for bygget – ARK, RIB, RIV, RIE, RIBr osv. De settes sammen til én 3D-modell, i riktig posisjon i forhold til hverandre.',
+    'Faget gjenkjennes fra filnavnet, og du kan slå hvert fag av og på – f.eks. skjule arkitekten for å se ventilasjon og el-føringer.',
+    'Kom det en ny IFC fra et fag? Bruk «Ny versjon». Mål, notater, tegningskoblinger og koblinger til systemer beholdes, og appen sjekker om koblingene finner objektene sine i den nye filen.',
+    'Modeller lastet opp tidligere bør lastes opp på nytt med «Ny versjon» dersom du legger til flere fag, slik at de ligger riktig sammen.',
+  ] },
   { id: '2026-11-21', dato: '2026-11-21', tittel: 'Store IFC-modeller kan lastes opp', punkter: [
     '3D-modeller pakkes nå 2–3 ganger tettere, slik at de lastes opp og åpnes raskere. Nøyaktigheten er bedre enn 2 mm.',
     'Svært store modeller deles automatisk i flere filer ved lagring, så det er ikke lenger noen grense på 50 MB. Modeller som feilet tidligere kan lastes opp på nytt.',

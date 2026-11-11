@@ -4,9 +4,9 @@
 // Kjører i en Web Worker (se worker.ts). Kjernen tar et ferdig initialisert web-ifc, så den kan testes i Node.
 
 export type Ek3dEtasje = { navn: string; kote: number; terreng?: boolean };
-export type Ek3dGruppe = { etasje: number; glass: boolean; nv: number; ni: number };
-export type Ek3dElement = { g: string; k: string; n: string; t: string; e: number };
-export type Ek3dHode = { v: 1 | 2; q?: number[][]; bbox: number[]; fokus: number[]; etasjer: Ek3dEtasje[]; grupper: Ek3dGruppe[]; elementer: Ek3dElement[]; nSeg: number; program?: string };
+export type Ek3dGruppe = { etasje: number; glass: boolean; nv: number; ni: number; fag?: number };
+export type Ek3dElement = { g: string; k: string; n: string; t: string; e: number; f?: number };
+export type Ek3dHode = { v: 1 | 2; q?: number[][]; koord?: number[]; bbox: number[]; fokus: number[]; etasjer: Ek3dEtasje[]; grupper: Ek3dGruppe[]; elementer: Ek3dElement[]; nSeg: number; program?: string };
 
 class Vekst { a: Float32Array | Int8Array | Uint32Array; n = 0; constructor(private T: any, start = 1 << 16) { this.a = new T(start); }
   skaff(m: number) { if (this.n + m > this.a.length) { const b = new this.T(Math.max(this.a.length * 2, this.n + m)); b.set(this.a); this.a = b; } }
@@ -16,6 +16,10 @@ type Grp = { etasje: number; glass: boolean; pos: Vekst; nor: Vekst; idx: Vekst;
 export async function konverter(api: any, W: any, data: Uint8Array, fremdrift: (p: number, t: string) => void): Promise<Uint8Array> {
   fremdrift(0.02, 'Åpner modellen');
   const id = api.OpenModel(data, { COORDINATE_TO_ORIGIN: true });
+  // Forskyvningen web-ifc gjør for å flytte modellen nær origo – trengs for å legge flere fagmodeller oppå hverandre (se samle.ts)
+  // (web-ifc regner den ut først når første objekt lastes, så den leses inne i strømmen)
+  let koord: number[] | undefined; let dy = 0;
+  const lesKoord = () => { try { const k = Array.from(api.GetCoordinationMatrix(id) as number[]).map(Number); if (k.length === 16) { koord = k; dy = k[13]; } } catch { /* eldre web-ifc */ } };
   const linjer = (type: number) => { const v = api.GetLineIDsWithType(id, type); const ut: number[] = []; for (let i = 0; i < v.size(); i++) ut.push(v.get(i)); return ut; };
   const verdi = (x: any) => (x && typeof x === 'object' && 'value' in x ? x.value : x);
 
@@ -35,7 +39,7 @@ export async function konverter(api: any, W: any, data: Uint8Array, fremdrift: (
   const totalt = Math.max(1, linjer(W.IFCBUILDINGELEMENTPROXY).length); void totalt;
 
   api.StreamAllMeshes(id, (m: any) => {
-    const n = m.geometries.size(); if (!n) return;
+    const n = m.geometries.size(); if (!n) return; if (!koord) lesKoord();
     const eid = m.expressID; let navn = '', guid = '', tag = '', klasse = '';
     try { const l = api.GetLine(id, eid); guid = String(verdi(l.GlobalId) || ''); navn = String(verdi(l.Name) || ''); tag = String(verdi(l.Tag) || ''); klasse = String(api.GetNameFromTypeCode(api.GetLineType(id, eid)) || '').toUpperCase(); } catch { /* ukjent objekt */ }
     let et: number | null = null; let elIdx = -1; let minZ = Infinity;
@@ -55,7 +59,7 @@ export async function konverter(api: any, W: any, data: Uint8Array, fremdrift: (
       deler.push({ pos, nor, ind: ia.slice(), rgba, glass: al < 235 }); geo.delete();
     }
     if (et == null) et = 0; void minZ;
-    { let sx = 0, sy = 0, sz = 0, sn = 0; for (const d of deler) for (let v = 0; v < d.pos.length; v += 3) { sx += d.pos[v]; sy += d.pos[v + 1]; sz += d.pos[v + 2]; sn++; } if (sn) { senter.push([sx / sn, sy / sn, sz / sn]); et = koteIdx(sy / sn);
+    { let sx = 0, sy = 0, sz = 0, sn = 0; for (const d of deler) for (let v = 0; v < d.pos.length; v += 3) { sx += d.pos[v]; sy += d.pos[v + 1]; sz += d.pos[v + 2]; sn++; } if (sn) { senter.push([sx / sn, sy / sn, sz / sn]); et = koteIdx(sy / sn - dy);
       // Store, tynne flater (terreng, tomt) legges i en egen gruppe som kan skjules
       let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const d of deler) for (let v = 0; v < d.pos.length; v += 3) { const X = d.pos[v], Y = d.pos[v + 1], Z = d.pos[v + 2]; if (X < x0) x0 = X; if (X > x1) x1 = X; if (Z < z0) z0 = Z; if (Z > z1) z1 = Z; if (Y < y0) y0 = Y; if (Y > y1) y1 = Y; }
       if (Math.max(x1 - x0, z1 - z0) > 100 && y1 - y0 < 3) { et = TERR; brukTerreng = true; } } }
@@ -71,7 +75,7 @@ export async function konverter(api: any, W: any, data: Uint8Array, fremdrift: (
   const segI = new Int32Array(seg); segGrp.forEach((g, i) => { segI[i * 7 + 1] = grpNr.get(g)!; });
   const pr = (k: number, p: number) => { const a = senter.map(c => c[k]).sort((x, y) => x - y); return a.length ? a[Math.min(a.length - 1, Math.max(0, Math.floor(a.length * p)))] : 0; };
   const fokus = [0, 1, 2].flatMap(k => [pr(k, 0.01)]).concat([0, 1, 2].map(k => pr(k, 0.99)));
-  const hode: Ek3dHode = { v: 1, bbox, fokus, etasjer: [...(etasjerR.length ? etasjerR : [{ navn: 'Alle', kote: 0 }]).map(e => ({ navn: e.navn, kote: e.kote })), ...(brukTerreng ? [{ navn: 'Terreng / omgivelser', kote: -1e3, terreng: true }] : [])], grupper: gl.map(g => ({ etasje: g.etasje, glass: g.glass, nv: g.nv, ni: g.idx.n })), elementer, nSeg: segGrp.length };
+  const hode: Ek3dHode = { v: 1, koord, bbox, fokus, etasjer: [...(etasjerR.length ? etasjerR : [{ navn: 'Alle', kote: 0 }]).map(e => ({ navn: e.navn, kote: e.kote })), ...(brukTerreng ? [{ navn: 'Terreng / omgivelser', kote: -1e3, terreng: true }] : [])], grupper: gl.map(g => ({ etasje: g.etasje, glass: g.glass, nv: g.nv, ni: g.idx.n })), elementer, nSeg: segGrp.length };
   const hb = new TextEncoder().encode(JSON.stringify(hode)); const hLen = Math.ceil(hb.length / 4) * 4;
   let total = 8 + hLen; for (const g of gl) total += g.nv * 12 + Math.ceil(g.nv * 3 / 4) * 4 + g.idx.n * 4; total += segI.length * 4;
   const ut = new Uint8Array(total); const dv = new DataView(ut.buffer); ut.set([0x45, 0x4b, 0x33, 0x44], 0); dv.setUint32(4, hb.length, true); ut.set(hb, 8);
