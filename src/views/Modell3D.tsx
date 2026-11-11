@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { S, canEdit, fileUrl, save, sb, state, toast, uploadFile, useStore, feiltekst } from '../lib/store';
-import { byId, aNavn, dUntil, openAvvik, fd, today, type Rec } from '../lib/utils';
+import { byId, aNavn, dUntil, openAvvik, fd, today, tfmKomp, type Rec } from '../lib/utils';
 import { tt } from '../lib/i18n';
 import { Chip, Empty, confirmBox, formModal } from '../components/ui';
 import { editAvvik, editAnlegg, editKomponent } from '../lib/actions';
@@ -76,7 +76,7 @@ export default function ModellSeksjon({ eid }: { eid: string }) {
   return <>
     {busy ? <div className="card"><b>{busy} …</b><div style={{ height: 8, background: 'var(--line2)', borderRadius: 4, marginTop: 8 }}><div style={{ height: 8, width: Math.round(pct * 100) + '%', background: '#1E4D57', borderRadius: 4, transition: 'width .3s' }} /></div><p className="small muted" style={{ marginBottom: 0 }}>{tt("Store modeller kan ta et minutt. Ikke lukk siden.")}</p></div>
       : <div className="toolbar" style={{ marginBottom: 10 }}><span className="grow small muted">{L.length ? <>{L.length > 1 ? tt("{0} fagmodeller", L.length) : L[0].data.navn} · {sum} {tt("objekter")} · {(L.reduce((s, r) => s + (r.data.str || 0), 0) / 1e6).toFixed(1)} MB <a href="#" onClick={e => { e.preventDefault(); setVisListe(!visListe); }}>{visListe ? tt("Skjul filer") : tt("Vis filer")}</a></> : ''}</span>
-        {ed && opp()}</div>}
+        {ed && L.length > 0 && <button className="btn" onClick={() => import('./SystemImport').then(m => m.importerSystemer(eid))}>{tt("Importer systemer og komponenter fra IFC")}</button>}{ed && opp()}</div>}
     {visListe && !busy && L.length > 0 && <div className="card"><div className="tbl-wrap"><table><thead><tr><th>{tt("Fag")}</th><th>{tt("Fil")}</th><th>{tt("Objekter")}</th><th>{tt("Lastet opp")}</th><th /></tr></thead><tbody>{L.map(r => <tr key={r.id}>
       <td>{ed ? <select value={fagAv(r)} onChange={e => settFag(r, e.target.value)}>{FAG.map(f => <option key={f.k} value={f.k}>{fagNavn(f.k)}</option>)}</select> : fagNavn(fagAv(r))}</td>
       <td className="small">{r.data.filnavn || r.data.navn}{(r.data.versjoner || []).length > 0 && <div className="muted">{tt("{0} tidligere versjon(er)", r.data.versjoner.length)}</div>}</td><td>{r.data.antall}</td><td className="small">{fd(r.data.tid)}{r.data.opprettetAv ? ' · ' + r.data.opprettetAv : ''}</td>
@@ -146,8 +146,11 @@ function Visning({ eid, modeller, hovedId }: { eid: string; modeller: Rec[]; hov
   }, [mod]);
 
   // --- «Vis i 3D» fra et system i appen
-  useEffect(() => { if (!lastet) return; let id = ''; try { id = sessionStorage.getItem('ek.3dfokus') || ''; sessionStorage.removeItem('ek.3dfokus'); } catch { /* ignorer */ } if (!id) return; const a = byId('anlegg', id); if (!a) return;
-    setFokus(id); setModus('status'); const els = (a.ifcGuider || []).map((g: string) => T.current.farg?.get(g)).filter((x: any) => x != null); setTimeout(() => flyTil(new Set(els)), 50); }, [lastet]);
+  useEffect(() => { if (!lastet) return; const f = () => setTimeout(fokuser, 30); window.addEventListener('ek3d-fokus', f); fokuser(); return () => window.removeEventListener('ek3d-fokus', f); }, [lastet]);
+  function fokuser() { let id = ''; try { id = sessionStorage.getItem('ek.3dfokus') || ''; sessionStorage.removeItem('ek.3dfokus'); } catch { /* ignorer */ } if (!id) return;
+    if (id.startsWith('k:')) { const k = byId('komponenter', id.slice(2)); const els = [k?.ifcGuid, ...(k?.ifcDeler || [])].map(g => g && T.current.farg?.get(g)).filter((x: any) => x != null) as number[]; if (!els.length) return; setVerk('velg'); setTimeout(() => { setSel({ el: els[0], p: senterAv(els[0]) }); flyTil(new Set(els)); }, 50); return; }
+    const a = byId('anlegg', id); if (!a) return;
+    setFokus(id); setModus('status'); const els = (a.ifcGuider || []).map((g: string) => T.current.farg?.get(g)).filter((x: any) => x != null); setTimeout(() => flyTil(new Set(els)), 50); }
 
   // --- farger (utseende / status / valgt / fokus)
   const fokusEl = useMemo(() => { const s = new Set<number>(); if (fokus && T.current.farg) (byId('anlegg', fokus)?.ifcGuider || []).forEach((g: string) => { const i = T.current.farg.get(g); if (i != null) s.add(i); }); return s; }, [fokus, lastet, S.anlegg]);
@@ -227,6 +230,7 @@ function Visning({ eid, modeller, hovedId }: { eid: string; modeller: Rec[]; hov
     while (lo <= hi) { const mid = (lo + hi) >> 1; const f = t.mod.seg[lst[mid] * 7 + 4]; if (f <= pos) { fnn = mid; lo = mid + 1; } else hi = mid - 1; }
     if (fnn < 0) return; setSel({ el: t.mod.seg[lst[fnn] * 7], p: [x.point.x, x.point.y, x.point.z] });
   };
+  const senterAv = (e: number): number[] => { const t = T.current; let x = 0, y = 0, z = 0, n = 0; for (const i of t.segAvEl?.get(e) || []) { const gi = t.mod.seg[i * 7 + 1], vf = t.mod.seg[i * 7 + 2], vc = t.mod.seg[i * 7 + 3]; const p = t.mod.grupper[gi].pos; for (let v = vf; v < vf + vc; v++) { x += p[v * 3]; y += p[v * 3 + 1]; z += p[v * 3 + 2]; n++; } } return n ? [x / n, y / n, z / n] : [0, 0, 0]; };
   const flyTil = (els: Set<number> | number[]) => { const t = T.current; if (!t.mod) return; const b = new t.THREE.Box3(); for (const e of els) for (const i of t.segAvEl.get(e) || []) { const gi = t.mod.seg[i * 7 + 1], vf = t.mod.seg[i * 7 + 2], vc = t.mod.seg[i * 7 + 3]; const p = t.mod.grupper[gi].pos; for (let v = vf; v < vf + vc; v += 3) b.expandByPoint(new t.THREE.Vector3(p[v * 3], p[v * 3 + 1], p[v * 3 + 2])); }
     if (b.isEmpty()) return; const c = b.getCenter(new t.THREE.Vector3()); const s = Math.max(b.getSize(new t.THREE.Vector3()).length(), t.str * 0.05); const dir = t.camera.position.clone().sub(t.kontroll.target).normalize(); t.kontroll.target.copy(c); t.camera.position.copy(c).add(dir.multiplyScalar(s * 1.6)); t.kontroll.update(); t.invalider(); };
 
@@ -286,6 +290,7 @@ function Visning({ eid, modeller, hovedId }: { eid: string; modeller: Rec[]; hov
           {Object.entries(eg?.egenskaper || {}).slice(0, 14).map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}{Object.entries(eg?.mengder || {}).slice(0, 6).map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{Math.round(v * 100) / 100}</dd></React.Fragment>)}
           <dt>GUID</dt><dd className="mono small">{el.g}</dd></dl>
         <h3 style={{ marginBottom: 4 }}>{tt("Koblet til i appen")}</h3>
+        {S.komponenter.filter(k => k.ifcGuid === el.g || (k.ifcDeler || []).includes(el.g)).map(k => <div key={k.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '3px 0', flexWrap: 'wrap' }}><Chip>{tt("Komponent")}</Chip><b>{[tfmKomp(k), k.navn].filter(Boolean).join(' – ')}</b><span className="small muted">{aNavn(k.anleggId)}{k.fabrikat ? ' · ' + k.fabrikat : ''}</span><button className="btn sm" onClick={() => editKomponent(k.id)}>{tt("Åpne")}</button></div>)}
         {koblet.length ? koblet.map(a => { const an = byId('anlegg', a)!; return <div key={a} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '3px 0', flexWrap: 'wrap' }}><Chip c={({ ok: 'green', snart: 'amber', rod: 'red', ingen: '' } as any)[statusAnlegg(a)]}>{({ ok: tt("I orden"), snart: tt("Snart"), rod: tt("Forfalt"), ingen: tt("Ingen kontroll") } as any)[statusAnlegg(a)]}</Chip><b>{aNavn(a)}</b>
           <span className="small muted">{S.oppgaver.filter(o => o.anleggId === a && o.aktiv !== false).length} {tt("kontroller")} · {openAvvik().filter(x => x.anleggId === a).length} {tt("åpne avvik")}</span>{ed && <button className="btn sm ghost" onClick={() => fjern(a)}>{tt("Fjern kobling")}</button>}<button className="btn sm" onClick={() => { setFokus(a); flyTil(new Set((an.ifcGuider || []).map((g: string) => T.current.farg.get(g)).filter((x: any) => x != null))); }}>{tt("Vis alle i modellen")}</button></div>; }) : <p className="small muted" style={{ margin: '0 0 6px' }}>{tt("Ikke koblet til noe system.")}</p>}
         <div className="toolbar">{ed && <button className="btn sm" onClick={koble} disabled={!el.g}>{tt("Koble til system")}</button>}{ed && <button className="btn sm pri" onClick={nyttAvvik}>{tt("Registrer avvik her")}</button>}</div>

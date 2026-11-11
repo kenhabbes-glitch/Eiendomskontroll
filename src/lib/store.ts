@@ -134,6 +134,17 @@ export async function save(col: Col, obj: any): Promise<string> {
   apply(col, 'upsert', fromRow(col, res.data));
   return o.id;
 }
+/** Lagrer mange nye rader i én operasjon per 500 (import). Returnerer id-ene. */
+export async function saveMange(col: Col, objs: any[], fremdrift?: (n: number) => void): Promise<string[]> {
+  const ider: string[] = [];
+  for (let i = 0; i < objs.length; i += 500) {
+    const del = objs.slice(i, i + 500).map(o => { const x = { ...o, id: o.id || crypto.randomUUID() }; ider.push(x.id); return x; });
+    const { data, error } = await sb.from(TABLES[col].table).insert(del.map(o => toRow(col, o))).select();
+    if (error) { toast('Lagring feilet: ' + feiltekst(error)); throw error; }
+    for (const r of data || []) apply(col, 'upsert', fromRow(col, r)); fremdrift?.(Math.min(objs.length, i + 500));
+  }
+  return ider;
+}
 /** Hent én rad på nytt fra databasen (f.eks. etter at en serverfunksjon har endret den) */
 export async function refetch(col: Col, id: string) { const { data } = await sb.from(TABLES[col].table).select('*').eq('id', id).maybeSingle(); if (data) apply(col, 'upsert', fromRow(col, data)); }
 export async function removeDoc(col: Col, id: string) {

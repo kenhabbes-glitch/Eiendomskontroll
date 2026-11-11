@@ -223,8 +223,8 @@ function PlasseringFelt({ kind, id, eiendomId, close }: { kind: 'a' | 'k'; id?: 
   const o = id ? byId(kind === 'a' ? 'anlegg' : 'komponenter', id) : null; const T = sortBy(S.tegninger.filter(t => t.eiendomId === eiendomId), t => +t.etasje || 0);
   const [tid, setTid] = React.useState(o?.pos?.tegningId || T[0]?.id || '');
   if (!id) return <div className="small muted">{tt("Lagre først – deretter kan du plassere den på en tegning.")}</div>;
-  const n3d = kind === 'a' ? (o?.ifcGuider || []).length : 0;
-  const vis3d = n3d > 0 && <><span className="small">{n3d} {tt("objekter i 3D-modellen")}</span><button type="button" className="btn sm" onClick={() => { try { sessionStorage.setItem('ek.3dfokus', id); } catch { /* ignorer */ } close(); location.hash = '#/eiendom/' + eiendomId; window.dispatchEvent(new Event('ek3d-fokus')); }}>{tt("Vis i 3D")}</button></>;
+  const n3d = kind === 'a' ? (o?.ifcGuider || []).length : o?.ifcGuid ? 1 : 0;
+  const vis3d = n3d > 0 && <><span className="small">{kind === 'a' ? `${n3d} ${tt("objekter i 3D-modellen")}` : tt("Koblet til 3D-modellen")}</span><button type="button" className="btn sm" onClick={() => { try { sessionStorage.setItem('ek.3dfokus', (kind === 'k' ? 'k:' : '') + id); } catch { /* ignorer */ } close(); location.hash = '#/eiendom/' + eiendomId; window.dispatchEvent(new Event('ek3d-fokus')); }}>{tt("Vis i 3D")}</button></>;
   if (!T.length && n3d) return <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>{vis3d}</div>;
   if (!T.length) return <div className="small muted">{tt("Ingen tegninger for eiendommen. Last opp under «Tegninger og arealer».")}</div>;
   const t = o?.pos ? byId('tegninger', o.pos.tegningId) : null;

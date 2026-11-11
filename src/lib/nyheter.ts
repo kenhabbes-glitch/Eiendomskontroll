@@ -1,6 +1,12 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-23', dato: '2026-11-23', tittel: 'Systemer og komponenter fra IFC – koblet til 3D', punkter: [
+    'Importen fra IFC lager nå ett system per etasje (f.eks. «Branndører – 2. etasje»), og hver bygningsdel blir en egen komponent i systemet med TFM-kode og løpenummer.',
+    'Systemer og komponenter kobles automatisk til objektene i 3D-modellen. Trykk «Vis i 3D» på en komponent for å se akkurat den døra, eller «Vis i modellen» på systemet.',
+    'Har modellen TFM-merking (=360.001-JV001) eller fagsystemer (vanlig i RIV- og RIE-modeller), brukes de: komponentene samles i riktig system med riktig kode. Fabrikat og serienummer tas med når modellen har dem.',
+    'Ny knapp på 3D-fanen: «Importer systemer og komponenter fra IFC». Komponenter som allerede er importert fra samme objekt, lages ikke på nytt.',
+  ] },
   { id: '2026-11-22', dato: '2026-11-22', tittel: 'Flere fagmodeller i 3D – slå fag av og på', punkter: [
     'Last opp alle IFC-filene for bygget – ARK, RIB, RIV, RIE, RIBr osv. De settes sammen til én 3D-modell, i riktig posisjon i forhold til hverandre.',
     'Faget gjenkjennes fra filnavnet, og du kan slå hvert fag av og på – f.eks. skjule arkitekten for å se ventilasjon og el-føringer.',

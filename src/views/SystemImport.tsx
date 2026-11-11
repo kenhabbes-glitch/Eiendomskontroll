@@ -1,13 +1,17 @@
 // Import av systemer fra datainnsamlingsfil (Excel). Steg: fil → hvilket bygg (eller ny eiendom) → kontroll av radene → import.
 import React, { useMemo, useState } from 'react';
-import { S, save, toast, useStore, kanRedigereE, mineOrg } from '../lib/store';
-import { byId, sortBy, nok, type Rec } from '../lib/utils';
+import { S, save, saveMange, toast, useStore, kanRedigereE, mineOrg } from '../lib/store';
+import { byId, sortBy, nok, nextKompLop, type Rec } from '../lib/utils';
+import { TFM_DEF } from '../lib/catalog';
 import { ModalFrame, openModal, Chip } from '../components/ui';
 import { editEiendom, generatePlan } from '../lib/actions';
 import { KOMP } from '../lib/catalog';
 import { lesXlsx, lesCsv, tolkData, tolkGenerell, foreslaKolonner, GEN_FELT, tilSystem, type ImportRad } from '../lib/systemImport';
 import { tt, lokale } from '../lib/i18n';
-import { lesIfc, ifcAntall, ifcTilTabell, IFC_KAT, type IfcModell } from '../lib/ifc';
+import { lesIfc, ifcAntall, ifcTilTabell, IFC_KAT, type IfcModell, type IfcKomp } from '../lib/ifc';
+
+/** Systemtype i katalogen ut fra TFM-systemkode (360 → ventilasjon osv.) */
+const typeFraTfm = (kode: string) => Object.entries(TFM_DEF).find(([, v]) => v[0] === kode)?.[0] || '';
 
 export function importerSystemer(eid?: string) { openModal({ wide: true, render: close => <Dialog eid0={eid} close={close} /> }); }
 
@@ -19,7 +23,7 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
   useStore();
   const [ark, setArk] = useState<Record<string, any[][]> | null>(null); const [navn, setNavn] = useState(''); const [feil, setFeil] = useState('');
   const [eid, setEid] = useState(eid0 || ''); const [steg, setSteg] = useState<'fil' | 'ifc' | 'kolonner' | 'bygg' | 'sjekk' | 'ferdig'>('fil');
-  const [ifcM, setIfcM] = useState<IfcModell | null>(null); const [ifcVal, setIfcVal] = useState<Set<string>>(new Set()); const [ifcEt, setIfcEt] = useState(true); const [ifcPct, setIfcPct] = useState(0); const [ifcTyper, setIfcTyper] = useState<Record<number, string>>({});
+  const [ifcM, setIfcM] = useState<IfcModell | null>(null); const [ifcVal, setIfcVal] = useState<Set<string>>(new Set()); const [ifcEt, setIfcEt] = useState(true); const [ifcPct, setIfcPct] = useState(0); const [ifcTyper, setIfcTyper] = useState<Record<number, string>>({}); const [ifcKomp, setIfcKomp] = useState<Record<number, IfcKomp[]>>({}); const [somKomp, setSomKomp] = useState(true); const [fase, setFase] = useState('');
   const [gen, setGen] = useState<{ ark: Record<string, any[][]>; ark1: string; hode: number; map: Record<string, number> } | null>(null);
   const [endr, setEndr] = useState<Record<number, Partial<ImportRad>>>({}); const [eks, setEks] = useState<'oppdater' | 'hopp'>('oppdater');
   const [busy, setBusy] = useState(false); const [res, setRes] = useState<{ ny: number; opp: number; hopp: number } | null>(null);
@@ -59,15 +63,29 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
     catch (e: any) { setFeil(tt("Kunne ikke lese modellen: ") + (e?.message || e)); }
     setBusy(false);
   };
-  const fraIfc = () => { if (!ifcM) return; const { R, typer } = ifcTilTabell(ifcM, ifcVal, ifcEt); setIfcTyper(typer); setEndr({}); setArk(null); setGen({ ark: { IFC: R }, ark1: 'IFC', hode: 0, map: { navn: 0, type: 1, kode: 2, plassering: 3, komm: 4 } }); setSteg(eid ? 'sjekk' : 'bygg'); };
+  const fraIfc = () => { if (!ifcM) return; const { R, typer, komp } = ifcTilTabell(ifcM, ifcVal, ifcEt, typeFraTfm); setIfcTyper(typer); setIfcKomp(somKomp ? komp : {}); setEndr({}); setArk(null); setGen({ ark: { IFC: R }, ark1: 'IFC', hode: 0, map: { navn: 0, type: 1, kode: 2, plassering: 3, komm: 4, lop: 5 } }); setSteg(eid ? 'sjekk' : 'bygg'); };
   const velgArk = (n: string) => { const fk = foreslaKolonner(gen!.ark[n]); setGen({ ...gen!, ark1: n, hode: fk.hode, map: fk.map }); };
   const nyEiendom = () => editEiendom(undefined, nid => { setEid(nid); setSteg('sjekk'); }, { navn });
   const importer = async () => {
     const L = rader.filter(r => r.ta && !(r.finnes && eks === 'hopp')); if (!L.length) return toast(tt("Ingen rader valgt"));
     setBusy(true); let ny = 0, opp = 0;
     try {
-      for (const r of L) { const f = r.finnes ? byId('anlegg', r.finnes.id) : null; await save('anlegg', tilSystem(r, eid, f)); f ? opp++ : ny++; }
-      setRes({ ny, opp, hopp: rader.filter(r => r.ta).length - L.length }); setSteg('ferdig');
+      let nk = 0, i = 0;
+      for (const r of L) { i++; const f = r.finnes ? byId('anlegg', r.finnes.id) : null; const K = ifcKomp[r.rad] || [];
+        if (K.length) setFase(tt("System {0} av {1}: {2}", i, L.length, r.navn));
+        const sys = tilSystem(r, eid, f);
+        if (K.length) { // koble systemet til objektene i 3D-modellen
+          const meta = { ...(sys.ifcMeta || {}) }; const gs: string[] = []; K.forEach(k => { for (const g of k.deler?.length ? k.deler : [k.guid]) { gs.push(g); meta[g] = { k: k.klasse, n: k.navn, t: k.tag, e: k.etasje, c: null }; } });
+          Object.assign(sys, { ifcGuider: [...new Set([...(sys.ifcGuider || []), ...gs])], ifcMeta: meta }); }
+        const sid = await save('anlegg', sys); f ? opp++ : ny++;
+        if (K.length) { // hver bygningsdel blir en komponent (finnes den fra før – samme IFC-objekt – oppdateres den ikke)
+          const har = new Set(S.komponenter.filter(k => k.anleggId === sid && k.ifcGuid).map(k => k.ifcGuid)); const def = TFM_DEF[sys.type]?.[1] || '';
+          const brukt = new Map<string, Set<string>>(); const lopFor = (kode: string, ønsket: string) => { const b = brukt.get(kode) || new Set(S.komponenter.filter(k => k.anleggId === sid && (k.kode || '').toUpperCase() === kode).map(k => String(k.lop))); brukt.set(kode, b);
+            if (ønsket && !b.has(ønsket)) { b.add(ønsket); return ønsket; } let n = +(nextKompLop(sid, kode)) || 1; while (b.has(String(n).padStart(3, '0'))) n++; const l = String(n).padStart(3, '0'); b.add(l); return l; };
+          const nye = K.filter(k => !har.has(k.guid)).map(k => { const kode = (k.kode || def).toUpperCase();
+            return { anleggId: sid, eiendomId: eid, kode, lop: lopFor(kode, k.lop), navn: k.navn, plassering: k.plassering, ...(k.fabrikat ? { fabrikat: k.fabrikat } : {}), ...(k.serienr ? { serienr: k.serienr } : {}), ifcGuid: k.guid, ...(k.deler?.length ? { ifcDeler: k.deler } : {}), importKilde: { dato: new Date().toISOString().slice(0, 10), ifc: ifcM?.filnavn || '' } }; });
+          if (nye.length) { await saveMange('komponenter', nye, n => setFase(tt("System {0} av {1}: {2} – {3} av {4} komponenter", i, L.length, r.navn, n, nye.length))); nk += nye.length; } } }
+      setFase(''); setRes({ ny, opp, hopp: rader.filter(r => r.ta).length - L.length, nk } as any); setSteg('ferdig');
     } catch (e: any) { toast(tt("Importen stoppet: ") + (e?.message || e)); }
     setBusy(false);
   };
@@ -77,7 +95,7 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
     {steg === 'ifc' && <><button className="btn" onClick={() => { setIfcM(null); setSteg('fil'); }}>{tt("← Tilbake")}</button><span className="grow" /><button className="btn pri" disabled={!ifcVal.size} onClick={fraIfc}>{tt("Neste →")}</button></>}
     {steg === 'kolonner' && <><button className="btn" onClick={() => { setGen(null); setSteg('fil'); }}>{tt("← Tilbake")}</button><span className="grow" /><button className="btn pri" disabled={gen?.map.navn == null && gen?.map.type == null} onClick={() => setSteg(eid ? 'sjekk' : 'bygg')}>{tt("Neste →")}</button></>}
     {steg === 'bygg' && <><button className="btn" onClick={() => setSteg(ifcM && gen?.ark1 === 'IFC' ? 'ifc' : gen ? 'kolonner' : 'fil')}>{tt("← Tilbake")}</button><span className="grow" /><button className="btn pri" disabled={!eid} onClick={() => setSteg('sjekk')}>{tt("Neste →")}</button></>}
-    {steg === 'sjekk' && <><button className="btn" onClick={() => setSteg('bygg')}>{tt("← Bytt bygg")}</button><span className="grow" /><span className="small muted">{valgt.length} {tt("systemer ·")} {nok(sumKost)}</span><button className="btn pri" disabled={busy || !valgt.length} onClick={importer}>{busy ? tt("Importerer …") : tt("Importer {0} systemer", valgt.filter(r => !(r.finnes && eks === 'hopp')).length)}</button></>}
+    {steg === 'sjekk' && <><button className="btn" onClick={() => setSteg('bygg')}>{tt("← Bytt bygg")}</button><span className="grow" /><span className="small muted">{valgt.length} {tt("systemer ·")} {nok(sumKost)}</span><button className="btn pri" disabled={busy || !valgt.length} onClick={importer}>{busy ? (fase || tt("Importerer …")) : tt("Importer {0} systemer", valgt.filter(r => !(r.finnes && eks === 'hopp')).length) + (() => { const n = valgt.reduce((s, r) => s + (ifcKomp[r.rad]?.length || 0), 0); return n ? ' ' + tt("med {0} komponenter", n) : ''; })()}</button></>}
     {steg === 'ferdig' && <><span className="grow" /><button className="btn" onClick={() => { close(); location.hash = '#/eiendom/' + eid; }}>{tt("Gå til eiendommen")}</button><button className="btn pri" onClick={() => { close(); generatePlan(eid); }}>{tt("Lag kontrollplan for systemene →")}</button></>}
     {steg === 'fil' && <><span className="grow" /><button className="btn" onClick={close}>{tt("Avbryt")}</button></>}</>}>
     {steg === 'fil' && <div>
@@ -97,7 +115,9 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
       <p style={{ marginTop: 0 }}><b>{ifcM.byggNavn || ifcM.filnavn}</b> · {ifcM.schema} · {ifcM.etasjer.length} {tt("etasjer")}<br /><span className="small muted">{tt("Laget i {0}", (ifcM.program || '').slice(0, 70))}</span></p>
       <p className="small muted">{tt("Modellen har {0} objekter totalt. Konstruksjon (vegger, dekker, søyler, bjelker) tas ikke med – dem følger du opp som bygningsdeler og tilstandsgrad, ikke som systemer. Velg hva som skal bli systemer:", tom.toLocaleString(lokale()))}</p>
       {IFC_KAT.filter(k => ant[k.id] > 0).map(k => <label key={k.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '5px 0' }}><input type="checkbox" checked={ifcVal.has(k.id)} onChange={x => setIfcVal(v => { const n = new Set(v); x.target.checked ? n.add(k.id) : n.delete(k.id); return n; })} /><span><b>{tt(k.navn)}</b> <span className="muted">· {ant[k.id]} {tt("stk")}</span><br /><span className="small muted">{tt(k.hint)}</span></span></label>)}
-      <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}><input type="checkbox" checked={ifcEt} onChange={x => setIfcEt(x.target.checked)} />{tt("Én rad per etasje (anbefalt). Av = én rad per type for hele bygget.")}</label></div>; })()}
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}><input type="checkbox" checked={ifcEt} onChange={x => setIfcEt(x.target.checked)} />{tt("Ett system per etasje (anbefalt). Av = ett system per type for hele bygget.")}</label>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 6 }}><input type="checkbox" checked={somKomp} onChange={x => setSomKomp(x.target.checked)} /><span>{tt("Hver bygningsdel blir en komponent i systemet (f.eks. hver branndør), koblet til objektet i 3D-modellen")}<br /><span className="small muted">{tt("Fabrikat, serienummer og TFM-kode tas med når modellen har dem.")}</span></span></label>
+      {(() => { const tfm = ifcM.elementer.filter(e => e.tfm).length, sys = new Set(ifcM.elementer.map(e => e.system).filter(Boolean)).size; return (tfm || sys) ? <p className="small note" style={{ color: 'var(--ink)' }}>{tfm ? tt("{0} objekter har TFM-merking – de samles i systemene merkingen angir (f.eks. 360.001), for hele bygget.", tfm) + ' ' : ''}{sys ? tt("Modellen har {0} fagsystemer – objekter som hører til et fagsystem samles i det.", sys) : ''}</p> : null; })()}</div>; })()}
     {steg === 'kolonner' && gen && (() => { const hdr = (genR[gen.hode] || []).map((h: any, i: number) => String(h ?? '').trim() || tt("Kolonne {0}", i + 1)); const ant = genR.length - gen.hode - 1;
       return <div>
         <p style={{ marginTop: 0 }}>{tt("Filen")} <b>{navn}</b> {tt("har")} {ant} {tt("rader. Velg hvilken kolonne som inneholder hva. Trenger du bare navn eller type, er det nok. Resten fylles inn der det finnes.")}</p>
@@ -134,7 +154,7 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
       <p className="small muted">{tt("Typen bestemmer levetid, kontroller og sjekklister i appen. Rader markert gult har ingen katalogtype. De importeres likevel med NS 3451-koden, men får ikke automatiske kontroller. Kostnad i m² regnes som areal × enhetspris, så den kan måles opp på tegning senere.")}</p>
     </div>}
     {steg === 'ferdig' && res && <div>
-      <p style={{ marginTop: 0 }}><b>{res.ny}</b> {tt("nye systemer og")} <b>{res.opp}</b> {tt("oppdatert på")} <b>{e?.navn}</b>{res.hopp ? tt(", {0} hoppet over", res.hopp) : ''}.</p>
+      <p style={{ marginTop: 0 }}><b>{res.ny}</b> {tt("nye systemer og")} <b>{res.opp}</b> {tt("oppdatert på")} <b>{e?.navn}</b>{res.hopp ? tt(", {0} hoppet over", res.hopp) : ''}.{(res as any).nk ? ' ' + tt("{0} komponenter er opprettet og koblet til 3D-modellen.", (res as any).nk) : ''}</p>
       <p>{tt("Neste steg: lag kontrollplanen. Da foreslås lovpålagte og anbefalte kontroller for systemene, for eksempel brannalarm, nødlys, heis og ventilasjon.")}</p></div>}
   </ModalFrame>;
 }
