@@ -123,7 +123,7 @@ export type IfcKat = { id: string; navn: string; klasser: string[]; kode: string
 export const IFC_KAT: IfcKat[] = [
   { id: 'vindu', navn: 'Vinduer', klasser: ['IFCWINDOW'], kode: '234', type: 'vinduer', standard: true, hint: 'Bygningsdel 234, levetid 40 år' },
   { id: 'dor', navn: 'Dører', klasser: ['IFCDOOR'], kode: '244', type: '', standard: true, hint: 'Ytterdører og branndører får egen type når modellen oppgir det' },
-  { id: 'fasade', navn: 'Glassfasade / systemfasade', klasser: ['IFCCURTAINWALL'], kode: '230', type: 'fasade_mur', standard: true, hint: 'Bygningsdel 230' },
+  { id: 'fasade', navn: 'Glassfasade / systemfasade', klasser: ['IFCCURTAINWALL'], kode: '233', type: 'fasade_mur', standard: true, hint: 'Bygningsdel 233 Glassfasader, levetid 30–40 år' },
   { id: 'trapp', navn: 'Trapper og ramper', klasser: ['IFCSTAIR', 'IFCSTAIRFLIGHT', 'IFCRAMP'], kode: '', type: '', standard: true, hint: 'Trenger kontroll av gelender og slitasje' },
   { id: 'rekkverk', navn: 'Rekkverk og gelendere', klasser: ['IFCRAILING'], kode: '', type: '', standard: true, hint: 'Personsikkerhet – kontroll av festepunkter' },
   { id: 'sanitar', navn: 'Sanitærutstyr / armaturer (foreslått)', klasser: ['IFCFLOWTERMINAL', 'IFCSANITARYTERMINAL'], kode: '313', type: 'sanitar', standard: true, hint: 'Arkitektmodeller har ofte bare sanitærutstyr, ikke tekniske anlegg' },
@@ -134,17 +134,22 @@ export const IFC_KAT: IfcKat[] = [
 ];
 export function ifcAntall(m: IfcModell): Record<string, number> { const o: Record<string, number> = {}; for (const k of IFC_KAT) o[k.id] = m.elementer.filter(e => k.klasser.includes(e.klasse)).length; return o; }
 
-export type IfcKomp = { deler?: string[]; guid: string; navn: string; kode: string; lop: string; typekode: string; plassering: string; fabrikat: string; serienr: string; klasse: string; tag: string; etasje: string; brann: string };
+export type IfcKomp = { levetid: number; deler?: string[]; guid: string; navn: string; kode: string; lop: string; typekode: string; plassering: string; fabrikat: string; serienr: string; klasse: string; tag: string; etasje: string; brann: string };
 const rensNavn = (n: string) => n.replace(/:\d{5,}$/, '').replace(/:/g, ' · ').replace(/[\s-]+$/, '').trim();
+/** Forventet teknisk levetid (år) per komponent. Bygger på NS 3451-referansen i appen (midt i spennet) og vanlige erfaringstall; brukes når modellen ikke sier noe. */
+const LEV_KAT: Record<string, number> = { vindu: 40, dor: 30, fasade: 35, trapp: 60, rekkverk: 25, sanitar: 20, teknisk: 20, himling: 20, innredning: 15, annet: 20 };
+const LEV_KLASSE: Record<string, number> = { IFCPUMP: 15, IFCFAN: 20, IFCBOILER: 20, IFCCHILLER: 20, IFCVALVE: 20, IFCDAMPER: 20, IFCFILTER: 10, IFCHEATEXCHANGER: 20, IFCTANK: 25, IFCLIGHTFIXTURE: 18, IFCLAMP: 15,
+  IFCALARM: 15, IFCSENSOR: 15, IFCACTUATOR: 15, IFCCONTROLLER: 15, IFCELECTRICDISTRIBUTIONBOARD: 30, IFCUNITARYEQUIPMENT: 20, IFCAIRTERMINAL: 25, IFCFIRESUPPRESSIONTERMINAL: 30, IFCTRANSPORTELEMENT: 25,
+  IFCSANITARYTERMINAL: 20, IFCFLOWTERMINAL: 20, IFCSTAIRFLIGHT: 60, IFCRAMP: 60 };
 const ENTALL: Record<string, string> = { vindu: 'Vindu', dor: 'Dør', fasade: 'Glassfasade', trapp: 'Trapp', rekkverk: 'Rekkverk', sanitar: 'Sanitærutstyr', teknisk: 'Teknisk komponent', himling: 'Himling', innredning: 'Innredning', annet: 'Objekt' };
 const brannAv = (e: IfcEl) => { const b = e.egenskaper.FireRating || e.egenskaper.Brannklasse || e.egenskaper.Brannmotstand || ''; return b && !/^(nei|0|-|ingen|none)$/i.test(b) ? b : ''; };
 
 /** Lager en tabell (overskrift + rader) som kan kjøres gjennom den vanlige importen, en type per rad og bygningsdelene (komponentene) per rad.
  *  Gruppering: 1) TFM-merket system i modellen (=360.001 …) – ett system for hele bygget, 2) fagsystem i modellen (IfcSystem),
  *  3) ellers kategori per etasje (f.eks. «Branndører – 2. etasje» med hver dør som komponent). */
-export function ifcTilTabell(m: IfcModell, valgt: Set<string>, perEtasje: boolean, sysType?: (kode: string) => string): { R: any[][]; typer: Record<number, string>; komp: Record<number, IfcKomp[]> } {
-  const R: any[][] = [['Navn', 'Type', 'Kode', 'Plassering', 'Merknad', 'Løpenr']]; const typer: Record<number, string> = {}; const komp: Record<number, IfcKomp[]> = {};
-  type G = { navn: string; kode: string; lop: string; type: string; etasje: string; areal: number; ex: string[]; kilde: string; el: { e: IfcEl; kompKode: string; ent: string }[] };
+export function ifcTilTabell(m: IfcModell, valgt: Set<string>, perEtasje: boolean, sysType?: (kode: string) => string): { R: any[][]; typer: Record<number, string>; komp: Record<number, IfcKomp[]>; lev: Record<number, number> } {
+  const R: any[][] = [['Navn', 'Type', 'Kode', 'Plassering', 'Merknad', 'Løpenr']]; const typer: Record<number, string> = {}; const komp: Record<number, IfcKomp[]> = {}; const lev: Record<number, number> = {};
+  type G = { navn: string; kode: string; lop: string; type: string; etasje: string; areal: number; ex: string[]; kilde: string; el: { e: IfcEl; kompKode: string; ent: string; lev: number }[] };
   const grp = new Map<string, G>();
   const klasseAvGuid = new Map(m.elementer.map(e => [e.guid, e.klasse]));
   for (const kat of IFC_KAT) { if (!valgt.has(kat.id)) continue;
@@ -156,10 +161,12 @@ export function ifcTilTabell(m: IfcModell, valgt: Set<string>, perEtasje: boolea
       else if (e.system) { key = 'sys|' + e.system + '|' + kat.id; g0 = { navn: e.system, kode, lop: '', type, etasje: '', kilde: 'system i modellen' }; }
       else { const et = perEtasje ? e.etasje : ''; key = [kat.id, navn, et, e.klasse === 'IFCSTAIRFLIGHT' ? 'x' : ''].join('|'); g0 = { navn: `${navn}${et ? ' – ' + et : ''}`, kode, lop: '', type, etasje: et, kilde: '' }; }
       const g = grp.get(key) || { ...g0, areal: 0, ex: [], el: [] }; g.areal += e.mengder.Area || 0; if (g.ex.length < 4 && e.navn) g.ex.push(rensNavn(e.navn));
-      g.el.push({ e, kompKode: e.tfm?.komp || '', ent: kat.id === 'dor' && navn === 'Branndører' ? 'Branndør' : kat.id === 'dor' && navn === 'Ytterdører' ? 'Ytterdør' : ENTALL[kat.id] || 'Objekt' }); grp.set(key, g); } }
+      g.el.push({ e, lev: LEV_KLASSE[e.klasse] || LEV_KAT[kat.id] || 20, kompKode: e.tfm?.komp || '', ent: kat.id === 'dor' && navn === 'Branndører' ? 'Branndør' : kat.id === 'dor' && navn === 'Ytterdører' ? 'Ytterdør' : ENTALL[kat.id] || 'Objekt' }); grp.set(key, g); } }
   for (const g of grp.values()) { const rad = R.length + 1; const n = g.el.length;
     R.push([g.navn, g.navn, g.kode, g.etasje, `Fra IFC-modell ${m.filnavn}${g.kilde ? ` (${g.kilde})` : ''}: ${n} stk${g.areal ? `, ca. ${Math.round(g.areal)} m² samlet flate` : ''}. Eksempler: ${g.ex.join(', ')}`, g.lop]); typer[rad] = g.type;
-    komp[rad] = g.el.map(({ e, kompKode, ent }) => { const b = brannAv(e); const ok = (x: string) => !!x && x.length >= 3 && !/^(obj\.?|objekt)?[\s.-]*\d*$/i.test(x) && !/^[A-ZÆØÅ]{1,2}-?$/i.test(x); const nv = [rensNavn(e.navn), rensNavn(e.type)].find(ok) || ent;
-      return { guid: e.guid, ...(e.deler?.length ? { deler: e.deler } : {}), navn: nv + (b ? ` (${b})` : ''), kode: kompKode, lop: e.tfm?.klop || '', typekode: '', plassering: [e.etasje, e.egenskaper.Rom || e.egenskaper.Room || e.egenskaper.RoomName || ''].filter(Boolean).join(' · '), fabrikat: e.fabrikat || '', serienr: e.serienr || '', klasse: e.klasse, tag: e.tag, etasje: e.etasje, brann: b }; }); }
-  return { R, typer, komp };
+    // systemets levetid: det vanligste blant komponentene (en etasje med branndører skiftes over tid, ikke samtidig)
+    { const t = new Map<number, number>(); g.el.forEach(x => t.set(x.lev, (t.get(x.lev) || 0) + 1)); lev[rad] = [...t].sort((a, b) => b[1] - a[1])[0]?.[0] || 20; }
+    komp[rad] = g.el.map(({ e, kompKode, ent, lev: kl }) => { const b = brannAv(e); const ok = (x: string) => !!x && x.length >= 3 && !/^(obj\.?|objekt)?[\s.-]*\d*$/i.test(x) && !/^[A-ZÆØÅ]{1,2}-?$/i.test(x); const nv = [rensNavn(e.navn), rensNavn(e.type)].find(ok) || ent;
+      return { levetid: kl, guid: e.guid, ...(e.deler?.length ? { deler: e.deler } : {}), navn: nv + (b ? ` (${b})` : ''), kode: kompKode, lop: e.tfm?.klop || '', typekode: '', plassering: [e.etasje, e.egenskaper.Rom || e.egenskaper.Room || e.egenskaper.RoomName || ''].filter(Boolean).join(' · '), fabrikat: e.fabrikat || '', serienr: e.serienr || '', klasse: e.klasse, tag: e.tag, etasje: e.etasje, brann: b }; }); }
+  return { R, typer, komp, lev };
 }

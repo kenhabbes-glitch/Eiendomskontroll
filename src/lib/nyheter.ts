@@ -6,6 +6,7 @@ export const NYHETER: Nyhet[] = [
     'Systemer og komponenter kobles automatisk til objektene i 3D-modellen. Trykk «Vis i 3D» på en komponent for å se akkurat den døra, eller «Vis i modellen» på systemet.',
     'Har modellen TFM-merking (=360.001-JV001) eller fagsystemer (vanlig i RIV- og RIE-modeller), brukes de: komponentene samles i riktig system med riktig kode. Fabrikat og serienummer tas med når modellen har dem.',
     'Ny knapp på 3D-fanen: «Importer systemer og komponenter fra IFC». Komponenter som allerede er importert fra samme objekt, lages ikke på nytt.',
+    'Hvert system og hver komponent får forventet levetid (f.eks. vinduer 40 år, dører 30, rekkverk 25, pumper 15) og byggeåret som installasjonsår, slik at de havner riktig i vedlikeholdsplanen. Endre året før import på rader som er skiftet senere.',
   ] },
   { id: '2026-11-22', dato: '2026-11-22', tittel: 'Flere fagmodeller i 3D – slå fag av og på', punkter: [
     'Last opp alle IFC-filene for bygget – ARK, RIB, RIV, RIE, RIBr osv. De settes sammen til én 3D-modell, i riktig posisjon i forhold til hverandre.',

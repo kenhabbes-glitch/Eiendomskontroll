@@ -23,7 +23,7 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
   useStore();
   const [ark, setArk] = useState<Record<string, any[][]> | null>(null); const [navn, setNavn] = useState(''); const [feil, setFeil] = useState('');
   const [eid, setEid] = useState(eid0 || ''); const [steg, setSteg] = useState<'fil' | 'ifc' | 'kolonner' | 'bygg' | 'sjekk' | 'ferdig'>('fil');
-  const [ifcM, setIfcM] = useState<IfcModell | null>(null); const [ifcVal, setIfcVal] = useState<Set<string>>(new Set()); const [ifcEt, setIfcEt] = useState(true); const [ifcPct, setIfcPct] = useState(0); const [ifcTyper, setIfcTyper] = useState<Record<number, string>>({}); const [ifcKomp, setIfcKomp] = useState<Record<number, IfcKomp[]>>({}); const [somKomp, setSomKomp] = useState(true); const [fase, setFase] = useState('');
+  const [ifcM, setIfcM] = useState<IfcModell | null>(null); const [ifcVal, setIfcVal] = useState<Set<string>>(new Set()); const [ifcEt, setIfcEt] = useState(true); const [ifcPct, setIfcPct] = useState(0); const [ifcTyper, setIfcTyper] = useState<Record<number, string>>({}); const [ifcKomp, setIfcKomp] = useState<Record<number, IfcKomp[]>>({}); const [ifcLev, setIfcLev] = useState<Record<number, number>>({}); const [somKomp, setSomKomp] = useState(true); const [fase, setFase] = useState('');
   const [gen, setGen] = useState<{ ark: Record<string, any[][]>; ark1: string; hode: number; map: Record<string, number> } | null>(null);
   const [endr, setEndr] = useState<Record<number, Partial<ImportRad>>>({}); const [eks, setEks] = useState<'oppdater' | 'hopp'>('oppdater');
   const [busy, setBusy] = useState(false); const [res, setRes] = useState<{ ny: number; opp: number; hopp: number } | null>(null);
@@ -31,7 +31,9 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
   const kanNy = mineOrg(['admin', 'forvalter']).length > 0;
   const genR = gen ? gen.ark[gen.ark1] || [] : [];
   const tolket = useMemo(() => gen && eid ? { rader: tolkGenerell(genR, gen.hode, gen.map, eid), feil: '' } : ark && eid ? tolkData(ark, eid) : null, [ark, gen, eid, S.anlegg.length]);
-  const rader: ImportRad[] = (tolket?.rader || []).map(r => ({ ...r, ...(ifcTyper[r.rad] ? { type: ifcTyper[r.rad] } : {}), ...(endr[r.rad] || {}) }));
+  const byggeaar = eid ? +(byId('eiendommer', eid)?.byggeaar || 0) || null : null;
+  // Fra IFC: forventet levetid per system og byggeåret som installasjonsår (kan endres per rad før import)
+  const rader: ImportRad[] = (tolket?.rader || []).map(r => ({ ...r, ...(ifcTyper[r.rad] ? { type: ifcTyper[r.rad] } : {}), ...(ifcLev[r.rad] ? { levetid: r.levetid || ifcLev[r.rad], aar: r.aar || byggeaar } : {}), ...(endr[r.rad] || {}) }));
   const settR = (rad: number, p: Partial<ImportRad>) => setEndr(x => ({ ...x, [rad]: { ...(x[rad] || {}), ...p } }));
 
   const velgFil = async (f?: File | null) => {
@@ -63,7 +65,7 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
     catch (e: any) { setFeil(tt("Kunne ikke lese modellen: ") + (e?.message || e)); }
     setBusy(false);
   };
-  const fraIfc = () => { if (!ifcM) return; const { R, typer, komp } = ifcTilTabell(ifcM, ifcVal, ifcEt, typeFraTfm); setIfcTyper(typer); setIfcKomp(somKomp ? komp : {}); setEndr({}); setArk(null); setGen({ ark: { IFC: R }, ark1: 'IFC', hode: 0, map: { navn: 0, type: 1, kode: 2, plassering: 3, komm: 4, lop: 5 } }); setSteg(eid ? 'sjekk' : 'bygg'); };
+  const fraIfc = () => { if (!ifcM) return; const { R, typer, komp, lev } = ifcTilTabell(ifcM, ifcVal, ifcEt, typeFraTfm); setIfcTyper(typer); setIfcLev(lev); setIfcKomp(somKomp ? komp : {}); setEndr({}); setArk(null); setGen({ ark: { IFC: R }, ark1: 'IFC', hode: 0, map: { navn: 0, type: 1, kode: 2, plassering: 3, komm: 4, lop: 5 } }); setSteg(eid ? 'sjekk' : 'bygg'); };
   const velgArk = (n: string) => { const fk = foreslaKolonner(gen!.ark[n]); setGen({ ...gen!, ark1: n, hode: fk.hode, map: fk.map }); };
   const nyEiendom = () => editEiendom(undefined, nid => { setEid(nid); setSteg('sjekk'); }, { navn });
   const importer = async () => {
@@ -83,7 +85,7 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
           const brukt = new Map<string, Set<string>>(); const lopFor = (kode: string, ønsket: string) => { const b = brukt.get(kode) || new Set(S.komponenter.filter(k => k.anleggId === sid && (k.kode || '').toUpperCase() === kode).map(k => String(k.lop))); brukt.set(kode, b);
             if (ønsket && !b.has(ønsket)) { b.add(ønsket); return ønsket; } let n = +(nextKompLop(sid, kode)) || 1; while (b.has(String(n).padStart(3, '0'))) n++; const l = String(n).padStart(3, '0'); b.add(l); return l; };
           const nye = K.filter(k => !har.has(k.guid)).map(k => { const kode = (k.kode || def).toUpperCase();
-            return { anleggId: sid, eiendomId: eid, kode, lop: lopFor(kode, k.lop), navn: k.navn, plassering: k.plassering, ...(k.fabrikat ? { fabrikat: k.fabrikat } : {}), ...(k.serienr ? { serienr: k.serienr } : {}), ifcGuid: k.guid, ...(k.deler?.length ? { ifcDeler: k.deler } : {}), importKilde: { dato: new Date().toISOString().slice(0, 10), ifc: ifcM?.filnavn || '' } }; });
+            return { anleggId: sid, eiendomId: eid, kode, lop: lopFor(kode, k.lop), navn: k.navn, plassering: k.plassering, levetid: k.levetid, ...((r.aar || byggeaar) ? { aar: r.aar || byggeaar } : {}), ...(k.fabrikat ? { fabrikat: k.fabrikat } : {}), ...(k.serienr ? { serienr: k.serienr } : {}), ifcGuid: k.guid, ...(k.deler?.length ? { ifcDeler: k.deler } : {}), importKilde: { dato: new Date().toISOString().slice(0, 10), ifc: ifcM?.filnavn || '' } }; });
           if (nye.length) { await saveMange('komponenter', nye, n => setFase(tt("System {0} av {1}: {2} – {3} av {4} komponenter", i, L.length, r.navn, n, nye.length))); nk += nye.length; } } }
       setFase(''); setRes({ ny, opp, hopp: rader.filter(r => r.ta).length - L.length, nk } as any); setSteg('ferdig');
     } catch (e: any) { toast(tt("Importen stoppet: ") + (e?.message || e)); }
@@ -151,6 +153,7 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
           <td className="num small mono">{r.kost ? nok(r.kost) : '–'}{/^m(2|²)$/i.test(r.enhet) && r.antall ? <div className="muted">{r.antall.toLocaleString(lokale())} m²</div> : r.antall && r.antall > 1 ? <div className="muted">{r.antall} {r.enhet}</div> : null}</td>
           <td>{r.finnes ? <Chip c={eks === 'hopp' ? '' : 'blue'}>{eks === 'hopp' ? tt("Hoppes over") : tt("Oppdateres")}</Chip> : <Chip c="green">{tt("Ny")}</Chip>}</td></tr>)}
       </tbody></table></div>
+      {Object.keys(ifcLev).length > 0 && <p className="small note" style={{ color: 'var(--ink)' }}>{byggeaar ? tt("Installasjonsår er satt til byggeåret ({0}) for alle systemer og komponenter, og forventet levetid er lagt inn per bygningsdel. Endre året på rader som er skiftet senere.", byggeaar) : tt("Eiendommen har ikke byggeår, så installasjonsår blir stående tomt. Legg inn byggeår på eiendommen (Rediger) og start importen på nytt, eller fyll inn år per rad.")}</p>}
       <p className="small muted">{tt("Typen bestemmer levetid, kontroller og sjekklister i appen. Rader markert gult har ingen katalogtype. De importeres likevel med NS 3451-koden, men får ikke automatiske kontroller. Kostnad i m² regnes som areal × enhetspris, så den kan måles opp på tegning senere.")}</p>
     </div>}
     {steg === 'ferdig' && res && <div>
