@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-24', dato: '2026-11-24', tittel: 'Tydeligere «Vis i 3D»', punkter: [
+    '«Vis i 3D» på en komponent eller et system åpner modellen med objektene i sterk oransje, synlige gjennom vegger og tak, og med navnet over.',
+    'Kameraet flyr mykt inn og ser litt ovenfra på trygg avstand, så du ser hvor i bygget objektet står.',
+    'Nederst i modellen: «Zoom til», «Avslutt fokus» og «Gjennomsiktig rundt», som gjør resten av bygget nesten usynlig.',
+  ] },
   { id: '2026-11-23', dato: '2026-11-23', tittel: 'Systemer og komponenter fra IFC – koblet til 3D', punkter: [
     'Importen fra IFC lager nå ett system per etasje (f.eks. «Branndører – 2. etasje»), og hver bygningsdel blir en egen komponent i systemet med TFM-kode og løpenummer.',
     'Systemer og komponenter kobles automatisk til objektene i 3D-modellen. Trykk «Vis i 3D» på en komponent for å se akkurat den døra, eller «Vis i modellen» på systemet.',
