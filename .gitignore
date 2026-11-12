@@ -4,3 +4,5 @@ dist
 .env.local
 .netlify
 .DS_Store
+server/funksjoner
+.env.server

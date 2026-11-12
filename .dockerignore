@@ -1,0 +1,8 @@
+node_modules
+dist
+server/funksjoner
+.git
+.netlify
+.env
+.env.*
+!.env.server.example

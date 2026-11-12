@@ -1,0 +1,12 @@
+# Start: docker compose -f docker-compose.server.yml --env-file .env.server up -d --build
+services:
+  app:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    env_file: .env.server
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped

@@ -1,0 +1,18 @@
+# Tillegg til selvhostet Supabase for Eiendomskontroll (se server/README.md, steg 8).
+# Kopieres til supabase-project/docker-compose.eiendomskontroll.yml og tas med via COMPOSE_FILE i supabase-project/.env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.eiendomskontroll.yml
+# Erstatt app.dittdomene.no med din egen adresse.
+services:
+  auth:
+    environment:
+      # E-postmaler på flere språk for invitasjon og nytt passord (serveres av appen)
+      GOTRUE_MAILER_TEMPLATES_INVITE: https://app.dittdomene.no/epostmaler/invite.html
+      GOTRUE_MAILER_TEMPLATES_RECOVERY: https://app.dittdomene.no/epostmaler/recovery.html
+      GOTRUE_MAILER_SUBJECTS_INVITE: '{{$$s:=printf "%v" .Data.sprak}}{{if eq $$s "en"}}Invitation{{else if eq $$s "sv"}}Inbjudan{{else if eq $$s "da"}}Invitation{{else if eq $$s "es-MX" "es-ES"}}Invitación{{else}}Invitasjon{{end}} – Eiendomskontroll'
+      GOTRUE_MAILER_SUBJECTS_RECOVERY: '{{$$s:=printf "%v" .Data.sprak}}{{if eq $$s "en"}}New password{{else if eq $$s "sv"}}Nytt lösenord{{else if eq $$s "da"}}Ny adgangskode{{else if eq $$s "es-MX" "es-ES"}}Nueva contraseña{{else}}Nytt passord{{end}} – Eiendomskontroll'
+  functions:
+    environment:
+      # Nøkler for leverandøroppslag med KI (valgfritt – samme verdier som i Supabase → Edge Functions → Secrets)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
