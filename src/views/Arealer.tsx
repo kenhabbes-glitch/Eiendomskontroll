@@ -185,7 +185,8 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   const tipMove = (e: React.PointerEvent) => { if (tip && !st.drag) setTip({ ...tip, x: e.clientX, y: e.clientY }); else if (tip) setTip(null); };
   const tipOff = () => setTip(null);
   const tfmMode = opts.mode === 'tfm'; const maalMode = !!opts.maal;
-  const st = useRef({ flater: (opts.maal?.flater ? clone(opts.maal.flater) : []) as number[][][], tgF: '', tagg: (opts.tagg || '') as string, fokus: new Set<string>(opts.fokus || (opts.focus ? [opts.focus] : [])), visPlassert: false, flyttOk: (opts.placeId || '') as string, lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, nkSys: (opts.nyKomp || '') as string, nkKode: '', nkNavn: '', nkLagt: [] as string[], tool: opts.nyKomp && !ro ? 'nykomp' : opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '', ptr: new Map<number, { x: number; y: number }>(), pinch: null as any }).current;
+  const st = useRef({ flater: (opts.maal?.flater ? clone(opts.maal.flater) : []) as number[][][], tgF: '', tagg: (opts.tagg || '') as string, fokus: new Set<string>(opts.fokus || (opts.focus ? [opts.focus] : [])), visPlassert: false, flyttOk: (opts.placeId || '') as string, lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, nkSys: (opts.nyKomp || '') as string, nkKode: '', nkNavn: '', nkLagt: [] as string[], tool: opts.nyKomp && !ro ? 'nykomp' : opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '', ptr: new Map<number, { x: number; y: number }>(), pinch: null as any, laas: (() => { try { const v = localStorage.getItem('ek.planLaas'); if (v) return v === '1'; } catch { /* */ } return matchMedia('(pointer: coarse)').matches; })() }).current;
+  const settLaas = (v: boolean) => { st.laas = v; try { localStorage.setItem('ek.planLaas', v ? '1' : '0'); } catch { /* */ } toast(v ? tt("Låst – systemer, komponenter og arealer kan ikke dras ved et uhell") : tt("Låst opp – du kan dra systemer, komponenter og hjørner i arealer")); rr(); };
   const [fullsk, setFullsk] = useState(() => window.innerWidth <= 860 && !opts.maal);
   const [vb, setVb] = useState({ x: 0, y: 0, w: T.w || 1000, h: T.h || 800 });
   const svgRef = useRef<SVGSVGElement>(null);
@@ -258,6 +259,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
       if (st.pinch) return; }
     st.shift = e.shiftKey; const p = pt(e); const tg = e.target as Element; const hdl = tg.getAttribute('data-h'); const zid = tg.getAttribute('data-z');
     const mid = (tg.closest && tg.closest('[data-m]')?.getAttribute('data-m')) || null;
+    if (mid && e.button === 0 && st.laas && (st.tool === 'velg' || st.tool === 'plasser' || st.tool === 'nykomp')) { st.drag = { t: 'pan', cx: e.clientX, cy: e.clientY, vb0: { ...vb }, moved: false, velgM: mid }; svgRef.current!.setPointerCapture(e.pointerId); return; }
     if (mid && e.button === 0 && (st.tool === 'velg' || st.tool === 'plasser' || st.tool === 'nykomp')) { st.selM = mid; st.sel = null; if (!ro) { st.drag = { t: 'm', id: mid, cx: e.clientX, cy: e.clientY, moved: false }; svgRef.current!.setPointerCapture(e.pointerId); } rr(); return; }
     if (st.tool === 'nykomp' && e.button === 0 && !ro && !st.space && nkM2() && st.nkSys) {
       if (!mpp(T)) { toast(tt("Sett målestokk på tegningen først («Sett målestokk»), så arealet blir riktig")); return; }
@@ -269,7 +271,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
           lagrePos(it, { tegningId: T.id, x: Math.round(pos[0] * 10) / 10, y: Math.round(pos[1] * 10) / 10 }).then(() => toast(tt("{0} flyttet hit fra {1}", itemKode(it), it.o.pos?.tegningId === T.id ? 'forrige plassering' : fra))); st.selM = it.o.id; st.placeId = ''; rr(); });
         return; }
       lagrePos(it, { tegningId: T.id, x: Math.round(p[0] * 10) / 10, y: Math.round(p[1] * 10) / 10 }).then(() => { toast(itemKode(it) + tt(" plassert")); }); st.selM = it.o.id; const nx = (it.kind === 'v' ? [] : items).find(i => !i.o.pos && i.o.id !== it.o.id); st.placeId = nx ? nx.o.id : ''; rr(); return; }
-    if (e.button === 1 || st.space || (st.tool === 'velg' && hdl == null && !zid)) { st.drag = { t: 'pan', cx: e.clientX, cy: e.clientY, vb0: { ...vb }, moved: false }; svgRef.current!.setPointerCapture(e.pointerId); return; }
+    if (e.button === 1 || st.space || (st.tool === 'velg' && (hdl == null || st.laas) && !zid)) { st.drag = { t: 'pan', cx: e.clientX, cy: e.clientY, vb0: { ...vb }, moved: false }; svgRef.current!.setPointerCapture(e.pointerId); return; }
     if (st.tool === 'velg') { if (st.selM) { st.selM = null; rr(); } if (hdl != null && !ro) { st.drag = { t: 'v', i: +hdl }; svgRef.current!.setPointerCapture(e.pointerId); return; } if (zid) { st.sel = zid; rr(); return; } }
     if (e.button !== 0 || ro) return;
     if (st.tool === 'tegn' || st.tool === 'flate') { const q = snap(p, st.draft[st.draft.length - 1]); if (st.draft.length >= 3 && Math.hypot(q[0] - st.draft[0][0], q[1] - st.draft[0][1]) < 12 * k()) { closePoly(); return; } st.draft.push(q); rr(); return; }
@@ -309,6 +311,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
     if (st.pinch) { if (st.ptr.size < 2) { st.pinch = null; st.drag = null; } return; }
     if (st.drag?.t === 'm') { const it = findItem(st.drag.id); if (it && st.drag.moved && st.mpos) { const pos = { tegningId: T.id, x: Math.round(st.mpos[0] * 10) / 10, y: Math.round(st.mpos[1] * 10) / 10 }; it.o.pos = pos; lagrePos(it, pos); } st.mpos = null; st.drag = null; rr(); return; }
     if (st.drag?.t === 'v') { const z = T.soner.find((z: Rec) => z.id === st.sel); if (z) z.pts[st.drag.i] = z.pts[st.drag.i].map((v: number) => Math.round(v * 10) / 10); change(); }
+    if (st.drag?.t === 'pan' && !st.drag.moved && st.drag.velgM) { st.selM = st.drag.velgM; st.sel = null; st.drag = null; rr(); return; }
     if (st.drag?.t === 'pan' && !st.drag.moved && st.tool === 'velg' && st.sel) { st.sel = null; rr(); }
     st.drag = null;
   };
@@ -375,7 +378,8 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
       <div className="pzoom" onPointerDown={e => e.stopPropagation()}>
         <button type="button" aria-label={tt("Zoom inn")} onClick={() => zoomRundt(1 / 1.5)}>+</button>
         <button type="button" aria-label={tt("Zoom ut")} onClick={() => zoomRundt(1.5)}>−</button>
-        <button type="button" aria-label={tt("Hele tegningen")} style={{ fontSize: 14 }} onClick={() => setVb({ x: 0, y: 0, w: T.w || 1000, h: T.h || 800 })}>⤢</button></div>
+        <button type="button" aria-label={tt("Hele tegningen")} style={{ fontSize: 14 }} onClick={() => setVb({ x: 0, y: 0, w: T.w || 1000, h: T.h || 800 })}>⤢</button>
+        {!ro && <button type="button" className={st.laas ? '' : 'aapen'} aria-pressed={!st.laas} aria-label={st.laas ? tt("Lås opp for å flytte") : tt("Lås flytting")} title={st.laas ? tt("Låst: trykk for å kunne dra systemer, komponenter og arealhjørner") : tt("Ulåst: trykk for å låse")} style={{ fontSize: 16 }} onClick={() => settLaas(!st.laas)}>{st.laas ? '🔒' : '🔓'}</button>}</div>
       {tip && (() => { const i = tip.i; const sys = i.kind === 'k' ? byId('anlegg', i.o.anleggId) : i.kind === 'v' ? byId('anlegg', i.o.anleggId) : null; const kc = i.kind === 'v' && i.o.komponentId ? byId('komponenter', i.o.komponentId) : null;
         const kode = i.kind === 'a' ? tfmSys(i.o, true) : i.kind === 'k' ? tfmKomp(i.o, true) : '#' + (i.o.nr || '');
         const ekstra = i.kind === 'v' ? [i.o.status, i.o.alv].filter(Boolean).join(' · ') : [i.o.fabrikat, i.o.tg].filter(Boolean).join(' · ');

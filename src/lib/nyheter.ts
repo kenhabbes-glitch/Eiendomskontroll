@@ -1,11 +1,12 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
-  { id: '2026-11-25', dato: '2026-11-25', tittel: 'Tegninger i fullskjerm på mobil', punkter: [
+  { id: '2026-11-25', dato: '2026-11-25', tittel: 'Tegninger i fullskjerm og lås mot utilsiktet flytting', punkter: [
     'På mobil åpner tegninger og systemkart nå i fullskjerm, med «Lukk» øverst. Trykk «Verktøy» for å få fram verktøyene og listen.',
     'Klyp med to fingre for å zoome, eller bruk knappene + og − i hjørnet. ⤢ viser hele tegningen igjen.',
     'Trykker du på et system, en komponent eller et avvik, vises detaljene nederst på skjermen.',
     'Små kart i skjemaer og arbeidsordrer har fått en egen fullskjerm-knapp (⛶).',
+    'Ny lås (🔒) i hjørnet av tegningen: når den er låst, kan du zoome og flytte rundt med fingrene uten å dra systemer, komponenter eller arealhjørner ut av posisjon ved et uhell. Trykk på låsen for å kunne flytte. På mobil og nettbrett er den låst fra start.',
   ] },
   { id: '2026-11-24', dato: '2026-11-24', tittel: 'Tydeligere «Vis i 3D»', punkter: [
     '«Vis i 3D» på en komponent eller et system åpner modellen med objektene i sterk oransje, synlige gjennom vegger og tak, og med navnet over.',
