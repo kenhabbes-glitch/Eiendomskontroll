@@ -10,7 +10,7 @@ import { editAvvik, editAnlegg, editKomponent } from '../lib/actions';
 import { fmt } from '../lib/maaler';
 import { KalPanel, SjekkPanel, type Rad } from './Modell3DVerktoy';
 import { avst, areal, vinkel, lengde, horisontalt, midt, kalMat, tilModell, meterPerPiksel, type V3, type Kal } from '../lib/ifc3d/geom';
-import { lagModell, lesModellStrom, delStrom, delOpp, type Modell } from '../lib/ifc3d/modell';
+import { lagModell, lettModell, lesModellStrom, delStrom, delOpp, type Modell } from '../lib/ifc3d/modell';
 import { samle, rammeFra, gjettFag, fagNavn, FAG, type Del, type Samlet } from '../lib/ifc3d/samle';
 
 const KLASSE: Record<string, string> = { IFCDOOR: 'Dør', IFCWINDOW: 'Vindu', IFCWALL: 'Vegg', IFCWALLSTANDARDCASE: 'Vegg', IFCSLAB: 'Dekke / plate', IFCCOLUMN: 'Søyle', IFCBEAM: 'Bjelke', IFCMEMBER: 'Profil / list', IFCPLATE: 'Plate', IFCRAILING: 'Rekkverk', IFCSTAIR: 'Trapp', IFCSTAIRFLIGHT: 'Trappeløp', IFCROOF: 'Tak', IFCCURTAINWALL: 'Glassfasade', IFCCOVERING: 'Kledning / himling', IFCFURNISHINGELEMENT: 'Inventar', IFCBUILDINGELEMENTPROXY: 'Bygningsdel', IFCFLOWTERMINAL: 'Terminal', IFCALARM: 'Alarm', IFCSANITARYTERMINAL: 'Sanitærutstyr', IFCLIGHTFIXTURE: 'Armatur', IFCTRANSPORTELEMENT: 'Heis / transport', IFCRAMP: 'Rampe', IFCFOOTING: 'Fundament', IFCOPENINGELEMENT: 'Åpning' };
@@ -32,6 +32,9 @@ const resultat = (ty: string, p: V3[]): string => {
 // ------------------------------------------------------------------ fane på eiendommen
 /** Samlet (komprimert) størrelse der mobil og nettbrett spør før modellen åpnes. */
 const STOR_MOBIL = 15e6;
+/** Anslått minnebruk i nettleseren (punkter, farger og trekanter), og grensen der mobil spør først. */
+const minneAv = (h: { grupper: { nv: number; ni: number }[]; flat?: boolean }) => h.grupper.reduce((s, g) => s + g.nv * (h.flat ? 15 : 18) + g.ni * 4, 0);
+const STORT_MINNE = 90e6;
 const erMobil = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 900;
 export default function ModellSeksjon({ eid }: { eid: string }) {
   useStore(); const ed = canEdit();
@@ -44,6 +47,32 @@ export default function ModellSeksjon({ eid }: { eid: string }) {
   const slettFiler = (r: Rec) => sb.storage.from('filer').remove(r.data.deler || [r.data.path]);
   // Flytter felles data (mål, kalibrering, ramme) til en annen rad før en rad slettes eller byttes
   const flyttFelles = async (fra: Rec, til: Rec) => { const d = { ...til.data }; for (const k of FELLES) if (fra.data[k] !== undefined) d[k] = fra.data[k]; await sb.from('modeller3d').update({ data: d }).eq('id', til.id); };
+  const lastOpp = async (blob: Blob, navn: string): Promise<string[]> => {
+    const biter = delOpp(blob); const deler: string[] = [];
+    for (let i = 0; i < biter.length; i++) {
+      if (biter.length > 1) setBusy(tt("Laster opp del {0} av {1}", i + 1, biter.length));
+      const fn = navn + '.ek3d.gz' + (biter.length > 1 ? '.' + (i + 1) : ''); const fil = await uploadFile(new File([biter[i]], fn), eid, undefined, fn, 'intern/modell');
+      if (!fil) { if (deler.length) await sb.storage.from('filer').remove(deler); throw new Error(tt("Opplastingen av modellen feilet ({0} MB). Sjekk nettforbindelsen og prøv igjen.", (blob.size / 1e6).toFixed(1))); }
+      deler.push(fil.path);
+    }
+    return deler;
+  };
+  // Gjør modeller som er lastet opp tidligere lettere (slår sammen like punkter) uten at IFC-filen trengs. Raden, mål og koblinger beholdes.
+  const gjorLett = async (rader: Rec[]) => {
+    let spart = 0, n = 0;
+    try { for (const r of rader) {
+      setBusy(tt("Henter {0}-modellen", fagAv(r))); setPct(0.1);
+      const m = await lesModellStrom(delStrom((r.data.deler as string[]) || [r.data.path], async p => fetch(await fileUrl(p))));
+      setBusy(tt("Gjør {0}-modellen lettere", fagAv(r))); setPct(0.5); await new Promise(ok => setTimeout(ok, 30));
+      const { blob, hode, for: forP, etter } = await lettModell(m);
+      setBusy(tt("Laster opp")); setPct(0.8); const deler = await lastOpp(blob, r.data.navn);
+      const { path: _p, deler: _d, ...rest } = r.data; void _p; void _d;
+      const data = { ...rest, path: deler[0], ...(deler.length > 1 ? { deler } : {}), str: blob.size, flat: true, minne: minneAv(hode) };
+      const { error } = await sb.from('modeller3d').update({ data }).eq('id', r.id); if (error) { await sb.storage.from('filer').remove(deler); throw error; }
+      await slettFiler(r); spart += forP - etter; n++;
+    }
+    toast(tt("{0} modell(er) er gjort lettere – {1} mill. færre punkter", n, (spart / 1e6).toFixed(1))); } catch (e: any) { toast(feiltekst(e)); } finally { setBusy(''); await last(); }
+  };
   const velg = async (f?: File | null, erstatt?: Rec) => {
     if (!f) return; setBusy(tt("Leser egenskaper")); setPct(0);
     try {
@@ -54,14 +83,8 @@ export default function ModellSeksjon({ eid }: { eid: string }) {
       const { blob, hode } = await lagModell(f, (p, t) => { setPct(p); const mm = t.match(/^(.*) \((\d+) objekter\)$/); setBusy(mm ? tt("Bygger 3D ({0} objekter)", mm[2]) : tt(t)); }, props);
       setBusy(tt("Laster opp")); setPct(0.98);
       const navn = f.name.replace(/\.(ifczip|ifc|zip)$/i, '');
-      const biter = delOpp(blob); const deler: string[] = [];
-      for (let i = 0; i < biter.length; i++) {
-        if (biter.length > 1) setBusy(tt("Laster opp del {0} av {1}", i + 1, biter.length));
-        const fn = navn + '.ek3d.gz' + (biter.length > 1 ? '.' + (i + 1) : ''); const fil = await uploadFile(new File([biter[i]], fn), eid, undefined, fn, 'intern/modell');
-        if (!fil) { if (deler.length) await sb.storage.from('filer').remove(deler); throw new Error(tt("Opplastingen av modellen feilet ({0} MB). Sjekk nettforbindelsen og prøv igjen.", (blob.size / 1e6).toFixed(1))); }
-        deler.push(fil.path);
-      }
-      const data: Record<string, any> = { navn, filnavn: f.name, fag, path: deler[0], ...(deler.length > 1 ? { deler } : {}), str: blob.size, tid: new Date().toISOString(), antall: hode.elementer.length, etasjer: hode.etasjer.map(e => e.navn), opprettetAv: state.me?.navn || '' };
+      const deler = await lastOpp(blob, navn);
+      const data: Record<string, any> = { navn, filnavn: f.name, fag, path: deler[0], ...(deler.length > 1 ? { deler } : {}), str: blob.size, flat: true, minne: minneAv(hode), tid: new Date().toISOString(), antall: hode.elementer.length, etasjer: hode.etasjer.map(e => e.navn), opprettetAv: state.me?.navn || '' };
       if (erstatt) { for (const k of FELLES) if (erstatt.data[k] !== undefined) data[k] = erstatt.data[k]; data.versjoner = [{ navn: erstatt.data.navn, filnavn: erstatt.data.filnavn, tid: erstatt.data.tid, av: erstatt.data.opprettetAv }, ...(erstatt.data.versjoner || [])].slice(0, 20); }
       const { error } = await sb.from('modeller3d').insert({ eiendom_id: eid, data }); if (error) throw error;
       if (erstatt) { await slettFiler(erstatt); await sb.from('modeller3d').delete().eq('id', erstatt.id); }
@@ -76,9 +99,9 @@ export default function ModellSeksjon({ eid }: { eid: string }) {
   const settFag = async (r: Rec, fag: string) => { await sb.from('modeller3d').update({ data: { ...r.data, fag } }).eq('id', r.id); await last(); };
   const L = mod || []; const sum = L.reduce((s, r) => s + (r.data.antall || 0), 0); const nokkel = L.map(r => r.id + fagAv(r)).join('|');
   // Mobil/nettbrett: store modeller åpnes ikke av seg selv. Brukeren velger fag først (minnet i mobilnettlesere er begrenset).
-  const totalStr = L.reduce((s, r) => s + (r.data.str || 0), 0); const stor = erMobil && totalStr > STOR_MOBIL;
+  const totalStr = L.reduce((s, r) => s + (r.data.str || 0), 0); const tung = (r: Rec) => r.data.minne ? r.data.minne / STORT_MINNE : (r.data.str || 0) / STOR_MOBIL; const stor = erMobil && L.reduce((s, r) => s + tung(r), 0) > 1; const ikkeLette = L.filter(r => !r.data.flat);
   const [valgt, setValgt] = useState<string[] | null>(null); const [kryss, setKryss] = useState<string[]>([]);
-  useEffect(() => { if (!stor) return; const minst = [...L].sort((x, y) => (x.data.str || 0) - (y.data.str || 0)); let s = 0; setKryss(minst.filter(r => (s += r.data.str || 0) <= STOR_MOBIL || r === minst[0]).map(r => r.id)); setValgt(null); }, [nokkel, stor]);
+  useEffect(() => { if (!stor) return; const minst = [...L].sort((x, y) => tung(x) - tung(y)); let s = 0; setKryss(minst.filter(r => (s += tung(r)) <= 1 || r === minst[0]).map(r => r.id)); setValgt(null); }, [nokkel, stor]);
   const opp = (r?: Rec) => <label className={'btn' + (r ? ' sm' : '')} style={{ display: 'inline-flex' }}>{r ? tt("Ny versjon") : L.length ? tt("Legg til fagmodell (IFC)") : tt("Last opp IFC-modell")}<input type="file" accept=".ifc,.ifczip,.zip" style={{ display: 'none' }} onChange={e => { velg(e.target.files?.[0], r); e.target.value = ''; }} /></label>;
   return <>
     {busy ? <div className="card"><b>{busy} …</b><div style={{ height: 8, background: 'var(--line2)', borderRadius: 4, marginTop: 8 }}><div style={{ height: 8, width: Math.round(pct * 100) + '%', background: '#1E4D57', borderRadius: 4, transition: 'width .3s' }} /></div><p className="small muted" style={{ marginBottom: 0 }}>{tt("Store modeller kan ta et minutt. Ikke lukk siden.")}</p></div>
@@ -95,7 +118,11 @@ export default function ModellSeksjon({ eid }: { eid: string }) {
       <p className="small muted" style={{ margin: '6px 0 10px' }}>{tt("På mobil og nettbrett kan store modeller bruke mer minne enn nettleseren tillater, og da lukkes siden. Velg hva du vil åpne – færre og mindre fag er tryggest.")}</p>
       {L.map(r => <label key={r.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0' }}><input type="checkbox" checked={kryss.includes(r.id)} onChange={e => setKryss(e.target.checked ? [...kryss, r.id] : kryss.filter(x => x !== r.id))} />
         <span className="grow">{fagNavn(fagAv(r))} <span className="small muted">· {r.data.navn}</span></span><span className="small muted">{((r.data.str || 0) / 1e6).toFixed(0)} MB</span></label>)}
-      <button className="btn pri" style={{ marginTop: 10 }} disabled={!kryss.length} onClick={() => setValgt(kryss)}>{tt("Åpne 3D-modellen")}</button></div>}
+      <button className="btn pri" style={{ marginTop: 10 }} disabled={!kryss.length} onClick={() => setValgt(kryss)}>{tt("Åpne 3D-modellen")}</button>
+      {ikkeLette.length > 0 && <p className="small muted" style={{ margin: '10px 0 0' }}>{tt("Tips: Åpne denne siden på en PC og velg «Gjør modellene lettere». Da bruker de rundt en tredjedel av minnet, og tåler mobil bedre.")}</p>}</div>}
+    {ed && !erMobil && !busy && ikkeLette.length > 0 && <div className="card" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span className="grow small">{tt("{0} av modellene er lastet opp før appen begynte å slå sammen like punkter. De kan gjøres lettere nå, uten ny opplasting – da åpner de raskere og bruker rundt en tredjedel av minnet (viktig på mobil). Mål, notater og koblinger beholdes. Runde flater kan se litt mer kantete ut.", ikkeLette.length)}</span>
+      <button className="btn" onClick={() => gjorLett(ikkeLette)}>{tt("Gjør modellene lettere")}</button></div>}
     {L.length > 0 && !busy && (!stor || valgt) && <>
       {stor && valgt && <p className="small muted" style={{ margin: '0 0 8px' }}>{valgt.length < L.length ? tt("Viser {0} av {1} fagmodeller.", valgt.length, L.length) : ''} <a href="#" onClick={e => { e.preventDefault(); setValgt(null); }}>{tt("Velg fag på nytt")}</a></p>}
       <Visning key={nokkel + '|' + (valgt || []).join(',')} eid={eid} modeller={L.map(r => ({ ...r, data: { ...r.data, fag: fagAv(r) } }))} hovedId={hoved(L).id} last={stor ? valgt : null} /></>}
@@ -148,8 +175,8 @@ function Visning({ eid, modeller, hovedId, last }: { eid: string; modeller: Rec[
     const plan = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e6);
     // meshes
     const meshes: THREE.Mesh[] = []; const base: Uint8Array[] = []; const segEtter: number[][] = []; const segAvEl = new Map<number, number[]>();
-    mod.grupper.forEach((g, gi) => { const gr = h.grupper[gi]; const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(g.pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(g.nor, 3, true)); const col = new Uint8Array(gr.nv * 3); geo.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); geo.setIndex(new THREE.BufferAttribute(g.idx, 1)); geo.computeBoundingSphere();
-      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.05, side: THREE.DoubleSide, transparent: gr.glass, opacity: gr.glass ? 0.35 : 1, depthWrite: !gr.glass, clippingPlanes: [plan] });
+    mod.grupper.forEach((g, gi) => { const gr = h.grupper[gi]; const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(g.pos, 3)); const flat = !g.nor.length; if (!flat) geo.setAttribute('normal', new THREE.BufferAttribute(g.nor, 3, true)); const col = new Uint8Array(g.pos.length); geo.setAttribute('color', new THREE.BufferAttribute(col, 3, true)); geo.setIndex(new THREE.BufferAttribute(g.idx, 1)); geo.computeBoundingSphere();
+      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: flat, roughness: 0.85, metalness: 0.05, side: THREE.DoubleSide, transparent: gr.glass, opacity: gr.glass ? 0.35 : 1, depthWrite: !gr.glass, clippingPlanes: [plan] });
       const m = new THREE.Mesh(geo, mat); m.userData.g = gi; m.userData.glass = gr.glass; scene.add(m); meshes.push(m); base.push(col); segEtter.push([]); });
     const n = h.nSeg; const sg = mod.seg;
     for (let i = 0; i < n; i++) { const e = sg[i * 7], gi = sg[i * 7 + 1], vf = sg[i * 7 + 2], vc = sg[i * 7 + 3], rgba = sg[i * 7 + 6]; const r = (rgba >>> 24) & 255, gg = (rgba >>> 16) & 255, b = (rgba >>> 8) & 255; const col = base[gi];

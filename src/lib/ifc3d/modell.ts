@@ -2,6 +2,7 @@
 import type { Ek3dHode } from './konverter';
 import type { IfcModell } from '../ifc';
 import { pakkV2 } from './pakk';
+import { lesRaa, skrivRaa, sveis } from './sveis';
 
 export type Ek3dEgenskaper = Record<string, { ns?: string; type?: string; mengder?: Record<string, number>; egenskaper?: Record<string, string> }>;
 export type Ek3dFull = Ek3dHode & { egenskaper?: Ek3dEgenskaper };
@@ -16,7 +17,7 @@ export async function lagModell(file: File, fremdrift: (p: number, t: string) =>
     w.onerror = e => { w.terminate(); feil(new Error(e.message || 'Konverteringen feilet')); };
     w.postMessage({ buf, navn: file.name }, [buf]);
   });
-  let ut: Uint8Array = new Uint8Array(rå);
+  fremdrift(0.94, 'Pakker modellen'); let ut: Uint8Array = skrivRaa(sveis(lesRaa(new Uint8Array(rå))));
   if (props) ut = medEgenskaper(ut, props);
   fremdrift(0.96, 'Pakker'); ut = pakkV2(ut);
   fremdrift(0.97, 'Komprimerer');
@@ -64,17 +65,17 @@ export async function lesModellStrom(gz: ReadableStream<Uint8Array>, behold?: (g
   const hode: Ek3dFull = JSON.parse(new TextDecoder().decode((await les(pad4(hl))).subarray(0, hl)));
   const grupper: Modell['grupper'] = []; const utelatt = new Set<number>();
   for (let gi = 0; gi < hode.grupper.length; gi++) {
-    const g = hode.grupper[gi]; const n = g.nv, ni = g.ni;
-    if (behold && !behold(g, hode)) { await les(hode.v === 2 ? pad4(n * 6) + pad4(n * 3) + ni * 4 : n * 12 + pad4(n * 3) + ni * 4, true); utelatt.add(gi); grupper.push({ pos: new Float32Array(0), nor: new Int8Array(0), idx: new Uint32Array(0) }); continue; }
+    const g = hode.grupper[gi]; const n = g.nv, ni = g.ni; const nn = hode.flat ? 0 : n * 3; if (hode.flat) g.flat = true;
+    if (behold && !behold(g, hode)) { await les(hode.v === 2 ? pad4(n * 6) + pad4(nn) + ni * 4 : n * 12 + pad4(nn) + ni * 4, true); utelatt.add(gi); grupper.push({ pos: new Float32Array(0), nor: new Int8Array(0), idx: new Uint32Array(0) }); continue; }
     if (hode.v === 2) {
       const q = hode.q![gi]; const pq = await les(pad4(n * 6)); const pos = new Float32Array(n * 3);
       for (let a = 0; a < 3; a++) { let v = 0; const lo = a * 2 * n, hi = lo + n; for (let i = 0; i < n; i++) { v = (v + (pq[lo + i] | (pq[hi + i] << 8))) & 0xffff; pos[i * 3 + a] = q[a] + v * q[3 + a]; } }
-      const nq = await les(pad4(n * 3)); const nor = new Int8Array(n * 3); nor.set(new Int8Array(nq.buffer, 0, n * 3));
+      const nq = await les(pad4(nn)); const nor = new Int8Array(nn); nor.set(new Int8Array(nq.buffer, 0, nn));
       const iq = await les(ni * 4); const idx = new Uint32Array(ni); let v = 0;
       for (let i = 0; i < ni; i++) { v = (v + (iq[i] | (iq[ni + i] << 8) | (iq[2 * ni + i] << 16) | (iq[3 * ni + i] << 24))) >>> 0; idx[i] = v; }
       grupper.push({ pos, nor, idx });
     } else {
-      const pos = new Float32Array((await les(n * 12)).buffer); const nb = await les(pad4(n * 3)); const nor = new Int8Array(n * 3); nor.set(new Int8Array(nb.buffer, 0, n * 3));
+      const pos = new Float32Array((await les(n * 12)).buffer); const nb = await les(pad4(nn)); const nor = new Int8Array(nn); nor.set(new Int8Array(nb.buffer, 0, nn));
       grupper.push({ pos, nor, idx: new Uint32Array((await les(ni * 4)).buffer) });
     }
   }
@@ -101,6 +102,13 @@ export function delStrom(deler: string[], hent: (sti: string) => Promise<Respons
     },
     cancel() { r?.cancel().catch(() => { }); },
   });
+}
+
+/** Gjør en modell som er lastet opp tidligere lettere (slår sammen like punkter), uten at IFC-filen trengs. Gir ny fil klar for opplasting. */
+export async function lettModell(m: Modell): Promise<{ blob: Blob; hode: Ek3dFull; for: number; etter: number }> {
+  const s = sveis(m as any); const ut = pakkV2(skrivRaa(s));
+  const gz = await new Response(new Blob([ut as BlobPart]).stream().pipeThrough(new CompressionStream('gzip'))).blob();
+  return { blob: gz, hode: lesHode(ut), for: m.grupper.reduce((a, g) => a + g.pos.length / 3, 0), etter: s.grupper.reduce((a, g) => a + g.pos.length / 3, 0) };
 }
 
 /** Største bit som lagres i én fil (lagringen tar maks 50 MB pr. fil). */

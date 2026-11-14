@@ -2,6 +2,8 @@
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
   { id: '2026-11-26', dato: '2026-11-26', tittel: 'Store 3D-modeller bruker mindre minne', punkter: [
+    'Nye 3D-modeller blir mye lettere: like punkter slås sammen ved opplasting, så modellen bruker rundt en tredjedel av minnet. Modeller som er lastet opp tidligere kan gjøres lettere med ett trykk på PC («Gjør modellene lettere») – uten ny opplasting.',
+    'På mobil og nettbrett åpnes ikke store modeller av seg selv lenger. Du velger først hvilke fag du vil se, slik at siden ikke lukkes fordi minnet går fullt.',
     '3D-modeller leses nå bit for bit mens de lastes ned, og fagmodellene hentes én om gangen. Store modeller bruker rundt 40 % mindre minne enn før – nyttig på mobil og nettbrett.',
   ] },
   { id: '2026-11-25', dato: '2026-11-25', tittel: 'Tegninger i fullskjerm og lås mot utilsiktet flytting', punkter: [

@@ -13,7 +13,7 @@ export function pakkV2(b: Uint8Array): Uint8Array {
   const ab = b.buffer.slice(b.byteOffset, b.byteOffset + b.length);
   for (const g of hode.grupper) {
     const pos = new Float32Array(ab, o, g.nv * 3); o += g.nv * 12;
-    const nor = new Uint8Array(ab, o, g.nv * 3); o += pad4(g.nv * 3);
+    const nn = hode.flat ? 0 : g.nv * 3; const nor = new Uint8Array(ab, o, nn); o += pad4(nn);
     const idx = new Uint32Array(ab, o, g.ni); o += g.ni * 4;
     // kvantiser posisjoner pr. akse
     const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
@@ -24,7 +24,7 @@ export function pakkV2(b: Uint8Array): Uint8Array {
     // indekser som differanser, bytene i fire plan
     const iq = new Uint8Array(g.ni * 4); let prev = 0; const ni = g.ni;
     for (let i = 0; i < ni; i++) { const d = (idx[i] - prev) | 0; prev = idx[i]; iq[i] = d & 0xff; iq[ni + i] = (d >>> 8) & 0xff; iq[2 * ni + i] = (d >>> 16) & 0xff; iq[3 * ni + i] = (d >>> 24) & 0xff; }
-    const nq = new Uint8Array(pad4(n * 3)); nq.set(nor);
+    const nq = new Uint8Array(pad4(nor.length)); nq.set(nor);
     deler.push(pq, nq, iq);
   }
   deler.push(new Uint8Array(ab, o, hode.nSeg * 28).slice());
@@ -42,7 +42,7 @@ export function lesV2(rå: Uint8Array, hode: any, start: number) {
     const n = g.nv, ni = g.ni, q = hode.q[gi]; const pos = new Float32Array(n * 3);
     for (let a = 0; a < 3; a++) { let v = 0; const lo = o + a * 2 * n, hi = lo + n; for (let i = 0; i < n; i++) { v = (v + (rå[lo + i] | (rå[hi + i] << 8))) & 0xffff; pos[i * 3 + a] = q[a] + v * q[3 + a]; } }
     o += pad4(n * 6);
-    const nor = new Int8Array(rå.buffer, rå.byteOffset + o, n * 3); o += pad4(n * 3);
+    const nn = hode.flat ? 0 : n * 3; const nor = new Int8Array(rå.buffer, rå.byteOffset + o, nn); o += pad4(nn);
     const idx = new Uint32Array(ni); let v = 0;
     for (let i = 0; i < ni; i++) { v = (v + (rå[o + i] | (rå[o + ni + i] << 8) | (rå[o + 2 * ni + i] << 16) | (rå[o + 3 * ni + i] << 24))) >>> 0; idx[i] = v; }
     o += ni * 4; grupper.push({ pos, nor, idx });

@@ -76,3 +76,42 @@ test('lett visning: utelatte grupper tar ikke plass, og resten av modellen er ue
   assert.deepEqual([...m.seg], forventet); assert.equal(m.hode.nSeg, forventet.length / 7);
   for (let i = 0; i < m.hode.nSeg; i++) assert.equal(m.seg[i * 7 + 1], 1);
 });
+
+// ---- sveising (slå sammen like punkter)
+// @ts-ignore
+import { sveis, lesRaa, skrivRaa } from './.bygg/sveis.mjs';
+
+// To bokser der hver trekant har egne hjørner (slik IFC-leseren leverer dem): 36 punkter pr. boks, bare 8 unike
+function bokser() {
+  const hj = (x: number, y: number, z: number) => [0, 1, 2, 3, 4, 5, 6, 7].map(i => [x + (i & 1), y + ((i >> 1) & 1), z + ((i >> 2) & 1)]);
+  const F = [[0, 1, 3], [0, 3, 2], [4, 6, 7], [4, 7, 5], [0, 4, 5], [0, 5, 1], [2, 3, 7], [2, 7, 6], [0, 2, 6], [0, 6, 4], [1, 5, 7], [1, 7, 3]];
+  const pos: number[] = [], idx: number[] = [], seg: number[] = [];
+  [[0, 0, 0], [5, -0, 2]].forEach((o, b) => { const H = hj(o[0], o[1], o[2]); const vf = pos.length / 3, f = idx.length; F.forEach(t => t.forEach(h => { idx.push(pos.length / 3); pos.push(...H[h]); })); seg.push(b, 0, vf, 36, f, 36, 255); });
+  const m = { hode: { v: 1, bbox: [], fokus: [], etasjer: [], grupper: [{ etasje: 0, glass: false, nv: 72, ni: 72 }], elementer: [{}, {}], nSeg: 2 } as any, grupper: [{ pos: new Float32Array(pos), nor: new Int8Array(pos.length), idx: new Uint32Array(idx) }], seg: new Int32Array(seg) };
+  return m;
+}
+const trekanter = (m: any) => { const ut: string[] = []; for (let s = 0; s < m.seg.length / 7; s++) { const g = m.grupper[m.seg[s * 7 + 1]], f = m.seg[s * 7 + 4], c = m.seg[s * 7 + 5];
+  for (let i = f; i < f + c; i += 3) ut.push(m.seg[s * 7] + ':' + [0, 1, 2].map(k => { const v = g.idx[i + k]; return [g.pos[v * 3], g.pos[v * 3 + 1], g.pos[v * 3 + 2]].map(x => x + 0).join(','); }).join(' ')); } return ut; };
+
+test('sveising: like punkter slås sammen, og hver trekant ligger nøyaktig der den lå', () => {
+  const m = bokser(); const s = sveis(m);
+  assert.equal(s.grupper[0].pos.length / 3, 16); assert.equal(s.grupper[0].idx.length, 72); assert.equal(s.grupper[0].nor.length, 0); assert.equal(s.hode.flat, true);
+  assert.deepEqual(trekanter(s), trekanter(m));
+  assert.deepEqual([...s.seg], [0, 0, 0, 8, 0, 36, 255, 1, 0, 8, 8, 36, 36, 255]); // hver boks har sitt eget punktområde
+  for (let i = 0; i < 36; i++) { assert.ok(s.grupper[0].idx[i] < 8); assert.ok(s.grupper[0].idx[36 + i] >= 8); }
+});
+
+test('sveiset modell kan lagres, pakkes og leses igjen – også i små biter', async () => {
+  const s = sveis(bokser()); const raa = skrivRaa(s); assert.deepEqual(trekanter(lesRaa(raa)), trekanter(s));
+  const gz = await gzip(pakkV2(raa)); const m = await lesModellStrom(iBiter(gz, 13));
+  assert.equal(m.hode.flat, true); assert.equal(m.hode.grupper[0].flat, true); assert.equal(m.grupper[0].nor.length, 0); assert.equal(m.grupper[0].pos.length / 3, 16);
+  const t1 = trekanter(m), t0 = trekanter(s); assert.equal(t1.length, t0.length);
+  m.grupper[0].pos.forEach((v: number, i: number) => assert.ok(Math.abs(v - s.grupper[0].pos[i]) < 0.001)); assert.deepEqual([...m.grupper[0].idx], [...s.grupper[0].idx]); assert.deepEqual([...m.seg], [...s.seg]);
+});
+
+test('sveising av en modell som allerede er sveiset endrer ingenting', () => { const s = sveis(bokser()); const s2 = sveis(s); assert.deepEqual(s2.grupper[0].pos, s.grupper[0].pos); assert.deepEqual(s2.grupper[0].idx, s.grupper[0].idx); assert.deepEqual(s2.seg, s.seg); });
+
+test('modell med retninger (lastet opp før sveising) leses fortsatt som før', async () => {
+  const m = bokser(); m.grupper[0].nor.fill(7); const r = await lesModell((await gzip(pakkV2(skrivRaa(m)))).buffer);
+  assert.equal(r.hode.flat, undefined); assert.equal(r.grupper[0].nor.length, 216); assert.equal(r.grupper[0].nor[5], 7); assert.equal(r.grupper[0].pos.length / 3, 72);
+});
