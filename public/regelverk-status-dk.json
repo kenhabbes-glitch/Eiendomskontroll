@@ -1,8 +1,14 @@
 {
-  "sjekket": "2026-11-09T13:53:48.887Z",
+  "sjekket": "2026-11-14T12:20:42.534Z",
   "kontrollertMot": "2026-11-09T13:53:48.887Z",
   "antallKilder": 8,
-  "endringer": [],
+  "endringer": [
+    {
+      "navn": "Forordning (EU) 2024/573 om fluorholdige drivhusgasser",
+      "lenke": "https://eur-lex.europa.eu/legal-content/DA/TXT/?uri=CELEX:32024R0573",
+      "tekst": "innholdet på siden er endret"
+    }
+  ],
   "kilder": [
     {
       "navn": "Bygningsreglementet (BR18) §§ 137–158 og vejledning kapitel 7",

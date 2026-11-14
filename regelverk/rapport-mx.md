@@ -1,4 +1,4 @@
-# Regelverkssjekk Mexico 2026-11-09
+# Regelverkssjekk Mexico 2026-11-14
 
 **2 endring(er)** som kan kreve oppdatering av malene i `src/lib/land/mx.ts`:
 
