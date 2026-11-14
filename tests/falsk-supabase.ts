@@ -2,7 +2,7 @@
 // Tabeller ligger i minnet, og alle kall til brukeradministrasjonen (auth.admin) logges i «kall».
 export type Db = Record<string, any[]>;
 const inneholder = (a: any, b: any): boolean => Array.isArray(b) ? Array.isArray(a) && b.every(x => a.some(y => inneholder(y, x))) : b && typeof b === 'object' ? !!a && typeof a === 'object' && Object.keys(b).every(k => inneholder(a[k], b[k])) : a === b;
-export function lagFalsk(db: Db, brukere: Record<string, { id: string; email: string; user_metadata?: any; faktorer?: string[] }>, tokens: Record<string, string>, valg: { niva?: Record<string, Record<string, string>>; filer?: Record<string, number> } = {}) {
+export function lagFalsk(db: Db, brukere: Record<string, { id: string; email: string; user_metadata?: any; faktorer?: string[] }>, tokens: Record<string, string>, valg: { niva?: Record<string, Record<string, string>>; filer?: Record<string, number>; opplastingFeiler?: boolean; invitasjonFeiler?: any } = {}) {
   const kall: { hva: string; arg: any }[] = [];
   const sporring = (tabell: string) => {
     const filtre: ((r: any) => boolean)[] = []; let modus = 'select', nytt: any = null, hode = false;
@@ -42,6 +42,7 @@ export function lagFalsk(db: Db, brukere: Record<string, { id: string; email: st
       return { data: null };
     },
     storage: { from: () => ({
+      upload: async (path: string, buf: any, o: any) => { kall.push({ hva: 'opplasting', arg: { path, str: buf.length, type: o?.contentType } }); return valg.opplastingFeiler ? { error: { message: 'full' } } : { data: { path }, error: null }; },
       createSignedUploadUrl: async (path: string) => { kall.push({ hva: 'signertOpplasting', arg: path }); return { data: { token: 'opplasting', path }, error: null }; },
       createSignedUrl: async (path: string) => { kall.push({ hva: 'signertLenke', arg: path }); return { data: { signedUrl: 'http://fil/' + path }, error: null }; },
       list: async (mappe: string) => ({ data: Array.from({ length: valg.filer?.[mappe] || 0 }, (_, i) => ({ name: 'f' + i })), error: null }),
@@ -52,7 +53,7 @@ export function lagFalsk(db: Db, brukere: Record<string, { id: string; email: st
         getUserById: async (id: string) => ({ data: { user: brukere[id] || null }, error: null }),
         updateUserById: async (id: string, e: any) => { kall.push({ hva: 'updateUserById', arg: { id, ...e } }); return { data: { user: brukere[id] }, error: null }; },
         createUser: async (e: any) => { kall.push({ hva: 'createUser', arg: e }); const id = 'u-ny-' + kall.length; brukere[id] = { id, email: e.email, user_metadata: e.user_metadata }; return { data: { user: brukere[id] }, error: null }; },
-        inviteUserByEmail: async (epost: string, o: any) => { kall.push({ hva: 'inviteUserByEmail', arg: { epost, ...o } }); const id = 'u-inv-' + kall.length; brukere[id] = { id, email: epost, user_metadata: o?.data }; return { data: { user: brukere[id] }, error: null }; },
+        inviteUserByEmail: async (epost: string, o: any) => { kall.push({ hva: 'inviteUserByEmail', arg: { epost, ...o } }); if (valg.invitasjonFeiler) return { data: { user: null }, error: valg.invitasjonFeiler }; const id = 'u-inv-' + kall.length; brukere[id] = { id, email: epost, user_metadata: o?.data }; return { data: { user: brukere[id] }, error: null }; },
         deleteUser: async (id: string) => { kall.push({ hva: 'deleteUser', arg: id }); return { error: null }; },
         mfa: {
           listFactors: async ({ userId }: any) => ({ data: { factors: (brukere[userId]?.faktorer || []).map(id => ({ id })) }, error: null }),

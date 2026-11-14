@@ -12,13 +12,18 @@ const PORT = +(process.env.PORT || 8080);
 const TYPER = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json', '.gz': 'application/gzip' };
 const SIKKERHET = { 'X-Frame-Options': 'DENY', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin' };
+const MAKS_KROPP = 6 * 1024 * 1024;
 const moduler = new Map();
 const hentFn = async navn => { if (!/^[a-z0-9-]+$/.test(navn)) return null; const f = path.join(FN, navn + '.mjs'); if (!existsSync(f)) return null;
   if (!moduler.has(navn)) moduler.set(navn, await import(pathToFileURL(f).href)); return moduler.get(navn); };
 
 async function kjorFunksjon(navn, req, res) {
   const m = await hentFn(navn); if (!m?.default) { res.writeHead(404); return res.end('Ukjent funksjon'); }
-  const chunks = []; for await (const c of req) chunks.push(c); const body = Buffer.concat(chunks);
+  // Øvre grense for forespørsler (som hos Netlify, 6 MB): hindrer at noen fyller minnet på serveren med kjempestore kall
+  const chunks = []; let str = 0;
+  if (Number(req.headers['content-length']) > MAKS_KROPP) { res.writeHead(413, { 'Content-Type': 'application/json', Connection: 'close' }); return res.end('{"error":"Forespørselen er for stor"}'); }
+  for await (const c of req) { str += c.length; if (str > MAKS_KROPP) { res.writeHead(413, { 'Content-Type': 'application/json', Connection: 'close' }); res.end('{"error":"Forespørselen er for stor"}'); req.destroy(); return; } chunks.push(c); }
+  const body = Buffer.concat(chunks);
   const proto = req.headers['x-forwarded-proto'] || 'http'; const url = `${proto}://${req.headers.host}${req.url}`;
   const headers = new Headers(); for (const [k, v] of Object.entries(req.headers)) if (v != null) headers.set(k, Array.isArray(v) ? v.join(', ') : v);
   const r = new Request(url, { method: req.method, headers, body: ['GET', 'HEAD'].includes(req.method) ? undefined : body });
