@@ -2,7 +2,7 @@
 // Rapporten lagres som et øyeblikksbilde i prosjektet, kan skrives ut/lagres som PDF og sendes på e-post med en personlig lenke.
 import React, { useEffect, useRef, useState } from 'react';
 import { aoApi, refetch, toast, useStore, state } from '../lib/store';
-import { byId, fd, today, addDays, nok, type Rec } from '../lib/utils';
+import { byId, fd, today, addDays, nok, type Rec, Obj } from '../lib/utils';
 import { openModal, ModalFrame, Chip, Empty, confirmBox, copyText } from '../components/ui';
 import { FASER, uid } from '../lib/prosjekt';
 import { BESLUTNING_TEKST, GODKJENT, krevGodkjenning, n, oppdaterP, snapshot, trafikklysForslag } from '../lib/prosjektArbeid';
@@ -115,7 +115,7 @@ function RapportDialog({ pid, type, fase0, close }: { pid: string; type: 'fase' 
   const forrige = (p.rapporter || []).filter((r: Rec) => r.type === 'status').map((r: Rec) => r.snap?.periode?.til).filter(Boolean).sort().slice(-1)[0];
   const [fase, setFase] = useState(fase0 || p.fase);
   const [t, setT0] = useState<Rec>(() => ({ fra: forrige ? addDays(forrige, 1) : p.start || '', til: today(), anbefaling: '', beslutning: '', statusTekst: '', nesteTekst: '', trafikklys: null, trafikklysTekst: {} }));
-  const setT = (x: Rec) => setT0(v => ({ ...v, ...x }));
+  const setT = (x: Obj) => setT0(v => ({ ...v, ...x }));
   const base = snapshot(p, type, { fase, fra: t.fra, til: t.til });
   const besl = t.beslutning || BESLUTNING_TEKST[fase]?.(p, base) || '';
   const tl = t.trafikklys || trafikklysForslag(base);
@@ -191,7 +191,7 @@ function RapportVis({ pid, rid, close }: { pid: string; rid: string; close: () =
   const [man, setMan] = useState<Rec | null>(null);
   if (!p || !r) return <ModalFrame title={tt("Rapport")} close={close}><p>{tt("Fant ikke rapporten.")}</p></ModalFrame>;
   const besvart = GODKJENT.includes(r.status) || r.status === 'Avvist';
-  const settRapport = async (patch: Rec, logg: string, extra: Rec = {}) => { const P = byId('prosjekter', pid)!; await oppdaterP(pid, { ...extra, rapporter: (P.rapporter || []).map((x: Rec) => x.id === rid ? { ...x, ...patch } : x) }, logg); };
+  const settRapport = async (patch: Obj, logg: string, extra: Rec = {}) => { const P = byId('prosjekter', pid)!; await oppdaterP(pid, { ...extra, rapporter: (P.rapporter || []).map((x: Rec) => x.id === rid ? { ...x, ...patch } : x) }, logg); };
   const registrer = async () => {
     if (!man?.navn?.trim()) return toast(tt("Skriv hvem som fattet beslutningen"));
     const svar = { navn: man.navn.trim(), komm: man.komm || '', t: (man.dato || today()) + 'T12:00:00.000Z', via: 'manuelt', beslutning: man.beslutning, regAv: state.me?.navn };

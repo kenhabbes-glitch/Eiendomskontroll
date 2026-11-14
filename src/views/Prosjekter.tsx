@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { Hjelp as LovHjelp } from '../components/LovHjelp';
 import { S, save, removeDoc, toast, useStore, kanRedigereE, uploadFile, state } from '../lib/store';
-import { byId, fd, today, sortBy, eNavn, aNavn, nok, toCsv, type Rec } from '../lib/utils';
+import { byId, fd, today, sortBy, eNavn, aNavn, nok, toCsv, type Rec, Obj } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, openModal, ModalFrame, FileLink, TgChip } from '../components/ui';
 import { editAnlegg, editDok } from '../lib/actions';
 import { KOMP } from '../lib/catalog';
@@ -31,7 +31,7 @@ const fagValg = (p: Rec) => [...new Set([...(p.fag || []).map((f: Rec) => f.fag)
 const FagVelger = ({ v, set }: { v: string[]; set: (x: string[]) => void }) => <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: '2px 10px', maxHeight: 190, overflow: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: '6px 8px' }}>
   {FAG.map(f => <label key={f} className="small" style={{ display: 'flex', gap: 6, fontWeight: 400 }}><input type="checkbox" style={{ width: 'auto' }} checked={v.includes(f)} onChange={e => set(e.target.checked ? [...v, f] : v.filter(x => x !== f))} />{f}</label>)}</div>;
 
-async function oppdater(pid: string, patch: Rec, loggTekst?: string) {
+async function oppdater(pid: string, patch: Obj, loggTekst?: string) {
   const p = byId('prosjekter', pid)!;
   await save('prosjekter', { ...p, ...patch, logg: loggTekst ? [...(p.logg || []), { t: new Date().toISOString(), k: loggTekst, av: state.me?.navn || state.me?.epost }] : p.logg });
 }
@@ -169,8 +169,8 @@ function Oversikt({ p, o, fr, kan }: { p: Rec; o: ReturnType<typeof okonomi>; fr
 function Oppgaver({ p, kan }: { p: Rec; kan: boolean }) {
   const [fagF, setFagF] = useState('');
   const O: Rec[] = (p.oppgaver || []).filter((o: Rec) => !fagF || o.fag === fagF);
-  const settO = (oid: string, patch: Rec) => oppdater(p.id, { oppgaver: (byId('prosjekter', p.id)!.oppgaver || []).map((x: Rec) => x.id === oid ? { ...x, ...patch } : x) }, patch.status === 'Ferdig' ? `Ferdig: ${O.find(x => x.id === oid)?.tittel}` : undefined);
-  const settFase = (k: string, patch: Rec) => oppdater(p.id, { faser: FASER.map(([fk, fl]) => { const f = (byId('prosjekter', p.id)!.faser || []).find((x: Rec) => x.k === fk) || { k: fk, navn: fl, start: '', slutt: '' }; return fk === k ? { ...f, ...patch } : f; }) });
+  const settO = (oid: string, patch: Obj) => oppdater(p.id, { oppgaver: (byId('prosjekter', p.id)!.oppgaver || []).map((x: Rec) => x.id === oid ? { ...x, ...patch } : x) }, patch.status === 'Ferdig' ? `Ferdig: ${O.find(x => x.id === oid)?.tittel}` : undefined);
+  const settFase = (k: string, patch: Obj) => oppdater(p.id, { faser: FASER.map(([fk, fl]) => { const f = (byId('prosjekter', p.id)!.faser || []).find((x: Rec) => x.k === fk) || { k: fk, navn: fl, start: '', slutt: '' }; return fk === k ? { ...f, ...patch } : f; }) });
   const redOppg = (o?: Rec, fase?: string) => formModal({ title: o ? tt("Rediger oppgave") : tt("Ny oppgave"), values: o || { fase: fase || p.fase, status: 'Ikke startet' }, fields: [
     { k: 'tittel', label: tt("Oppgave"), req: true }, { k: 'fase', label: tt("Fase"), type: 'select', options: FASER, half: true }, { k: 'status', label: tt("Status"), type: 'select', options: ['Ikke startet', 'Pågår', 'Ferdig', 'Ikke relevant'], half: true },
     { k: 'fag', label: tt("Fag"), type: 'select', options: fagValg(p), empty: tt("– ingen / felles –"), half: true }, { k: 'ansvarlig', label: tt("Ansvarlig"), half: true },

@@ -1,7 +1,7 @@
 // Arbeidsflater per oppgave i prosjektet (beskrivelse, overslag, ramme, tilbud, møter, endringer, mangler …),
 // beslutningspunkter mellom faser og grunnlag (øyeblikksbilde) for faserapport og statusrapport.
 import { S, save, state } from './store';
-import { byId, today, eNavn, aNavn, lNavn, addDays, type Rec } from './utils';
+import { byId, today, eNavn, aNavn, lNavn, addDays, type Rec, Obj } from './utils';
 import { FASER, okonomi, fremdrift, delFor, delNavn, KLASSER, uid } from './prosjekt';
 import { lokale } from './i18n';
 
@@ -59,7 +59,7 @@ export function kalkSum(k: Rec | undefined) {
 }
 
 // ---------------- Tilbud
-export function tilbudScore(T: Rec[], v: Rec = {}) {
+export function tilbudScore(T: Rec[], v: Obj = {}) {
   const wp = n(v.pris ?? 60), wk = n(v.kvalitet ?? 30), wf = n(v.fremdrift ?? 10); const W = wp + wk + wf || 1;
   const priser = T.map(t => n(t.pris)).filter(x => x > 0); const min = priser.length ? Math.min(...priser) : 0;
   return T.map(t => { const ps = n(t.pris) > 0 && min ? (min / n(t.pris)) * 10 : 0; const tot = (ps * wp + n(t.kvalitet) * wk + n(t.fremdrift) * wf) / W; return { ...t, ps: Math.round(ps * 10) / 10, tot: Math.round(tot * 10) / 10 }; });
@@ -143,7 +143,7 @@ export const trafikklysForslag = (s: Rec) => ({
 
 export async function sha256(t: string) { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
 export const ARBEID_VIA_PROSJEKT = ['sha', 'beskrivelse', 'overslag', 'ramme', 'kalkyle', 'tilbud', 'kontrakt', 'moter', 'endringer', 'mangler'];
-export async function oppdaterP(pid: string, patch: Rec, loggTekst?: string) {
+export async function oppdaterP(pid: string, patch: Obj, loggTekst?: string) {
   const p = byId('prosjekter', pid)!;
   await save('prosjekter', { ...p, ...patch, logg: loggTekst ? [...(p.logg || []), { t: new Date().toISOString(), k: loggTekst, av: state.me?.navn || state.me?.epost }] : p.logg });
 }

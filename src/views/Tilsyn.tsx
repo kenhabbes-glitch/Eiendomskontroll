@@ -3,7 +3,7 @@
 import { harModul } from '../lib/moduler';
 import React, { useState } from 'react';
 import { S, save, state, toast, uploadFile, useStore, canEdit } from '../lib/store';
-import { addDays, byId, eNavn, fd, today, dUntil, sortBy, type Rec } from '../lib/utils';
+import { addDays, byId, eNavn, fd, today, dUntil, sortBy, type Rec, Obj } from '../lib/utils';
 import { AV_ALV, AV_FRIST, AV_LUKKET } from '../lib/catalog';
 import { Chip, Empty, FileLink, ModalFrame, confirmBox, openModal, StChip, DueChip } from '../components/ui';
 import { Hjelp } from '../components/Hjelp';
@@ -34,7 +34,7 @@ export function tilsynssaker(): Sak[] {
 /** Saker der tilbakemelding til myndigheten ikke er sendt og fristen nærmer seg (til purreoversikten) */
 export const svarfristSnart = (dager = 14) => tilsynssaker().filter(s => harModul('tilsyn', s.eiendomId) && s.svarfrist && !s.svarSendt && !s.lukket && (dUntil(s.svarfrist) as number) <= dager);
 
-async function oppdaterSak(s: Sak, patch: Rec, loggTekst: string) {
+async function oppdaterSak(s: Sak, patch: Obj, loggTekst: string) {
   for (const a of s.avvik) { const f = byId('avvik', a.id)!; await save('avvik', { ...f, ...patch, logg: [...(f.logg || []), { t: new Date().toISOString(), s: f.status, k: loggTekst, av: state.me?.navn }] }); }
 }
 
@@ -84,7 +84,7 @@ export function registrerTilsyn(sak?: Sak) { openModal({ wide: true, render: clo
 function RegistrerTilsyn({ close, sak }: { close: () => void; sak?: Sak }) {
   useStore(); const ny = (): Rad => ({ id: Math.random().toString(36).slice(2), type: 'Avvik', punkt: '', t: '', alv: 'Høy', frist: '', tiltak: '' });
   const [h, setH0] = useState<Rec>(() => sak ? { eiendomId: sak.eiendomId, kilde: sak.kilde, myndighet: sak.myndighet, ref: sak.ref, dato: sak.dato, svarfrist: sak.svarfrist } : { eiendomId: S.eiendommer[0]?.id || '', kilde: tilsynKilder(S.eiendommer[0]?.id)[0], myndighet: myndighet(tilsynKilder(S.eiendommer[0]?.id)[0]), ref: '', dato: today(), svarfrist: '' });
-  const setH = (x: Rec) => setH0(v => ({ ...v, ...x }));
+  const setH = (x: Obj) => setH0(v => ({ ...v, ...x }));
   const [R, setR] = useState<Rad[]>([ny()]); const [fil, setFil] = useState<File | null>(null); const [busy, setBusy] = useState(false);
   const setRad = (i: number, x: Partial<Rad>) => setR(L => L.map((r, j) => j === i ? { ...r, ...x } : r));
   const lagre = async () => {
@@ -132,7 +132,7 @@ function Tilbakemelding({ s, close }: { s: Sak; close: () => void }) {
   const [v, setV0] = useState<Rec>(() => ({ avsender: e?.eierNavn || '', kontakt: [state.me?.navn, state.me?.epost].filter(Boolean).join(', '), mottaker: s.myndighet,
     innledning: `Vi viser til ${s.kilde === 'Forsikring' ? 'besiktigelse' : 'tilsyn'} ${fd(s.dato)}${s.ref ? ` (deres ref. ${s.ref})` : ''} ved ${eNavn(s.eiendomId)}${e?.adresse ? ', ' + e.adresse : ''}. Nedenfor følger status og tiltak for forholdene som ble påpekt.`,
     avslutning: 'Vi ber om at saken avsluttes for de forholdene som er utbedret. Ta gjerne kontakt dersom dere har spørsmål eller trenger ytterligere dokumentasjon.', med: Object.fromEntries(s.avvik.map(a => [a.id, true])) }));
-  const setV = (x: Rec) => setV0(p => ({ ...p, ...x })); const [busy, setBusy] = useState(false);
+  const setV = (x: Obj) => setV0(p => ({ ...p, ...x })); const [busy, setBusy] = useState(false);
   const statusTekst = (a: Rec) => AV_LUKKET.includes(a.status) || a.status === 'Utført – til kontroll' ? `Utbedret${a.utfort?.t ? ' ' + fd(String(a.utfort.t).slice(0, 10)) : a.lukket ? ' ' + fd(a.lukket) : ''}` : a.status === 'Utsatt' ? `Utsatt til ${fd(a.planlagt)}` : `Planlagt utbedret innen ${fd(a.planlagt || a.frist)}`;
   const lag = async () => {
     const A = s.avvik.filter(a => v.med[a.id]); if (!A.length) return toast(tt("Velg minst ett avvik"));

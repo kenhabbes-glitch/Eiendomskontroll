@@ -1,6 +1,6 @@
 // SHA etter byggherreforskriften: vurdering av plikter, risikovurdering, koordinatorer/organisering og byggherrens SHA-plan.
 import React, { useRef } from 'react';
-import { byId, eNavn, fd, today, type Rec } from '../lib/utils';
+import { byId, eNavn, fd, today, type Rec, Obj } from '../lib/utils';
 import { Chip } from '../components/ui';
 import { Hjelp } from '../components/LovHjelp';
 import { RISIKOFORHOLD } from '../lib/lovhjelp';
@@ -26,7 +26,7 @@ export function shaKonklusjon(v: Rec = {}, p?: Rec) {
   return { gjelder, koord, kp, ku, fm, dager, dagerPlan, dagsverk, vurdert: !!(V.vedlikehold && (V.flere || (V.flereP && V.flereU))) };
 }
 /** Hvilke sjekkpunkter som kan krysses av ut fra innholdet i SHA-verktøyet */
-export function shaAvkrysning(t: string, v: Rec = {}, p?: Rec): boolean {
+export function shaAvkrysning(t: string, v: Obj = {}, p?: Rec): boolean {
   const k = shaKonklusjon(v, p); const s = t.toLowerCase(); const O = v.org || {};
   if (/risikovurdering av arbeidet/.test(s)) return (v.risiko || []).length > 0;
   if (/behov for sha-plan|sha-plan og behov/.test(s)) return k.vurdert;
@@ -36,9 +36,9 @@ export function shaAvkrysning(t: string, v: Rec = {}, p?: Rec): boolean {
   return false;
 }
 
-export function Sha({ v, set, p, fane, setFane }: { v: Rec; set: (x: Rec) => void; p: Rec; fane: ShaFane; setFane: (f: ShaFane) => void }) {
-  const V: Rec = v.vurdering || {}; const setV = (x: Rec) => set({ vurdering: { ...V, ...x } });
-  const O: Rec = v.org || {}; const setO = (x: Rec) => set({ org: { ...O, ...x } });
+export function Sha({ v, set, p, fane, setFane }: { v: Rec; set: (x: Obj) => void; p: Rec; fane: ShaFane; setFane: (f: ShaFane) => void }) {
+  const V: Rec = v.vurdering || {}; const setV = (x: Obj) => set({ vurdering: { ...V, ...x } });
+  const O: Rec = v.org || {}; const setO = (x: Obj) => set({ org: { ...O, ...x } });
   const R: Rec[] = v.risiko || []; const k = shaKonklusjon(v, p);
   const leggTilRf = (navn: string[]) => set({ risiko: [...R, ...navn.filter(x => !R.some(r => r.aktivitet === x)).map(x => { const f = RISIKOFORHOLD.find(z => z[0] === x)!; return { id: uid(), aktivitet: f[0], fare: f[1], s: 'Middels', k: 'Høy', tiltak: f[2], ansvar: '', fase: 'Utførelse', status: 'Åpen' }; })] });
   const ref = useRef<HTMLDivElement>(null);

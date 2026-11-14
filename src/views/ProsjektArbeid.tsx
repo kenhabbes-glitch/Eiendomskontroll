@@ -1,7 +1,7 @@
 // Arbeidsflate for en oppgave i prosjektet: åpnes ved klikk på oppgaven under «Faser og oppgaver».
 import React, { useState } from 'react';
 import { S, save, toast, useStore, uploadFile } from '../lib/store';
-import { byId, fd, today, nok, type Rec } from '../lib/utils';
+import { byId, fd, today, nok, type Rec, Obj } from '../lib/utils';
 import { openModal, ModalFrame, confirmBox, FileLink, Chip } from '../components/ui';
 import { NsVelger, nsNavn } from '../components/NsVelger';
 import { FASER, FAG, KLASSER, uid } from '../lib/prosjekt';
@@ -16,7 +16,7 @@ type Kol = { k: string; l: string; w?: number | string; type?: 'text' | 'number'
 
 /** Enkel radredigering (tabell) brukt i flere arbeidsflater */
 export function Rader({ v, set, kol, ny, tom, sum, sumL = 'Sum' }: { v: Rec[]; set: (x: Rec[]) => void; kol: Kol[]; ny: () => Rec; tom?: string; sum?: (r: Rec) => React.ReactNode; sumL?: string }) {
-  const endre = (i: number, p: Rec) => set(v.map((r, j) => j === i ? { ...r, ...p } : r));
+  const endre = (i: number, p: Obj) => set(v.map((r, j) => j === i ? { ...r, ...p } : r));
   return <div className="pa-rader">
     {v.length ? <div className="tbl-wrap"><table className="pa-tbl"><thead><tr>{kol.map(c => <th key={c.k} style={{ width: c.w }}>{c.l}</th>)}{sum && <th className="num">{sumL}</th>}<th style={{ width: 30 }} /></tr></thead><tbody>
       {v.map((r, i) => <tr key={r.id || i}>{kol.map(c => <td key={c.k}>
@@ -32,7 +32,7 @@ export function Rader({ v, set, kol, ny, tom, sum, sumL = 'Sum' }: { v: Rec[]; s
   </div>;
 }
 const Felt = ({ l, children, half, hint }: { l: React.ReactNode; children: React.ReactNode; half?: boolean; hint?: string }) => <label className={'pa-felt' + (half ? ' half' : '')}><span>{l}</span>{children}{hint && <small className="muted">{hint}</small>}</label>;
-const Tekst = ({ v, set, k, l, rows = 3, ph }: { v: Rec; set: (p: Rec) => void; k: string; l: string; rows?: number; ph?: string }) => <Felt l={l}><textarea rows={rows} value={v[k] || ''} placeholder={ph} onChange={e => set({ [k]: e.target.value })} /></Felt>;
+const Tekst = ({ v, set, k, l, rows = 3, ph }: { v: Rec; set: (p: Obj) => void; k: string; l: string; rows?: number; ph?: string }) => <Felt l={l}><textarea rows={rows} value={v[k] || ''} placeholder={ph} onChange={e => set({ [k]: e.target.value })} /></Felt>;
 
 export function aapneOppgave(pid: string, oid: string) { openModal({ wide: true, render: close => <Arbeidsflate pid={pid} oid={oid} close={close} /> }); }
 export function nyOppgave(pid: string, fase: string) {
@@ -49,9 +49,9 @@ function Arbeidsflate({ pid, oid, close }: { pid: string; oid: string; close: ()
   const [shaFane, setShaFane] = useState<ShaFane>('vurdering');
   const [busy, setBusy] = useState(false);
   if (!p || !o0) return <ModalFrame title={tt("Oppgave")} close={close}><p>{tt("Fant ikke oppgaven.")}</p></ModalFrame>;
-  const setF = (x: Rec) => setF0(v => ({ ...v, ...x }));
+  const setF = (x: Obj) => setF0(v => ({ ...v, ...x }));
   const PA: Rec = p.arbeid || {}; const get = (k: string) => A[k] ?? PA[k];
-  const a: Rec = get(type) || {}; const setA = (x: Rec) => setA0(v => ({ ...v, [type]: { ...((v[type] ?? PA[type]) || {}), ...x } }));
+  const a: Rec = get(type) || {}; const setA = (x: Obj) => setA0(v => ({ ...v, [type]: { ...((v[type] ?? PA[type]) || {}), ...x } }));
   const lagre = async (ferdig?: boolean) => {
     setBusy(true);
     const P = byId('prosjekter', pid)!; const sha = A.sha ?? P.arbeid?.sha;
@@ -118,7 +118,7 @@ function Sjekk({ v, set, tittel, verktoy }: { v: Rec[]; set: (x: Rec[]) => void;
 
 const SANNS = ['Lav', 'Middels', 'Høy'];
 export const risikoNivaa = (r: Rec) => (SANNS.indexOf(r.sannsynlighet) + 1) * (SANNS.indexOf(r.konsekvens) + 1);
-function Beskrivelse({ v, set, risiko, setRisiko, p }: { v: Rec; set: (x: Rec) => void; risiko: Rec[]; setRisiko: (r: Rec[]) => void; p: Rec }) {
+function Beskrivelse({ v, set, risiko, setRisiko, p }: { v: Rec; set: (x: Obj) => void; risiko: Rec[]; setRisiko: (r: Rec[]) => void; p: Rec }) {
   return <>
     <h3 className="pa-h">{tt("Prosjektbeskrivelse")}</h3>
     <Tekst v={v} set={set} k="bakgrunn" l="Bakgrunn og behov" ph={p.beskrivelse || tt("Hvorfor skal prosjektet gjennomføres? Tilstand, krav, leietakerbehov …")} />
@@ -134,9 +134,9 @@ function Beskrivelse({ v, set, risiko, setRisiko, p }: { v: Rec; set: (x: Rec) =
   </>;
 }
 
-function Kalkyle({ v, set, p, type, fraOverslag }: { v: Rec; set: (x: Rec) => void; p: Rec; type: string; fraOverslag?: Rec }) {
+function Kalkyle({ v, set, p, type, fraOverslag }: { v: Rec; set: (x: Obj) => void; p: Rec; type: string; fraOverslag?: Rec }) {
   const k = kalkSum(v); const L: Linje[] = v.linjer || [];
-  const setL = (i: number, x: Rec) => set({ linjer: L.map((l, j) => j === i ? { ...l, ...x } : l) });
+  const setL = (i: number, x: Obj) => set({ linjer: L.map((l, j) => j === i ? { ...l, ...x } : l) });
   const overfor = async () => {
     if (!k.tot) return toast(tt("Ingen beløp å overføre"));
     const P = byId('prosjekter', p.id)!; const B: Rec[] = P.budsjett || [];
@@ -170,7 +170,7 @@ function Kalkyle({ v, set, p, type, fraOverslag }: { v: Rec; set: (x: Rec) => vo
 }
 
 const KILDER = ['Egenkapital / drift', 'Vedlikeholdsfond / avsetning', 'Lån', 'Leietakers bidrag', 'Tilskudd (f.eks. Enova)', 'Forsikringsoppgjør', 'Annet'];
-function Ramme({ v, set, overslag, kalkyle }: { v: Rec; set: (x: Rec) => void; overslag?: Rec; kalkyle?: Rec }) {
+function Ramme({ v, set, overslag, kalkyle }: { v: Rec; set: (x: Obj) => void; overslag?: Rec; kalkyle?: Rec }) {
   const ov = kalkSum(overslag).tot, ka = kalkSum(kalkyle).tot; const F: Rec[] = v.finansiering || []; const fs = F.reduce((s, x) => s + n(x.belop), 0); const r = n(v.ramme);
   return <>
     <h3 className="pa-h">{tt("Finansiering og budsjettramme")}</h3>
@@ -186,7 +186,7 @@ function Ramme({ v, set, overslag, kalkyle }: { v: Rec; set: (x: Rec) => void; o
   </>;
 }
 
-function Tilbud({ v, set, fagL }: { v: Rec; set: (x: Rec) => void; fagL: string[] }) {
+function Tilbud({ v, set, fagL }: { v: Rec; set: (x: Obj) => void; fagL: string[] }) {
   const T: Rec[] = v.liste || []; const vekt = v.vekt || { pris: 60, kvalitet: 30, fremdrift: 10 }; const sc = tilbudScore(T, vekt); const best = sc.length ? Math.max(...sc.map(x => x.tot)) : 0;
   return <>
     <h3 className="pa-h">{tt("Tilbud og evaluering")}</h3>
@@ -199,7 +199,7 @@ function Tilbud({ v, set, fagL }: { v: Rec; set: (x: Rec) => void; fagL: string[
   </>;
 }
 
-function Kontrakt({ v, set, tilbud, p }: { v: Rec; set: (x: Rec) => void; tilbud?: Rec; p: Rec }) {
+function Kontrakt({ v, set, tilbud, p }: { v: Rec; set: (x: Obj) => void; tilbud?: Rec; p: Rec }) {
   const valgt = (tilbud?.liste || []).find((t: Rec) => t.valgt);
   const reg = async () => {
     if (!n(v.sum)) return toast(tt("Fyll inn kontraktssum"));
@@ -227,9 +227,9 @@ function Kontrakt({ v, set, tilbud, p }: { v: Rec; set: (x: Rec) => void; tilbud
   </>;
 }
 
-function Moter({ v, set }: { v: Rec; set: (x: Rec) => void }) {
+function Moter({ v, set }: { v: Rec; set: (x: Obj) => void }) {
   const M: Rec[] = v.liste || []; const [apen, setApen] = useState<string>(M[M.length - 1]?.id || '');
-  const setM = (i: number, x: Rec) => set({ liste: M.map((m, j) => j === i ? { ...m, ...x } : m) });
+  const setM = (i: number, x: Obj) => set({ liste: M.map((m, j) => j === i ? { ...m, ...x } : m) });
   const apneSaker = M.flatMap(m => (m.saker || []).filter((s: Rec) => s.status !== 'Lukket').map((s: Rec) => ({ ...s, mote: m })));
   return <>
     <h3 className="pa-h">{tt("Møter og referater")}</h3>
@@ -250,7 +250,7 @@ function Moter({ v, set }: { v: Rec; set: (x: Rec) => void }) {
   </>;
 }
 
-function Endringer({ v, set, fagL, p }: { v: Rec; set: (x: Rec) => void; fagL: string[]; p: Rec }) {
+function Endringer({ v, set, fagL, p }: { v: Rec; set: (x: Obj) => void; fagL: string[]; p: Rec }) {
   const E: Rec[] = v.liste || []; const sum = (s: string[]) => E.filter(x => s.includes(x.status)).reduce((a, x) => a + n(x.belop), 0);
   const tilKost = async (i: number) => { const x = E[i]; const P = byId('prosjekter', p.id)!; const id = uid(); const post = (P.budsjett || []).find((b: Rec) => b.fag && b.fag === x.fag)?.id || '';
     await oppdaterP(p.id, { kostnader: [...(P.kostnader || []), { id, dato: x.dato || today(), status: 'Bestilt', leverandor: x.leverandor || '', beskrivelse: `EM ${x.nr}: ${x.tittel}`, post, fag: x.fag || '', endring: true, belop: n(x.belop) }],
@@ -265,7 +265,7 @@ function Endringer({ v, set, fagL, p }: { v: Rec; set: (x: Rec) => void; fagL: s
   </>;
 }
 
-function Mangler({ v, set, fagL }: { v: Rec; set: (x: Rec) => void; fagL: string[] }) {
+function Mangler({ v, set, fagL }: { v: Rec; set: (x: Obj) => void; fagL: string[] }) {
   const M: Rec[] = v.liste || [];
   return <>
     <h3 className="pa-h">{tt("Overtakelse og mangler")}</h3>

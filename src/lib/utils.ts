@@ -3,6 +3,8 @@ import { S, ARKIV } from './store';
 import { lokale, sprak, utSprak } from './i18n';
 
 export type Rec = { id: string; [k: string]: any };
+/** Løst objekt uten krav om id – brukes for delvise endringer («patch») og skjemadata. */
+export type Obj = { [k: string]: any };
 
 export const iso = (d: Date) => { const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return z.toISOString().slice(0, 10); };
 export const today = () => iso(new Date());
