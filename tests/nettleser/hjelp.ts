@@ -8,9 +8,15 @@ const TYPER: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.j
 const SISTE_NYHET = (fs.readFileSync(path.join(UT, '../../../src/lib/nyheter.ts'), 'utf8').match(/id: '([^']+)'/) || [])[1] || '';
 let tjener: http.Server, nettleser: Browser; export let ADR = '';
 
-export async function start() {
+/** «funksjoner»: serverfunksjoner som skal svare på /.netlify/functions/<navn> – da kjører testen hele veien fra skjermbilde til serverkode. */
+export async function start(funksjoner: Record<string, (req: Request) => Promise<Response>> = {}) {
   if (!fs.existsSync(path.join(UT, 'main.js'))) throw new Error('Kjør «node tests/nettleser/bygg.mjs» først (npm run test:nettleser gjør det selv)');
-  tjener = http.createServer((req, res) => { const f = path.join(UT, decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/$/, '/index.html'));
+  tjener = http.createServer(async (req, res) => {
+    const fn = funksjoner[(req.url || '').replace('/.netlify/functions/', '')];
+    if (fn) { const biter: Buffer[] = []; for await (const c of req) biter.push(c as Buffer);
+      const svar = await fn(new Request('http://test' + req.url, { method: req.method, headers: req.headers as any, body: req.method === 'GET' ? undefined : Buffer.concat(biter) }));
+      res.writeHead(svar.status, { 'Content-Type': svar.headers.get('content-type') || 'application/json' }); return res.end(Buffer.from(await svar.arrayBuffer())); }
+    const f = path.join(UT, decodeURIComponent((req.url || '/').split('?')[0]).replace(/^\/$/, '/index.html'));
     if (!f.startsWith(UT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); }
     res.writeHead(200, { 'Content-Type': TYPER[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res); });
   await new Promise<void>(ok => tjener.listen(0, '127.0.0.1', ok)); ADR = 'http://127.0.0.1:' + (tjener.address() as any).port;

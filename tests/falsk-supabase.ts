@@ -9,7 +9,7 @@ export function lagFalsk(db: Db, brukere: Record<string, { id: string; email: st
     const rader = () => (db[tabell] ||= []).filter(r => filtre.every(f => f(r)));
     const utfor = (en?: 'single' | 'maybe') => {
       const T = (db[tabell] ||= []);
-      if (modus === 'insert') { const n = (Array.isArray(nytt) ? nytt : [nytt]).map(x => ({ id: 'ny-' + (T.length + 1), ...x })); T.push(...n); return { data: en ? n[0] : n, error: null }; }
+      if (modus === 'insert') { const n = (Array.isArray(nytt) ? nytt : [nytt]).map(x => ({ id: 'ny-' + (T.length + 1), ...(/_invitasjon$/.test(tabell) ? { token: crypto.randomUUID() } : {}), ...x })); /* databasen lager selv token for invitasjoner */ T.push(...n); return { data: en ? n[0] : n, error: null }; }
       if (modus === 'upsert') { const n = Array.isArray(nytt) ? nytt : [nytt];
         for (const x of n) { const i = T.findIndex(r => (x.id && r.id === x.id) || (x.org_id && x.user_id && r.org_id === x.org_id && r.user_id === x.user_id)); if (i >= 0) T[i] = { ...T[i], ...x }; else T.push(x); }
         return { data: en ? n[0] : n, error: null }; }
