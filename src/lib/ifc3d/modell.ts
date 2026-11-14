@@ -38,31 +38,34 @@ function medEgenskaper(b: Uint8Array, m: IfcModell): Uint8Array {
 /** Leser nøyaktig n byte om gangen fra en strøm, uten å holde mer enn det som trengs i minnet. */
 function byteLeser(strom: ReadableStream<Uint8Array>) {
   const r = strom.getReader(); let rest: Uint8Array | null = null;
-  return async (n: number): Promise<Uint8Array> => {
-    const ut = new Uint8Array(n); let o = 0;
+  return async (n: number, hopp = false): Promise<Uint8Array> => {
+    const ut = hopp ? TOM : new Uint8Array(n); let o = 0;
     while (o < n) {
       if (!rest || !rest.length) { const { value, done } = await r.read(); if (done) throw new Error('Modellfilen er ufullstendig'); rest = value!; continue; }
-      const k = Math.min(rest.length, n - o); ut.set(rest.subarray(0, k), o); o += k; rest = rest.subarray(k);
+      const k = Math.min(rest.length, n - o); if (!hopp) ut.set(rest.subarray(0, k), o); o += k; rest = rest.subarray(k);
     }
     return ut;
   };
 }
+const TOM = new Uint8Array(0);
 const pad4 = (n: number) => Math.ceil(n / 4) * 4;
 
 /**
  * Leser en lagret modell (gzip) til typede arrays klare for three.js – bit for bit.
  * Den utpakkede filen holdes aldri samlet i minnet: hver gruppe pakkes ut, gjøres om til ferdige arrays og slippes,
  * før neste leses. Det halverer omtrent minnebruken ved åpning av store modeller (viktig på mobil).
+ * Med «behold» kan deler av modellen (f.eks. etasjer) hoppes over: de tar da ikke plass i minnet i det hele tatt.
  */
-export async function lesModellStrom(gz: ReadableStream<Uint8Array>): Promise<Modell> {
+export async function lesModellStrom(gz: ReadableStream<Uint8Array>, behold?: (g: Ek3dHode['grupper'][number], hode: Ek3dFull) => boolean): Promise<Modell> {
   const les = byteLeser(gz.pipeThrough(new DecompressionStream('gzip') as any) as ReadableStream<Uint8Array>);
   const start = await les(8);
   if (start[0] !== 0x45 || start[1] !== 0x4b || start[2] !== 0x33) throw new Error('Ukjent modellformat');
   const hl = new DataView(start.buffer).getUint32(4, true);
   const hode: Ek3dFull = JSON.parse(new TextDecoder().decode((await les(pad4(hl))).subarray(0, hl)));
-  const grupper: Modell['grupper'] = [];
+  const grupper: Modell['grupper'] = []; const utelatt = new Set<number>();
   for (let gi = 0; gi < hode.grupper.length; gi++) {
     const g = hode.grupper[gi]; const n = g.nv, ni = g.ni;
+    if (behold && !behold(g, hode)) { await les(hode.v === 2 ? pad4(n * 6) + pad4(n * 3) + ni * 4 : n * 12 + pad4(n * 3) + ni * 4, true); utelatt.add(gi); grupper.push({ pos: new Float32Array(0), nor: new Int8Array(0), idx: new Uint32Array(0) }); continue; }
     if (hode.v === 2) {
       const q = hode.q![gi]; const pq = await les(pad4(n * 6)); const pos = new Float32Array(n * 3);
       for (let a = 0; a < 3; a++) { let v = 0; const lo = a * 2 * n, hi = lo + n; for (let i = 0; i < n; i++) { v = (v + (pq[lo + i] | (pq[hi + i] << 8))) & 0xffff; pos[i * 3 + a] = q[a] + v * q[3 + a]; } }
@@ -75,7 +78,13 @@ export async function lesModellStrom(gz: ReadableStream<Uint8Array>): Promise<Mo
       grupper.push({ pos, nor, idx: new Uint32Array((await les(ni * 4)).buffer) });
     }
   }
-  return { hode, grupper, seg: new Int32Array((await les(hode.nSeg * 28)).buffer) };
+  let seg = new Int32Array((await les(hode.nSeg * 28)).buffer);
+  if (utelatt.size) { // fjern det som peker inn i utelatte grupper, så resten av appen ser en mindre, men hel, modell
+    let n = 0; for (let i = 0; i < hode.nSeg; i++) if (!utelatt.has(seg[i * 7 + 1])) n++;
+    const ny = new Int32Array(n * 7); let o = 0; for (let i = 0; i < hode.nSeg; i++) if (!utelatt.has(seg[i * 7 + 1])) { ny.set(seg.subarray(i * 7, i * 7 + 7), o); o += 7; }
+    seg = ny; hode.nSeg = n; hode.grupper = hode.grupper.map((g, gi) => utelatt.has(gi) ? { ...g, nv: 0, ni: 0 } : g);
+  }
+  return { hode, grupper, seg };
 }
 /** Som lesModellStrom, for en fil som allerede ligger i minnet. */
 export const lesModell = (gz: ArrayBuffer): Promise<Modell> => lesModellStrom(new Blob([gz]).stream() as ReadableStream<Uint8Array>);

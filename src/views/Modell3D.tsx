@@ -30,6 +30,9 @@ const resultat = (ty: string, p: V3[]): string => {
 };
 
 // ------------------------------------------------------------------ fane på eiendommen
+/** Samlet (komprimert) størrelse der mobil og nettbrett spør før modellen åpnes. */
+const STOR_MOBIL = 15e6;
+const erMobil = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 900;
 export default function ModellSeksjon({ eid }: { eid: string }) {
   useStore(); const ed = canEdit();
   const [mod, setMod] = useState<Rec[] | null>(null); const [busy, setBusy] = useState(''); const [pct, setPct] = useState(0); const [visListe, setVisListe] = useState(false);
@@ -72,6 +75,10 @@ export default function ModellSeksjon({ eid }: { eid: string }) {
   };
   const settFag = async (r: Rec, fag: string) => { await sb.from('modeller3d').update({ data: { ...r.data, fag } }).eq('id', r.id); await last(); };
   const L = mod || []; const sum = L.reduce((s, r) => s + (r.data.antall || 0), 0); const nokkel = L.map(r => r.id + fagAv(r)).join('|');
+  // Mobil/nettbrett: store modeller åpnes ikke av seg selv. Brukeren velger fag først (minnet i mobilnettlesere er begrenset).
+  const totalStr = L.reduce((s, r) => s + (r.data.str || 0), 0); const stor = erMobil && totalStr > STOR_MOBIL;
+  const [valgt, setValgt] = useState<string[] | null>(null); const [kryss, setKryss] = useState<string[]>([]);
+  useEffect(() => { if (!stor) return; const minst = [...L].sort((x, y) => (x.data.str || 0) - (y.data.str || 0)); let s = 0; setKryss(minst.filter(r => (s += r.data.str || 0) <= STOR_MOBIL || r === minst[0]).map(r => r.id)); setValgt(null); }, [nokkel, stor]);
   const opp = (r?: Rec) => <label className={'btn' + (r ? ' sm' : '')} style={{ display: 'inline-flex' }}>{r ? tt("Ny versjon") : L.length ? tt("Legg til fagmodell (IFC)") : tt("Last opp IFC-modell")}<input type="file" accept=".ifc,.ifczip,.zip" style={{ display: 'none' }} onChange={e => { velg(e.target.files?.[0], r); e.target.value = ''; }} /></label>;
   return <>
     {busy ? <div className="card"><b>{busy} …</b><div style={{ height: 8, background: 'var(--line2)', borderRadius: 4, marginTop: 8 }}><div style={{ height: 8, width: Math.round(pct * 100) + '%', background: '#1E4D57', borderRadius: 4, transition: 'width .3s' }} /></div><p className="small muted" style={{ marginBottom: 0 }}>{tt("Store modeller kan ta et minutt. Ikke lukk siden.")}</p></div>
@@ -83,13 +90,23 @@ export default function ModellSeksjon({ eid }: { eid: string }) {
       <td style={{ whiteSpace: 'nowrap' }}>{ed && opp(r)} {ed && <button className="btn sm ghost" onClick={() => slett(r)}>{tt("Slett")}</button>}</td></tr>)}</tbody></table></div>
       <p className="small muted" style={{ marginBottom: 0 }}>{tt("Faget gjettes fra filnavnet (ARK, RIB, RIV, RIE, RIBr …). Rett det her om det ble feil. «Ny versjon» bytter ut filen og beholder mål, notater, tegningskoblinger og koblinger til systemer.")}</p></div>}
     {mod && !L.length && !busy && <Empty t={tt("Ingen 3D-modell er lastet opp ennå.")}><p className="small muted" style={{ maxWidth: 560, margin: '8px auto' }}>{tt("Last opp IFC-filer (.ifc eller .ifczip) fra arkitekt- og fagmodellene – ARK, RIB, RIV, RIE, RIBr osv. De settes sammen til én modell du kan snu og zoome på, slå fag av og på, se data for hver bygningsdel, koble til systemer og markere avvik i.")}</p></Empty>}
-    {L.length > 0 && !busy && <Visning key={nokkel} eid={eid} modeller={L.map(r => ({ ...r, data: { ...r.data, fag: fagAv(r) } }))} hovedId={hoved(L).id} />}
+    {L.length > 0 && !busy && stor && !valgt && <div className="card">
+      <b>{tt("Stor 3D-modell ({0} MB)", (totalStr / 1e6).toFixed(0))}</b>
+      <p className="small muted" style={{ margin: '6px 0 10px' }}>{tt("På mobil og nettbrett kan store modeller bruke mer minne enn nettleseren tillater, og da lukkes siden. Velg hva du vil åpne – færre og mindre fag er tryggest.")}</p>
+      {L.map(r => <label key={r.id} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0' }}><input type="checkbox" checked={kryss.includes(r.id)} onChange={e => setKryss(e.target.checked ? [...kryss, r.id] : kryss.filter(x => x !== r.id))} />
+        <span className="grow">{fagNavn(fagAv(r))} <span className="small muted">· {r.data.navn}</span></span><span className="small muted">{((r.data.str || 0) / 1e6).toFixed(0)} MB</span></label>)}
+      <button className="btn pri" style={{ marginTop: 10 }} disabled={!kryss.length} onClick={() => setValgt(kryss)}>{tt("Åpne 3D-modellen")}</button></div>}
+    {L.length > 0 && !busy && (!stor || valgt) && <>
+      {stor && valgt && <p className="small muted" style={{ margin: '0 0 8px' }}>{valgt.length < L.length ? tt("Viser {0} av {1} fagmodeller.", valgt.length, L.length) : ''} <a href="#" onClick={e => { e.preventDefault(); setValgt(null); }}>{tt("Velg fag på nytt")}</a></p>}
+      <Visning key={nokkel + '|' + (valgt || []).join(',')} eid={eid} modeller={L.map(r => ({ ...r, data: { ...r.data, fag: fagAv(r) } }))} hovedId={hoved(L).id} last={stor ? valgt : null} /></>}
   </>;
 }
 
 // ------------------------------------------------------------------ visning
-function Visning({ eid, modeller, hovedId }: { eid: string; modeller: Rec[]; hovedId: string }) {
+function Visning({ eid, modeller, hovedId, last }: { eid: string; modeller: Rec[]; hovedId: string; last?: string[] | null }) {
   useStore(); const ed = canEdit(); const modellRad = modeller.find(r => r.id === hovedId) || modeller[0];
+  // «Vis i 3D» legger igjen hva som skal vises. Hentes ut med en gang, slik at en side som lastes på nytt (f.eks. etter at nettleseren gikk tom for minne) ikke åpner modellen automatisk igjen.
+  const [ventFokus] = useState(() => { try { const v = sessionStorage.getItem('ek.3dfokus') || ''; sessionStorage.removeItem('ek.3dfokus'); return { id: v }; } catch { return { id: '' }; } });
   const [fagVis, setFagVis] = useState<boolean[]>([]); const [fagListe, setFagListe] = useState<Samlet['fag']>([]);
   const vert = useRef<HTMLDivElement>(null); const T = useRef<any>({}); // three-objekter
   const [mod, setMod] = useState<Modell | null>(null); const [feil, setFeil] = useState(''); const [lastet, setLastet] = useState(0);
@@ -112,7 +129,7 @@ function Visning({ eid, modeller, hovedId }: { eid: string; modeller: Rec[]; hov
   // --- last modellen
   useEffect(() => { let av = false; (async () => { try {
     // Én fagmodell om gangen, lest rett fra nettet bit for bit – da holdes minnebruken nede (store modeller på mobil)
-    const deler: Del[] = []; for (const r of modeller) { if (av) return; deler.push({ mod: await lesModellStrom(delStrom((r.data.deler as string[]) || [r.data.path], async p => fetch(await fileUrl(p)))), fag: r.data.fag, navn: r.data.navn, id: r.id }); }
+    const deler: Del[] = []; for (const r of modeller) { if (av) return; if (last && !last.includes(r.id)) continue; deler.push({ mod: await lesModellStrom(delStrom((r.data.deler as string[]) || [r.data.path], async p => fetch(await fileUrl(p)))), fag: r.data.fag, navn: r.data.navn, id: r.id }); }
     // Felles ramme: lagres på hovedmodellen. Har hovedmodellen ikke forskyvning (lastet opp før fagstøtte), brukes en midlertidig ramme.
     const hd = deler.find(d => d.id === modellRad.id); const K = hd?.mod.hode.koord;
     let ramme: number[] | null = modellRad.data.ramme || (K ? [K[12], K[13], K[14]] : rammeFra(deler));
@@ -148,7 +165,7 @@ function Visning({ eid, modeller, hovedId }: { eid: string; modeller: Rec[]; hov
 
   // --- «Vis i 3D» fra et system i appen
   useEffect(() => { if (!lastet) return; const f = () => setTimeout(fokuser, 30); window.addEventListener('ek3d-fokus', f); fokuser(); return () => window.removeEventListener('ek3d-fokus', f); }, [lastet]);
-  function fokuser() { let id = ''; try { id = sessionStorage.getItem('ek.3dfokus') || ''; sessionStorage.removeItem('ek.3dfokus'); } catch { /* ignorer */ } if (!id) return;
+  function fokuser() { let id = ''; try { id = sessionStorage.getItem('ek.3dfokus') || ''; sessionStorage.removeItem('ek.3dfokus'); } catch { /* ignorer */ } if (!id) { id = ventFokus.id; ventFokus.id = ''; } if (!id) return;
     if (id.startsWith('k:')) { const k = byId('komponenter', id.slice(2)); const els = [k?.ifcGuid, ...(k?.ifcDeler || [])].map(g => g && T.current.farg?.get(g)).filter((x: any) => x != null) as number[]; if (!els.length) return; setVerk('velg'); setTimeout(() => { setSel({ el: els[0], p: senterAv(els[0]) }); fokusPaa(els, [tfmKomp(k!), k!.navn].filter(Boolean).join(' – ')); }, 50); return; }
     const a = byId('anlegg', id); if (!a) return;
     setFokus(id); setModus('status'); const els = (a.ifcGuider || []).map((g: string) => T.current.farg?.get(g)).filter((x: any) => x != null); setTimeout(() => fokusPaa(els, a.navn), 50); }

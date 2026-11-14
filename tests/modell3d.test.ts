@@ -21,7 +21,7 @@ function lagRaa() {
     for (let i = 0; i < g.nv * 3; i++) { const v = Math.fround(rnd() * 60 - 5); dv.setFloat32(o + i * 4, v, true); f.pos.push(v); } o += g.nv * 12;
     for (let i = 0; i < g.nv * 3; i++) { const v = Math.round(rnd() * 254 - 127) | 0; dv.setInt8(o + i, v); f.nor.push(v); } o += pad4(g.nv * 3);
     for (let i = 0; i < g.ni; i++) { const v = Math.floor(rnd() * g.nv); dv.setUint32(o + i * 4, v, true); f.idx.push(v); } o += g.ni * 4; fasit.push(f); }
-  const seg: number[] = []; for (let i = 0; i < nSeg * 7; i++) { const v = Math.floor(rnd() * 1000) - 3; dv.setInt32(o + i * 4, v, true); seg.push(v); }
+  const seg: number[] = []; for (let i = 0; i < nSeg * 7; i++) { const v = i % 7 === 1 ? Math.floor(rnd() * 2) : Math.floor(rnd() * 1000) - 3; dv.setInt32(o + i * 4, v, true); seg.push(v); }
   return { b, fasit, seg, hode };
 }
 const gzip = async (b: Uint8Array) => new Uint8Array(await new Response(new Blob([b]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
@@ -65,4 +65,14 @@ test('avkuttet fil, feil filtype og fil som ikke finnes gir feilmelding i stedet
   await assert.rejects(async () => lesModell((await gzip(raa.slice(0, raa.length - 50))).buffer), /ufullstendig/);
   await assert.rejects(async () => lesModell((await gzip(new TextEncoder().encode('{"error":"ikke tilgang"}          '))).buffer), /Ukjent modellformat/);
   await assert.rejects(() => lesModellStrom(delStrom(['x'], async () => new Response('nei', { status: 400 }))));
+});
+
+test('lett visning: utelatte grupper tar ikke plass, og resten av modellen er uendret', async () => {
+  const R = lagRaa(); const gz = await gzip(pakkV2(R.b)); const hel = await lesModell(gz.buffer);
+  let nr = 0; const m = await lesModellStrom(iBiter(gz, 500), () => nr++ === 1); // behold bare gruppe 2
+  assert.equal(m.grupper[0].pos.length, 0); assert.equal(m.hode.grupper[0].nv, 0); assert.equal(m.hode.grupper[0].ni, 0);
+  assert.deepEqual(m.grupper[1].pos, hel.grupper[1].pos); assert.deepEqual(m.grupper[1].idx, hel.grupper[1].idx);
+  const forventet: number[] = []; for (let i = 0; i < hel.hode.nSeg; i++) if (hel.seg[i * 7 + 1] === 1) forventet.push(...hel.seg.subarray(i * 7, i * 7 + 7));
+  assert.deepEqual([...m.seg], forventet); assert.equal(m.hode.nSeg, forventet.length / 7);
+  for (let i = 0; i < m.hode.nSeg; i++) assert.equal(m.seg[i * 7 + 1], 1);
 });
