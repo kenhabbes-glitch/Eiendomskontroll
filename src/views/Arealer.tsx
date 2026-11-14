@@ -185,7 +185,8 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   const tipMove = (e: React.PointerEvent) => { if (tip && !st.drag) setTip({ ...tip, x: e.clientX, y: e.clientY }); else if (tip) setTip(null); };
   const tipOff = () => setTip(null);
   const tfmMode = opts.mode === 'tfm'; const maalMode = !!opts.maal;
-  const st = useRef({ flater: (opts.maal?.flater ? clone(opts.maal.flater) : []) as number[][][], tgF: '', tagg: (opts.tagg || '') as string, fokus: new Set<string>(opts.fokus || (opts.focus ? [opts.focus] : [])), visPlassert: false, flyttOk: (opts.placeId || '') as string, lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, nkSys: (opts.nyKomp || '') as string, nkKode: '', nkNavn: '', nkLagt: [] as string[], tool: opts.nyKomp && !ro ? 'nykomp' : opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '' }).current;
+  const st = useRef({ flater: (opts.maal?.flater ? clone(opts.maal.flater) : []) as number[][][], tgF: '', tagg: (opts.tagg || '') as string, fokus: new Set<string>(opts.fokus || (opts.focus ? [opts.focus] : [])), visPlassert: false, flyttOk: (opts.placeId || '') as string, lagA: !tfmMode, lagM: true, lagV: true, fag: '', selM: (opts.focus || null) as string | null, placeId: (opts.placeId || '') as string, mpos: null as number[] | null, nkSys: (opts.nyKomp || '') as string, nkKode: '', nkNavn: '', nkLagt: [] as string[], tool: opts.nyKomp && !ro ? 'nykomp' : opts.placeId && !ro ? 'plasser' : tfmMode ? 'velg' : mpp(T) ? 'velg' : (ro ? 'velg' : 'skala'), sel: null as string | null, draft: [] as number[][], meas: [] as number[][], scale: [] as number[][], hover: null as number[] | null, drag: null as any, shift: false, space: false, dirty: false, saveT: 0 as any, status: '', ptr: new Map<number, { x: number; y: number }>(), pinch: null as any }).current;
+  const [fullsk, setFullsk] = useState(() => window.innerWidth <= 860 && !opts.maal);
   const [vb, setVb] = useState({ x: 0, y: 0, w: T.w || 1000, h: T.h || 800 });
   const svgRef = useRef<SVGSVGElement>(null);
   const src = useFileUrl(T.fil?.path);
@@ -208,6 +209,12 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
 
   const k = () => { const r = svgRef.current?.getBoundingClientRect(); return r ? Math.max(vb.w / (r.width || 1), vb.h / (r.height || 1)) : 1; };
   const pt = (e: { clientX: number; clientY: number }) => { const s = svgRef.current!; const p = s.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const q = p.matrixTransform(s.getScreenCTM()!.inverse()); return [q.x, q.y]; };
+  // skjermpunkt ↔ tegning med samme «meet»-tilpasning som SVG-en (brukes av klyp og zoomknapper)
+  const skala = (v: { w: number; h: number }, r: DOMRect) => Math.max(v.w / r.width, v.h / r.height);
+  const zoomRundt = (f: number, cx?: number, cy?: number) => { const r = svgRef.current!.getBoundingClientRect(); const X = cx ?? r.left + r.width / 2, Y = cy ?? r.top + r.height / 2;
+    setVb(v => { const nw = Math.min(Math.max(v.w * f, (T.w || 1000) / 80), (T.w || 1000) * 4); const g = nw / v.w; const s0 = skala(v, r), s1 = s0 * g;
+      const ax = v.x + (v.w - r.width * s0) / 2 + (X - r.left) * s0, ay = v.y + (v.h - r.height * s0) / 2 + (Y - r.top) * s0; const nh = v.h * g;
+      return { x: ax - (nw - r.width * s1) / 2 - (X - r.left) * s1, y: ay - (nh - r.height * s1) / 2 - (Y - r.top) * s1, w: nw, h: nh }; }); };
   const snap = (p: number[], ref?: number[] | null, skip?: { z: string; i: number }) => {
     const tol = 10 * k(); let best: number[] | null = null, bd = tol;
     T.soner.forEach((z: Rec) => z.pts.forEach((q: number[], i: number) => { if (skip && skip.z === z.id && skip.i === i) return; const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; best = q; } }));
@@ -245,6 +252,10 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   useEffect(() => () => { if (st.dirty) save('tegninger', clone(T)).then(() => syncArealer(T.eiendomId)).catch(() => {}); }, []);
 
   const onDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') { st.ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (st.ptr.size === 2) { const [a, b] = [...st.ptr.values()]; if (st.drag?.t === 'm' && st.mpos) st.mpos = null; st.drag = null; st.hover = null;
+        st.pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, vb0: { ...vb }, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 }; svgRef.current!.setPointerCapture(e.pointerId); rr(); return; }
+      if (st.pinch) return; }
     st.shift = e.shiftKey; const p = pt(e); const tg = e.target as Element; const hdl = tg.getAttribute('data-h'); const zid = tg.getAttribute('data-z');
     const mid = (tg.closest && tg.closest('[data-m]')?.getAttribute('data-m')) || null;
     if (mid && e.button === 0 && (st.tool === 'velg' || st.tool === 'plasser' || st.tool === 'nykomp')) { st.selM = mid; st.sel = null; if (!ro) { st.drag = { t: 'm', id: mid, cx: e.clientX, cy: e.clientY, moved: false }; svgRef.current!.setPointerCapture(e.pointerId); } rr(); return; }
@@ -280,6 +291,12 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
     catch (e: any) { toast(e?.message || tt("Kunne ikke lagre komponenten")); }
   };
   const onMove = (e: React.PointerEvent) => {
+    if (st.ptr.has(e.pointerId)) st.ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (st.pinch) { if (st.ptr.size < 2) return; const [a, b] = [...st.ptr.values()]; const P = st.pinch, v0 = P.vb0; const r = svgRef.current!.getBoundingClientRect();
+      const nw = Math.min(Math.max(v0.w * P.d0 / (Math.hypot(a.x - b.x, a.y - b.y) || 1), (T.w || 1000) / 80), (T.w || 1000) * 4); const g = nw / v0.w, nh = v0.h * g;
+      const s0 = skala(v0, r), s1 = s0 * g; const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+      const ax = v0.x + (v0.w - r.width * s0) / 2 + (P.cx - r.left) * s0, ay = v0.y + (v0.h - r.height * s0) / 2 + (P.cy - r.top) * s0;
+      setVb({ x: ax - (nw - r.width * s1) / 2 - (cx - r.left) * s1, y: ay - (nh - r.height * s1) / 2 - (cy - r.top) * s1, w: nw, h: nh }); return; }
     st.shift = e.shiftKey; const p = pt(e);
     if (st.drag?.t === 'pan') { const r = svgRef.current!.getBoundingClientRect(); const v0 = st.drag.vb0; const kk = Math.max(v0.w / r.width, v0.h / r.height); setVb({ ...v0, x: v0.x - (e.clientX - st.drag.cx) * kk, y: v0.y - (e.clientY - st.drag.cy) * kk }); if (Math.abs(e.clientX - st.drag.cx) + Math.abs(e.clientY - st.drag.cy) > 4) st.drag.moved = true; return; }
     if (st.drag?.t === 'm') { if (Math.abs(e.clientX - st.drag.cx) + Math.abs(e.clientY - st.drag.cy) > 4) st.drag.moved = true; if (st.drag.moved) { st.mpos = p; rr(); } return; }
@@ -287,7 +304,9 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
     const ref = st.tool === 'tegn' || st.tool === 'flate' ? st.draft[st.draft.length - 1] : st.tool === 'skala' ? (st.scale.length === 1 ? st.scale[0] : null) : st.tool === 'maal' ? (st.meas.length === 1 ? st.meas[0] : null) : null;
     if (st.tool !== 'velg') { st.hover = snap(p, ref); rr(); }
   };
-  const onUp = () => {
+  const onUp = (e?: React.PointerEvent) => {
+    if (e) st.ptr.delete(e.pointerId);
+    if (st.pinch) { if (st.ptr.size < 2) { st.pinch = null; st.drag = null; } return; }
     if (st.drag?.t === 'm') { const it = findItem(st.drag.id); if (it && st.drag.moved && st.mpos) { const pos = { tegningId: T.id, x: Math.round(st.mpos[0] * 10) / 10, y: Math.round(st.mpos[1] * 10) / 10 }; it.o.pos = pos; lagrePos(it, pos); } st.mpos = null; st.drag = null; rr(); return; }
     if (st.drag?.t === 'v') { const z = T.soner.find((z: Rec) => z.id === st.sel); if (z) z.pts[st.drag.i] = z.pts[st.drag.i].map((v: number) => Math.round(v * 10) / 10); change(); }
     if (st.drag?.t === 'pan' && !st.drag.moved && st.tool === 'velg' && st.sel) { st.sel = null; rr(); }
@@ -300,8 +319,10 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
   const selZ = T.soner.find((z: Rec) => z.id === st.sel);
   const sum: Record<string, number> = {}; T.soner.forEach((z: Rec) => { sum[z.kat] = (sum[z.kat] || 0) + (zoneArea(T, z) || 0); });
 
-  return <div className="modal plan" role="dialog" aria-modal="true">
-    <div className="mh"><h2>{eNavn(T.eiendomId)} · {T.navn}</h2><span className="small muted">{ro ? tt("Lesetilgang") : st.status}</span><button className="btn sm" onClick={done}>{tt("Ferdig")}</button></div>
+  return <div className={'modal plan' + (fullsk ? ' fs' : '') + (fullsk && (st.sel || st.selM) ? ' harvalg' : '')} role="dialog" aria-modal="true">
+    <div className="mh"><h2>{eNavn(T.eiendomId)} · {T.navn}</h2><span className="small muted pstatus">{ro ? tt("Lesetilgang") : st.status}</span>
+      <button className="btn sm" onClick={() => setFullsk(!fullsk)} title={fullsk ? tt("Vis verktøy og liste") : tt("Bare tegningen, i hele skjermen")}>{fullsk ? tt("Verktøy") : '⛶ ' + tt("Fullskjerm")}</button>
+      <button className="btn sm pri" onClick={done} aria-label={tt("Lukk")}>✕ {tt("Lukk")}</button></div>
     <div className="pbody">
       <div className="ptools">
         {(maalMode ? ['velg', 'skala', 'flate', 'maal'] as const : ['velg', 'skala', 'tegn', 'maal', 'plasser', 'nykomp'] as const).filter(t => !ro || t === 'velg' || t === 'maal').map(t => <button key={t} className={st.tool === t ? 'on' : ''} onClick={() => setTool(t)}>{({ velg: 'Velg / panorer', skala: 'Sett målestokk', tegn: 'Tegn areal', flate: 'Tegn flate som skal måles', maal: 'Mål avstand', plasser: 'Plasser system/komponent', nykomp: 'Legg til komponenter' } as any)[t]}</button>)}
@@ -315,7 +336,7 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
         {st.fokus.size > 0 && <button className="btn sm" style={{ marginTop: 4 }} onClick={() => { st.fokus = new Set(); rr(); }}>{tt("Fjern utheving")}</button>}
         <hr /><button onClick={() => setVb({ x: 0, y: 0, w: T.w, h: T.h })}>{tt("Tilpass til vindu")}</button><div className="phelp">{HELP[st.tool]}</div>
       </div>
-      <div className="pcanvas"><svg ref={svgRef} className={st.tool === 'velg' ? 'pan' : ''} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
+      <div className="pcanvas"><svg ref={svgRef} className={st.tool === 'velg' ? 'pan' : ''} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
         onDoubleClick={() => { if (st.tool === 'tegn' || st.tool === 'flate' || (st.tool === 'nykomp' && st.draft.length)) { if (st.draft.length > 3) st.draft.pop(); closePoly(); } }} onPointerLeave={() => { st.hover = null; if (st.tool !== 'velg') rr(); }} fontFamily="IBM Plex Sans,sans-serif">
         {src && <image href={src} x={0} y={0} width={T.w} height={T.h} />}
         {st.lagA && T.soner.map((z: Rec) => { const c = zoneColor(T, z); const on = z.id === st.sel; return <polygon key={z.id} points={z.pts.map((p: number[]) => p.join(',')).join(' ')} fill={c} fillOpacity={on ? .38 : .24} stroke={c} strokeWidth={on ? 3 : 1.6} vectorEffect="non-scaling-stroke" data-z={z.id} style={{ cursor: 'pointer' }} />; })}
@@ -351,6 +372,10 @@ function PlanEditor({ tid, close, opts = {} }: { tid: string; close: () => void;
           {st.hover && r0 && <text x={st.hover[0] + 10 * kk} y={st.hover[1] - 10 * kk} fontSize={fs * .9} fill="#1f6f5c" stroke="#fff" strokeWidth={3 * kk} paintOrder="stroke">{fmtM(Math.hypot(st.hover[0] - st.draft[st.draft.length - 1][0], st.hover[1] - st.draft[st.draft.length - 1][1]) * r0)}</text>}</g>}
         {!st.draft.length && st.hover && st.tool !== 'velg' && <circle cx={st.hover[0]} cy={st.hover[1]} r={r} fill="none" stroke="#1f6f5c" strokeWidth={2} vectorEffect="non-scaling-stroke" pointerEvents="none" />}
       </svg>
+      <div className="pzoom" onPointerDown={e => e.stopPropagation()}>
+        <button type="button" aria-label={tt("Zoom inn")} onClick={() => zoomRundt(1 / 1.5)}>+</button>
+        <button type="button" aria-label={tt("Zoom ut")} onClick={() => zoomRundt(1.5)}>−</button>
+        <button type="button" aria-label={tt("Hele tegningen")} style={{ fontSize: 14 }} onClick={() => setVb({ x: 0, y: 0, w: T.w || 1000, h: T.h || 800 })}>⤢</button></div>
       {tip && (() => { const i = tip.i; const sys = i.kind === 'k' ? byId('anlegg', i.o.anleggId) : i.kind === 'v' ? byId('anlegg', i.o.anleggId) : null; const kc = i.kind === 'v' && i.o.komponentId ? byId('komponenter', i.o.komponentId) : null;
         const kode = i.kind === 'a' ? tfmSys(i.o, true) : i.kind === 'k' ? tfmKomp(i.o, true) : '#' + (i.o.nr || '');
         const ekstra = i.kind === 'v' ? [i.o.status, i.o.alv].filter(Boolean).join(' · ') : [i.o.fabrikat, i.o.tg].filter(Boolean).join(' · ');
