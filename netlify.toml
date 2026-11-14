@@ -6,10 +6,13 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# Appen er flyttet til egen server (november 2026). Den gamle adressen videresender, slik at QR-koder og
+# lenker i e-poster som allerede er sendt ut, fortsatt virker (delen etter # følger med av seg selv).
 [[redirects]]
   from = "/*"
-  to = "/index.html"
-  status = 200
+  to = "https://eiendomskontroll.knusleriet.no/:splat"
+  status = 301
+  force = true
 
 [[headers]]
   for = "/*"

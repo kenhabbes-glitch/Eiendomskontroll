@@ -4,9 +4,9 @@
 #
 # Oppsett (én gang):
 #   GitHub → Settings → Secrets and variables → Actions:
-#     REGELVERK_TOKEN  – lang tilfeldig verdi (samme som i Netlify)
-#     APP_URL          – f.eks. https://eiendomskontroll.netlify.app
-#   Netlify → Environment variables: REGELVERK_TOKEN (samme verdi) og UTVIKLER_EPOST
+#     REGELVERK_TOKEN  – lang tilfeldig verdi (samme som i .env.server på serveren)
+#     APP_URL          – https://eiendomskontroll.knusleriet.no
+#   Serveren → ~/eiendomskontroll/.env.server: REGELVERK_TOKEN (samme verdi) og UTVIKLER_EPOST
 name: Regelverkssjekk
 on:
   schedule:
@@ -77,7 +77,7 @@ jobs:
           node -e "
             const v=require('./regelverk/varsel.json'); const k=require('./regelverk/kilder.json');
             const ctl=new AbortController(); setTimeout(()=>ctl.abort(),60000);
-            fetch((process.env.APP_URL||'https://eiendomskontroll.netlify.app').replace(/\/+$/,'')+'/.netlify/functions/arbeidsordre',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json','x-regelverk-token':process.env.REGELVERK_TOKEN},
+            fetch((process.env.APP_URL||'https://eiendomskontroll.knusleriet.no').replace(/\/+$/,'')+'/.netlify/functions/arbeidsordre',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json','x-regelverk-token':process.env.REGELVERK_TOKEN},
               body:JSON.stringify({action:'regelverk_varsel',varsel:v,issue:process.env.ISSUE||'',antall:k.kilder.length})}).then(async r=>{const t=await r.text();console.log(r.status,t);if(!r.ok){console.log('::warning::Varsel til appen feilet ('+r.status+'). Sjekk at REGELVERK_TOKEN er lik i GitHub og Netlify, og at Netlify er deployet etter at variabelen ble satt.');process.exit(1)}}).catch(e=>{console.log('::warning::'+e.message);process.exit(1)});"
       - name: Sjekk Mexico (NOM og føderale lover)
         continue-on-error: true

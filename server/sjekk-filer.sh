@@ -1,6 +1,6 @@
 #!/bin/sh
 # Feilsøking: lager en signert lenke (som appen gjør) til en tegning og en 3D-fil, og henter dem gjennom Cloudflare.
-SUPA="${SUPA:-$HOME/supabase-project}"; API="${API:-https://api.knusleriet.no}"; APP="${APP:-https://app.knusleriet.no}"
+SUPA="${SUPA:-$HOME/supabase-project}"; API="${API:-https://eiendomskontroll-api.knusleriet.no}"; APP="${APP:-https://eiendomskontroll.knusleriet.no}"
 PW=$(grep '^POSTGRES_PASSWORD=' "$SUPA/.env" | cut -d= -f2-); NOK=$(grep '^SERVICE_ROLE_KEY=' "$SUPA/.env" | cut -d= -f2-)
 q() { docker exec -e PGPASSWORD="$PW" supabase-db psql -h localhost -U supabase_admin -d postgres -At -c "$1"; }
 for P in "$(q "select name from storage.objects where bucket_id='filer' and name not like '%modell%' and (name ilike '%.pdf' or name ilike '%.png' or name ilike '%.jpg') order by created_at desc limit 1")" \
