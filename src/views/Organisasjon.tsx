@@ -76,7 +76,7 @@ export function leggTilMedlem(org: string) {
     onSave: async v => {
       const tildelinger = [...(v.tild?.e || []).map((e: string) => ({ eiendom_id: e })), ...(v.tild?.p || []).map((p: string) => ({ portefolje_id: p }))];
       const body = { action: v.passord ? 'testbruker' : 'inviter', org_id: org, epost: v.epost.trim(), navn: v.navn, rolle: v.rolle, alle_bygg: v.rolle === 'admin' || !!v.alle_bygg, tildelinger, passord: v.passord || undefined, redirectTo: location.origin };
-      const ferdig = (r: any) => toast(r.ny ? (v.passord ? tt("Testbruker opprettet") : tt("Invitasjon sendt til ") + v.epost) : tt("Eksisterende bruker lagt til"));
+      const ferdig = (r: any) => toast(r.ny ? (v.passord ? tt("Testbruker opprettet") : tt("Invitasjon sendt til ") + v.epost) : r.passordUendret ? tt("Eksisterende bruker lagt til. Passordet ble ikke endret – brukeren logger inn med sitt eget.") : tt("Eksisterende bruker lagt til"));
       try { ferdig(await adminApi(body)); }
       catch (e: any) {
         if (!e.kanOppgradere) { toast(tt("Feilet: ") + e.message); return false; }

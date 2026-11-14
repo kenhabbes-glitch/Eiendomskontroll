@@ -57,9 +57,19 @@ const handler = async (req: Request) => {
     return false;
   };
   // Finn eller opprett bruker. Finnes e-posten fra før, gjenbrukes brukeren (kan være medlem i flere organisasjoner).
-  const finnEllerOpprett = async (epost: string, navn: string, passord?: string): Promise<{ id: string; ny: boolean }> => {
-    const { data: p } = await admin.from('profiles').select('id').eq('epost', epost).maybeSingle();
-    if (p) { if (passord) await admin.auth.admin.updateUserById(p.id, { password: passord }); return { id: p.id, ny: false }; }
+  // Andre aktive medlemskap enn i «org» (brukes til å hindre at én organisasjon kan ta over en bruker som også tilhører andre)
+  const andreOrg = async (uid: string, org?: string | null) => { const { data } = await admin.from('org_medlem').select('org_id').eq('user_id', uid); return (data || []).some((m: any) => m.org_id !== org); };
+  const finnEllerOpprett = async (epost: string, navn: string, passord?: string, org?: string | null): Promise<{ id: string; ny: boolean; passordUendret?: boolean }> => {
+    const { data: p } = await admin.from('profiles').select('id, plattform_admin').eq('epost', epost).maybeSingle();
+    if (p) {
+      if (!passord) return { id: p.id, ny: false };
+      // Passordet til en bruker som finnes fra før, endres ALDRI her – unntatt for rene testbrukere (opprettet med passord)
+      // som ikke tilhører andre organisasjoner. Ellers kunne en administrator i én organisasjon overta en annens konto.
+      const { data: au } = await admin.auth.admin.getUserById(p.id);
+      const test = au?.user?.user_metadata?.test === true && !p.plattform_admin && p.id !== me.id;
+      if (test && (plattform || !(await andreOrg(p.id, org)))) { await admin.auth.admin.updateUserById(p.id, { password: passord }); return { id: p.id, ny: false }; }
+      return { id: p.id, ny: false, passordUendret: true };
+    }
     if (!passord && !(await kanSendeTil(epost))) throw new Error(`Testmodus for e-post er på – invitasjon til ${epost} ble ikke sendt. Opprett brukeren med passord (testbruker), legg adressen til i listen over tillatte mottakere eller slå av testmodus under Innstillinger → E-post.`);
     const r = passord
       ? await admin.auth.admin.createUser({ email: epost, password: passord, email_confirm: true, user_metadata: { navn, test: true } })
@@ -139,7 +149,7 @@ const handler = async (req: Request) => {
     if (!/^\S+@\S+\.\S+$/.test(epost)) return json(400, { error: 'Ugyldig e-post for administrator' });
     const { data: org, error } = await admin.from('organisasjoner').insert({ navn, type, orgnr: String(body.orgnr || '').replace(/\s/g, '') || null }).select().single();
     if (error) return json(500, { error: error.message });
-    try { const b = await finnEllerOpprett(epost, String(body.admin_navn || ''), body.passord ? String(body.passord) : undefined); await settMedlem(org.id, b.id, 'admin', true, []); }
+    try { const b = await finnEllerOpprett(epost, String(body.admin_navn || ''), body.passord ? String(body.passord) : undefined, org.id); await settMedlem(org.id, b.id, 'admin', true, []); }
     catch (e: any) { await admin.from('organisasjoner').delete().eq('id', org.id); return json(400, { error: e.message }); }
     await logg(org.id, `Organisasjon «${navn}» opprettet med administrator ${epost}`);
     return json(200, { ok: true, org_id: org.id });
@@ -158,7 +168,7 @@ const handler = async (req: Request) => {
       if ((await niva(lt.eiendom_id)) !== 'skriv') return json(403, { error: 'Du har ikke redigeringstilgang til leietakerens eiendom' });
       const { data: fins } = await admin.from('profiles').select('id, rolle').eq('epost', epost).maybeSingle();
       if (fins && fins.rolle !== 'leietaker' && fins.rolle !== 'ingen') return json(409, { error: 'E-posten tilhører en ansatt-bruker og kan ikke gjøres til leietaker' });
-      try { const b = await finnEllerOpprett(epost, navn, passord); await admin.from('profiles').update({ rolle: 'leietaker', leietaker_id: lt.id, aktiv: true }).eq('id', b.id); await logg(null, `Leietakerbruker ${epost} lagt til`); return json(200, { ok: true, id: b.id, ny: b.ny }); }
+      try { const b = await finnEllerOpprett(epost, navn, passord, null); await admin.from('profiles').update({ rolle: 'leietaker', leietaker_id: lt.id, aktiv: true }).eq('id', b.id); await logg(null, `Leietakerbruker ${epost} lagt til`); return json(200, { ok: true, id: b.id, ny: b.ny, passordUendret: b.passordUendret }); }
       catch (e: any) { return json(400, { error: e.message }); }
     }
 
@@ -184,10 +194,10 @@ const handler = async (req: Request) => {
       }
     }
     try {
-      const b = await finnEllerOpprett(epost, navn, passord);
+      const b = await finnEllerOpprett(epost, navn, passord, org);
       await settMedlem(org, b.id, rolle, !!body.alle_bygg, body.tildelinger || []);
       await logg(org, `${b.ny ? 'Ny bruker' : 'Eksisterende bruker'} ${epost} lagt til som ${rolle}${body.alle_bygg ? ' (alle bygg)' : ''}`);
-      return json(200, { ok: true, id: b.id, ny: b.ny, oppgradert });
+      return json(200, { ok: true, id: b.id, ny: b.ny, oppgradert, passordUendret: b.passordUendret });
     } catch (e: any) { return json(400, { error: e.message }); }
   }
 
@@ -199,6 +209,9 @@ const handler = async (req: Request) => {
       if (!(await erOrgAdmin(org))) return json(403, { error: 'Bare administrator i organisasjonen kan nullstille tofaktor' });
       const { data: m } = await admin.from('org_medlem').select('user_id').eq('org_id', org).eq('user_id', uid).maybeSingle();
       if (!m) return json(403, { error: 'Brukeren er ikke medlem i organisasjonen' });
+      // Tofaktor beskytter brukeren i ALLE organisasjonene vedkommende tilhører – da kan ikke én av dem fjerne den alene
+      const { data: mp } = await admin.from('profiles').select('plattform_admin').eq('id', uid).maybeSingle();
+      if (mp?.plattform_admin || (await andreOrg(uid, org))) return json(403, { error: 'Brukeren tilhører også andre organisasjoner. Tofaktor må nullstilles av plattformadministrator.' });
     }
     const { data: l, error: le } = await admin.auth.admin.mfa.listFactors({ userId: uid });
     if (le) return json(400, { error: le.message });
