@@ -1,6 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-26', dato: '2026-11-26', tittel: 'Store 3D-modeller bruker mindre minne', punkter: [
+    '3D-modeller leses nå bit for bit mens de lastes ned, og fagmodellene hentes én om gangen. Store modeller bruker rundt 40 % mindre minne enn før – nyttig på mobil og nettbrett.',
+  ] },
   { id: '2026-11-25', dato: '2026-11-25', tittel: 'Tegninger i fullskjerm og lås mot utilsiktet flytting', punkter: [
     'På mobil åpner tegninger og systemkart nå i fullskjerm, med «Lukk» øverst. Trykk «Verktøy» for å få fram verktøyene og listen.',
     'Klyp med to fingre for å zoome, eller bruk knappene + og − i hjørnet. ⤢ viser hele tegningen igjen.',

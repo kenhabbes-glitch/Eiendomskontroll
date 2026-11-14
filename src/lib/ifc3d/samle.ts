@@ -72,7 +72,8 @@ export function samle(deler: Del[], ramme: number[] | null): Samlet {
     const g0 = grupper.length, e0 = elementer.length;
     d.mod.grupper.forEach((g, gi) => {
       let pos = g.pos, nor = g.nor;
-      if (!id) { pos = new Float32Array(g.pos.length); for (let v = 0; v < pos.length; v += 3) { const p = bruk(M, g.pos[v], g.pos[v + 1], g.pos[v + 2]); pos[v] = p[0]; pos[v + 1] = p[1]; pos[v + 2] = p[2]; } }
+      // flyttes på stedet (ingen kopi): arrayene er nylig lest og brukes ikke av andre
+      if (!id) { for (let v = 0; v < pos.length; v += 3) { const p = bruk(M, pos[v], pos[v + 1], pos[v + 2]); pos[v] = p[0]; pos[v + 1] = p[1]; pos[v + 2] = p[2]; } }
       if (rot) { nor = new Int8Array(g.nor.length); for (let v = 0; v < nor.length; v += 3) { const x = g.nor[v], y = g.nor[v + 1], z = g.nor[v + 2]; const nx = M[0] * x + M[4] * y + M[8] * z, ny = M[1] * x + M[5] * y + M[9] * z, nz = M[2] * x + M[6] * y + M[10] * z; const L = Math.hypot(nx, ny, nz) || 1; nor[v] = Math.round(nx / L * 127); nor[v + 1] = Math.round(ny / L * 127); nor[v + 2] = Math.round(nz / L * 127); } }
       grupper.push({ pos, nor, idx: g.idx }); const gh = h.grupper[gi]; hg.push({ ...gh, etasje: etKart[fi][gh.etasje] ?? 0, fag: fi });
     });

@@ -10,7 +10,7 @@ import { editAvvik, editAnlegg, editKomponent } from '../lib/actions';
 import { fmt } from '../lib/maaler';
 import { KalPanel, SjekkPanel, type Rad } from './Modell3DVerktoy';
 import { avst, areal, vinkel, lengde, horisontalt, midt, kalMat, tilModell, meterPerPiksel, type V3, type Kal } from '../lib/ifc3d/geom';
-import { lagModell, lesModell, delOpp, type Modell } from '../lib/ifc3d/modell';
+import { lagModell, lesModellStrom, delStrom, delOpp, type Modell } from '../lib/ifc3d/modell';
 import { samle, rammeFra, gjettFag, fagNavn, FAG, type Del, type Samlet } from '../lib/ifc3d/samle';
 
 const KLASSE: Record<string, string> = { IFCDOOR: 'Dør', IFCWINDOW: 'Vindu', IFCWALL: 'Vegg', IFCWALLSTANDARDCASE: 'Vegg', IFCSLAB: 'Dekke / plate', IFCCOLUMN: 'Søyle', IFCBEAM: 'Bjelke', IFCMEMBER: 'Profil / list', IFCPLATE: 'Plate', IFCRAILING: 'Rekkverk', IFCSTAIR: 'Trapp', IFCSTAIRFLIGHT: 'Trappeløp', IFCROOF: 'Tak', IFCCURTAINWALL: 'Glassfasade', IFCCOVERING: 'Kledning / himling', IFCFURNISHINGELEMENT: 'Inventar', IFCBUILDINGELEMENTPROXY: 'Bygningsdel', IFCFLOWTERMINAL: 'Terminal', IFCALARM: 'Alarm', IFCSANITARYTERMINAL: 'Sanitærutstyr', IFCLIGHTFIXTURE: 'Armatur', IFCTRANSPORTELEMENT: 'Heis / transport', IFCRAMP: 'Rampe', IFCFOOTING: 'Fundament', IFCOPENINGELEMENT: 'Åpning' };
@@ -111,7 +111,8 @@ function Visning({ eid, modeller, hovedId }: { eid: string; modeller: Rec[]; hov
 
   // --- last modellen
   useEffect(() => { let av = false; (async () => { try {
-    const deler: Del[] = await Promise.all(modeller.map(async r => { const biter = await Promise.all(((r.data.deler as string[]) || [r.data.path]).map(async p => { const x = await fetch(await fileUrl(p)); if (!x.ok) throw new Error('HTTP ' + x.status); return x.blob(); })); return { mod: await lesModell(await new Blob(biter).arrayBuffer()), fag: r.data.fag, navn: r.data.navn, id: r.id }; }));
+    // Én fagmodell om gangen, lest rett fra nettet bit for bit – da holdes minnebruken nede (store modeller på mobil)
+    const deler: Del[] = []; for (const r of modeller) { if (av) return; deler.push({ mod: await lesModellStrom(delStrom((r.data.deler as string[]) || [r.data.path], async p => fetch(await fileUrl(p)))), fag: r.data.fag, navn: r.data.navn, id: r.id }); }
     // Felles ramme: lagres på hovedmodellen. Har hovedmodellen ikke forskyvning (lastet opp før fagstøtte), brukes en midlertidig ramme.
     const hd = deler.find(d => d.id === modellRad.id); const K = hd?.mod.hode.koord;
     let ramme: number[] | null = modellRad.data.ramme || (K ? [K[12], K[13], K[14]] : rammeFra(deler));
