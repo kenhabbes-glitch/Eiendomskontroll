@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "node --test --experimental-test-module-mocks tests/*.test.ts",
-    "pretest": "esbuild netlify/functions/arbeidsordre.ts src/lib/ifc3d/modell.ts src/lib/ifc3d/pakk.ts src/lib/ifc3d/sveis.ts --bundle --platform=node --format=esm --packages=external --log-level=warning --outdir=tests/.bygg --entry-names=[name] --out-extension:.js=.mjs"
+    "pretest": "esbuild netlify/functions/arbeidsordre.ts src/lib/ifc3d/modell.ts src/lib/ifc3d/pakk.ts src/lib/ifc3d/sveis.ts --bundle --platform=node --format=esm --packages=external --log-level=warning --outdir=tests/.bygg --entry-names=[name] --out-extension:.js=.mjs",
+    "test:nettleser": "node tests/nettleser/bygg.mjs && node --test tests/nettleser/*.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -35,6 +36,7 @@
     "@types/three": "^0.187.0",
     "@types/ws": "^8.5.12",
     "@vitejs/plugin-react": "^4.3.1",
+    "playwright": "^1.63.0",
     "typescript": "^5.5.4",
     "vite": "^5.4.0"
   },
