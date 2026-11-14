@@ -4,6 +4,8 @@ import { Hjelp } from '../components/Hjelp';
 import { AV_LUKKET, DOK_PAAKREVD } from '../lib/catalog';
 import { eierRapport } from './EierRapport';
 import { SamsvarKort } from '../components/Samsvar';
+import { Kravregister } from './Kravregister';
+import { eierStatus } from '../lib/eierRapport';
 import { capexRapport } from './CapexRapport';
 import { tilstandsrapport } from './Tilstandsrapport';
 import { qrPunkter } from './QrPunkter';
@@ -61,6 +63,7 @@ export function Eiendom({ id }: { id: string }) {
   if (!e) return <Empty t="Fant ikke eiendommen"><a href="#/eiendommer">{tt("Tilbake")}</a></Empty>;
   const T = S.oppgaver.filter(o => o.eiendomId === id); const A = S.avvik.filter(a => a.eiendomId === id); const D = S.dokumenter.filter(d => d.eiendomId === id); const AN = S.anlegg.filter(a => a.eiendomId === id); const L = S.leietakere.filter(l => l.eiendomId === id);
   const tabs: [string, string, number | ''][] = [['info', 'Oversikt', ''], ['anlegg', 'Systemer og komponenter (TFM)', AN.length], ['kontroll', 'Kontrollplan', T.filter(o => o.aktiv !== false).length], ['avvik', 'Avvik', A.filter(a => !AV_LUKKET.includes(a.status)).length], ['dok', 'Dokumenter', D.length]];
+  if (ed) { const st = eierStatus(id); tabs.splice(1, 0, ['krav', 'Lovkrav', st.kontroller.filter(k => k.lys === 'red').length + st.dok.filter(d => d.lys === 'red').length || '']); }
   if (harModul('brannvern', id)) tabs.push(['brann', 'Brannvern', ed ? L.filter(l => bvStatus(l).o >= 1 || mangelAnsvarlig(l)).length + aktiveMidl(e).length || '' : aktiveMidl(e).length || '']);
   if (harModul('brannvern', id)) tabs.push(['brannbok', 'Brannbok', '']);
   if (ed) tabs.push(['leie', 'Leietakere', L.length]);
@@ -83,6 +86,7 @@ export function Eiendom({ id }: { id: string }) {
           : <><p className="muted">{tt("Ingen kontrollplan ennå.")}</p>{ed && <button className="btn pri sm" onClick={() => generatePlan(id)}>{tt("Generer kontrollplan")}</button>}</>}</div></div>
       {ed && <div className="sec"><h2>{tt("Dokumentdekning")}</h2><CoverageTable es={[e]} /></div>}</>;
   }
+  if (cur === 'krav') c = <Kravregister id={id} />;
   if (cur === 'anlegg') c = <>
     <div className="toolbar">{ed && <><button className="btn pri" onClick={() => editAnlegg(undefined, id)}>{tt("+ System / bygningsdel")}</button><button className="btn" onClick={() => importerSystemer(id)}>{tt("Importer fra Excel")}</button><button className="btn" onClick={() => importTfm(id)}>{tt("Importer TFM-liste")}</button>
       {AN.some(a => !a.tfmSys) && <button className="btn" onClick={() => autoTfm(id)}>{tt("Tildel TFM-koder automatisk (")}{AN.filter(a => !a.tfmSys).length})</button>}</>}

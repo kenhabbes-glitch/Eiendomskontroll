@@ -22,11 +22,11 @@ export function SamsvarKort({ id, tilFane, leggTil }: { id: string; tilFane: (fa
   const s = eierStatus(id); const mangler = s.kontroller.filter(k => k.mangler); const tiltak = s.tiltak.slice(0, 6);
   return <div className="card samsvar">
     <h2>{tt("Samsvar med lov og forskrift")} <LysChip lys={s.lys} /></h2>
-    <div className="samsvar-omr">{s.omrader.map(o => <button key={o.key} className="samsvar-o" onClick={() => tilFane(o.key === 'tilsyn' ? 'avvik' : o.key)}>
+    <div className="samsvar-omr">{s.omrader.map(o => <button key={o.key} className="samsvar-o" onClick={() => tilFane(o.key === 'tilsyn' ? 'avvik' : o.key === 'kontroll' || o.key === 'dok' ? 'krav' : o.key)}>
       <Lyspunkt lys={o.lys} /><span><b>{o.navn}</b><span className="small muted">{o.tekst}</span></span></button>)}</div>
     {tiltak.length > 0 ? <><h3>{tt("Dette må gjøres")}</h3><ol className="samsvar-t">{tiltak.map((t, i) => <li key={i}><span className={'chip ' + (t.pri === 1 ? 'red' : t.pri === 2 ? 'amber' : '')}>{tt(PRI[t.pri])}</span> {t.tekst}</li>)}</ol>
       {s.tiltak.length > tiltak.length && <p className="small muted">+ {s.tiltak.length - tiltak.length} {tt("til")} {tt("– se «Statusrapport til eier»")}</p>}</>
       : <p className="muted" style={{ marginBottom: 0 }}>{tt("Ingen tiltak nødvendig akkurat nå.")}</p>}
-    {mangler.length > 0 && leggTil && <p style={{ marginBottom: 0 }}><button className="btn pri sm" onClick={leggTil}>{tt("Legg inn {0} manglende lovpålagte kontroller", mangler.length)}</button></p>}
+    <p style={{ marginBottom: 0 }}>{mangler.length > 0 && leggTil && <><button className="btn pri sm" onClick={leggTil}>{tt("Legg inn {0} manglende lovpålagte kontroller", mangler.length)}</button> </>}<button className="btn sm" onClick={() => tilFane('krav')}>{tt("Se alle lovkrav med status og dokumentasjon")}</button></p>
   </div>;
 }

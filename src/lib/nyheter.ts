@@ -1,6 +1,12 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-27', dato: '2026-11-27', tittel: 'Lovkrav: se om alt er på plass', punkter: [
+    'Forsiden viser nå trafikklys per eiendom og område (kontroller, dokumenter, avvik, tilsyn, brannvern og leietakere), og en teller for lovpålagte kontroller som mangler i kontrollplanen.',
+    'Øverst på hver eiendom står «Samsvar med lov og forskrift» med de viktigste tiltakene i prioritert rekkefølge.',
+    'Ny fane «Lovkrav» på eiendommen: hvert krav med hjemmel, status og hva som dokumenterer det. Manglende kontroller legges inn med ett trykk, eller merkes «Ikke aktuelt» med begrunnelse.',
+    'Lovpålagte kontroller som er kvittert uten rapport eller annen dokumentasjon blir flagget, så du kan legge ved det som mangler før et tilsyn.',
+  ] },
   { id: '2026-11-26', dato: '2026-11-26', tittel: 'Store 3D-modeller bruker mindre minne', punkter: [
     'Nye 3D-modeller blir mye lettere: like punkter slås sammen ved opplasting, så modellen bruker rundt en tredjedel av minnet. Modeller som er lastet opp tidligere kan gjøres lettere med ett trykk på PC («Gjør modellene lettere») – uten ny opplasting.',
     'På mobil og nettbrett åpnes ikke store modeller av seg selv lenger. Du velger først hvilke fag du vil se, slik at siden ikke lukkes fordi minnet går fullt.',

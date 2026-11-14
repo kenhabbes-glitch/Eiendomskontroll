@@ -833,6 +833,15 @@ export function editDok(id?: string, preset: any = {}) {
     },
   });
 }
+/** Merk en forventet lovpålagt kontroll som «ikke aktuelt» for eiendommen – med begrunnelse, slik at vurderingen kan vises ved tilsyn. */
+export function settKontrollNA(eid: string, k: string, a: string, navn: string) {
+  formModal({ title: tt("Ikke aktuelt for eiendommen"), saveTxt: tt("Lagre vurderingen"),
+    top: <p className="small" style={{ marginTop: 0 }}><b>{navn}</b><br />{tt("Skriv kort hvorfor kravet ikke gjelder her. Begrunnelsen lagres med navnet ditt og dagens dato, og vises i lovkravoversikten og i statusrapporten til eier.")}</p>,
+    fields: [{ k: 'grunn', label: tt("Begrunnelse"), type: 'textarea', req: true, ph: tt("F.eks. «Bygget har ikke sprinkleranlegg» eller «Leietaker har ansvaret etter leieavtalen § 8»") }],
+    onSave: async (v, close) => { const e = byId('eiendommer', eid)!;
+      await save('eiendommer', { ...e, kontrollNA: [...(e.kontrollNA || []).filter((x: Rec) => !(x.k === k && (x.a || '') === a)), { k, a, grunn: String(v.grunn).trim(), av: state.me?.navn || state.me?.epost || '', dato: today() }] }); close(); } });
+}
+export async function fjernKontrollNA(eid: string, k: string, a: string) { const e = byId('eiendommer', eid)!; await save('eiendommer', { ...e, kontrollNA: (e.kontrollNA || []).filter((x: Rec) => !(x.k === k && (x.a || '') === a)) }); }
 export async function toggleDokNA(eid: string, type: string) { const e = byId('eiendommer', eid)!; const na = (e.dokNA || []).slice(); const i = na.indexOf(type); if (i >= 0) na.splice(i, 1); else na.push(type); await save('eiendommer', { ...e, dokNA: na }); }
 
 // ================= LEIETAKER =================

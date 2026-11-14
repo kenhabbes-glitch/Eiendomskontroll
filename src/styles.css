@@ -421,3 +421,7 @@ h1 .hjelp-q{position:relative;top:-2px}
 .samsvar-o span>.small{display:block}
 .samsvar-t{margin:0 0 4px;padding-left:20px}
 .samsvar-t li{margin:5px 0}
+.krav-st{display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.krav-uten{color:var(--amber);font-weight:500}
+.krav-h{white-space:nowrap;text-align:right}
+table.krav td{vertical-align:top}

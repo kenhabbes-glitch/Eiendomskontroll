@@ -27,7 +27,9 @@ export const DOK_GRUNNLAG: Record<string, { h: string; krav: 'lov' | 'tiltak' | 
 };
 export const KRAV_TEKST = { lov: 'Lovkrav', tiltak: 'Ved tiltak', anbefalt: 'Anbefalt', avtale: 'Avtale' };
 
-export type KontrollRad = { navn: string; system: string; hjemmel: string; intervall: string; sist: string; frist: string; lys: Lys; status: string; type: string; mangler?: boolean; id?: string; malKey?: string; anleggId?: string };
+export type KontrollRad = { navn: string; system: string; hjemmel: string; intervall: string; sist: string; frist: string; lys: Lys; status: string; type: string; mangler?: boolean; id?: string; malKey?: string; anleggId?: string;
+  /** Begrunnelse når kravet er vurdert som ikke aktuelt for eiendommen */ na?: string;
+  /** Siste utførelse er kvittert uten rapport, dokument eller sjekkliste */ utenDok?: boolean; /** Hva som dokumenterer siste utførelse */ bevis?: string };
 export type DokRad = { type: string; h: string; krav: string; lys: Lys; status: string; dato: string; gyldigTil: string; tittel: string };
 export type Tiltak = { pri: 1 | 2 | 3; tekst: string; omr: string };
 export type EierStatus = {
@@ -44,6 +46,8 @@ export type EierStatus = {
 };
 
 const LOVTYPER = ['Lovpålagt', 'Forsikringskrav'];
+/** Er en forventet kontroll vurdert som «ikke aktuelt» for eiendommen? (e.kontrollNA: [{ k: malnøkkel, a: system-id, grunn, av, dato }]) */
+export function kontrollNA(e: Rec, k: string, a = ''): Rec | undefined { return (e.kontrollNA || []).find((x: Rec) => x.k === k && (x.a || '') === a); }
 function kontrollLys(o: Rec): [Lys, string] {
   const d = dUntil(o.nesteFrist); if (d === null) return ['amber', 'Mangler frist'];
   if (d < 0) return ['red', `Forfalt (${-d} d)`]; if (d <= 30) return ['amber', `Forfaller om ${d} d`]; return ['green', 'I rute'];
@@ -56,20 +60,24 @@ export function eierStatus(eid: string): EierStatus {
 
   // ---- Eiers lovpålagte kontroller (registrerte + forventede som mangler i kontrollplanen)
   const kontroller: KontrollRad[] = sortBy(T.filter(o => LOVTYPER.includes(o.type) && (o.ansvar || 'Eier') !== 'Leietaker'), o => o.nesteFrist || '').map(o => {
-    const [lys, status] = kontrollLys(o); const h = (o.historikk || []).slice(-1)[0];
-    return { id: o.id, navn: o.navn, system: o.anleggId ? aNavn(o.anleggId) : 'Eiendommen', hjemmel: o.hjemmel || MALER[o.malKey]?.h || '', intervall: intTxt(o.intervall), sist: o.sistUtfort || h?.dato || '', frist: o.nesteFrist || '', lys, status, type: o.type };
+    const [lys, status] = kontrollLys(o); const h = (o.historikk || [])[0]; // nyeste først
+    const nDok = h ? (h.dokIds?.length || (h.dokId ? 1 : 0)) : 0;
+    const bevis = !h ? '' : nDok ? (nDok > 1 ? tt("{0} dokumenter", nDok) : tt("Rapport vedlagt")) : h.sjekk ? tt("Sjekkliste") : h.auto ? tt("Automatisk registrert") : '';
+    return { utenDok: !!h && !bevis, bevis, id: o.id, navn: o.navn, system: o.anleggId ? aNavn(o.anleggId) : 'Eiendommen', hjemmel: o.hjemmel || MALER[o.malKey]?.h || '', intervall: intTxt(o.intervall), sist: o.sistUtfort || h?.dato || '', frist: o.nesteFrist || '', lys, status, type: o.type };
   });
   const har = (k: string, a: string) => S.oppgaver.some(o => o.eiendomId === eid && o.malKey === k && (o.anleggId || '') === a && o.aktiv !== false);
   const forventet: [string, string][] = [
     ...propMaler(eid).filter(k => LOVTYPER.includes(MALER[k]?.t) && !(k === 'energiattest' && +e.bta && +e.bta < 1000)).map(k => [k, ''] as [string, string]),
     ...S.anlegg.filter(a => a.eiendomId === eid && !a.arkivert).flatMap(a => kompMaler(a.type, eid).filter(k => LOVTYPER.includes(MALER[k]?.t)).map(k => [k, a.id] as [string, string])),
   ];
-  for (const [k, a] of forventet) if (!har(k, a)) { const m = MALER[k];
+  for (const [k, a] of forventet) if (!har(k, a)) { const m = MALER[k]; const na = kontrollNA(e, k, a);
+    if (na) { kontroller.push({ navn: m.n, system: a ? aNavn(a) : 'Eiendommen', hjemmel: m.h, intervall: intTxt({ n: m.i[0], enhet: m.i[1] }), sist: '', frist: '', lys: 'grey', status: 'Ikke aktuelt', type: m.t, malKey: k, anleggId: a, na: na.grunn || '–' }); continue; }
     kontroller.push({ navn: m.n, system: a ? aNavn(a) : 'Eiendommen', hjemmel: m.h, intervall: intTxt({ n: m.i[0], enhet: m.i[1] }), sist: '', frist: '', lys: 'red', status: 'Ikke i kontrollplanen', type: m.t, mangler: true, malKey: k, anleggId: a }); }
-  const kForf = kontroller.filter(k => k.lys === 'red' && !k.mangler); const kMangl = kontroller.filter(k => k.mangler); const kSnart = kontroller.filter(k => k.lys === 'amber');
+  const kForf = kontroller.filter(k => k.lys === 'red' && !k.mangler); const kMangl = kontroller.filter(k => k.mangler); const kSnart = kontroller.filter(k => k.lys === 'amber'); const kUten = kontroller.filter(k => k.utenDok);
   kForf.forEach(k => tiltak.push({ pri: 1, omr: 'Kontroller', tekst: tt("Gjennomfør «{0}»{1} – frist var {2}", k.navn, k.system !== 'Eiendommen' ? ` (${k.system})` : '', fd(k.frist)) }));
   if (kMangl.length) tiltak.push({ pri: 1, omr: 'Kontroller', tekst: tt("Legg inn {0} lovpålagt{1} kontroll{2} som mangler i kontrollplanen: {3}{4}", kMangl.length, kMangl.length > 1 ? 'e' : '', kMangl.length > 1 ? 'er' : '', kMangl.slice(0, 3).map(k => '«' + k.navn + '»').join(', '), kMangl.length > 3 ? ' …' : '') });
-  const kLys = verst(kForf.length || kMangl.length ? 'red' : 'green', kSnart.length ? 'amber' : 'green');
+  if (kUten.length) tiltak.push({ pri: 2, omr: 'Kontroller', tekst: tt("Legg ved rapport eller annen dokumentasjon for {0} lovpålagt{1} kontroll{2} som er kvittert uten: {3}{4}", kUten.length, kUten.length > 1 ? 'e' : '', kUten.length > 1 ? 'er' : '', kUten.slice(0, 3).map(k => '«' + k.navn + '»').join(', '), kUten.length > 3 ? ' …' : '') });
+  const kLys = verst(kForf.length || kMangl.length ? 'red' : 'green', kSnart.length || kUten.length ? 'amber' : 'green');
 
   // ---- Dokumenter eier skal ha
   const dok: DokRad[] = docCoverage(e, dokPaakrevd(eid)).map((c: any) => { const g = DOK_GRUNNLAG[c.t] || { h: '', krav: 'anbefalt' as const };
@@ -128,7 +136,7 @@ export function eierStatus(eid: string): EierStatus {
   ], x => x.d);
 
   const omrader = [
-    { key: 'kontroll', navn: tt("Lovpålagte kontroller"), lys: kLys, tekst: tt("{0} registrert · {1} forfalt · {2} mangler i planen", kontroller.filter(k => !k.mangler).length, kForf.length, kMangl.length) },
+    { key: 'kontroll', navn: tt("Lovpålagte kontroller"), lys: kLys, tekst: tt("{0} registrert · {1} forfalt · {2} mangler i planen", kontroller.filter(k => !k.mangler && !k.na).length, kForf.length, kMangl.length) },
     { key: 'dok', navn: tt("Påkrevde dokumenter"), lys: dLys, tekst: tt("{0} av {1} foreligger", dok.filter(d => d.lys === 'green').length, dok.filter(d => d.lys !== 'grey').length) },
     { key: 'avvik', navn: tt("Avvik"), lys: aLys, tekst: tt("{0} åpne · {1} kritiske/høye · {2} over frist", A.length, krit.length, over.length) },
     ...(harTs ? [{ key: 'tilsyn', navn: tt("Tilsynssaker"), lys: tLys, tekst: tilsyn.length ? tt("{0} åpne saker", tilsyn.length) : tt("Ingen åpne saker") }] : []),

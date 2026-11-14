@@ -2,7 +2,7 @@
 // Fanger feil som brukeren selv ville merket: sider som ikke åpner, skjemaer som ikke lagrer, knapper som ikke virker.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { start, stopp, aapne, grunndata, type Aapnet } from './hjelp.ts';
+import { start, stopp, aapne, grunndata, NAA, type Aapnet } from './hjelp.ts';
 
 before(start); after(stopp);
 const SIDER = ['oversikt', 'eiendommer', 'eiendom/e1', 'kontroller', 'runde', 'befaringer', 'tilsynsanalyser', 'avvik', 'tilsyn', 'arbeidsordre', 'leietakere', 'maalere', 'tfm', 'arealer', 'dokumenter', 'innboks', 'meldinger',
@@ -95,6 +95,30 @@ test('samsvar: forsiden og eiendomssiden viser trafikklys og hva som mangler ett
     if (process.env.EK_BILDE) await a.side.screenshot({ path: process.env.EK_BILDE, fullPage: true });
     await kort.locator('button', { hasText: 'manglende lovpålagte kontroller' }).click();
     await a.side.locator('.modal').last().waitFor();
+    assert.deepEqual(a.feil, []);
+  } finally { await a.lukk(); }
+});
+
+test('lovkrav: manglende kontroll kan legges inn eller merkes «ikke aktuelt» med begrunnelse, og utførelse uten rapport flagges', async () => {
+  const data = grunndata();
+  data.oppgaver = [{ id: 'o1', eiendom_id: 'e1', created_at: NAA, data: { eiendomId: 'e1', anleggId: 's1', malKey: 'brannalarm_aar', navn: 'Brannalarmanlegg – årlig kontroll og service', type: 'Lovpålagt', ansvar: 'Eier', aktiv: true,
+    intervall: { n: 1, enhet: 'år' }, nesteFrist: '2099-01-01', sistUtfort: '2026-06-01', historikk: [{ dato: '2026-06-01', av: 'Ola', res: 'OK – ingen avvik' }] } }];
+  const a = await aapne('#/eiendom/e1', { data }); try {
+    await a.side.locator('.tabs a, .tabs button', { hasText: 'Lovkrav' }).click();
+    const utfort = a.side.locator('table.krav tr', { hasText: 'Brannalarmanlegg – årlig kontroll' });
+    assert.match(await utfort.innerText(), /I rute[\s\S]*Ingen rapport eller dokumentasjon vedlagt/);
+    // Ikke aktuelt krever begrunnelse
+    const rad = a.side.locator('table.krav tr', { hasText: 'Eiers internkontroll' }).first();
+    await rad.locator('button', { hasText: 'Ikke aktuelt' }).click();
+    const m = a.side.locator('.modal').last(); await m.locator('textarea').fill('Dekkes av konsernets felles internkontroll');
+    await m.locator('button', { hasText: 'Lagre vurderingen' }).click(); await m.waitFor({ state: 'detached' });
+    await a.side.locator('table.krav tr', { hasText: 'Dekkes av konsernets felles internkontroll' }).waitFor();
+    const e = (await a.db()).eiendommer[0].data; assert.equal(e.kontrollNA.length, 1); assert.equal(e.kontrollNA[0].grunn, 'Dekkes av konsernets felles internkontroll');
+    // Legg inn direkte
+    const for_ = (await a.db()).oppgaver.length;
+    await a.side.locator('table.krav tr', { hasText: 'Ikke i kontrollplanen' }).first().locator('button', { hasText: 'Legg inn' }).click();
+    await a.side.waitForFunction((n: number) => JSON.parse(localStorage.getItem('mockdb') || '{}').oppgaver.length === n + 1, for_);
+    if (process.env.EK_BILDE) await a.side.screenshot({ path: process.env.EK_BILDE, fullPage: true });
     assert.deepEqual(a.feil, []);
   } finally { await a.lukk(); }
 });
