@@ -1,7 +1,8 @@
 // En liten etterligning av Supabase-klienten for tester av serverfunksjonene.
 // Tabeller ligger i minnet, og alle kall til brukeradministrasjonen (auth.admin) logges i «kall».
 export type Db = Record<string, any[]>;
-export function lagFalsk(db: Db, brukere: Record<string, { id: string; email: string; user_metadata?: any; faktorer?: string[] }>, tokens: Record<string, string>) {
+const inneholder = (a: any, b: any): boolean => Array.isArray(b) ? Array.isArray(a) && b.every(x => a.some(y => inneholder(y, x))) : b && typeof b === 'object' ? !!a && typeof a === 'object' && Object.keys(b).every(k => inneholder(a[k], b[k])) : a === b;
+export function lagFalsk(db: Db, brukere: Record<string, { id: string; email: string; user_metadata?: any; faktorer?: string[] }>, tokens: Record<string, string>, valg: { niva?: Record<string, Record<string, string>>; filer?: Record<string, number> } = {}) {
   const kall: { hva: string; arg: any }[] = [];
   const sporring = (tabell: string) => {
     const filtre: ((r: any) => boolean)[] = []; let modus = 'select', nytt: any = null, hode = false;
@@ -22,6 +23,9 @@ export function lagFalsk(db: Db, brukere: Record<string, { id: string; email: st
       insert: (x: any) => { modus = 'insert'; nytt = x; return b; }, upsert: (x: any) => { modus = 'upsert'; nytt = x; return b; },
       update: (x: any) => { modus = 'update'; nytt = x; return b; }, delete: () => { modus = 'delete'; return b; },
       eq: (k: string, v: any) => { filtre.push(r => r[k] === v); return b; }, neq: (k: string, v: any) => { filtre.push(r => r[k] !== v); return b; },
+      in: (k: string, v: any[]) => { filtre.push(r => v.includes(r[k])); return b; }, gte: (k: string, v: any) => { filtre.push(r => r[k] >= v); return b; }, lte: (k: string, v: any) => { filtre.push(r => r[k] <= v); return b; },
+      contains: (k: string, v: any) => { filtre.push(r => inneholder(r[k], v)); return b; }, is: (k: string, v: any) => { filtre.push(r => (r[k] ?? null) === v); return b; },
+      order: () => b, limit: () => b,
       single: async () => utfor('single'), maybeSingle: async () => utfor('maybe'),
       then: (ok: any, feil: any) => Promise.resolve(utfor()).then(ok, feil),
     };
@@ -34,9 +38,14 @@ export function lagFalsk(db: Db, brukere: Record<string, { id: string; email: st
       return sporring(t); },
     rpc: async (navn: string, a: any) => {
       if (navn === 'mfa_ok_for') return { data: true }; if (navn === 'full_tilgang') return { data: false };
-      if (navn === 'niva_for') return { data: null }; if (navn === 'org_har') return { data: true };
+      if (navn === 'niva_for') return { data: valg.niva?.[a.p_uid]?.[a.eid] ?? null }; if (navn === 'org_har') return { data: true };
       return { data: null };
     },
+    storage: { from: () => ({
+      createSignedUploadUrl: async (path: string) => { kall.push({ hva: 'signertOpplasting', arg: path }); return { data: { token: 'opplasting', path }, error: null }; },
+      createSignedUrl: async (path: string) => { kall.push({ hva: 'signertLenke', arg: path }); return { data: { signedUrl: 'http://fil/' + path }, error: null }; },
+      list: async (mappe: string) => ({ data: Array.from({ length: valg.filer?.[mappe] || 0 }, (_, i) => ({ name: 'f' + i })), error: null }),
+    }) },
     auth: {
       getUser: async (token: string) => { const id = tokens[token]; return id ? { data: { user: brukere[id] }, error: null } : { data: { user: null }, error: { message: 'ugyldig' } }; },
       admin: {

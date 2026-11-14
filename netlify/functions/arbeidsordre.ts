@@ -58,6 +58,9 @@ const handler = async (req: Request) => {
   const hentAvvik = async (id: string) => { const { data } = await admin.from('avvik').select('*').eq('id', id).single(); return data; };
   // Personvern: bekreftelse kreves før eksterne sender inn opplysninger eller oppretter bruker
   const samtykke = (b: any) => b?.samtykke === true && typeof b?.personvernVersjon === 'string' ? { versjon: String(b.personvernVersjon).slice(0, 40), tid: new Date().toISOString() } : null;
+  // Lenker uten innlogging kan laste opp vedlegg. En øvre grense per arbeidsordre hindrer at en lenke brukes til å fylle disken.
+  const MAKS_OPPLASTET = 60;
+  const forMangeFiler = async (mappe: string) => { const { data } = await admin.storage.from('filer').list(mappe, { limit: MAKS_OPPLASTET + 1 }); return (data || []).length > MAKS_OPPLASTET; };
   const SAMTYKKE_MANGLER = 'Du må lese og godta personvernerklæringen før du fortsetter.';
   const utlopt = (inv: any) => !!inv?.utloper && new Date(inv.utloper).getTime() < Date.now();
   const UTLOPT = 'Lenken er utløpt. Be oppdragsgiveren om å sende arbeidsordren på nytt.';
@@ -316,6 +319,7 @@ const handler = async (req: Request) => {
     const a = await hentAvvik(inv.avvik_id); if (!a) return json(404, { error: 'Avviket finnes ikke lenger' });
     if (body.action === 'ao_opplasting') {
       const navn = asciiNavn(body.navn);
+      if (await forMangeFiler(`${a.eiendom_id}/ao/${a.id}`)) return json(429, { error: 'Det er lastet opp for mange filer på denne arbeidsordren. Kontakt oppdragsgiveren.' });
       const path = `${a.eiendom_id}/ao/${a.id}/${crypto.randomUUID()}-${navn}`;
       const { data, error } = await admin.storage.from('filer').createSignedUploadUrl(path);
       if (error) return json(500, { error: 'Kunne ikke klargjøre opplasting: ' + error.message });
@@ -808,6 +812,7 @@ const handler = async (req: Request) => {
     const inv = await hentKo(body.token); if (!inv || inv.innsendt) return json(403, { error: 'Lenken er ugyldig eller allerede brukt' });
     if (utlopt(inv)) return json(410, { error: UTLOPT });
     const navn = asciiNavn(body.navn);
+    if (await forMangeFiler(`${inv.eiendom_id}/ko/${inv.oppgave_id}`)) return json(429, { error: 'Det er lastet opp for mange filer på denne kontrollen. Kontakt oppdragsgiveren.' });
     const path = `${inv.eiendom_id}/ko/${inv.oppgave_id}/${crypto.randomUUID()}-${navn}`;
     const { data, error } = await admin.storage.from('filer').createSignedUploadUrl(path);
     if (error) return json(500, { error: 'Kunne ikke klargjøre opplasting: ' + error.message });
