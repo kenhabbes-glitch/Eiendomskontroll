@@ -2,7 +2,7 @@
 // og utskiftingsprosjekt der nytt system erstatter det gamle ved ferdigstillelse.
 import { kompMaler } from './land';
 import { S, save, state, toast } from './store';
-import { addDays, addInt, byId, today, kNavn, aNavn, nextSysLop, type Rec } from './utils';
+import { addDays, addInt, byId, today, kNavn, aNavn, nextSysLop, type Rec, Obj } from './utils';
 import { KOMP, MALER, AV_LUKKET, TFM_DEF } from './catalog';
 
 export const PTYPER = ['Utskifting av system', 'Vedlikehold', 'Rehabilitering', 'Ombygging / leietakertilpasning', 'Energitiltak', 'Nybygg / tilbygg', 'Annet'];
@@ -46,7 +46,7 @@ export const FDV_KRAV = ['FDV-dokumentasjon', 'Samsvarserklæring / dokumentasjo
 export const uid = () => crypto.randomUUID();
 const n = (v: any) => +String(v ?? '').replace(/\s/g, '').replace(',', '.') || 0;
 
-export function nyttProsjektData(p: Partial<Rec> = {}): Rec {
+export function nyttProsjektData(p: Partial<Rec> = {}): Obj {
   const fase = FASER.map(([k, l]) => ({ k, navn: l, start: '', slutt: '' }));
   const lt = /leietaker/i.test(String(p.type || ''));
   const oppgaver = FASER.flatMap(([k]) => [...(STD[k] || []), ...(lt ? LT_OPPG[k] || [] : [])].map(t => ({ id: uid(), fase: k, tittel: t, status: 'Ikke startet', ansvarlig: '', frist: '', fag: '' })));

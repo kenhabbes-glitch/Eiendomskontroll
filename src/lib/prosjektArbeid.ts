@@ -13,7 +13,7 @@ export const OTYPER: [string, string][] = [
   ['ramme', 'Finansiering og budsjettramme'], ['kalkyle', 'Detaljert kostnadskalkyle'], ['sjekk', 'Sjekkliste'], ['sha', 'SHA: vurdering, risiko, koordinatorer og SHA-plan'], ['tilbud', 'Tilbud og evaluering'], ['kontrakt', 'Kontrakt'],
   ['moter', 'Møter og referater'], ['endringer', 'Endringsmeldinger og tillegg'], ['mangler', 'Overtakelse og mangelliste'],
 ];
-export function oppgaveType(o: Rec): string {
+export function oppgaveType(o: Obj): string {
   if (o.type && o.type !== 'auto') return o.type;
   const t = String(o.tittel || '').toLowerCase();
   if (/beskriv behov|behov og romprogram|behov og mål/.test(t)) return 'beskrivelse';
@@ -62,7 +62,7 @@ export function kalkSum(k: Rec | undefined) {
 export function tilbudScore(T: Rec[], v: Obj = {}) {
   const wp = n(v.pris ?? 60), wk = n(v.kvalitet ?? 30), wf = n(v.fremdrift ?? 10); const W = wp + wk + wf || 1;
   const priser = T.map(t => n(t.pris)).filter(x => x > 0); const min = priser.length ? Math.min(...priser) : 0;
-  return T.map(t => { const ps = n(t.pris) > 0 && min ? (min / n(t.pris)) * 10 : 0; const tot = (ps * wp + n(t.kvalitet) * wk + n(t.fremdrift) * wf) / W; return { ...t, ps: Math.round(ps * 10) / 10, tot: Math.round(tot * 10) / 10 }; });
+  return T.map(t => { const ps = n(t.pris) > 0 && min ? (min / n(t.pris)) * 10 : 0; const tot = (ps * wp + n(t.kvalitet) * wk + n(t.fremdrift) * wf) / W; return { ...t, ps: Math.round(ps * 10) / 10, tot: Math.round(tot * 10) / 10 } as Rec & { ps: number; tot: number }; });
 }
 
 // ---------------- Beslutningspunkter
@@ -101,7 +101,7 @@ export function ganttRader(p: Rec): GRad[] {
 }
 
 // ---------------- Rapportgrunnlag
-export function snapshot(p: Rec, type: 'fase' | 'status', opt: Rec = {}): Rec {
+export function snapshot(p: Rec, type: 'fase' | 'status', opt: Obj = {}): Rec {
   const o = okonomi(p); const e = byId('eiendommer', p.eiendomId); const fk = opt.fase || p.fase; const fi = FASER.findIndex(f => f[0] === fk);
   const A: Rec = p.arbeid || {}; const ov = kalkSum(A.overslag); const ka = kalkSum(A.kalkyle);
   const fra = opt.fra || ''; const til = opt.til || today();

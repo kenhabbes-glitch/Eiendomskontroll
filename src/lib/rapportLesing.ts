@@ -111,8 +111,8 @@ export function vurder(linjer: string[], ctx: string[], I = lesInnst()) {
 export async function laer(ctx: string[], forslag: Forslag[], valgt: Set<string>, ignorer: Set<string>) {
   const I = lesInnst(); const ny = { ...I, laering: { ...I.laering } };
   for (const c of ctx) {
-    const l: Laering = { m: {}, ign: [], n: 0, ...(ny.laering[c] || {}) }; l.m = { ...l.m }; l.n++;
-    for (const f of forslag) for (const m of f.treff) { const s = { g: 0, a: 0, ...(l.m[m] || {}) }; valgt.has(f.id) ? s.g++ : s.a++; l.m[m] = s; }
+    const l: Laering = { ...({ m: {}, ign: [], n: 0 } as Laering), ...(ny.laering[c] || {}) }; l.m = { ...l.m }; l.n++;
+    for (const f of forslag) for (const m of f.treff) { const s = { ...{ g: 0, a: 0 }, ...(l.m[m] || {}) }; valgt.has(f.id) ? s.g++ : s.a++; l.m[m] = s; }
     if (c.startsWith('lev:')) l.ign = [...new Set([...l.ign, ...forslag.filter(f => ignorer.has(f.id)).map(f => f.hash)])].slice(-400);
     ny.laering[c] = l;
   }

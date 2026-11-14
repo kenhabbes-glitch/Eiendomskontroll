@@ -36,7 +36,7 @@ async function oppdater(pid: string, patch: Obj, loggTekst?: string) {
   await save('prosjekter', { ...p, ...patch, logg: loggTekst ? [...(p.logg || []), { t: new Date().toISOString(), k: loggTekst, av: state.me?.navn || state.me?.epost }] : p.logg });
 }
 
-export function nyttProsjekt(preset: Rec = {}) {
+export function nyttProsjekt(preset: Obj = {}) {
   const E = S.eiendommer.filter(e => kanRedigereE(e.id));
   if (!E.length) return toast(tt("Du må ha skrivetilgang til en eiendom for å opprette prosjekter"));
   formModal({ title: tt("Nytt prosjekt"), saveTxt: tt("Opprett prosjekt"), values: { eiendomId: preset.eiendomId || E[0].id, type: 'Vedlikehold', start: today(), ...preset }, fields: [

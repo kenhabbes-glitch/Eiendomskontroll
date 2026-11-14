@@ -14,7 +14,7 @@ export type ShaFane = 'vurdering' | 'risiko' | 'org' | 'plan';
 const JN = ({ v, set }: { v?: string; set: (x: string) => void }) => <div className="seg">{[['ja', 'Ja'], ['nei', 'Nei'], ['usikker', 'Usikker']].map(([k, l]) => <button key={k} type="button" className={'btn sm' + (v === k ? ' pri' : '')} onClick={() => set(k)}>{tt(l)}</button>)}</div>;
 const virkedager = (a: string, b: string) => { if (!a || !b) return 0; let d = new Date(a + 'T00:00:00Z'), e = new Date(b + 'T00:00:00Z'), c = 0; while (d <= e) { const w = d.getUTCDay(); if (w && w !== 6) c++; d = new Date(d.getTime() + 864e5); } return c; };
 
-export function shaKonklusjon(v: Rec = {}, p?: Rec) {
+export function shaKonklusjon(v: Obj = {}, p?: Rec) {
   const V = v.vurdering || {}; const utf = (p?.faser || []).find((f: Rec) => f.k === 'utf') || {};
   const dagerPlan = virkedager(utf.start, utf.slutt); const dager = n(V.dager) || dagerPlan; const dagsverk = n(V.dagsverk) || (dager && n(V.personer) ? dager * n(V.personer) : 0);
   const gjelder = V.forbruker === 'ja' ? false : V.vedlikehold === 'ja' ? false : V.vedlikehold === 'nei' ? true : null;

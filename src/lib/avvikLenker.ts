@@ -8,7 +8,7 @@ export function rapportFor(a: Rec): { dok: Rec | null; dokIds: string[]; oppgave
   const h = o ? (o.historikk || []).find((x: Rec) => (x.avvik || []).includes(a.id)) : null;
   const dokIds = [a.dokId, ...(h?.dokIds || []), h?.dokId].filter((x, i, A) => x && A.indexOf(x) === i) as string[];
   if (!o && !dokIds.length) return null;
-  return { dok: dokIds.length ? byId('dokumenter', dokIds[0]) || null : null, dokIds, oppgave: o, dato: h?.dato || a.oppdaget || '' };
+  return { dok: dokIds.length ? byId('dokumenter', dokIds[0]) || null : null, dokIds, oppgave: o ?? null, dato: h?.dato || a.oppdaget || '' };
 }
 
 export const GJENTATT_MND = 24, GJENTATT_MIN = 3;

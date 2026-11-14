@@ -83,7 +83,7 @@ type Rad = { id: string; type: string; punkt: string; t: string; alv: string; fr
 export function registrerTilsyn(sak?: Sak) { openModal({ wide: true, render: close => <RegistrerTilsyn close={close} sak={sak} /> }); }
 function RegistrerTilsyn({ close, sak }: { close: () => void; sak?: Sak }) {
   useStore(); const ny = (): Rad => ({ id: Math.random().toString(36).slice(2), type: 'Avvik', punkt: '', t: '', alv: 'Høy', frist: '', tiltak: '' });
-  const [h, setH0] = useState<Rec>(() => sak ? { eiendomId: sak.eiendomId, kilde: sak.kilde, myndighet: sak.myndighet, ref: sak.ref, dato: sak.dato, svarfrist: sak.svarfrist } : { eiendomId: S.eiendommer[0]?.id || '', kilde: tilsynKilder(S.eiendommer[0]?.id)[0], myndighet: myndighet(tilsynKilder(S.eiendommer[0]?.id)[0]), ref: '', dato: today(), svarfrist: '' });
+  const [h, setH0] = useState<Obj>(() => sak ? { eiendomId: sak.eiendomId, kilde: sak.kilde, myndighet: sak.myndighet, ref: sak.ref, dato: sak.dato, svarfrist: sak.svarfrist } : { eiendomId: S.eiendommer[0]?.id || '', kilde: tilsynKilder(S.eiendommer[0]?.id)[0], myndighet: myndighet(tilsynKilder(S.eiendommer[0]?.id)[0]), ref: '', dato: today(), svarfrist: '' });
   const setH = (x: Obj) => setH0(v => ({ ...v, ...x }));
   const [R, setR] = useState<Rad[]>([ny()]); const [fil, setFil] = useState<File | null>(null); const [busy, setBusy] = useState(false);
   const setRad = (i: number, x: Partial<Rad>) => setR(L => L.map((r, j) => j === i ? { ...r, ...x } : r));
@@ -129,7 +129,7 @@ function RegistrerTilsyn({ close, sak }: { close: () => void; sak?: Sak }) {
 function tilbakemelding(s: Sak) { openModal({ wide: true, render: close => <Tilbakemelding s={s} close={close} /> }); }
 function Tilbakemelding({ s, close }: { s: Sak; close: () => void }) {
   const e = byId('eiendommer', s.eiendomId);
-  const [v, setV0] = useState<Rec>(() => ({ avsender: e?.eierNavn || '', kontakt: [state.me?.navn, state.me?.epost].filter(Boolean).join(', '), mottaker: s.myndighet,
+  const [v, setV0] = useState<Obj>(() => ({ avsender: e?.eierNavn || '', kontakt: [state.me?.navn, state.me?.epost].filter(Boolean).join(', '), mottaker: s.myndighet,
     innledning: `Vi viser til ${s.kilde === 'Forsikring' ? 'besiktigelse' : 'tilsyn'} ${fd(s.dato)}${s.ref ? ` (deres ref. ${s.ref})` : ''} ved ${eNavn(s.eiendomId)}${e?.adresse ? ', ' + e.adresse : ''}. Nedenfor følger status og tiltak for forholdene som ble påpekt.`,
     avslutning: 'Vi ber om at saken avsluttes for de forholdene som er utbedret. Ta gjerne kontakt dersom dere har spørsmål eller trenger ytterligere dokumentasjon.', med: Object.fromEntries(s.avvik.map(a => [a.id, true])) }));
   const setV = (x: Obj) => setV0(p => ({ ...p, ...x })); const [busy, setBusy] = useState(false);

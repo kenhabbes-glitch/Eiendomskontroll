@@ -3,7 +3,7 @@ import React from 'react';
 import { TG_DEF, KG_DEF } from '../lib/catalog';
 import { tt } from '../lib/i18n';
 
-export type Tilstand = { tg?: string; kg?: string; komm?: string };
+export type Tilstand = { tg?: string; kg?: string; komm?: string; [k: string]: any };
 export const tgTekst = (t?: Tilstand | null) => t?.tg ? `${t.tg}${t.kg ? ' · ' + t.kg : ''}` : 'Ikke vurdert';
 /** Avviker vurderingen fra nåværende tilstand? (tom TG = ikke vurdert = ingen endring) */
 export const tgAvviker = (ny?: Tilstand | null, naa?: Tilstand | null) => !!ny?.tg && (ny.tg !== (naa?.tg || '') || (!!ny.kg && ny.kg !== (naa?.kg || '')));

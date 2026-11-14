@@ -5,7 +5,7 @@ import { SERVICEAVTALE, TG_DEF, KG_DEF, NS_DOK } from './catalog';
 import { levetidRef, midt, spenn } from './ns3451';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER } from './catalog';
 import { S, aoApi, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore, kanRedigereE, kanDrifteE, mineOrg, oppdaterNiva } from './store';
-import { leieAreal, m2, FELLES_AVTALE } from './utils';
+import { leieAreal, m2, FELLES_AVTALE, Obj } from './utils';
 import { byggTillegg, harModul, orgPris } from './moduler';
 import { TgKgVelger, tgAvviker, tgTekst } from '../components/TgKg';
 import { PosVelger, BildeVelger, VedleggGalleri } from '../components/PosVelger';
@@ -55,9 +55,9 @@ const tgFelt = (): Field[] => [
 ];
 
 // ================= EIENDOM =================
-export function editEiendom(id?: string, etter?: (nid: string) => void, preset?: Rec) {
+export function editEiendom(id?: string, etter?: (nid: string) => void, preset?: Obj) {
   const eierOrg = mineOrg(['admin', 'forvalter']);
-  const e = id ? byId('eiendommer', id)! : { land: ({ 'es-MX': 'MX', sv: 'SE', da: 'DK' } as Rec)[sprak()] || hovedLand(), eierOrgId: (eierOrg.find(o => o.id === S.primarOrg) || eierOrg.find(o => o.type === 'eier') || eierOrg[0])?.id, ...(preset || {}) } as Rec;
+  const e = id ? byId('eiendommer', id)! : { land: ({ 'es-MX': 'MX', sv: 'SE', da: 'DK' } as Record<string, string>)[sprak()] || hovedLand(), eierOrgId: (eierOrg.find(o => o.id === S.primarOrg) || eierOrg.find(o => o.type === 'eier') || eierOrg[0])?.id, ...(preset || {}) } as unknown as Rec;
   if (!id && !eierOrg.length) { toast(tt("Du må være administrator eller forvalter i en organisasjon for å opprette eiendommer")); return; }
   const kanEie = id ? mineOrg(['admin']).some(o => o.id === e.eierOrgId) : true;
   const flyttTil = mineOrg(['admin']).filter(o => o.type === 'eier' || o.id === e.eierOrgId); const flyttbar = !!id && kanEie && flyttTil.length > 1;
@@ -291,7 +291,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     ...(id ? [{ k: 'kompSum', type: 'custom', show: () => S.komponenter.some(k => k.anleggId === id), render: () => { const K = S.komponenter.filter(k => k.anleggId === id); const mK = K.filter(k => +k.mengde > 0);
       const m2sum = mK.reduce((s0, k) => s0 + +String(k.mengde).replace(',', '.'), 0); const kSum = K.reduce((s0, k) => s0 + (+k.kost || 0), 0); const erM2 = KOMP[a.type]?.enh === 'm2' || mK.length > 0;
       return <div className="note small" style={{ color: 'var(--ink)' }}><b>{tt("Komponenter:")} {K.length}</b>{erM2 && <> {tt("· areal")} <b>{m2(m2sum)}</b>{mK.length < K.length ? <span className="muted"> ({K.length - mK.length} {tt("uten areal)")}</span> : null}</>}{kSum > 0 && <> {tt("· utskiftingskostnad")} <b>{nok(kSum)}</b></>}
-        {erM2 && <div className="muted" style={{ marginTop: 2 }}>{tt("Summen av komponentene. Mål hver komponent på tegningen i komponentskjemaet")}{kompFraTegning ? tt(", eller legg til komponenter fra tegning") : ''}.</div>}</div>; } } as Field] : []),
+        {erM2 && <div className="muted" style={{ marginTop: 2 }}>{tt("Summen av komponentene. Mål hver komponent på tegningen i komponentskjemaet")}{tt(", eller legg til komponenter fra tegning")}.</div>}</div>; } } as Field] : []),
     ...(isStaff() && canEdit() ? m2Felter(v => v.eiendomId, v => v.navn || KOMP[v.type]?.n || 'systemet') : []),
     ...(isStaff() && canEdit() ? [{ k: 'kost', label: tt("Sentralkost på systemnivå (kr)"), type: 'number', half: true, hint: tt("F.eks. sentral, styring, kabling. Komponentene summeres i tillegg.") } as Field, { k: 'kostAar', label: tt("Kostnad vurdert (prisnivå år)"), type: 'number', half: true, def: YEAR, hint: tt("Året beløpet er anslått i") } as Field] : []),
     { k: 'kostFlagg', type: 'custom', render: v => <KostFlagg v={v} /> },
@@ -363,7 +363,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
 }
 // Settes av views/Maalere (unngår sirkulær import)
 export const MaalerRef: { Kort: (p: { kid: string }) => any } = { Kort: () => null };
-export function editKomponent(id?: string, anleggId?: string, preset?: Rec) {
+export function editKomponent(id?: string, anleggId?: string, preset?: Obj) {
   const k: Rec = id ? byId('komponenter', id)! : { anleggId } as any;
   const sys = byId('anlegg', k.anleggId) || ({} as Rec); const ro = !kanRedigereE(sys.eiendomId);
   if (!id) { k.kode = TFM_DEF[sys.type]?.[1] || ''; Object.assign(k, preset || {}); k.lop = nextKompLop(k.anleggId, k.kode); k.eiendomId = sys.eiendomId;
@@ -493,7 +493,7 @@ export function editOppgave(id?: string, preset: any = {}) {
   const fields: Field[] = [
     { k: 'navn', label: tt("Kontroll / oppgave"), req: true },
     { k: 'eiendomId', label: tt("Eiendom"), type: 'select', options: eOptsSkriv, req: true, half: true },
-    { k: 'anleggId', label: tt("System"), type: 'select', options: () => S.anlegg.filter(a => !v.eiendomId || a.eiendomId === (v as any).eiendomId).map(a => [a.id, eNavn(a.eiendomId) + ' – ' + aNavn(a.id)] as [string, string]), empty: tt("(Hele eiendommen)"), half: true },
+    { k: 'anleggId', label: tt("System"), type: 'select', options: () => S.anlegg.filter(a => !(v as any).eiendomId || a.eiendomId === (v as any).eiendomId).map(a => [a.id, eNavn(a.eiendomId) + ' – ' + aNavn(a.id)] as [string, string]), empty: tt("(Hele eiendommen)"), half: true },
     { k: 'kategori', label: tt("Fagområde"), type: 'select', options: KATS, half: true }, { k: 'type', label: tt("Type"), type: 'select', options: TYPER, half: true },
     { k: 'in', label: tt("Intervall"), type: 'number', half: true }, { k: 'ie', label: tt("Enhet"), type: 'select', options: ENH, half: true },
     { k: 'nesteFrist', label: tt("Neste frist"), type: 'date', req: true, half: true }, { k: 'utfores', label: tt("Utføres av / leverandør"), half: true },

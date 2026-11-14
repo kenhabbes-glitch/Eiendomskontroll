@@ -15,7 +15,7 @@ const kr = (v: number) => nok(Math.round(v));
 type Kol = { k: string; l: string; w?: number | string; type?: 'text' | 'number' | 'date' | 'select' | 'check' | 'area'; opts?: string[]; ph?: string; dl?: string[] };
 
 /** Enkel radredigering (tabell) brukt i flere arbeidsflater */
-export function Rader({ v, set, kol, ny, tom, sum, sumL = 'Sum' }: { v: Rec[]; set: (x: Rec[]) => void; kol: Kol[]; ny: () => Rec; tom?: string; sum?: (r: Rec) => React.ReactNode; sumL?: string }) {
+export function Rader({ v, set, kol, ny, tom, sum, sumL = 'Sum' }: { v: Rec[]; set: (x: Rec[]) => void; kol: Kol[]; ny: () => Obj; tom?: string; sum?: (r: Rec) => React.ReactNode; sumL?: string }) {
   const endre = (i: number, p: Obj) => set(v.map((r, j) => j === i ? { ...r, ...p } : r));
   return <div className="pa-rader">
     {v.length ? <div className="tbl-wrap"><table className="pa-tbl"><thead><tr>{kol.map(c => <th key={c.k} style={{ width: c.w }}>{c.l}</th>)}{sum && <th className="num">{sumL}</th>}<th style={{ width: 30 }} /></tr></thead><tbody>
@@ -43,9 +43,9 @@ export function nyOppgave(pid: string, fase: string) {
 function Arbeidsflate({ pid, oid, close }: { pid: string; oid: string; close: () => void }) {
   useStore();
   const p = byId('prosjekter', pid); const o0 = (p?.oppgaver || []).find((x: Rec) => x.id === oid);
-  const [f, setF0] = useState<Rec>(() => ({ ...o0, sjekk: o0?.sjekk?.length ? rettSjekk(o0.sjekk) : standardSjekk(o0 || {}) }));
+  const [f, setF0] = useState<Obj>(() => ({ ...o0, sjekk: o0?.sjekk?.length ? rettSjekk(o0.sjekk) : standardSjekk(o0 || {}) }));
   const type = oppgaveType(f);
-  const [A, setA0] = useState<Rec>({}); // bare endrede deler; resten leses fra prosjektet
+  const [A, setA0] = useState<Obj>({}); // bare endrede deler; resten leses fra prosjektet
   const [shaFane, setShaFane] = useState<ShaFane>('vurdering');
   const [busy, setBusy] = useState(false);
   if (!p || !o0) return <ModalFrame title={tt("Oppgave")} close={close}><p>{tt("Fant ikke oppgaven.")}</p></ModalFrame>;
@@ -56,7 +56,7 @@ function Arbeidsflate({ pid, oid, close }: { pid: string; oid: string; close: ()
     setBusy(true);
     const P = byId('prosjekter', pid)!; const sha = A.sha ?? P.arbeid?.sha;
     const sjekk = type === 'sha' && sha ? (f.sjekk || []).map((x: Rec) => x.ok || !shaAvkrysning(x.t, sha, P) ? x : { ...x, ok: true }) : f.sjekk;
-    const ny = { ...f, sjekk, ...(ferdig ? { status: 'Ferdig', ferdig: today() } : f.status === 'Ferdig' && !f.ferdig ? { ferdig: today() } : {}) };
+    const ny: Obj = { ...f, sjekk, ...(ferdig ? { status: 'Ferdig', ferdig: today() } : f.status === 'Ferdig' && !f.ferdig ? { ferdig: today() } : {}) };
     await oppdaterP(pid, { oppgaver: (P.oppgaver || []).map((x: Rec) => x.id === oid ? ny : x), arbeid: { ...(P.arbeid || {}), ...A } }, ferdig || (ny.status === 'Ferdig' && o0.status !== 'Ferdig') ? `Ferdig: ${ny.tittel}` : undefined);
     setBusy(false); toast(tt("Lagret")); close();
   };
@@ -117,7 +117,7 @@ function Sjekk({ v, set, tittel, verktoy }: { v: Rec[]; set: (x: Rec[]) => void;
 }
 
 const SANNS = ['Lav', 'Middels', 'Høy'];
-export const risikoNivaa = (r: Rec) => (SANNS.indexOf(r.sannsynlighet) + 1) * (SANNS.indexOf(r.konsekvens) + 1);
+export const risikoNivaa = (r: Obj) => (SANNS.indexOf(r.sannsynlighet) + 1) * (SANNS.indexOf(r.konsekvens) + 1);
 function Beskrivelse({ v, set, risiko, setRisiko, p }: { v: Rec; set: (x: Obj) => void; risiko: Rec[]; setRisiko: (r: Rec[]) => void; p: Rec }) {
   return <>
     <h3 className="pa-h">{tt("Prosjektbeskrivelse")}</h3>
@@ -150,7 +150,7 @@ function Kalkyle({ v, set, p, type, fraOverslag }: { v: Rec; set: (x: Obj) => vo
   };
   return <>
     <h3 className="pa-h">{type === 'kalkyle' ? tt("Detaljert kostnadskalkyle") : tt("Grovt kostnadsoverslag")} <span className="small muted" style={{ fontWeight: 400 }}>{tt("kr eks. mva")}</span></h3>
-    {type === 'kalkyle' && !L.length && fraOverslag?.linjer?.length > 0 && <p><button type="button" className="btn sm" onClick={() => set({ linjer: fraOverslag.linjer.map((l: Linje) => ({ ...l, id: uid() })), paslag: fraOverslag.paslag })}>{tt("Start med linjene fra grovt overslag")}</button></p>}
+    {type === 'kalkyle' && !L.length && fraOverslag?.linjer?.length > 0 && <p><button type="button" className="btn sm" onClick={() => set({ linjer: fraOverslag!.linjer.map((l: Linje) => ({ ...l, id: uid() })), paslag: fraOverslag!.paslag })}>{tt("Start med linjene fra grovt overslag")}</button></p>}
     <div className="tbl-wrap"><table className="pa-tbl"><thead><tr><th style={{ width: '26%' }}>{tt("Post")}</th><th style={{ width: '24%' }}>{tt("Bygningsdel (NS 3451)")}</th><th className="num">{tt("Mengde")}</th><th>{tt("Enhet")}</th><th className="num">{tt("Enhetspris")}</th><th className="num">{tt("Sum")}</th><th /></tr></thead><tbody>
       {L.map((l, i) => <tr key={l.id}>
         <td><input value={l.post || ''} onChange={e => setL(i, { post: e.target.value })} placeholder={tt("F.eks. Nytt aggregat")} /></td>

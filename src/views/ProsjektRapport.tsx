@@ -114,14 +114,14 @@ function RapportDialog({ pid, type, fase0, close }: { pid: string; type: 'fase' 
   const p = byId('prosjekter', pid)!;
   const forrige = (p.rapporter || []).filter((r: Rec) => r.type === 'status').map((r: Rec) => r.snap?.periode?.til).filter(Boolean).sort().slice(-1)[0];
   const [fase, setFase] = useState(fase0 || p.fase);
-  const [t, setT0] = useState<Rec>(() => ({ fra: forrige ? addDays(forrige, 1) : p.start || '', til: today(), anbefaling: '', beslutning: '', statusTekst: '', nesteTekst: '', trafikklys: null, trafikklysTekst: {} }));
+  const [t, setT0] = useState<Obj>(() => ({ fra: forrige ? addDays(forrige, 1) : p.start || '', til: today(), anbefaling: '', beslutning: '', statusTekst: '', nesteTekst: '', trafikklys: null, trafikklysTekst: {} }));
   const setT = (x: Obj) => setT0(v => ({ ...v, ...x }));
   const base = snapshot(p, type, { fase, fra: t.fra, til: t.til });
   const besl = t.beslutning || BESLUTNING_TEKST[fase]?.(p, base) || '';
   const tl = t.trafikklys || trafikklysForslag(base);
   const s = snapshot(p, type, { fase, fra: t.fra, til: t.til, tekst: type === 'fase' ? { anbefaling: t.anbefaling, beslutning: besl } : { statusTekst: t.statusTekst, nesteTekst: t.nesteTekst, trafikklys: tl, trafikklysTekst: t.trafikklysTekst } });
   const ref = useRef<HTMLDivElement>(null);
-  const [send, setSend] = useState<Rec | null>(null); const [busy, setBusy] = useState(false); const [res, setRes] = useState<Rec | null>(null);
+  const [send, setSend] = useState<Obj | null>(null); const [busy, setBusy] = useState(false); const [res, setRes] = useState<Obj | null>(null);
   const lagre = async (): Promise<string> => { const id = uid(); const P = byId('prosjekter', pid)!;
     await oppdaterP(pid, { rapporter: [...(P.rapporter || []), { id, type, fase: type === 'fase' ? fase : P.fase, tittel: s.tittel, opprettet: new Date().toISOString(), av: state.me?.navn || state.me?.epost, status: 'Utkast', snap: s }] }, `${type === 'fase' ? 'Beslutningsnotat' : 'Statusrapport'} laget: ${s.tittel}`); return id; };
   const sendNa = async () => {
@@ -188,14 +188,14 @@ export const StatusChip = ({ s }: { s?: string }) => <Chip c={GODKJENT.includes(
 export function visRapport(pid: string, rid: string) { openModal({ wide: true, render: close => <RapportVis pid={pid} rid={rid} close={close} /> }); }
 function RapportVis({ pid, rid, close }: { pid: string; rid: string; close: () => void }) {
   useStore(); const p = byId('prosjekter', pid); const r = (p?.rapporter || []).find((x: Rec) => x.id === rid); const ref = useRef<HTMLDivElement>(null);
-  const [man, setMan] = useState<Rec | null>(null);
+  const [man, setMan] = useState<Obj | null>(null);
   if (!p || !r) return <ModalFrame title={tt("Rapport")} close={close}><p>{tt("Fant ikke rapporten.")}</p></ModalFrame>;
   const besvart = GODKJENT.includes(r.status) || r.status === 'Avvist';
-  const settRapport = async (patch: Obj, logg: string, extra: Rec = {}) => { const P = byId('prosjekter', pid)!; await oppdaterP(pid, { ...extra, rapporter: (P.rapporter || []).map((x: Rec) => x.id === rid ? { ...x, ...patch } : x) }, logg); };
+  const settRapport = async (patch: Obj, logg: string, extra: Obj = {}) => { const P = byId('prosjekter', pid)!; await oppdaterP(pid, { ...extra, rapporter: (P.rapporter || []).map((x: Rec) => x.id === rid ? { ...x, ...patch } : x) }, logg); };
   const registrer = async () => {
     if (!man?.navn?.trim()) return toast(tt("Skriv hvem som fattet beslutningen"));
     const svar = { navn: man.navn.trim(), komm: man.komm || '', t: (man.dato || today()) + 'T12:00:00.000Z', via: 'manuelt', beslutning: man.beslutning, regAv: state.me?.navn };
-    const P = byId('prosjekter', pid)!; const i = FASER.findIndex(f => f[0] === r.fase); let extra: Rec = {};
+    const P = byId('prosjekter', pid)!; const i = FASER.findIndex(f => f[0] === r.fase); let extra: Obj = {};
     if (GODKJENT.includes(man.beslutning) && P.fase === r.fase && i < FASER.length - 1) extra = { fase: FASER[i + 1][0], status: P.status === 'Idé' || (P.status === 'Planlagt' && i + 1 >= 3) ? (i + 1 >= 3 ? 'Pågår' : 'Planlagt') : P.status };
     await settRapport({ status: man.beslutning, svar }, `Beslutningsnotat «${FASER[i]?.[1]}»: ${man.beslutning.toLowerCase()} av ${svar.navn} (registrert manuelt)${extra.fase ? ` – fase: ${FASER[i + 1][1]}` : ''}`, extra);
     setMan(null); toast(tt("Beslutning registrert"));
@@ -221,8 +221,8 @@ function sendPaNytt(pid: string, rid: string) {
   openModal({ render: close => <SendSkjema close={close} start={{ navn: ek.navn || '', epost: ek.epost || '', melding: '' }} onSend={async x => {
     const res = await aoApi({ action: 'pr_send', prosjekt_id: pid, rapport_id: rid, ...x, lenkeBase: location.origin }); await refetch('prosjekter', pid); return res; }} /> });
 }
-function SendSkjema({ close, start, onSend }: { close: () => void; start: Rec; onSend: (x: Rec) => Promise<Rec> }) {
-  const [x, setX] = useState(start); const [busy, setBusy] = useState(false); const [res, setRes] = useState<Rec | null>(null);
+function SendSkjema({ close, start, onSend }: { close: () => void; start: Obj; onSend: (x: Obj) => Promise<Obj> }) {
+  const [x, setX] = useState(start); const [busy, setBusy] = useState(false); const [res, setRes] = useState<Obj | null>(null);
   return <ModalFrame title={tt("Send rapport")} close={close} foot={res ? <button className="btn pri" onClick={close}>{tt("Ferdig")}</button> : <><button className="btn" onClick={close}>{tt("Avbryt")}</button><button className="btn pri" disabled={busy} onClick={async () => { setBusy(true); try { const r = await onSend(x); setRes(r); if (r.sendt) toast(tt("Sendt")); } catch (e: any) { toast(e.message); } finally { setBusy(false); } }}>{busy ? tt("Sender …") : tt("Send")}</button></>}>
     {res ? (res.sendt ? <p>{tt("✓ Sendt til")} {res.til}{tt(". En tidligere sendt lenke er erstattet av den nye.")}</p> : <><p>{tt("Kunne ikke sende e-post")}{res.grunn ? tt(": {0}", res.grunn) : ''}{tt(". Lenke:")}</p><p className="mono small" style={{ wordBreak: 'break-all' }}>{res.lenke}</p><button className="btn sm" onClick={() => copyText(res.lenke)}>{tt("Kopier lenke")}</button></>)
       : <div className="pa-grid"><label className="pa-felt half"><span>{tt("Navn")}</span><input value={x.navn} onChange={e => setX({ ...x, navn: e.target.value })} /></label><label className="pa-felt half"><span>{tt("E-post")}</span><input value={x.epost} onChange={e => setX({ ...x, epost: e.target.value })} /></label>
@@ -232,7 +232,7 @@ function SendSkjema({ close, start, onSend }: { close: () => void; start: Rec; o
 
 // ---------------- Eiers lenkeside (uten innlogging)
 export function PrLenke({ token }: { token: string }) {
-  const [info, setInfo] = useState<Rec | null>(null); const [err, setErr] = useState(''); const [f, setF] = useState<Rec>({ beslutning: '', navn: '', komm: '' }); const [busy, setBusy] = useState(false); const [ok, setOk] = useState<Rec | null>(null);
+  const [info, setInfo] = useState<Obj | null>(null); const [err, setErr] = useState(''); const [f, setF] = useState<Obj>({ beslutning: '', navn: '', komm: '' }); const [busy, setBusy] = useState(false); const [ok, setOk] = useState<Obj | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const last = () => aoApi({ action: 'pr_info', token }, false).then(i => { setInfo(i); setF((x: Rec) => ({ ...x, navn: x.navn || i.sendtTil?.navn || '', beslutning: x.beslutning || (i.type === 'fase' ? '' : 'Kommentar') })); }).catch(e => setErr(e.message));
   useEffect(() => { last(); }, [token]);

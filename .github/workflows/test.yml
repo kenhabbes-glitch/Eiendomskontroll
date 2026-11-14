@@ -8,6 +8,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
+      - name: Typesjekk
+        run: npm run typesjekk
       - name: Serverfunksjoner og logikk
         run: npm test
       - name: Skjermbildetester i nettleser
