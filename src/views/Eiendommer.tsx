@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { AV_LUKKET, DOK_PAAKREVD } from '../lib/catalog';
 import { eierRapport } from './EierRapport';
+import { SamsvarKort } from '../components/Samsvar';
 import { capexRapport } from './CapexRapport';
 import { tilstandsrapport } from './Tilstandsrapport';
 import { qrPunkter } from './QrPunkter';
@@ -74,7 +75,7 @@ export function Eiendom({ id }: { id: string }) {
       ['Eier', e.eierNavn ? <>{e.eierNavn}{e.eierOrgnr ? <span className="muted mono small"> {e.eierOrgnr}</span> : null}{e.eierBrreg && enhetStatus(e.eierBrreg).c !== 'green' && <> <Chip c="red">{enhetStatus(e.eierBrreg).t}</Chip></>}</> : ''], ['TFM byggnummer', e.tfmBygg ? '+' + e.tfmBygg : ''], ['Kategori', e.kategori], ['Byggeår', e.byggeaar], ['Rehabilitert', e.rehabaar], ['BTA', e.bta ? e.bta + ' m²' : ''], ['Etasjer', e.etasjer], ['Risikoklasse', e.risikoklasse], ['Brannklasse', e.brannklasse], ['Energikarakter', e.energimerke], ['Tilsynsobjekt brann', e.tilsyn], ['Driftsansvarlig', e.driftsansvarlig], ['Brannansvarlig (eier)', e.brannansvarlig], ['Forsikring', ed ? e.forsikring : ''], ['Kontakt for leietakere', e.kontaktLeietaker]] as [string, any][]).filter(x => x[1]);
     const f = T.filter(o => o.aktiv !== false && (dUntil(o.nesteFrist) as number) < 0); const nx = sortBy(T.filter(o => o.aktiv !== false && (dUntil(o.nesteFrist) as number) >= 0), o => o.nesteFrist).slice(0, 6);
     const staff = S.profiles.filter(p => S.tilganger.some(t => t.user_id === p.id && t.eiendom_id === id));
-    c = <><div className="grid g2">
+    c = <>{ed && <SamsvarKort id={id} tilFane={f => setTab(tabs.some(t => t[0] === f) ? f : 'info')} leggTil={() => generatePlan(id)} />}<div className="grid g2">
       <div className="card"><h2>{tt("Eiendomsdata")}</h2>{dl.length ? <dl className="dl">{dl.map(([k, v]) => <React.Fragment key={k}><dt>{tt(k)}</dt><dd>{v}</dd></React.Fragment>)}</dl> : <p className="muted">{tt("Ingen detaljer registrert.")}</p>}{e.notat && <p className="small" style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>{e.notat}</p>}
         {isAdmin() && <p className="small muted" style={{ marginBottom: 0 }}>{tt("Tilgang:")} {staff.length ? staff.map(p => p.navn || p.epost).join(', ') : tt("bare administratorer")} · <a href="#/brukere">{tt("Endre")}</a></p>}</div>
       <div className="card"><h2>{tt("Kontroller")}</h2>{f.length > 0 && <p style={{ marginTop: 0 }}><Chip c="red">{f.length} {tt("forfalte")}</Chip></p>}

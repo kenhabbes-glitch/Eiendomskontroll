@@ -82,3 +82,19 @@ test('tegning på mobil: åpner i fullskjerm, kan zoomes, og låsen hindrer util
     await a.side.getByRole('button', { name: /Lukk/ }).last().click(); await a.side.waitForTimeout(400); assert.equal(await a.side.locator('.modal.plan').count(), 0); assert.deepEqual(a.feil, []);
   } finally { await a.lukk(); }
 });
+
+test('samsvar: forsiden og eiendomssiden viser trafikklys og hva som mangler etter lov og forskrift', async () => {
+  const a = await aapne('#/oversikt'); try {
+    const rad = a.side.locator('tr', { hasText: 'Testgården' });
+    await rad.locator('.chip', { hasText: 'Krever tiltak' }).waitFor();
+    assert.ok(await rad.locator('.lysp').count() >= 4, 'ett lys per område');
+    assert.ok(+(await a.side.locator('.kpi', { hasText: 'Lovpålagte kontroller mangler i planen' }).locator('.v').innerText()) > 0);
+    await a.side.locator('.kpi', { hasText: 'Lovpålagte kontroller mangler i planen' }).click();
+    const kort = a.side.locator('.samsvar'); await kort.waitFor();
+    assert.match(await kort.innerText(), /Lovpålagte kontroller[\s\S]*mangler i planen[\s\S]*Dette må gjøres/);
+    if (process.env.EK_BILDE) await a.side.screenshot({ path: process.env.EK_BILDE, fullPage: true });
+    await kort.locator('button', { hasText: 'manglende lovpålagte kontroller' }).click();
+    await a.side.locator('.modal').last().waitFor();
+    assert.deepEqual(a.feil, []);
+  } finally { await a.lukk(); }
+});

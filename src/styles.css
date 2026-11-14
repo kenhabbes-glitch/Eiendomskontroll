@@ -406,3 +406,18 @@ h1 .hjelp-q{position:relative;top:-2px}
 .ta-bar{height:8px;background:var(--graybg);border-radius:4px;overflow:hidden}
 .ta-bar>div{height:100%;background:var(--acc);border-radius:4px}
 .offline-band{background:var(--amberbg);color:var(--amber);padding:6px 14px;font-size:13px;font-weight:500;border-bottom:1px solid var(--line)}
+/* Samsvar – trafikklys */
+.lysp{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--muted);flex:none;vertical-align:baseline}
+.lysp.green{background:var(--green)} .lysp.amber{background:#d98a00} .lysp.red{background:var(--red)} .lysp.grey{background:#c5cbc7}
+.lysrekke{display:inline-flex;gap:4px;align-items:center}
+.samsvar-rad{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.samsvar{margin-bottom:16px}
+.samsvar h2{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.samsvar-omr{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin-bottom:14px}
+.samsvar-o{display:flex;gap:10px;align-items:flex-start;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;cursor:pointer;font:inherit;color:inherit}
+.samsvar-o:hover{border-color:var(--line2)}
+.samsvar-o .lysp{margin-top:5px}
+.samsvar-o span>b{display:block;font-weight:500}
+.samsvar-o span>.small{display:block}
+.samsvar-t{margin:0 0 4px;padding-left:20px}
+.samsvar-t li{margin:5px 0}
