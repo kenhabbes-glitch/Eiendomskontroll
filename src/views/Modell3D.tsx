@@ -34,7 +34,7 @@ const resultat = (ty: string, p: V3[]): string => {
 const STOR_MOBIL = 15e6;
 /** Anslått minnebruk i nettleseren (punkter, farger og trekanter), og grensen der mobil spør først. */
 const minneAv = (h: { grupper: { nv: number; ni: number }[]; flat?: boolean }) => h.grupper.reduce((s, g) => s + g.nv * (h.flat ? 15 : 18) + g.ni * 4, 0);
-const STORT_MINNE = 90e6;
+const STORT_MINNE = 300e6; // Herbarium (ARK + RIB, lette) åpner samtidig på iPhone, november 2026
 const erMobil = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 900;
 export default function ModellSeksjon({ eid }: { eid: string }) {
   useStore(); const ed = canEdit();
