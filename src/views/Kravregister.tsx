@@ -49,10 +49,10 @@ export function Kravregister({ id }: { id: string }) {
       {D.length ? <div className="tbl-wrap"><table className="krav"><thead><tr><th>{tt("Dokument")}</th><th>{tt("Krav")}</th><th>{tt("Status")}</th><th>{tt("Dokumentasjon")}</th><th></th></tr></thead><tbody>
         {D.map(d => <tr key={d.type}>
           <td><b style={{ fontWeight: 500 }}>{tt(d.type)}</b>{d.h && <div className="small muted">{d.h}</div>}</td><td className="small">{tt(d.krav)}</td>
-          <td><St lys={d.lys} t={d.status} />{d.gyldigTil && <div className="small muted">{tt("Gyldig til")} {fd(d.gyldigTil)}</div>}</td>
+          <td><St lys={d.lys} t={tt(d.status)} />{d.fdv && d.fdv.totalt > 0 && <div className="small muted">{tt("{0} av {1} systemer har FDV", d.fdv.dekket, d.fdv.totalt)}</div>}{d.fdv && d.fdv.manglerNavn.length > 0 && <div className="small" style={{ marginTop: 2 }}>{tt("Mangler FDV:")} {d.fdv.manglerNavn.join(', ')}</div>}{d.gyldigTil && <div className="small muted">{tt("Gyldig til")} {fd(d.gyldigTil)}</div>}</td>
           <td className="small">{d.docs?.length ? d.docs.map(x => <div key={x.id}><a href="#" onClick={ev => { ev.preventDefault(); editDok(x.id); }}>{x.tittel}</a> <span className="muted">{fd(x.dato)}{x.gyldigTil ? ' · ' + tt("Gyldig til") + ' ' + fd(x.gyldigTil) : ''}</span></div>) : <span className="muted">–</span>}</td>
           <td className="krav-h">{(d.status === 'Mangler' || d.status === 'Utløpt') && <><button className="btn sm pri" onClick={() => editDok(undefined, { eiendomId: id, type: d.type })}>{tt("Last opp")}</button> {d.status === 'Mangler' && <button className="btn sm" onClick={() => toggleDokNA(id, d.type)}>{tt("Ikke aktuelt")}</button>}</>}
-            {(d.status === 'Foreligger' || d.status === 'Utløper snart') && <button className="btn sm" title={tt("F.eks. én energiattest per bygningsdel")} onClick={() => editDok(undefined, { eiendomId: id, type: d.type })}>{tt("+ Flere")}</button>}
+            {(d.status === 'Foreligger' || d.status === 'Utløper snart' || d.status === 'Delvis') && <button className="btn sm" title={tt("F.eks. én energiattest per bygningsdel")} onClick={() => editDok(undefined, { eiendomId: id, type: d.type })}>{tt("+ Flere")}</button>}
             {d.status === 'Ikke relevant' && <button className="btn sm" onClick={() => toggleDokNA(id, d.type)}>{tt("Angre")}</button>}</td></tr>)}
       </tbody></table></div> : <p className="muted">{tt("Alle påkrevde dokumenter foreligger.")}</p>}
     </div>

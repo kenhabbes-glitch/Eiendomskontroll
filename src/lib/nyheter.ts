@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-03', dato: '2026-12-03', tittel: 'FDV telles per system', punkter: [
+    'FDV-dokumentasjon er ikke ett dokument, men dokumentasjon for hvert anlegg som følger bygget gjennom hele levetiden. Lovkravet viser nå «Delvis» og hvor mange systemer som har FDV, og lister hvilke som mangler.',
+    'Legg FDV inn på hvert system (fanen Dokumentasjon på systemet) – da blir kravet grønt når alle er dekket.',
+  ] },
   { id: '2026-12-02', dato: '2026-12-02', tittel: 'Søk og etasjefilter i 3D', punkter: [
     'Når du skjuler en etasje i 3D-modellen, skjules nå også systemer, komponenter og avvik som er plassert på den etasjen.',
     'Nytt søkefelt i 3D-panelet: skriv for eksempel «brann» eller navnet på et system, så vises bare treffene i modellen. Velg «Vis systemer i modellen» eller «Zoom til markeringer» for å se hvor de står.',

@@ -190,6 +190,10 @@ export function docCoverage(e: Rec, PAAKREVD: string[]) {
     if (na.includes(t)) return { t, s: 'na' };
     // Teller også rapporter som er lagt ved når den tilhørende kontrollen ble kvittert (f.eks. «Energiattest – fornyelse»)
     const ds = docs.filter(d => d.type === t || (d.oppgaveId && MAL_DOK[S.oppgaver.find(o => o.id === d.oppgaveId)?.malKey] === t)); if (!ds.length) return { t, s: 'no' };
+    // FDV er dokumentasjon for hvert system, ikke ett dokument: dekningen telles per system (og én generell for selve bygget)
+    if (t === 'FDV-dokumentasjon') { const sys = S.anlegg.filter(x => x.eiendomId === e.id && !x.arkivert); const har = (x: Rec) => ds.some(d => d.anleggId === x.id || (d.anleggIds || []).includes(x.id));
+      const mangler = sys.filter(x => !har(x)); const generell = ds.some(d => !d.anleggId && !(d.anleggIds || []).length); const dekket = sys.length - mangler.length;
+      if (sys.length && mangler.length) return { t, s: 'part', d: ds[0], ds, fdv: { dekket, totalt: sys.length, mangler: mangler.map(x => x.id), generell } }; return { t, s: 'ok', d: ds[0], ds, fdv: { dekket, totalt: sys.length, mangler: [] as string[], generell } }; }
     const valid = ds.filter(d => !d.gyldigTil || (dUntil(d.gyldigTil) as number) >= 0);
     if (!valid.length) return { t, s: 'exp', d: ds[0], ds };
     const soon = valid.every(d => d.gyldigTil && (dUntil(d.gyldigTil) as number) <= 90);

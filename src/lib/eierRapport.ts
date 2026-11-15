@@ -19,7 +19,7 @@ export const DOK_GRUNNLAG: Record<string, { h: string; krav: 'lov' | 'tiltak' | 
   'Ferdigattest/brukstillatelse': { h: 'Plan- og bygningsloven § 21-10 – ferdigattest (eller midlertidig brukstillatelse) for lovlig bruk', krav: 'lov' },
   'Brannkonsept/brannteknisk dokumentasjon': { h: 'Forskrift om brannforebygging §§ 4–5 – eier skal ha og holde oppdatert dokumentasjon av brannsikkerheten', krav: 'lov' },
   'Branntegninger/rømningsplaner': { h: 'Forskrift om brannforebygging §§ 4–5 – del av den branntekniske dokumentasjonen', krav: 'lov' },
-  'FDV-dokumentasjon': { h: 'TEK17 § 4-1 – dokumentasjon for forvaltning, drift og vedlikehold skal foreligge og holdes oppdatert', krav: 'lov' },
+  'FDV-dokumentasjon': { h: 'TEK17 kap. 4 (§ 4-1) / byggesaksforskriften § 5-5 – FDV skal overleveres eier ved ferdigattest, og eier må ha den for hvert anlegg; FOB § 4 og § 9 forutsetter at eier kjenner og følger opp sine sikkerhetsinnretninger. FDV følger bygget gjennom hele levetiden', krav: 'lov' },
   'Energiattest': { h: 'Energimerkeforskriften for bygninger – energiattest ved utleie, salg og nybygg (gyldig i 10 år)', krav: 'lov' },
   'Samsvarserklæring el-anlegg': { h: 'Forskrift om elektriske lavspenningsanlegg § 12 – samsvarserklæring for nye og endrede installasjoner', krav: 'lov' },
   'Tilstandsrapport': { h: 'Anbefalt (NS 3424) – grunnlag for vedlikeholdsplan; byggverk skal holdes i forsvarlig stand (pbl. § 31-1)', krav: 'anbefalt' },
@@ -32,7 +32,7 @@ export type KontrollRad = { navn: string; system: string; hjemmel: string; inter
   /** Begrunnelse når kravet er vurdert som ikke aktuelt for eiendommen */ na?: string;
   /** Kravet avhenger av opplysninger som mangler (f.eks. installert effekt) – teksten sier hva */ avklar?: string;
   /** Siste utførelse er kvittert uten rapport, dokument eller sjekkliste */ utenDok?: boolean; /** Hva som dokumenterer siste utførelse */ bevis?: string };
-export type DokRad = { type: string; h: string; krav: string; lys: Lys; status: string; dato: string; gyldigTil: string; tittel: string; /** Alle gjeldende dokumenter av typen – det kan være flere, f.eks. én energiattest per bygningsdel */ docs?: { id: string; tittel: string; dato: string; gyldigTil: string }[] };
+export type DokRad = { fdv?: { dekket: number; totalt: number; mangler: string[]; manglerNavn: string[]; generell: boolean }; type: string; h: string; krav: string; lys: Lys; status: string; dato: string; gyldigTil: string; tittel: string; /** Alle gjeldende dokumenter av typen – det kan være flere, f.eks. én energiattest per bygningsdel */ docs?: { id: string; tittel: string; dato: string; gyldigTil: string }[] };
 export type Tiltak = { pri: 1 | 2 | 3; tekst: string; omr: string };
 export type EierStatus = {
   harBv: boolean; harTs: boolean;
@@ -91,14 +91,15 @@ export function eierStatus(eid: string): EierStatus {
   // ---- Dokumenter eier skal ha
   const dok: DokRad[] = docCoverage(e, dokPaakrevd(eid)).map((c: any) => { const g = DOK_GRUNNLAG[c.t] || { h: '', krav: 'anbefalt' as const };
     const d = c.d as Rec | undefined; const krav = KRAV_TEKST[g.krav];
-    const [lys, status]: [Lys, string] = c.s === 'na' ? ['grey', 'Ikke relevant'] : c.s === 'ok' ? ['green', 'Foreligger'] : c.s === 'soon' ? ['amber', 'Utløper snart'] : c.s === 'exp' ? [g.krav === 'lov' ? 'red' : 'amber', 'Utløpt'] : [g.krav === 'lov' ? 'red' : 'amber', 'Mangler'];
-    return { type: c.t, h: g.h, krav, lys, status, dato: d?.dato || '', gyldigTil: d?.gyldigTil || '', tittel: d?.tittel || '', docs: (c.ds || (d ? [d] : [])).map((x: Rec) => ({ id: x.id, tittel: x.tittel || x.type, dato: x.dato || '', gyldigTil: x.gyldigTil || '' })) }; });
+    const [lys, status]: [Lys, string] = c.s === 'na' ? ['grey', 'Ikke relevant'] : c.s === 'part' ? ['amber', 'Delvis'] : c.s === 'ok' ? ['green', 'Foreligger'] : c.s === 'soon' ? ['amber', 'Utløper snart'] : c.s === 'exp' ? [g.krav === 'lov' ? 'red' : 'amber', 'Utløpt'] : [g.krav === 'lov' ? 'red' : 'amber', 'Mangler'];
+    return { type: c.t, h: g.h, krav, lys, status, dato: d?.dato || '', gyldigTil: d?.gyldigTil || '', tittel: d?.tittel || '', fdv: c.fdv ? { ...c.fdv, manglerNavn: c.fdv.mangler.map((id: string) => aNavn(id)) } : undefined, docs: (c.ds || (d ? [d] : [])).map((x: Rec) => ({ id: x.id, tittel: x.tittel || x.type, dato: x.dato || '', gyldigTil: x.gyldigTil || '' })) }; });
   const liste = (L: DokRad[]) => L.map(d => d.type).join(', ');
   const mangl = dok.filter(d => d.lys === 'red' && d.status === 'Mangler'); const utl = dok.filter(d => d.lys === 'red' && d.status === 'Utløpt');
   if (mangl.length) tiltak.push({ pri: 1, omr: 'Dokumenter', tekst: tt("Skaff {0}: {1}", mangl.length === 1 ? 'lovpålagt dokument' : mangl.length + ' lovpålagte dokumenter', liste(mangl)) });
   if (utl.length) tiltak.push({ pri: 1, omr: 'Dokumenter', tekst: tt("Forny utløpt{0}: {1}", utl.length > 1 ? 'e' : '', liste(utl)) });
+  dok.filter(d => d.fdv && d.fdv.mangler.length).forEach(d => tiltak.push({ pri: 2, omr: 'Dokumenter', tekst: tt("Legg inn FDV-dokumentasjon for {0} av {1} systemer: {2}", d.fdv!.mangler.length, d.fdv!.totalt, d.fdv!.manglerNavn.slice(0, 4).join(', ') + (d.fdv!.manglerNavn.length > 4 ? ' …' : '')) }));
   dok.filter(d => d.status === 'Utløper snart').forEach(d => tiltak.push({ pri: 2, omr: 'Dokumenter', tekst: tt("Forny {0} før {1}", d.type, fd(d.gyldigTil)) }));
-  const vurd = dok.filter(d => d.lys === 'amber' && d.status !== 'Utløper snart');
+  const vurd = dok.filter(d => d.lys === 'amber' && d.status !== 'Utløper snart' && d.status !== 'Delvis');
   if (vurd.length) tiltak.push({ pri: 3, omr: 'Dokumenter', tekst: tt("Vurder behovet for: {0}", vurd.map(d => `${d.type} (${d.krav.toLowerCase()})`).join(', ')) });
   const dLys = verst(...dok.filter(d => d.lys !== 'grey').map(d => d.lys));
 
