@@ -16,11 +16,11 @@ import { Innboks, useInnboksAntall } from './views/Innboks';
 import { RUTE_MODUL, harModul } from './lib/moduler';
 import { ModulSperret } from './views/Abonnement';
 import React, { useEffect, useState } from 'react';
-import { mineOrg, kanDrifteE, sendKo } from './lib/store';
+import { mineOrg, kanDrifteE, sendKo, ko, forkastKo } from './lib/store';
 import { autoKvitterIK } from './lib/actions';
 import { canEdit, configured, initAuth, isAdmin, isStaff, isTenant, isUtforer, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
 import { activeTasks, dUntil, openAvvik } from './lib/utils';
-import { ModalHost, Tip, Toast } from './components/ui';
+import { ModalHost, Tip, Toast, confirmBox } from './components/ui';
 import { Oversikt } from './views/Oversikt';
 import { Eiendommer, Eiendom } from './views/Eiendommer';
 import { Kontrollplan } from './views/Kontrollplan';
@@ -243,7 +243,12 @@ export default function App() {
     <main id="main">
       {state.error && <div className="banner">{state.error}</div>}
       <OrgnrVarsel />
-      {(state.offline || !navigator.onLine) && <div className="offline-band" role="status">{tt("Uten nett")}{(state as any).kopiTid ? tt(" – viser data fra {0}", new Date((state as any).kopiTid).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' })) : ''}{tt(". Befaringer kan gjennomføres og lagres på enheten; andre endringer krever nett.")}</div>}
+      {(state.offline || !navigator.onLine) && <div className="offline-band" role="status">{tt("Uten nett")}{(state as any).kopiTid ? tt(" – viser data fra {0}", new Date((state as any).kopiTid).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' })) : ''}{tt(". Kontroller, avvik, bilder og befaringer lagres på enheten og sendes når du er på nett igjen.")}{ko.antall > 0 && <b> {tt("{0} endringer venter.", ko.antall)}</b>}</div>}
+      {navigator.onLine && !state.offline && ko.antall > 0 && <div className="offline-band" role="status">
+        {ko.antall > ko.feil.length && <>{tt("{0} endringer gjort uten nett venter på å bli sendt.", ko.antall - ko.feil.length)} <button className="btn sm" onClick={() => sendKo()}>{tt("Send nå")}</button></>}
+        {ko.feil.length > 0 && <div className="ko-feil"><b>{tt("{0} endringer kunne ikke sendes:", ko.feil.length)}</b>
+          {ko.feil.map(f => <div key={f.key}>{f.navn} – <span className="muted">{tt(f.feil)}</span> <button className="btn sm" onClick={() => sendKo(true)}>{tt("Prøv igjen")}</button> <button className="btn sm" onClick={async () => { if (await confirmBox(tt("Forkaste endringen på «{0}»? Den blir ikke lagret.", f.navn), tt("Forkast"))) forkastKo(f.key); }}>{tt("Forkast")}</button></div>)}</div>}
+      </div>}
       {state.loading && !S.eiendommer.length ? <div className="empty"><b>{tt("Laster data …")}</b></div> : <React.Suspense fallback={<div className="empty"><b>{tt("Laster …")}</b></div>}>{body}</React.Suspense>}
     </main>
     <ModalHost /><Toast /><Tip /><NyheterPopup />

@@ -1,3 +1,4 @@
+import { flett, koSett, koNokkel, rens, lokaleFiler, byttFiler, erNettfeil } from './synk';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { useSyncExternalStore } from 'react';
 import { sprak, tt } from './i18n';
@@ -117,11 +118,8 @@ export function toast(m: string) { toasts.msg = m; toasts.t = Date.now(); bump()
 export async function save(col: Col, obj: any): Promise<string> {
   const o = { ...obj };
   const exists = !!o.id && ((S[col] as any[]).some(x => x.id === o.id) || ((ARK_COLS as readonly string[]).includes(col) && ARKIV[col as typeof ARK_COLS[number]].some(x => x.id === o.id)));
-  // Nytt avvik uten nett: lagres på enheten og sendes automatisk når nettet er tilbake
-  if (col === 'avvik' && !exists && typeof navigator !== 'undefined' && navigator.onLine === false) {
-    if (!o.id) o.id = crypto.randomUUID(); const { koLegg } = await import('./offline'); await koLegg(o.id, { col, obj: o, tid: Date.now() });
-    apply(col, 'upsert', { ...o, usynket: true }); toast(tt("Ingen nett – avviket er lagret på enheten og sendes når du er på nett igjen")); return o.id;
-  }
+  // Uten nett: endringen lagres på enheten og sendes automatisk når nettet er tilbake
+  if (utenNett()) return iKo(col, o, exists);
   if (!o.id) o.id = crypto.randomUUID();
   const row = toRow(col, o); const t = TABLES[col].table;
   const res = exists
@@ -130,10 +128,32 @@ export async function save(col: Col, obj: any): Promise<string> {
       // Ny eiendom: tilgangen opprettes av en trigger i samme operasjon og er ikke synlig for RETURNING – lagre først, hent etterpå
       ? await (async () => { const r: any = await sb.from(t).insert(row); return r.error ? r : await sb.from(t).select().eq('id', o.id).single(); })()
       : await sb.from(t).insert(row).select().single();
+  if (res.error && erNettfeil(res.error)) return iKo(col, o, exists); // nettet falt ut underveis
   if (res.error) { toast('Lagring feilet: ' + feiltekst(res.error)); throw res.error; }
   apply(col, 'upsert', fromRow(col, res.data));
   return o.id;
 }
+const utenNett = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+const finnRad = (col: Col, id: string) => (S[col] as any[]).find(x => x.id === id) || ((ARK_COLS as readonly string[]).includes(col) ? ARKIV[col as typeof ARK_COLS[number]].find(x => x.id === id) : undefined);
+/** Antall endringer som venter på å bli sendt, og de som serveren har avvist */
+export const ko = { antall: 0, feil: [] as { key: string; col: string; navn: string; feil: string }[] };
+async function tellKo() { try { const { koAlle } = await import('./offline'); const K = await koAlle(); ko.antall = K.length;
+  ko.feil = K.filter(x => x.v.feil).map(x => ({ key: x.key, col: x.v.col, navn: x.v.obj.navn || x.v.obj.tittel || x.v.col, feil: x.v.feil! })); bump(); } catch { } }
+async function iKo(col: Col, o: any, exists: boolean): Promise<string> {
+  if (!o.id) o.id = crypto.randomUUID();
+  const { koHent, koLegg, koSlett } = await import('./offline'); const key = koNokkel(col, o.id);
+  let gml = await koHent(key); if (!gml) { gml = await koHent(o.id); if (gml) await koSlett(o.id); } // eldre kø brukte bare id som nøkkel
+  const naa = exists ? finnRad(col, o.id) : null;
+  await koLegg(key, koSett(gml, { col, obj: rens(o), tid: Date.now(), base: naa ? rens(naa) : null }));
+  apply(col, 'upsert', { ...o, usynket: true }); lagreKopi(); tellKo();
+  toast(tt("Ingen nett – lagret på enheten og sendes når du er på nett igjen")); return o.id;
+}
+/** Legger ventende endringer oppå data som nettopp er lastet, så de ikke forsvinner fra skjermen før de er sendt. */
+async function leggPaaKo() { try { const { koAlle } = await import('./offline'); const K = (await koAlle()).sort((a, b) => a.v.tid - b.v.tid);
+  for (const { v } of K) if (TABLES[v.col as Col]) apply(v.col as Col, 'upsert', { ...(finnRad(v.col as Col, v.obj.id) || {}), ...v.obj, usynket: true }); await tellKo(); } catch { } }
+/** Forkaster en endring som ikke lot seg sende, og henter raden slik den er på serveren. */
+export async function forkastKo(key: string) { const { koHent, koSlett } = await import('./offline'); const p = await koHent(key); await koSlett(key);
+  if (p && TABLES[p.col as Col]) { apply(p.col as Col, 'delete', { id: p.obj.id }); await refetch(p.col as Col, p.obj.id).catch(() => { }); } await tellKo(); }
 /** Lagrer mange nye rader i én operasjon per 500 (import). Returnerer id-ene. */
 export async function saveMange(col: Col, objs: any[], fremdrift?: (n: number) => void): Promise<string[]> {
   const ider: string[] = [];
@@ -148,6 +168,7 @@ export async function saveMange(col: Col, objs: any[], fremdrift?: (n: number) =
 /** Hent én rad på nytt fra databasen (f.eks. etter at en serverfunksjon har endret den) */
 export async function refetch(col: Col, id: string) { const { data } = await sb.from(TABLES[col].table).select('*').eq('id', id).maybeSingle(); if (data) apply(col, 'upsert', fromRow(col, data)); }
 export async function removeDoc(col: Col, id: string) {
+  if (utenNett()) { toast(tt("Sletting krever nett")); throw new Error('uten nett'); }
   const { error } = await sb.from(TABLES[col].table).delete().eq('id', id);
   if (error) { toast('Sletting feilet: ' + feiltekst(error)); throw error; }
   apply(col, 'delete', { id });
@@ -189,10 +210,10 @@ export async function loadData() {
       S.tilganger = await loadAll('eiendom_tilgang');
     }
     if (state.me && state.me.rolle !== 'leietaker') await loadOrg();
-    state.offline = false; lagreKopi();
+    state.offline = false; await leggPaaKo(); lagreKopi();
   } catch (e: any) {
     // Uten nett: bruk kopien fra sist appen var på nett (bare til visning og befaringer)
-    if (!navigator.onLine && await hentKopi()) { state.offline = true; state.error = ''; }
+    if (!navigator.onLine && await hentKopi()) { state.offline = true; state.error = ''; await leggPaaKo(); }
     else state.error = 'Kunne ikke laste data: ' + feiltekst(e);
   }
   state.loading = false; bump();
@@ -224,17 +245,48 @@ async function hentKopi(): Promise<boolean> {
 }
 // Tilbake på nett: last på nytt og synk befaringer som er gjort uten nett
 if (typeof window !== 'undefined') window.addEventListener('offline', () => bump());
+// Dårlig dekning: prøv å sende køen igjen hvert minutt så lenge noe venter
+if (typeof window !== 'undefined') setInterval(() => { if (ko.antall > ko.feil.length && navigator.onLine) sendKo(); }, 60000);
 if (typeof window !== 'undefined') window.addEventListener('online', () => { bump(); if (state.offline) { loadedFor = ''; loadMe(); } setTimeout(() => import('./befaring').then(m => m.synkAlle()), 1500); setTimeout(() => sendKo(), 2500); });
-/** Sender avvik som ble registrert uten nett. Bruker samme lagring som vanlig, og fjerner dem fra køen når de er sendt. */
-export async function sendKo() {
-  if (!state.me || navigator.onLine === false) return;
-  const { koAlle, koSlett } = await import('./offline'); const K = await koAlle(); let n = 0;
-  for (const { key, v } of K) {
-    try { const o = { ...v.obj }; delete o.usynket; const row = toRow(v.col as Col, o); const r = await sb.from(TABLES[v.col as Col].table).insert(row).select().single();
-      if (r.error && !/duplicate key/i.test(r.error.message)) throw r.error;
-      if (r.data) apply(v.col as Col, 'upsert', fromRow(v.col as Col, r.data)); await koSlett(key); n++; } catch { /* prøves igjen senere */ }
-  }
-  if (n) toast(tt("{0} avvik registrert uten nett er nå sendt", n));
+/** Sender endringer som ble gjort uten nett, i den rekkefølgen de ble gjort. Filer lastes opp først. Endringer på rader andre
+ *  har rørt i mellomtiden flettes felt for felt (se synk.ts). Det serveren avviser blir liggende med feilmelding til brukeren har tatt stilling. */
+let sender = false;
+export async function sendKo(ogsaaFeilede = false) {
+  if (!state.me || utenNett() || sender) return; sender = true;
+  try {
+    const off = await import('./offline'); const K = (await off.koAlle()).sort((a, b) => a.v.tid - b.v.tid); let n = 0, avvist = 0;
+    for (const { key, v } of K) {
+      const col = v.col as Col; if (!TABLES[col]) { await off.koSlett(key); continue; }
+      if (v.feil && !ogsaaFeilede) { avvist++; continue; }
+      try {
+        // 1) filer som ligger på enheten
+        const opp: Record<string, any> = {};
+        for (const k of lokaleFiler(v.obj)) { let f = await off.opplastetSom(k);
+          if (!f) { const blob = await off.hentLokalFil(k); const m = (await off.lokalFilMeta(k)) || {}; if (!blob) continue;
+            f = await lastOpp(blob, m.eiendomId || v.obj.eiendomId || 'felles', m.leietakerId, m.navn, m.mappe); await off.merkOpplastet(k, f); }
+          opp[k] = f; }
+        const o = byttFiler(rens(v.obj), opp); const t = TABLES[col].table;
+        // 2) selve raden
+        if (v.base) {
+          const cur: any = await sb.from(t).select('*').eq('id', o.id).maybeSingle(); if (cur.error) throw cur.error;
+          if (!cur.data) throw new Error(tt("Raden finnes ikke lenger på serveren"));
+          const m = flett(byttFiler(v.base, opp), o, fromRow(col, cur.data));
+          const r: any = await sb.from(t).update({ ...toRow(col, m), id: undefined }).eq('id', o.id).select().single(); if (r.error) throw r.error;
+          apply(col, 'upsert', fromRow(col, r.data));
+        } else {
+          const r: any = await sb.from(t).insert(toRow(col, o)).select().single();
+          if (r.error && !/duplicate key/i.test(r.error.message)) throw r.error;
+          if (r.data) apply(col, 'upsert', fromRow(col, r.data)); else await refetch(col, o.id);
+        }
+        await off.koSlett(key); n++;
+      } catch (e: any) {
+        if (erNettfeil(e) || utenNett()) break; // fortsatt ikke kontakt: prøv senere, behold rekkefølgen
+        await off.koLegg(key, { ...v, feil: feiltekst(e), forsok: (v.forsok || 0) + 1 }); avvist++;
+      }
+    }
+    await tellKo(); if (n) lagreKopi();
+    if (n) toast(tt("{0} endringer gjort uten nett er nå sendt", n) + (avvist ? ' · ' + tt("{0} ble avvist", avvist) : ''));
+  } finally { sender = false; }
 }
 let tilgT: any = 0;
 function reloadTilgang() { clearTimeout(tilgT); tilgT = setTimeout(async () => { const prev = S.tilganger.filter(t => t.user_id === state.me?.id).length; S.tilganger = await loadAll('eiendom_tilgang'); const now = S.tilganger.filter(t => t.user_id === state.me?.id).length; if (prev !== now && state.me?.rolle !== 'admin') loadData(); else bump(); }, 400); }
@@ -298,6 +350,9 @@ export function initAuth() {
 }
 export async function signOut() {
   try { // usynkede befaringer på enheten slettes ved utlogging – synk først, og spør hvis noe fortsatt ikke er lagret
+    await sendKo(); await tellKo();
+    if (ko.antall) { const { confirmBox } = await import('../components/ui'); if (!(await confirmBox(tt("{0} endringer på denne enheten er ikke sendt til serveren ennå. Logger du ut nå, går de tapt.", ko.antall), tt("Logg ut likevel")))) return;
+      const { koAlle, koSlett } = await import('./offline'); for (const x of await koAlle()) await koSlett(x.key); ko.antall = 0; ko.feil = []; }
     const B = await import('./befaring'); await B.synkAlle(); const n = await B.antallUsynket();
     if (n) { const { confirmBox } = await import('../components/ui'); if (!(await confirmBox(`${n} befaring${n > 1 ? 'er' : ''} på denne enheten er ikke lagret på serveren ennå${navigator.onLine ? '' : ' (du er uten nett)'}. Logger du ut nå, går endringene tapt.`, 'Logg ut likevel'))) return; }
   } catch { }
@@ -324,21 +379,29 @@ export const isUtforer = () => role() === 'utforer';
 
 // ---- filer (privat bøtte «filer»)
 const MIME: Record<string, string> = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', txt: 'text/plain', csv: 'text/csv', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', doc: 'application/msword', xls: 'application/vnd.ms-excel', dwg: 'application/acad', msg: 'application/vnd.ms-outlook', eml: 'message/rfc822' };
-export type Fil = { path: string; navn: string; type?: string; str?: number };
-export async function uploadFile(file: Blob & { name?: string }, eiendomId: string, leietakerId?: string, navn?: string, mappe?: string): Promise<Fil | null> {
+export type Fil = { path: string; navn: string; type?: string; str?: number; /** Ligger bare på enheten ennå (lagt til uten nett) */ lokal?: string };
+export async function uploadFile(file: Blob & { name?: string }, eiendomId: string, leietakerId?: string, navn?: string, mappe?: string, direkte = false): Promise<Fil | null> {
   const name = navn || file.name || 'fil';
   const ext = (name.split('.').pop() || '').toLowerCase();
   // Lagringen godtar bare ASCII i filbanen – æøå og aksenter gjøres om (originalnavnet beholdes i «navn»)
   const safe = name.replace(/[æÆ]/g, m => m === 'æ' ? 'ae' : 'Ae').replace(/[øØ]/g, m => m === 'ø' ? 'o' : 'O').replace(/[åÅ]/g, m => m === 'å' ? 'a' : 'A')
     .normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9._-]+/g, '_').replace(/_+/g, '_').slice(-80) || 'fil';
   const path = `${eiendomId}/${mappe ? mappe : leietakerId ? 'leietaker/' + leietakerId : 'felles'}/${crypto.randomUUID()}-${safe}`;
+  // Uten nett: filen legges på enheten og lastes opp sammen med raden den hører til (se sendKo)
+  const lokalt = async () => { const { lagreLokalFil } = await import('./offline'); const l = await lagreLokalFil(file, name, { eiendomId, leietakerId, navn, mappe });
+    return { path: 'lokal:' + l.lokal, lokal: l.lokal, navn: name, type: file.type || MIME[ext], str: file.size } as Fil; };
+  if (utenNett() && !direkte) return lokalt();
   const { error } = await sb.storage.from('filer').upload(path, file, { contentType: file.type || MIME[ext] || 'application/octet-stream', upsert: false });
+  if (error && direkte) throw error;
+  if (error && erNettfeil(error)) return lokalt();
   if (error) { toast('Opplasting feilet: ' + feiltekst(error)); return null; }
   return { path, navn: name, type: file.type || MIME[ext], str: file.size };
 }
-export async function deleteFile(f?: Fil) { if (f?.path) await sb.storage.from('filer').remove([f.path]); }
+const lastOpp = (file: Blob, eiendomId: string, leietakerId?: string, navn?: string, mappe?: string) => uploadFile(file, eiendomId, leietakerId, navn, mappe, true) as Promise<Fil>;
+export async function deleteFile(f?: Fil) { if (f?.path && !f.lokal) await sb.storage.from('filer').remove([f.path]); }
 const urlCache: Record<string, { u: string; t: number }> = {};
 export async function fileUrl(path: string) {
+  if (path.startsWith('lokal:')) { const { lokalUrl } = await import('./offline'); return lokalUrl(path.slice(6)); }
   const c = urlCache[path]; if (c && Date.now() - c.t < 50 * 60 * 1000) return c.u;
   const { data, error } = await sb.storage.from('filer').createSignedUrl(path, 3600);
   if (error || !data) return '';

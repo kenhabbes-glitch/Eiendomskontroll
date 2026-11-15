@@ -1,6 +1,12 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-29', dato: '2026-11-29', tittel: 'Appen kan brukes uten nett', punkter: [
+    'I kjeller, teknisk rom og andre steder uten dekning kan du nå kvittere kontroller, melde og oppdatere avvik, ta bilder og lese av målere. Alt lagres på telefonen og sendes av seg selv når nettet er tilbake.',
+    'Rader som ikke er sendt ennå er merket «Ikke sendt», og et gult felt øverst viser hvor mange endringer som venter.',
+    'Har en kollega endret det samme i mellomtiden, beholdes begge endringene så langt det går – bare feltene du selv endret blir oppdatert. Det som ikke lar seg sende, vises med «Prøv igjen» og «Forkast».',
+    'Appen må ha vært åpnet med nett på enheten først. Sletting, e-post og import krever fortsatt nett.',
+  ] },
   { id: '2026-11-28', dato: '2026-11-28', tittel: 'Riktigere lovkrav for heis og energivurdering', punkter: [
     'Sikkerhetskontroll av heis er nå satt til hvert 2. år, utført av uavhengig kontrollorgan (ikke heisfirmaets service). Kontroller du allerede har lagt inn må du selv endre intervallet på.',
     'Energivurdering av varme- og klimaanlegg regnes bare som lovkrav når bygget er over grensene: varmeanlegg over 20 kW samlet (over 100 kW: hvert 2. år), ventilasjon/kjøling over 12 kW samlet eller mer enn 500 m². Registrer «Installert effekt (kW)» på systemet, så avgjør appen det for deg.',

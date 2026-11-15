@@ -142,3 +142,49 @@ test('veiviser: «Hva finnes i bygget?» registrerer systemer og foreslår de lo
     assert.deepEqual(a.feil, []);
   } finally { await a.lukk(); }
 });
+
+test('uten nett: nytt avvik og endring lagres på enheten, sendes når nettet er tilbake, og overskriver ikke kollegaens endring', async () => {
+  const a = await aapne('#/avvik'); try {
+    await a.kontekst.setOffline(true); await a.side.waitForTimeout(200);
+    // nytt avvik uten nett
+    await a.side.getByRole('button', { name: /Meld avvik|Nytt avvik|\+ Avvik/ }).first().click();
+    let m = a.side.locator('.modal'); await m.locator('input[type=text], input:not([type])').first().fill('Knust rute i trapp');
+    await m.getByRole('button', { name: 'Lagre' }).click(); await m.waitFor({ state: 'detached' });
+    await a.side.locator('tr', { hasText: 'Knust rute i trapp' }).locator('.chip', { hasText: 'Ikke sendt' }).waitFor();
+    // endre et eksisterende avvik uten nett
+    await a.side.locator('tr', { hasText: 'Løs himlingsplate' }).click();
+    m = a.side.locator('.modal'); await m.locator('input[type=text], input:not([type])').first().fill('Løs himlingsplate ved heis');
+    await m.getByRole('button', { name: 'Lagre' }).click(); await m.waitFor({ state: 'detached' });
+    assert.match(await a.side.locator('.offline-band').first().innerText(), /2 endringer venter/);
+    let d = await a.db(); assert.equal(d.avvik.length, 1, 'ingenting skal være sendt ennå'); assert.equal(d.avvik[0].data.tittel, 'Løs himlingsplate');
+    // i mellomtiden har en kollega endret alvorlighetsgraden på serveren
+    await a.side.evaluate(() => { (window as any).__mockdb.avvik[0].data.alv = 'Høy'; });
+    await a.kontekst.setOffline(false);
+    await a.side.waitForFunction(() => JSON.parse(localStorage.getItem('mockdb') || '{}').avvik.length === 2, null, { timeout: 15000 });
+    await a.side.waitForFunction(() => !document.querySelector('.offline-band'), null, { timeout: 8000 });
+    d = await a.db(); const gml = d.avvik.find(x => x.id === 'a1')!.data;
+    assert.equal(gml.tittel, 'Løs himlingsplate ved heis', 'min endring ble sendt'); assert.equal(gml.alv, 'Høy', 'kollegaens endring ble beholdt');
+    assert.equal(d.avvik.find(x => x.id !== 'a1')!.data.tittel, 'Knust rute i trapp'); assert.ok(!('usynket' in gml));
+    assert.equal(await a.side.locator('.chip', { hasText: 'Ikke sendt' }).count(), 0); assert.deepEqual(a.feil, []);
+  } finally { await a.lukk(); }
+});
+
+test('uten nett: kontroll kvitteres med bilde av rapporten, og alt lastes opp når nettet er tilbake', async () => {
+  const data = grunndata();
+  data.oppgaver = [{ id: 'o1', eiendom_id: 'e1', created_at: NAA, data: { eiendomId: 'e1', anleggId: 's1', malKey: 'brannalarm_aar', navn: 'Brannalarmanlegg – årlig kontroll og service', type: 'Lovpålagt', ansvar: 'Eier', aktiv: true, intervall: { n: 1, enhet: 'år' }, nesteFrist: '2026-01-01', historikk: [] } }];
+  data.dokumenter = [];
+  const a = await aapne('#/kontroller', { data }); try {
+    await a.kontekst.setOffline(true); await a.side.waitForTimeout(200);
+    await a.side.locator('tr', { hasText: 'Brannalarmanlegg – årlig kontroll' }).first().click();
+    await a.side.locator('.modal').last().getByRole('button', { name: 'Registrer utført' }).click();
+    const m = a.side.locator('.modal').last();
+    await m.locator('input[type=file]').first().setInputFiles({ name: 'rapport.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
+    await m.locator('.mf button.pri, .mf .btn.pri').last().click(); await m.waitFor({ state: 'detached', timeout: 8000 });
+    let d = await a.db(); assert.equal(d.dokumenter.length, 0); assert.equal(d.oppgaver[0].data.historikk.length, 0, 'ingenting sendt uten nett');
+    await a.kontekst.setOffline(false);
+    await a.side.waitForFunction(() => { const x = JSON.parse(localStorage.getItem('mockdb') || '{}'); return x.dokumenter.length === 1 && x.oppgaver[0].data.historikk.length === 1; }, null, { timeout: 15000 });
+    d = await a.db(); const dok = d.dokumenter[0].data, o = d.oppgaver[0].data;
+    assert.ok(dok.fil.path && !dok.fil.path.startsWith('lokal:') && !dok.fil.lokal, 'filen skal være lastet opp: ' + JSON.stringify(dok.fil));
+    assert.equal(o.historikk[0].dokId, d.dokumenter[0].id); assert.ok(o.nesteFrist > '2026-06-01', 'neste frist flyttet'); assert.deepEqual(a.feil, []);
+  } finally { await a.lukk(); }
+});

@@ -35,10 +35,11 @@ export const paaNett = () => typeof navigator === 'undefined' || navigator.onLin
 
 // ---------- lokale filer (bilder) – referanse { lokal: nøkkel, navn, type }
 export type LokalFil = { lokal: string; navn: string; type: string; str?: number };
-export async function lagreLokalFil(blob: Blob, navn: string): Promise<LokalFil> {
-  const k = crypto.randomUUID(); await idbPut('filer', k, { blob, navn, type: blob.type, t: Date.now() });
+export async function lagreLokalFil(blob: Blob, navn: string, meta?: any): Promise<LokalFil> {
+  const k = crypto.randomUUID(); await idbPut('filer', k, { blob, navn, type: blob.type, t: Date.now(), meta });
   return { lokal: k, navn, type: blob.type || 'application/octet-stream', str: blob.size };
 }
+export const lokalFilMeta = async (k: string) => (await idbGet<any>('filer', k))?.meta;
 export async function hentLokalFil(k: string): Promise<Blob | null> { const r = await idbGet<any>('filer', k); return r?.blob || null; }
 /** Husk at en lokal fil er lastet opp (så den ikke lastes opp på nytt) */
 export async function merkOpplastet(k: string, fil: any) { const r = await idbGet<any>('filer', k); if (r) await idbPut('filer', k, { ...r, fil }); }
@@ -84,8 +85,10 @@ export const lagreSnap = (v: any) => idbPut('snap', 'S', { v, t: Date.now() }).c
 export const hentSnap = () => idbGet<{ v: any; t: number }>('snap', 'S');
 export async function tomAlt() { for (const s of ['utkast', 'filer', 'tegn', 'snap']) { const a = await idbAlle(s); for (const x of a) await idbDel(s, x.key); } }
 
-// ---- Kø for nye avvik registrert uten nett
-export type KoPost = { col: string; obj: any; tid: number };
+// ---- Kø for endringer gjort uten nett (nye og endrede rader). Reglene for sammenslåing ligger i synk.ts.
+import type { KoPost } from './synk';
+export type { KoPost };
 export const koLegg = (id: string, p: KoPost) => idbPut('ko', id, p);
+export const koHent = (id: string) => idbGet<KoPost>('ko', id);
 export const koAlle = () => idbAlle<KoPost>('ko');
 export const koSlett = (id: string) => idbDel('ko', id);
