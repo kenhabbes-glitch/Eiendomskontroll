@@ -18,7 +18,7 @@ export function KalPanel({ tegninger, tid, setTid, steg, p, sp, setSp, onTap, nu
   const pkt = (px: number) => p.map((q, i) => <g key={i}><circle cx={q[0]} cy={q[1]} r={px * 9} fill="#1d4ed8" fillOpacity={.85} stroke="#fff" strokeWidth={px * 1.5} /><text x={q[0] + px * 12} y={q[1] - px * 10} fontSize={px * 16} fontWeight={700} fill="#1d4ed8" stroke="#fff" strokeWidth={px * 3} paintOrder="stroke">{i + 1}</text></g>);
   return <div className="card">
     <div className="toolbar" style={{ marginBottom: 6 }}><h2 style={{ margin: 0, flex: 1 }}>{tt("Koble en plantegning til modellen")}</h2>
-      <select value={tid} onChange={e => { setTid(e.target.value); nullstill(); }}>{tegninger.map(x => <option key={x.id} value={x.id}>{x.navn}</option>)}</select></div>
+      <select value={tid} onChange={e => setTid(e.target.value)}>{tegninger.map(x => <option key={x.id} value={x.id}>{x.navn}</option>)}</select></div>
     <p className="small muted" style={{ marginTop: 0 }}>{tt("Gjør dette én gang per etasjetegning. Etterpå vises alle systemer, komponenter og avvik du har plassert på tegningen som markører i 3D-modellen. Ved ny IFC-modell eller ny tegning trenger du bare å kalibrere på nytt.")}</p>
     {!ferdig ? <p style={{ margin: '0 0 6px' }}><b>{tt("Punkt {0} av 2:", Math.floor(steg / 2) + 1)} {STEG[Math.min(steg, 3)]()}</b></p>
       : <p style={{ margin: '0 0 6px' }}><b>{tt("Ferdig.")}</b> {mpp != null && <span className="small muted">{tt("Tegningen får {0} cm per piksel i modellen.", (mpp * 100).toFixed(1))}</span>} {tt("Sjekk at markørene i modellen havner riktig før du lagrer.")}</p>}

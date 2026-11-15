@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-01', dato: '2026-12-01', tittel: 'Lagret kalibrering kan justeres', punkter: [
+    'Åpner du «Tegning» i 3D-modellen for en etasje som allerede er koblet, kommer den lagrede kalibreringen opp ferdig utfylt. Ble markørene speilvendt, kan du bare krysse av «Speilvend», se at de havner riktig, og lagre – uten å måle punktene på nytt. «Start på nytt» gir en blank kalibrering.',
+    'På mobil er panelet med etasjer og filtre i 3D-visningen lukket til du åpner det med «☰ Etasjer og visning».',
+  ] },
   { id: '2026-11-30', dato: '2026-11-30', tittel: 'Bilder på kontroller og sesongavhengige kontroller', punkter: [
     'Når du registrerer en kontroll som utført, kan du nå ta bilder med kameraet eller velge flere fra bildebiblioteket. Bildene lagres på utførelsen og vises i historikken.',
     'Kontroller kan ha sesong, f.eks. november–april for snø og is på tak. Utenfor sesongen får de ingen frist – neste frist settes til første dag i neste sesong. Velg «Sesong fra/til» når du redigerer kontrollen.',
