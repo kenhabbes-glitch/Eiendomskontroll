@@ -1,4 +1,3 @@
-import { NoeklerView } from './views/Noekler';
 import { PrLenke } from './views/ProsjektRapport';
 import { Registrer } from './views/Registrer';
 import { OrgnrVarsel } from './components/OrgnrVarsel';
@@ -28,32 +27,39 @@ import { Kontrollplan } from './views/Kontrollplan';
 import { AvvikView } from './views/Avvik';
 import { Leietakere, LeietakerView } from './views/Leietakere';
 import { Dokumenter } from './views/Dokumenter';
-import { Maalere } from './views/Maalere';
 import { Kontrollrunde } from './views/Kontrollrunde';
-import { Prosjekter, ProsjektSide } from './views/Prosjekter';
-import { Arkiv } from './views/Arkiv';
-import { Vedlikehold } from './views/Vedlikehold';
-import { TfmRegister } from './views/Tfm';
 import { Arealer } from './views/Arealer';
-import { Regelverk } from './views/Regelverk';
-import { Handbok } from './views/Handbok';
 import { HjelpSide } from './views/HjelpSide';
 import { Brukere, DataAdmin } from './views/Brukere';
 import { Portal } from './views/Portal';
 import { Profil } from './views/Profil';
-import { Innstillinger } from './views/Innstillinger';
 import { KoLenke } from './views/KontrollAo';
 import { PersonvernTekst } from './components/Personvern';
 import { AoLenke, ArbeidsordreListe, Hendelseslogg, mineAo } from './views/Arbeidsordre';
 import { LtLenke } from './views/Sjekkliste';
 import { BbLenke } from './views/Brannbok';
 import { Befaringer, BefaringSide } from './views/Befaring';
-import { Tilsynsanalyser } from './views/Tilsynsanalyser';
 import { SignerLenke } from './views/SignerLenke';
 import { synkAlle, lastLokale } from './lib/befaring';
 import { tt, lokale, sprak } from './lib/i18n';
 import { SprakVelger } from './components/SprakVelger';
 import './lib/land';
+// Sider som brukes sjelden lastes først når de åpnes, så appen starter raskere. De hentes likevel i bakgrunnen
+// like etter oppstart, slik at de også virker uten nett.
+const sent: (() => Promise<any>)[] = [];
+function lat<P = {}>(hent: () => Promise<any>, navn: string) { sent.push(hent); return React.lazy(() => hent().then(m => ({ default: m[navn] as React.ComponentType<P> }))); }
+const NoeklerView = lat(() => import('./views/Noekler'), 'NoeklerView');
+const TfmRegister = lat(() => import('./views/Tfm'), 'TfmRegister');
+const Maalere = lat(() => import('./views/Maalere'), 'Maalere');
+const Tilsynsanalyser = lat(() => import('./views/Tilsynsanalyser'), 'Tilsynsanalyser');
+const Arkiv = lat(() => import('./views/Arkiv'), 'Arkiv');
+const Vedlikehold = lat(() => import('./views/Vedlikehold'), 'Vedlikehold');
+const Regelverk = lat(() => import('./views/Regelverk'), 'Regelverk');
+const Handbok = lat(() => import('./views/Handbok'), 'Handbok');
+const Innstillinger = lat(() => import('./views/Innstillinger'), 'Innstillinger');
+const Prosjekter = lat(() => import('./views/Prosjekter'), 'Prosjekter');
+const ProsjektSide = lat<{ id: string }>(() => import('./views/Prosjekter'), 'ProsjektSide');
+export function hentSeneSider() { if (navigator.onLine) sent.forEach(h => h().catch(() => {})); }
 
 export function go(path: string) { if (location.hash === '#/' + path) window.dispatchEvent(new HashChangeEvent('hashchange')); else location.hash = '#/' + path; }
 function useRoute() {
@@ -119,7 +125,7 @@ function navFor(): [string, string][] {
 
 const ADMIN_NAV = ['innstillinger', 'logg', 'arkiv', 'brukere', 'data'];
 export default function App() {
-  useEffect(() => { initAuth(); }, []);
+  useEffect(() => { initAuth(); const t = setTimeout(hentSeneSider, 4000); return () => clearTimeout(t); }, []);
   // Befaringer gjort uten nett: last inn fra enheten og synk når appen er klar
   useEffect(() => { if (state.ready && state.me) { lastLokale(); const t = setTimeout(() => { synkAlle(); sendKo(); }, 2500); return () => clearTimeout(t); } }, [state.ready, state.me?.id]);
   const [admApen, setAdmApen] = useState(() => { try { return localStorage.getItem('navAdmin') === '1'; } catch { return false; } });
@@ -230,7 +236,7 @@ export default function App() {
       {state.error && <div className="banner">{state.error}</div>}
       <OrgnrVarsel />
       {(state.offline || !navigator.onLine) && <div className="offline-band" role="status">{tt("Uten nett")}{(state as any).kopiTid ? tt(" – viser data fra {0}", new Date((state as any).kopiTid).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' })) : ''}{tt(". Befaringer kan gjennomføres og lagres på enheten; andre endringer krever nett.")}</div>}
-      {state.loading && !S.eiendommer.length ? <div className="empty"><b>{tt("Laster data …")}</b></div> : body}
+      {state.loading && !S.eiendommer.length ? <div className="empty"><b>{tt("Laster data …")}</b></div> : <React.Suspense fallback={<div className="empty"><b>{tt("Laster …")}</b></div>}>{body}</React.Suspense>}
     </main>
     <ModalHost /><Toast /><Tip /><NyheterPopup />
   </div>;

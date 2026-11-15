@@ -1,6 +1,5 @@
 // Verktøy for bruk i felt: installere appen på hjemskjermen og skanne QR-koder med kameraet.
 import { useEffect, useRef, useState } from 'react';
-import jsQR from 'jsqr';
 import { S, toast } from '../lib/store';
 import { showModal } from './ui';
 import { tt } from '../lib/i18n';
@@ -46,12 +45,12 @@ function Skanner({ close }: { close: () => void }) {
         strom = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
         if (stopp) { strom.getTracks().forEach(t => t.stop()); return; }
         const el = v.current!; el.srcObject = strom; await el.play();
-        const BD = (window as any).BarcodeDetector; const det = BD ? new BD({ formats: ['qr_code'] }) : null; const c = document.createElement('canvas'); const g = c.getContext('2d', { willReadFrequently: true })!;
+        const BD = (window as any).BarcodeDetector; const det = BD ? new BD({ formats: ['qr_code'] }) : null; const jsQR = det ? null : (await import('jsqr')).default; const c = document.createElement('canvas'); const g = c.getContext('2d', { willReadFrequently: true })!;
         const les = async () => {
           if (stopp) return;
           if (el.videoWidth) {
             let kode = '';
-            try { if (det) { const r = await det.detect(el); kode = r[0]?.rawValue || ''; } else { c.width = el.videoWidth; c.height = el.videoHeight; g.drawImage(el, 0, 0); const d = g.getImageData(0, 0, c.width, c.height); kode = jsQR(d.data, d.width, d.height)?.data || ''; } } catch { }
+            try { if (det) { const r = await det.detect(el); kode = r[0]?.rawValue || ''; } else { c.width = el.videoWidth; c.height = el.videoHeight; g.drawImage(el, 0, 0); const d = g.getImageData(0, 0, c.width, c.height); kode = jsQR!(d.data, d.width, d.height)?.data || ''; } } catch { }
             if (kode) { if (handterKode(kode)) { close(); return; } setUkjent(kode); }
           }
           setTimeout(les, 250);
