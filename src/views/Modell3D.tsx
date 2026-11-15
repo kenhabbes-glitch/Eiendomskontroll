@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { S, canEdit, fileUrl, save, sb, state, toast, uploadFile, useStore, feiltekst } from '../lib/store';
-import { byId, aNavn, dUntil, openAvvik, fd, today, tfmKomp, type Rec } from '../lib/utils';
+import { byId, taggerFor, aNavn, dUntil, openAvvik, fd, today, tfmKomp, type Rec } from '../lib/utils';
 import { tt } from '../lib/i18n';
 import { Chip, Empty, confirmBox, formModal } from '../components/ui';
 import { editAvvik, editAnlegg, editKomponent } from '../lib/actions';
@@ -137,7 +137,7 @@ function Visning({ eid, modeller, hovedId, last }: { eid: string; modeller: Rec[
   const [fagVis, setFagVis] = useState<boolean[]>([]); const [fagListe, setFagListe] = useState<Samlet['fag']>([]);
   const vert = useRef<HTMLDivElement>(null); const T = useRef<any>({}); // three-objekter
   const [mod, setMod] = useState<Modell | null>(null); const [feil, setFeil] = useState(''); const [lastet, setLastet] = useState(0);
-  const [sel, setSel] = useState<{ el: number; p: number[] } | null>(null); const [vis, setVis] = useState<boolean[]>([]); const [modus, setModus] = useState<'utseende' | 'status'>('utseende');
+  const [sel, setSel] = useState<{ el: number; p: number[] } | null>(null); const [vis, setVis] = useState<boolean[]>([]); const [sok, setSok] = useState(''); const [modus, setModus] = useState<'utseende' | 'status'>('utseende');
   // På mobil dekker panelet med etasjer og filtre modellen, så det er lukket til brukeren åpner det
   const [panel, setPanel] = useState(!erMobil);
   const [snitt, setSnitt] = useState<number | null>(null); const [fokus, setFokus] = useState<string>(''); const [fok, setFok] = useState<{ navn: string; els: number[] } | null>(null); const [gjennom, setGjennom] = useState(false); const [skjul, setSkjul] = useState(false);
@@ -234,8 +234,17 @@ function Visning({ eid, modeller, hovedId, last }: { eid: string; modeller: Rec[
 
   // --- avvik som markører
   const avvikM = openAvvik().filter(a => a.eiendomId === eid && a.modell?.x != null);
+  // Etasje for et punkt: laveste Y per etasje fra geometrien; punktet hører til øverste etasje som starter under det
+  const etgMinY = useMemo(() => { const t = T.current; const h = t.mod?.hode; if (!h) return [] as number[]; const mn: number[] = h.etasjer.map(() => Infinity);
+    t.mod.grupper.forEach((g: any, gi: number) => { const e = h.grupper[gi]?.etasje; if (e == null || h.etasjer[e]?.kote <= -1e3 || h.etasjer[e]?.terreng) return; const P = g.pos; for (let i = 1; i < P.length; i += 3) if (P[i] < mn[e]) mn[e] = P[i]; }); return mn; }, [lastet]);
+  const etgAvY = (y: number, navn?: string) => { const h = T.current.mod?.hode; if (!h) return -1; if (navn) { const i = h.etasjer.findIndex((e: any) => e.navn === navn); if (i >= 0) return i; }
+    let best = -1, bm = -Infinity; etgMinY.forEach((m, i) => { if (m !== Infinity && m <= y + 0.4 && m > bm) { bm = m; best = i; } }); if (best < 0) { let lo = Infinity; etgMinY.forEach((m, i) => { if (m < lo) { lo = m; best = i; } }); } return best; };
+  const etgSyn = (y: number, navn?: string) => { const i = etgAvY(y, navn); return i < 0 || vis[i] !== false; };
+  const sokOrd = sok.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const treffer = (col: string, o: Rec) => { if (!sokOrd.length) return true; const a = col === 'anlegg' ? o : byId('anlegg', o.anleggId); const tekst = [o.navn, o.tittel, o.type, o.tfmSys, a?.navn, a?.type, ...taggerFor(a || o, 'a')].filter(Boolean).join(' ').toLowerCase(); return sokOrd.every(w => tekst.includes(w)); };
+  const avvikSyn = avvikM.filter(a => etgSyn(a.modell.y, a.modell.etasje) && treffer('avvik', a));
   useEffect(() => { const t = T.current; if (!t.mod) return; const g: THREE.Group = t.merker; while (g.children.length) { const c = g.children.pop() as THREE.Mesh; c.geometry.dispose(); (c.material as THREE.Material).dispose(); }
-    const r = t.str * 0.011; for (const a of avvikM) { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), new THREE.MeshBasicMaterial({ color: a.alv === 'Kritisk' || a.alv === 'Høy' ? ST.rod : ST.snart, depthTest: false })); m.position.set(a.modell.x, a.modell.y, a.modell.z); m.renderOrder = 10; m.userData.avvik = a.id; g.add(m); } t.invalider(); }, [lastet, S.avvik]);
+    const r = t.str * 0.011; for (const a of avvikSyn) { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), new THREE.MeshBasicMaterial({ color: a.alv === 'Kritisk' || a.alv === 'Høy' ? ST.rod : ST.snart, depthTest: false })); m.position.set(a.modell.x, a.modell.y, a.modell.z); m.renderOrder = 10; m.userData.avvik = a.id; g.add(m); } t.invalider(); }, [lastet, S.avvik, vis, sok]);
 
   // --- målinger og tegninger i modellen
   const projiser = () => { const t = T.current; if (!t.camera) return; t.ankre = t.ankre || []; const c = t.renderer.domElement; const w = c.clientWidth, hh = c.clientHeight; const v = new THREE.Vector3(); const ut: any[] = [];
@@ -256,7 +265,7 @@ function Visning({ eid, modeller, hovedId, last }: { eid: string; modeller: Rec[
     for (const tid of Object.keys(kalEff)) { const M = kalMat(kalEff[tid]); if (!M) continue;
       const tilf = (col: string, L: Rec[], farge: (o: Rec) => string) => L.filter(o => o.eiendomId === eid && !o.arkivert && o.pos?.tegningId === tid).forEach(o => ut.push({ col, id: o.id, p: tilModell(M, o.pos.x, o.pos.y), farge: farge(o) }));
       tilf('anlegg', S.anlegg, o => ST[statusAnlegg(o.id)]); tilf('komponenter', S.komponenter, o => ST[o.anleggId ? statusAnlegg(o.anleggId) : 'ingen']); tilf('avvik', openAvvik(), o => o.alv === 'Kritisk' || o.alv === 'Høy' ? ST.rod : ST.snart); }
-    return ut; }, [kalEff, visPl, S.anlegg, S.komponenter, S.avvik, S.oppgaver, eid]);
+    return ut.filter(m => etgSyn(m.p[1]) && treffer(m.col, byId(m.col as any, m.id) || ({} as Rec))); }, [kalEff, visPl, S.anlegg, S.komponenter, S.avvik, S.oppgaver, eid, vis, sok, etgMinY]);
   useEffect(() => { const t = T.current; if (!t.mod) return; tomGruppe(t.plass); const r = t.str * 0.009;
     for (const m of plassert) { const geo = m.col === 'avvik' ? new THREE.ConeGeometry(r, r * 2.2, 10) : m.col === 'anlegg' ? new THREE.BoxGeometry(r * 1.6, r * 1.6, r * 1.6) : new THREE.SphereGeometry(r * .8, 12, 8); const k = plSel && plSel.col === m.col && plSel.id === m.id;
       const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: k ? ST.valgt : m.farge, depthTest: false })); mesh.position.set(m.p[0], m.p[1], m.p[2]); if (k) mesh.scale.setScalar(1.7); mesh.renderOrder = 9; mesh.userData.pl = { col: m.col, id: m.id }; t.plass.add(mesh); } t.invalider(); }, [plassert, plSel, lastet]);
@@ -297,7 +306,9 @@ function Visning({ eid, modeller, hovedId, last }: { eid: string; modeller: Rec[
   const senterAv = (e: number): number[] => { const t = T.current; let x = 0, y = 0, z = 0, n = 0; for (const i of t.segAvEl?.get(e) || []) { const gi = t.mod.seg[i * 7 + 1], vf = t.mod.seg[i * 7 + 2], vc = t.mod.seg[i * 7 + 3]; const p = t.mod.grupper[gi].pos; for (let v = vf; v < vf + vc; v++) { x += p[v * 3]; y += p[v * 3 + 1]; z += p[v * 3 + 2]; n++; } } return n ? [x / n, y / n, z / n] : [0, 0, 0]; };
   const boksAv = (els: Iterable<number>) => { const t = T.current; const b = new t.THREE.Box3(); for (const e of els) for (const i of t.segAvEl.get(e) || []) { const gi = t.mod.seg[i * 7 + 1], vf = t.mod.seg[i * 7 + 2], vc = t.mod.seg[i * 7 + 3]; const p = t.mod.grupper[gi].pos; for (let v = vf; v < vf + vc; v += 3) b.expandByPoint(new t.THREE.Vector3(p[v * 3], p[v * 3 + 1], p[v * 3 + 2])); } return b; };
   // Flyr kameraet til objektene: litt ovenfra, på trygg avstand, med myk overgang
-  const flyTil = (els: Set<number> | number[]) => { const t = T.current; if (!t.mod) return; const b = boksAv(els);
+  const flyTil = (els: Set<number> | number[]) => flyBoks(boksAv(els));
+  const flyPkt = (pts: number[][]) => { const t = T.current; if (!t.mod || !pts.length) return; const b = new t.THREE.Box3(); pts.forEach(p => b.expandByPoint(new t.THREE.Vector3(p[0], p[1], p[2]))); flyBoks(b); };
+  const flyBoks = (b: any) => { const t = T.current; if (!t.mod) return;
     if (b.isEmpty()) return; const c = b.getCenter(new t.THREE.Vector3()); const r = Math.max(b.getSize(new t.THREE.Vector3()).length() / 2, 1.5);
     const fov = t.camera.fov * Math.PI / 180; const avst = Math.max(r / Math.sin(fov / 2) * 1.25, 9);
     const hor = t.camera.position.clone().sub(t.kontroll.target); hor.y = 0; if (hor.lengthSq() < 1e-6) hor.set(1, 0, 1); hor.normalize();
@@ -383,6 +394,11 @@ function Visning({ eid, modeller, hovedId, last }: { eid: string; modeller: Rec[
         <div className="toolbar" style={{ marginBottom: 6 }}><h2 style={{ margin: 0, flex: 1 }}>{tt("Systemer i modellen")}</h2>{fokus && <button className="btn sm" onClick={() => { setFokus(''); setFok(null); }}>{tt("Fjern markering")}</button>}</div>
         <p className="small muted" style={{ marginTop: 0 }}>{tt("Klikk på en bygningsdel i modellen for å se data, koble den til et system eller registrere avvik. Velg et system under for å se hvor det står i bygget.")}</p>
         {anl.filter(a => (a.ifcGuider || []).length).length ? <div className="tbl-wrap"><table><thead><tr><th>{tt("System")}</th><th>{tt("Objekter")}</th><th>{tt("Status")}</th><th /></tr></thead><tbody>{anl.filter(a => (a.ifcGuider || []).length).map(a => <tr key={a.id}><td><b>{aNavn(a.id)}</b></td><td>{a.ifcGuider.length}</td><td><Chip c={({ ok: 'green', snart: 'amber', rod: 'red', ingen: '' } as any)[statusAnlegg(a.id)]}>{({ ok: tt("I orden"), snart: tt("Snart"), rod: tt("Forfalt"), ingen: tt("Ingen kontroll") } as any)[statusAnlegg(a.id)]}</Chip></td><td><button className="btn sm" onClick={() => { setFokus(a.id); fokusPaa(a.ifcGuider.map((g: string) => T.current.farg.get(g)).filter((x: any) => x != null), a.navn); }}>{tt("Vis i modellen")}</button></td></tr>)}</tbody></table></div> : <p className="small muted">{tt("Ingen systemer er koblet til modellen ennå.")}</p>}
+        <div style={{ margin: '6px 0' }}><input type="search" placeholder={tt("Søk i modellen: brann, ventilasjon, system …")} value={sok} onChange={e => setSok(e.target.value)} style={{ width: '100%' }} />
+          {sokOrd.length > 0 && (() => { const aT = anl.filter(a => treffer('anlegg', a)); const els = aT.flatMap(a => (a.ifcGuider || []).map((g: string) => T.current.farg?.get(g)).filter((x: any) => x != null)); const pkt = [...plassert.map(m => m.p), ...avvikSyn.map(a => [a.modell.x, a.modell.y, a.modell.z])];
+            return <div className="small" style={{ marginTop: 4 }}><span className="muted">{tt("{0} systemer, {1} markeringer", aT.length, pkt.length)} · {tt("markeringer på skjulte etasjer vises ikke")}</span>
+              <div className="toolbar" style={{ margin: '4px 0' }}>{els.length > 0 && <button className="btn sm" onClick={() => fokusPaa(els, sok)}>{tt("Vis systemer i modellen")}</button>}{pkt.length > 0 && <button className="btn sm" onClick={() => flyPkt(pkt)}>{tt("Zoom til markeringer")}</button>}<button className="btn sm ghost" onClick={() => setSok('')}>{tt("Tøm søk")}</button></div>
+              {aT.slice(0, 8).map(a => <div key={a.id}>{aNavn(a.id)}</div>)}</div>; })()}</div>
         <div className="toolbar" style={{ margin: '6px 0' }}><label className="small" style={{ display: 'flex', gap: 5, alignItems: 'center' }}><input type="checkbox" checked={visPl} onChange={e => setVisPl(e.target.checked)} />{tt("Vis plasseringer fra tegninger ({0})", plassert.length)}</label><span className="grow" />{anl.some(a => (a.ifcGuider || []).length) && <button className="btn sm" onClick={() => setSjekk(true)}>{tt("Sjekk koblinger")}</button>}</div>
         {Object.keys(kal).length > 0 && <p className="small muted" style={{ margin: '0 0 6px' }}>{tt("Koblede tegninger:")} {Object.keys(kal).map(id => byId('tegninger', id)?.navn).filter(Boolean).join(', ')}</p>}
         {merk.length > 0 && <><h3 style={{ marginBottom: 4 }}>{tt("Mål og tegninger")}</h3>{merk.map(m => <div key={m.id} className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '2px 0', flexWrap: 'wrap' }}><i style={{ width: 10, height: 10, borderRadius: 3, background: m.farge, display: 'inline-block' }} /><label style={{ display: 'flex', gap: 4, alignItems: 'center' }}><input type="checkbox" checked={!skjulM[m.id]} onChange={e => setSkjulM({ ...skjulM, [m.id]: !e.target.checked })} /><b>{m.tekst || ({ avstand: tt("Avstand"), areal: tt("Areal"), vinkel: tt("Vinkel"), linje: tt("Linje"), notat: tt("Notat") } as any)[m.type]}</b></label><span className="muted">{resultat(m.type, m.pts)}</span>{ed && <button className="btn sm ghost" onClick={() => slettMerk(m.id)}>{tt("Slett")}</button>}</div>)}</>}

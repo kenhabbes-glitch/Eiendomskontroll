@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-02', dato: '2026-12-02', tittel: 'Søk og etasjefilter i 3D', punkter: [
+    'Når du skjuler en etasje i 3D-modellen, skjules nå også systemer, komponenter og avvik som er plassert på den etasjen.',
+    'Nytt søkefelt i 3D-panelet: skriv for eksempel «brann» eller navnet på et system, så vises bare treffene i modellen. Velg «Vis systemer i modellen» eller «Zoom til markeringer» for å se hvor de står.',
+  ] },
   { id: '2026-12-01', dato: '2026-12-01', tittel: 'Lagret kalibrering kan justeres', punkter: [
     'Åpner du «Tegning» i 3D-modellen for en etasje som allerede er koblet, kommer den lagrede kalibreringen opp ferdig utfylt. Ble markørene speilvendt, kan du bare krysse av «Speilvend», se at de havner riktig, og lagre – uten å måle punktene på nytt. «Start på nytt» gir en blank kalibrering.',
     'På mobil er panelet med etasjer og filtre i 3D-visningen lukket til du åpner det med «☰ Etasjer og visning».',
