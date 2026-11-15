@@ -50,8 +50,9 @@ export function Kravregister({ id }: { id: string }) {
         {D.map(d => <tr key={d.type}>
           <td><b style={{ fontWeight: 500 }}>{tt(d.type)}</b>{d.h && <div className="small muted">{d.h}</div>}</td><td className="small">{tt(d.krav)}</td>
           <td><St lys={d.lys} t={d.status} />{d.gyldigTil && <div className="small muted">{tt("Gyldig til")} {fd(d.gyldigTil)}</div>}</td>
-          <td className="small">{d.tittel || d.dato ? <>{d.tittel}<div className="muted">{fd(d.dato)}</div></> : <span className="muted">–</span>}</td>
+          <td className="small">{d.docs?.length ? d.docs.map(x => <div key={x.id}><a href="#" onClick={ev => { ev.preventDefault(); editDok(x.id); }}>{x.tittel}</a> <span className="muted">{fd(x.dato)}{x.gyldigTil ? ' · ' + tt("Gyldig til") + ' ' + fd(x.gyldigTil) : ''}</span></div>) : <span className="muted">–</span>}</td>
           <td className="krav-h">{(d.status === 'Mangler' || d.status === 'Utløpt') && <><button className="btn sm pri" onClick={() => editDok(undefined, { eiendomId: id, type: d.type })}>{tt("Last opp")}</button> {d.status === 'Mangler' && <button className="btn sm" onClick={() => toggleDokNA(id, d.type)}>{tt("Ikke aktuelt")}</button>}</>}
+            {(d.status === 'Foreligger' || d.status === 'Utløper snart') && <button className="btn sm" title={tt("F.eks. én energiattest per bygningsdel")} onClick={() => editDok(undefined, { eiendomId: id, type: d.type })}>{tt("+ Flere")}</button>}
             {d.status === 'Ikke relevant' && <button className="btn sm" onClick={() => toggleDokNA(id, d.type)}>{tt("Angre")}</button>}</td></tr>)}
       </tbody></table></div> : <p className="muted">{tt("Alle påkrevde dokumenter foreligger.")}</p>}
     </div>

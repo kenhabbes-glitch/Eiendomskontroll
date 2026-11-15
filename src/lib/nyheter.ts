@@ -7,6 +7,7 @@ export const NYHETER: Nyhet[] = [
     'For varme-, ventilasjons- og kjøleanlegg som er 15 år eller eldre foreslår appen en energi- og utskiftingsvurdering, også når den ikke er lovpålagt.',
     'Energiattest forventes nå for alle utleide bygg, ikke bare over 1000 m² – plikten gjelder ved utleie og salg uansett størrelse.',
     'Ny systemtype «Kjøletårn/luftskrubber» med lovpålagt vurdering fra akkreditert inspeksjonsorgan hvert 5. år. Hjemlene for legionella og motoriserte porter er rettet.',
+    'Rapporten du legger ved når «Energiattest – fornyelse» kvitteres, teller nå som dokumentet «Energiattest». Du kan ha flere attester per bygg (f.eks. kontordel og butikkdel) – bruk «+ Flere» under Lovkrav.',
   ] },
   { id: '2026-11-27', dato: '2026-11-27', tittel: 'Lovkrav: se om alt er på plass', punkter: [
     'Forsiden viser nå trafikklys per eiendom og område (kontroller, dokumenter, avvik, tilsyn, brannvern og leietakere), og en teller for lovpålagte kontroller som mangler i kontrollplanen.',

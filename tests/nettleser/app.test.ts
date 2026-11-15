@@ -103,8 +103,12 @@ test('lovkrav: manglende kontroll kan legges inn eller merkes «ikke aktuelt» m
   const data = grunndata();
   data.oppgaver = [{ id: 'o1', eiendom_id: 'e1', created_at: NAA, data: { eiendomId: 'e1', anleggId: 's1', malKey: 'brannalarm_aar', navn: 'Brannalarmanlegg – årlig kontroll og service', type: 'Lovpålagt', ansvar: 'Eier', aktiv: true,
     intervall: { n: 1, enhet: 'år' }, nesteFrist: '2099-01-01', sistUtfort: '2026-06-01', historikk: [{ dato: '2026-06-01', av: 'Ola', res: 'OK – ingen avvik' }] } }];
+  // Energiattest lagt ved da kontrollen ble kvittert skal telle som dokumentet «Energiattest»
+  data.oppgaver.push({ id: 'o2', eiendom_id: 'e1', created_at: NAA, data: { eiendomId: 'e1', malKey: 'energiattest', navn: 'Energiattest – fornyelse', type: 'Lovpålagt', ansvar: 'Eier', aktiv: true, intervall: { n: 10, enhet: 'år' }, nesteFrist: '2099-01-01', sistUtfort: '2026-06-01', historikk: [{ dato: '2026-06-01', res: 'OK', dokId: 'd1' }] } });
+  data.dokumenter = [{ id: 'd1', eiendom_id: 'e1', created_at: NAA, data: { eiendomId: 'e1', type: 'Servicerapport', tittel: 'Energiattest kontordel', dato: '2026-06-01', oppgaveId: 'o2' } }];
   const a = await aapne('#/eiendom/e1', { data }); try {
     await a.side.locator('.tabs a, .tabs button', { hasText: 'Lovkrav' }).click();
+    assert.match(await a.side.locator('table.krav tr', { hasText: 'energiattest ved utleie' }).last().innerText(), /Foreligger[\s\S]*Energiattest kontordel[\s\S]*\+ Flere/);
     const utfort = a.side.locator('table.krav tr', { hasText: 'Brannalarmanlegg – årlig kontroll' });
     assert.match(await utfort.innerText(), /I rute[\s\S]*Ingen rapport eller dokumentasjon vedlagt/);
     // Ikke aktuelt krever begrunnelse

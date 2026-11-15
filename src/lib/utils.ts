@@ -179,15 +179,19 @@ export function taggerFor(o: Rec | null | undefined, kind?: 'a' | 'k'): string[]
   if (erK) return taggerFor(byId('anlegg', o.anleggId), 'a');
   return standardTagger(o);
 }
+/** Kontroller som ender i et dokument eier skal kunne legge fram: malnøkkel → dokumenttype */
+export const MAL_DOK: Record<string, string> = { energiattest: 'Energiattest', tilstand: 'Tilstandsrapport' };
 export function docCoverage(e: Rec, PAAKREVD: string[]) {
   const docs = S.dokumenter.filter(d => d.eiendomId === e.id); const na = e.dokNA || [];
   return PAAKREVD.map(t => {
     if (na.includes(t)) return { t, s: 'na' };
-    const ds = docs.filter(d => d.type === t); if (!ds.length) return { t, s: 'no' };
+    // Teller også rapporter som er lagt ved når den tilhørende kontrollen ble kvittert (f.eks. «Energiattest – fornyelse»)
+    const ds = docs.filter(d => d.type === t || (d.oppgaveId && MAL_DOK[S.oppgaver.find(o => o.id === d.oppgaveId)?.malKey] === t)); if (!ds.length) return { t, s: 'no' };
     const valid = ds.filter(d => !d.gyldigTil || (dUntil(d.gyldigTil) as number) >= 0);
-    if (!valid.length) return { t, s: 'exp', d: ds[0] };
+    if (!valid.length) return { t, s: 'exp', d: ds[0], ds };
     const soon = valid.every(d => d.gyldigTil && (dUntil(d.gyldigTil) as number) <= 90);
-    return { t, s: soon ? 'soon' : 'ok', d: valid[0] };
+    // Det kan finnes flere gyldige dokumenter av samme type, f.eks. én energiattest per bygningsdel
+    return { t, s: soon ? 'soon' : 'ok', d: valid[0], ds: valid };
   });
 }
 export function csvCell(v: any) { const s = String(v ?? ''); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }

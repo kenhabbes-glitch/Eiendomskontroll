@@ -32,7 +32,7 @@ export type KontrollRad = { navn: string; system: string; hjemmel: string; inter
   /** Begrunnelse når kravet er vurdert som ikke aktuelt for eiendommen */ na?: string;
   /** Kravet avhenger av opplysninger som mangler (f.eks. installert effekt) – teksten sier hva */ avklar?: string;
   /** Siste utførelse er kvittert uten rapport, dokument eller sjekkliste */ utenDok?: boolean; /** Hva som dokumenterer siste utførelse */ bevis?: string };
-export type DokRad = { type: string; h: string; krav: string; lys: Lys; status: string; dato: string; gyldigTil: string; tittel: string };
+export type DokRad = { type: string; h: string; krav: string; lys: Lys; status: string; dato: string; gyldigTil: string; tittel: string; /** Alle gjeldende dokumenter av typen – det kan være flere, f.eks. én energiattest per bygningsdel */ docs?: { id: string; tittel: string; dato: string; gyldigTil: string }[] };
 export type Tiltak = { pri: 1 | 2 | 3; tekst: string; omr: string };
 export type EierStatus = {
   harBv: boolean; harTs: boolean;
@@ -65,7 +65,7 @@ export function eierStatus(eid: string): EierStatus {
     const [lys, status] = kontrollLys(o); const h = (o.historikk || [])[0]; // nyeste først
     const nDok = h ? (h.dokIds?.length || (h.dokId ? 1 : 0)) : 0;
     const bevis = !h ? '' : nDok ? (nDok > 1 ? tt("{0} dokumenter", nDok) : tt("Rapport vedlagt")) : h.sjekk ? tt("Sjekkliste") : h.auto ? tt("Automatisk registrert") : '';
-    return { utenDok: !!h && !bevis, bevis, id: o.id, navn: o.navn, system: o.anleggId ? aNavn(o.anleggId) : 'Eiendommen', hjemmel: o.hjemmel || MALER[o.malKey]?.h || '', intervall: intTxt(o.intervall), sist: o.sistUtfort || h?.dato || '', frist: o.nesteFrist || '', lys, status, type: o.type };
+    return { utenDok: !!h && !bevis, bevis, id: o.id, navn: o.navn, system: o.anleggId ? aNavn(o.anleggId) : 'Eiendommen', hjemmel: MALER[o.malKey]?.h || o.hjemmel || '', intervall: intTxt(o.intervall), sist: o.sistUtfort || h?.dato || '', frist: o.nesteFrist || '', lys, status, type: o.type };
   });
   const har = (k: string, a: string) => S.oppgaver.some(o => o.eiendomId === eid && o.malKey === k && (o.anleggId || '') === a && o.aktiv !== false);
   const forventet: [string, string][] = [
@@ -92,7 +92,7 @@ export function eierStatus(eid: string): EierStatus {
   const dok: DokRad[] = docCoverage(e, dokPaakrevd(eid)).map((c: any) => { const g = DOK_GRUNNLAG[c.t] || { h: '', krav: 'anbefalt' as const };
     const d = c.d as Rec | undefined; const krav = KRAV_TEKST[g.krav];
     const [lys, status]: [Lys, string] = c.s === 'na' ? ['grey', 'Ikke relevant'] : c.s === 'ok' ? ['green', 'Foreligger'] : c.s === 'soon' ? ['amber', 'Utløper snart'] : c.s === 'exp' ? [g.krav === 'lov' ? 'red' : 'amber', 'Utløpt'] : [g.krav === 'lov' ? 'red' : 'amber', 'Mangler'];
-    return { type: c.t, h: g.h, krav, lys, status, dato: d?.dato || '', gyldigTil: d?.gyldigTil || '', tittel: d?.tittel || '' }; });
+    return { type: c.t, h: g.h, krav, lys, status, dato: d?.dato || '', gyldigTil: d?.gyldigTil || '', tittel: d?.tittel || '', docs: (c.ds || (d ? [d] : [])).map((x: Rec) => ({ id: x.id, tittel: x.tittel || x.type, dato: x.dato || '', gyldigTil: x.gyldigTil || '' })) }; });
   const liste = (L: DokRad[]) => L.map(d => d.type).join(', ');
   const mangl = dok.filter(d => d.lys === 'red' && d.status === 'Mangler'); const utl = dok.filter(d => d.lys === 'red' && d.status === 'Utløpt');
   if (mangl.length) tiltak.push({ pri: 1, omr: 'Dokumenter', tekst: tt("Skaff {0}: {1}", mangl.length === 1 ? 'lovpålagt dokument' : mangl.length + ' lovpålagte dokumenter', liste(mangl)) });

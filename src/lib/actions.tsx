@@ -23,7 +23,7 @@ import { SysSjekkVelger, SysSjekkKort } from '../components/SysSjekk';
 import { alleMaler, finnMal, kopi, kontraktKey, fordeling, pliktKeysFor, OMR, ANS_VALG } from './kontrakt';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst, standardTagger, taggerFor } from './utils';
 import { ikDekning } from './utils';
-import { energikravFor, addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
+import { MAL_DOK, energikravFor, addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
 import { openPlan, plasserteFor } from '../views/Arealer';
 import { AoPanel, HendelseListe, aoSnapshot } from './arbeidsordre';
@@ -589,9 +589,9 @@ export function utfor(id: string, pre?: UtforPreset) {
       if (sjAv.length && x.res === 'OK – ingen avvik') x.res = 'Avvik funnet';
       if (x.res === 'Avvik funnet' && !avs.length && !rAvvik.length && !sjAv.length) { toast(tt("Skriv inn avvikene i feltene under «Avvik fra kontrollen» – én linje per avvik")); return false; }
       let dokId = '';
-      if (x.fil) { const f = await uploadFile(x.fil, o.eiendomId); if (f) dokId = await save('dokumenter', { eiendomId: o.eiendomId, leietakerId: '', type: o.type === 'Egenkontroll' ? 'Egenkontrollskjema' : 'Servicerapport', tittel: o.navn + ' – ' + fd(x.dato), dato: x.dato, fil: f, oppgaveId: o.id }); }
+      if (x.fil) { const f = await uploadFile(x.fil, o.eiendomId); if (f) dokId = await save('dokumenter', { eiendomId: o.eiendomId, leietakerId: '', type: MAL_DOK[o.malKey] || (o.type === 'Egenkontroll' ? 'Egenkontrollskjema' : 'Servicerapport'), gyldigTil: o.malKey === 'energiattest' ? addInt(x.dato, o.intervall) : undefined, tittel: o.navn + ' – ' + fd(x.dato), dato: x.dato, fil: f, oppgaveId: o.id }); }
       const dokIds: string[] = [];
-      for (const f of pre?.filer || []) dokIds.push(await save('dokumenter', { eiendomId: o.eiendomId, leietakerId: '', type: o.type === 'Egenkontroll' ? 'Egenkontrollskjema' : 'Servicerapport', tittel: o.navn + ' – ' + fd(x.dato) + (pre!.filer!.length > 1 ? ' – ' + f.navn : ''), dato: x.dato, fil: f, oppgaveId: o.id, anleggIds: o.anleggId ? [o.anleggId] : [] }));
+      for (const f of pre?.filer || []) dokIds.push(await save('dokumenter', { eiendomId: o.eiendomId, leietakerId: '', type: MAL_DOK[o.malKey] || (o.type === 'Egenkontroll' ? 'Egenkontrollskjema' : 'Servicerapport'), gyldigTil: o.malKey === 'energiattest' ? addInt(x.dato, o.intervall) : undefined, tittel: o.navn + ' – ' + fd(x.dato) + (pre!.filer!.length > 1 ? ' – ' + f.navn : ''), dato: x.dato, fil: f, oppgaveId: o.id, anleggIds: o.anleggId ? [o.anleggId] : [] }));
       if (!dokId && dokIds.length) dokId = dokIds[0];
       const ids: string[] = [];
       for (const t of sjAv) avs.push({ ...nyRad(), t, l: o.ansvar === 'Leietaker' ? (o.leietakerId || nyRad().l) : '' });
