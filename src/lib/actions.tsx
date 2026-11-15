@@ -471,7 +471,7 @@ function GenPlanBody({ eid, isNew, close }: { eid: string; isNew?: boolean; clos
   const e = byId('eiendommer', eid) || ({} as Rec); const ex = S.oppgaver.filter(o => o.eiendomId === eid);
   const has = (k: string, a: string) => ex.some(o => o.malKey === k && (o.anleggId || '') === (a || ''));
   const rows: { k: string; a: string; def: boolean }[] = [];
-  propMaler(eid).forEach(k => { if (!has(k, '')) rows.push({ k, a: '', def: !(k === 'energiattest' && +e.bta && +e.bta < 1000) && k !== 'radon' }); });
+  propMaler(eid).forEach(k => { if (!has(k, '')) rows.push({ k, a: '', def: !(k === 'energiattest' && +e.bta && +e.bta < 50) && k !== 'radon' }); });
   S.anlegg.filter(a => a.eiendomId === eid).forEach(a => kompMaler(a.type, eid).forEach(k => { if (!has(k, a.id)) rows.push({ k, a: a.id, def: !(k === 'energivurdering' && energikravFor(a.id)?.krav === 'nei') }); }));
   const [sel, setSel] = useState(() => rows.map(r => r.def)); const [d, setD] = useState(addDays(today(), 30)); const [busy, setBusy] = useState(false);
   const run = async () => { setBusy(true); const L = rows.filter((_, i) => sel[i]); for (const r of L) await save('oppgaver', taskFromMal(r.k, MALER, eid, r.a, d || today())); close(); toast(tt("{0} kontroller opprettet", L.length)); };

@@ -69,7 +69,7 @@ export function eierStatus(eid: string): EierStatus {
   });
   const har = (k: string, a: string) => S.oppgaver.some(o => o.eiendomId === eid && o.malKey === k && (o.anleggId || '') === a && o.aktiv !== false);
   const forventet: [string, string][] = [
-    ...propMaler(eid).filter(k => LOVTYPER.includes(MALER[k]?.t) && !(k === 'energiattest' && +e.bta && +e.bta < 1000)).map(k => [k, ''] as [string, string]),
+    ...propMaler(eid).filter(k => LOVTYPER.includes(MALER[k]?.t) && !(k === 'energiattest' && +e.bta && +e.bta < 50)).map(k => [k, ''] as [string, string]),
     ...S.anlegg.filter(a => a.eiendomId === eid && !a.arkivert).flatMap(a => kompMaler(a.type, eid).filter(k => LOVTYPER.includes(MALER[k]?.t)).map(k => [k, a.id] as [string, string])),
   ];
   for (const [k, a] of forventet) if (!har(k, a)) { const m = MALER[k]; const na = kontrollNA(e, k, a);
