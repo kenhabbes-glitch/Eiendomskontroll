@@ -42,7 +42,7 @@ export function Oversikt() {
   const ikMiss = S.leietakere.flatMap(l => (l.plikter || []).filter((p: any) => pliktStatus(p).o >= 2));
   const lev = [...S.anlegg, ...S.komponenter.filter(k => k.levetid || k.planAar || k.tg)].filter(a => { const r = compRest(a); return (r !== null && r <= 3) || a.tg === 'TG3'; });
   const lAv = S.leietakere.filter(l => l.slutt && (dUntil(l.slutt) as number) <= (+l.varsel || 12) * 30.5);
-  const lovM = ed ? [...samsvar.values()].flatMap(x => x.kontroller.filter(k => k.mangler)) : []; const rode = ed ? [...samsvar.values()].filter(x => x.lys === 'red').length : 0;
+  const lovM = ed ? [...samsvar.values()].flatMap(x => x.kontroller.filter(k => k.mangler && !k.avklar)) : []; const rode = ed ? [...samsvar.values()].filter(x => x.lys === 'red').length : 0;
   const K = (v: number, l: string, s: string, cls: string, h: string) => <button className={'kpi ' + cls} onClick={() => go(h)}><div className="l">{l}</div><div className="v">{v}</div><div className="s">{s}</div></button>;
   const actions = [
     ...forf.map(o => ({ d: o.nesteFrist, el: <div key={o.id} className="li" onClick={() => visOppgave(o.id)}><DueChip s={o.nesteFrist} /><div className="grow"><div className="lt">{o.navn}</div><div className="ls">{eNavn(o.eiendomId)} · {o.type}</div></div></div> })),
@@ -57,7 +57,7 @@ export function Oversikt() {
     <div className="head"><div className="grow"><h1>{tt("Oversikt")}<Hjelp id="side.oversikt" /></h1><p className="sub">{S.eiendommer.length} {tt("eiendommer")}{ed ? tt(" · {0} leietakere", S.leietakere.length) : ''} · {T.length} {tt("aktive kontroller · status per")} {fd(today())}</p></div>{ed && harModul('rapporter') && <button className="btn" onClick={() => eierRapport()}>{tt("Statusrapport til eier")}</button>}<button className="btn" onClick={() => editAvvik()}>{tt("+ Meld avvik")}</button></div>
     {ed && <RegelverkStatus kompakt />}
     <div className="kpis">
-      {ed && K(lovM.length, 'Lovpålagte kontroller mangler i planen', rode ? `${rode} eiendommer krever tiltak` : 'alle eiendommer fulgt opp', lovM.length ? 'bad' : 'ok', lovM.length ? 'eiendom/' + [...samsvar.values()].find(x => x.kontroller.some(k => k.mangler))!.e.id : 'kontroller')}
+      {ed && K(lovM.length, 'Lovpålagte kontroller mangler i planen', rode ? `${rode} eiendommer krever tiltak` : 'alle eiendommer fulgt opp', lovM.length ? 'bad' : 'ok', lovM.length ? 'eiendom/' + [...samsvar.values()].find(x => x.kontroller.some(k => k.mangler && !k.avklar))!.e.id : 'kontroller')}
       {K(forf.length, 'Forfalte kontroller', `${d30.length} forfaller neste 30 dager`, forf.length ? 'bad' : 'ok', 'kontroller')}
       {K(OA.length, 'Åpne avvik', `${krit.length} kritiske/høye · ${avForf.length} over frist`, avForf.length || krit.length ? 'bad' : OA.length ? 'warn' : 'ok', 'avvik')}
       {ed && K(cov.length, 'Dokumenter mangler/utløpt', `${dokExp.length} utløper innen 90 d`, cov.length ? 'warn' : 'ok', 'dokumenter')}

@@ -5,7 +5,7 @@ import { save, toast } from '../lib/store';
 import { fd, taskFromMal, today, addDays } from '../lib/utils';
 import { tt } from '../lib/i18n';
 import { eierStatus, kontrollNA, type KontrollRad, type Lys } from '../lib/eierRapport';
-import { editDok, fjernKontrollNA, generatePlan, settKontrollNA, toggleDokNA, visOppgave } from '../lib/actions';
+import { editAnlegg, editDok, fjernKontrollNA, generatePlan, settKontrollNA, toggleDokNA, visOppgave } from '../lib/actions';
 import { Lyspunkt } from '../components/Samsvar';
 import { byggVeiviser } from './Veiviser';
 
@@ -19,7 +19,7 @@ export function Kravregister({ id }: { id: string }) {
   const alle = [...s.kontroller.filter(k => !k.na), ...s.dok.filter(d => d.lys !== 'grey')];
   const ok = alle.filter(x => x.lys === 'green' && !(x as KontrollRad).utenDok).length; const rod = alle.filter(x => x.lys === 'red').length;
   const leggInn = async (k: KontrollRad) => { await save('oppgaver', taskFromMal(k.malKey!, MALER, id, k.anleggId || '', addDays(today(), 30))); toast(tt("Kontrollen er lagt inn i kontrollplanen med frist om 30 dager")); };
-  const mangler = s.kontroller.filter(k => k.mangler);
+  const mangler = s.kontroller.filter(k => k.mangler && !k.avklar);
   return <>
     <div className="toolbar">
       <p className="small muted" style={{ margin: 0 }}><b>{alle.length}</b> {tt("krav gjelder eiendommen")} · <b style={{ color: 'var(--green)' }}>{ok}</b> {tt("i orden og dokumentert")} · <b style={rod ? { color: 'var(--red)' } : undefined}>{rod}</b> {tt("krever tiltak")}</p>
@@ -34,11 +34,12 @@ export function Kravregister({ id }: { id: string }) {
           <td className="small">{k.system === 'Eiendommen' ? tt("Eiendommen") : k.system}</td><td className="small">{k.intervall}</td>
           <td><St lys={k.lys} t={k.status} />{k.frist && <div className="small muted">{tt("Frist")} {fd(k.frist)}</div>}</td>
           <td className="small">{k.na ? <><i>{k.na}</i><div className="muted">{(() => { const n = kontrollNA(s.e, k.malKey!, k.anleggId); return n ? `${n.av || ''} ${fd(n.dato)}` : ''; })()}</div></>
+            : k.avklar ? <span>{tt(k.avklar)}</span>
             : k.mangler ? <span className="muted">–</span>
             : k.sist ? <>{tt("Utført")} {fd(k.sist)}<div className={k.utenDok ? 'krav-uten' : 'muted'}>{k.utenDok ? tt("Ingen rapport eller dokumentasjon vedlagt") : k.bevis}</div></>
             : <span className="muted">{tt("Ikke utført ennå")}</span>}</td>
           <td className="krav-h" onClick={e => e.stopPropagation()}>
-            {k.mangler && <><button className="btn sm pri" onClick={() => leggInn(k)}>{tt("Legg inn")}</button> <button className="btn sm" onClick={() => settKontrollNA(id, k.malKey!, k.anleggId || '', k.navn)}>{tt("Ikke aktuelt")}</button></>}
+            {k.avklar && <><button className="btn sm pri" onClick={() => editAnlegg(k.anleggId!)}>{tt("Registrer effekt")}</button> </>}{k.mangler && <><button className={'btn sm' + (k.avklar ? '' : ' pri')} onClick={() => leggInn(k)}>{tt("Legg inn")}</button> <button className="btn sm" onClick={() => settKontrollNA(id, k.malKey!, k.anleggId || '', k.navn)}>{tt("Ikke aktuelt")}</button></>}
             {k.na && <button className="btn sm" onClick={() => fjernKontrollNA(id, k.malKey!, k.anleggId || '')}>{tt("Angre")}</button>}
             {k.utenDok && k.id && <button className="btn sm" onClick={() => visOppgave(k.id!)}>{tt("Legg ved")}</button>}
           </td></tr>)}

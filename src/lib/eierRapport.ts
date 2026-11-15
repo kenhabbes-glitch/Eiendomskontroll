@@ -1,9 +1,10 @@
 // Statusrapport til eier: eiers lov- og forskriftsfestede oppgaver, påkrevde dokumenter, avvik, tilsyn,
 // leietakeroppfølging og brannvern – med trafikklys og prioriterte tiltak.
+import { VARME_TYPER, KLIMA_TYPER } from './energikrav';
 import { S } from './store';
 import { AV_LUKKET, MALER } from './catalog';
 import { dokPaakrevd, kompMaler, propMaler } from './land';
-import { aNavn, addDays, dUntil, docCoverage, fd, intTxt, pliktStatus, sortBy, today, type Rec } from './utils';
+import { YEAR, energikravFor, aNavn, addDays, dUntil, docCoverage, fd, intTxt, pliktStatus, sortBy, today, type Rec } from './utils';
 import { bvStatus, bvVersjon, aktiveMidl, mangelAnsvarlig } from './brannvern';
 import { tilsynssaker } from '../views/Tilsyn';
 import { harModul } from './moduler';
@@ -29,6 +30,7 @@ export const KRAV_TEKST = { lov: 'Lovkrav', tiltak: 'Ved tiltak', anbefalt: 'Anb
 
 export type KontrollRad = { navn: string; system: string; hjemmel: string; intervall: string; sist: string; frist: string; lys: Lys; status: string; type: string; mangler?: boolean; id?: string; malKey?: string; anleggId?: string;
   /** Begrunnelse når kravet er vurdert som ikke aktuelt for eiendommen */ na?: string;
+  /** Kravet avhenger av opplysninger som mangler (f.eks. installert effekt) – teksten sier hva */ avklar?: string;
   /** Siste utførelse er kvittert uten rapport, dokument eller sjekkliste */ utenDok?: boolean; /** Hva som dokumenterer siste utførelse */ bevis?: string };
 export type DokRad = { type: string; h: string; krav: string; lys: Lys; status: string; dato: string; gyldigTil: string; tittel: string };
 export type Tiltak = { pri: 1 | 2 | 3; tekst: string; omr: string };
@@ -71,13 +73,20 @@ export function eierStatus(eid: string): EierStatus {
     ...S.anlegg.filter(a => a.eiendomId === eid && !a.arkivert).flatMap(a => kompMaler(a.type, eid).filter(k => LOVTYPER.includes(MALER[k]?.t)).map(k => [k, a.id] as [string, string])),
   ];
   for (const [k, a] of forventet) if (!har(k, a)) { const m = MALER[k]; const na = kontrollNA(e, k, a);
+    const ek = k === 'energivurdering' && a ? energikravFor(a) : null;
+    if (ek?.krav === 'nei') continue; // under grensene: ikke lovkrav
+    if (ek?.krav === 'ukjent' && !na) { kontroller.push({ navn: m.n, system: aNavn(a), hjemmel: m.h, intervall: intTxt({ n: m.i[0], enhet: m.i[1] }), sist: '', frist: '', lys: 'amber', status: 'Avklar om kravet gjelder', type: m.t, mangler: true, avklar: ek.grunn, malKey: k, anleggId: a }); continue; }
     if (na) { kontroller.push({ navn: m.n, system: a ? aNavn(a) : 'Eiendommen', hjemmel: m.h, intervall: intTxt({ n: m.i[0], enhet: m.i[1] }), sist: '', frist: '', lys: 'grey', status: 'Ikke aktuelt', type: m.t, malKey: k, anleggId: a, na: na.grunn || '–' }); continue; }
-    kontroller.push({ navn: m.n, system: a ? aNavn(a) : 'Eiendommen', hjemmel: m.h, intervall: intTxt({ n: m.i[0], enhet: m.i[1] }), sist: '', frist: '', lys: 'red', status: 'Ikke i kontrollplanen', type: m.t, mangler: true, malKey: k, anleggId: a }); }
-  const kForf = kontroller.filter(k => k.lys === 'red' && !k.mangler); const kMangl = kontroller.filter(k => k.mangler); const kSnart = kontroller.filter(k => k.lys === 'amber'); const kUten = kontroller.filter(k => k.utenDok);
+    kontroller.push({ navn: m.n, system: a ? aNavn(a) : 'Eiendommen', hjemmel: m.h, intervall: intTxt({ n: ek?.aar || m.i[0], enhet: m.i[1] }), sist: '', frist: '', lys: 'red', status: 'Ikke i kontrollplanen', type: m.t, mangler: true, malKey: k, anleggId: a }); }
+  const kForf = kontroller.filter(k => k.lys === 'red' && !k.mangler); const kMangl = kontroller.filter(k => k.mangler && !k.avklar); const kAvkl = kontroller.filter(k => k.avklar); const kSnart = kontroller.filter(k => k.lys === 'amber'); const kUten = kontroller.filter(k => k.utenDok);
   kForf.forEach(k => tiltak.push({ pri: 1, omr: 'Kontroller', tekst: tt("Gjennomfør «{0}»{1} – frist var {2}", k.navn, k.system !== 'Eiendommen' ? ` (${k.system})` : '', fd(k.frist)) }));
   if (kMangl.length) tiltak.push({ pri: 1, omr: 'Kontroller', tekst: tt("Legg inn {0} lovpålagt{1} kontroll{2} som mangler i kontrollplanen: {3}{4}", kMangl.length, kMangl.length > 1 ? 'e' : '', kMangl.length > 1 ? 'er' : '', kMangl.slice(0, 3).map(k => '«' + k.navn + '»').join(', '), kMangl.length > 3 ? ' …' : '') });
+  if (kAvkl.length) tiltak.push({ pri: 2, omr: 'Kontroller', tekst: tt("Avklar om energivurdering er lovpålagt for {0}: registrer installert effekt (kW) på systemene og byggets areal", kAvkl.map(k => k.system).join(', ')) });
+  // Eldre varme- og klimaanlegg: en energi- og utskiftingsvurdering kan lønne seg også når den ikke er lovpålagt
+  const gamle = S.anlegg.filter(x => x.eiendomId === eid && !x.arkivert && [...VARME_TYPER, ...KLIMA_TYPER].includes(x.type) && +x.aar && YEAR - +x.aar >= 15 && !S.oppgaver.some(o => o.anleggId === x.id && o.malKey === 'energivurdering' && o.aktiv !== false));
+  if (gamle.length) tiltak.push({ pri: 3, omr: 'Kontroller', tekst: tt("Vurder energi- og utskiftingsvurdering av eldre anlegg: {0}", gamle.map(x => `${aNavn(x.id)} (${YEAR - +x.aar} år)`).join(', ')) });
   if (kUten.length) tiltak.push({ pri: 2, omr: 'Kontroller', tekst: tt("Legg ved rapport eller annen dokumentasjon for {0} lovpålagt{1} kontroll{2} som er kvittert uten: {3}{4}", kUten.length, kUten.length > 1 ? 'e' : '', kUten.length > 1 ? 'er' : '', kUten.slice(0, 3).map(k => '«' + k.navn + '»').join(', '), kUten.length > 3 ? ' …' : '') });
-  const kLys = verst(kForf.length || kMangl.length ? 'red' : 'green', kSnart.length || kUten.length ? 'amber' : 'green');
+  const kLys = verst(kForf.length || kMangl.length ? 'red' : 'green', kSnart.length || kUten.length || kAvkl.length ? 'amber' : 'green');
 
   // ---- Dokumenter eier skal ha
   const dok: DokRad[] = docCoverage(e, dokPaakrevd(eid)).map((c: any) => { const g = DOK_GRUNNLAG[c.t] || { h: '', krav: 'anbefalt' as const };
@@ -136,7 +145,7 @@ export function eierStatus(eid: string): EierStatus {
   ], x => x.d);
 
   const omrader = [
-    { key: 'kontroll', navn: tt("Lovpålagte kontroller"), lys: kLys, tekst: tt("{0} registrert · {1} forfalt · {2} mangler i planen", kontroller.filter(k => !k.mangler && !k.na).length, kForf.length, kMangl.length) },
+    { key: 'kontroll', navn: tt("Lovpålagte kontroller"), lys: kLys, tekst: tt("{0} registrert · {1} forfalt · {2} mangler i planen", kontroller.filter(k => !k.mangler && !k.na).length, kForf.length, kMangl.length) + (kAvkl.length ? ' · ' + tt("{0} må avklares", kAvkl.length) : '') },
     { key: 'dok', navn: tt("Påkrevde dokumenter"), lys: dLys, tekst: tt("{0} av {1} foreligger", dok.filter(d => d.lys === 'green').length, dok.filter(d => d.lys !== 'grey').length) },
     { key: 'avvik', navn: tt("Avvik"), lys: aLys, tekst: tt("{0} åpne · {1} kritiske/høye · {2} over frist", A.length, krit.length, over.length) },
     ...(harTs ? [{ key: 'tilsyn', navn: tt("Tilsynssaker"), lys: tLys, tekst: tilsyn.length ? tt("{0} åpne saker", tilsyn.length) : tt("Ingen åpne saker") }] : []),

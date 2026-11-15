@@ -19,7 +19,7 @@ export function useSamsvar(): Map<string, EierStatus> {
 const PRI = ['', 'Må gjøres nå', 'Bør gjøres snart', 'Bør vurderes'];
 /** Kortet øverst på eiendomssiden: samlet status, status per område og hva som må gjøres. */
 export function SamsvarKort({ id, tilFane, leggTil }: { id: string; tilFane: (fane: string) => void; leggTil?: () => void }) {
-  const s = eierStatus(id); const mangler = s.kontroller.filter(k => k.mangler); const tiltak = s.tiltak.slice(0, 6);
+  const s = eierStatus(id); const mangler = s.kontroller.filter(k => k.mangler && !k.avklar); const tiltak = s.tiltak.slice(0, 6);
   return <div className="card samsvar">
     <h2>{tt("Samsvar med lov og forskrift")} <LysChip lys={s.lys} /></h2>
     <div className="samsvar-omr">{s.omrader.map(o => <button key={o.key} className="samsvar-o" onClick={() => tilFane(o.key === 'tilsyn' ? 'avvik' : o.key === 'kontroll' || o.key === 'dok' ? 'krav' : o.key)}>

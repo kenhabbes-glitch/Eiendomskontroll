@@ -23,7 +23,7 @@ import { SysSjekkVelger, SysSjekkKort } from '../components/SysSjekk';
 import { alleMaler, finnMal, kopi, kontraktKey, fordeling, pliktKeysFor, OMR, ANS_VALG } from './kontrakt';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst, standardTagger, taggerFor } from './utils';
 import { ikDekning } from './utils';
-import { addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
+import { energikravFor, addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
 import { openPlan, plasserteFor } from '../views/Arealer';
 import { AoPanel, HendelseListe, aoSnapshot } from './arbeidsordre';
@@ -287,6 +287,7 @@ export function editAnlegg(id?: string, eiendomId?: string) {
     { k: 'prev', type: 'custom', render: v => { const e = byId('eiendommer', v.eiendomId); return <div className="note mono" style={{ fontSize: 14, color: 'var(--ink)' }}>{v.tfmSys ? tt("{0}={1}.{2}", e?.tfmBygg ? '+' + e.tfmBygg : '', v.tfmSys, pad(v.tfmLop || 1)) : tt("(ingen TFM-kode)")}</div>; } },
     { k: 'navn', label: tt("Betegnelse / plassering"), half: true, ph: tt("F.eks. Ventilasjon kontorfløy") }, { k: 'fabrikat', label: tt("Fabrikat / modell"), half: true },
     { k: 'aar', label: tt("Installert/utskiftet år"), type: 'number', half: true }, { k: 'levetid', label: tt("Forventet levetid (år)"), type: 'number', half: true, hint: tt("Tomt = veiledende levetid for typen") },
+    { k: 'effektKw', label: tt("Installert effekt (kW)"), type: 'number', half: true, show: x => ['kjel', 'varmepumpe', 'ventilasjon', 'kjole'].includes(x.type), hint: tt("Avgjør om energivurdering er lovpålagt: varme over 20 kW, ventilasjon/kjøling over 12 kW – samlet for bygget") },
     { k: 'levHjelp', type: 'custom', render: (v, set) => <LevetidHjelp v={v} set={set} sysKode={v.tfmSys} typeLev={KOMP[v.type]?.l} /> },
     { k: 'planAar', label: tt("Overstyr utskiftingsår (valgfritt)"), type: 'number', half: true, hint: tt("La stå tom for å bruke beregnet år") },
     ...(id ? [{ k: 'kompSum', type: 'custom', show: () => S.komponenter.some(k => k.anleggId === id), render: () => { const K = S.komponenter.filter(k => k.anleggId === id); const mK = K.filter(k => +k.mengde > 0);
@@ -471,7 +472,7 @@ function GenPlanBody({ eid, isNew, close }: { eid: string; isNew?: boolean; clos
   const has = (k: string, a: string) => ex.some(o => o.malKey === k && (o.anleggId || '') === (a || ''));
   const rows: { k: string; a: string; def: boolean }[] = [];
   propMaler(eid).forEach(k => { if (!has(k, '')) rows.push({ k, a: '', def: !(k === 'energiattest' && +e.bta && +e.bta < 1000) && k !== 'radon' }); });
-  S.anlegg.filter(a => a.eiendomId === eid).forEach(a => kompMaler(a.type, eid).forEach(k => { if (!has(k, a.id)) rows.push({ k, a: a.id, def: true }); }));
+  S.anlegg.filter(a => a.eiendomId === eid).forEach(a => kompMaler(a.type, eid).forEach(k => { if (!has(k, a.id)) rows.push({ k, a: a.id, def: !(k === 'energivurdering' && energikravFor(a.id)?.krav === 'nei') }); }));
   const [sel, setSel] = useState(() => rows.map(r => r.def)); const [d, setD] = useState(addDays(today(), 30)); const [busy, setBusy] = useState(false);
   const run = async () => { setBusy(true); const L = rows.filter((_, i) => sel[i]); for (const r of L) await save('oppgaver', taskFromMal(r.k, MALER, eid, r.a, d || today())); close(); toast(tt("{0} kontroller opprettet", L.length)); };
   return <>
@@ -479,7 +480,7 @@ function GenPlanBody({ eid, isNew, close }: { eid: string; isNew?: boolean; clos
     <div className="mb">
       <p className="muted" style={{ marginTop: 0 }}>{isNew ? tt("Her er kontrollene som gjelder eiendommen og systemene du krysset av for. Fjern krysset for det som ikke er aktuelt.") : tt("Forslag basert på eiendommen og registrerte systemer. Kontroller som allerede finnes, vises ikke.")}</p>
       {rows.length ? <>
-        <div className="checks">{rows.map((r, i) => { const m = MALER[r.k]; return <label key={r.k + r.a}><input type="checkbox" checked={sel[i]} onChange={ev => setSel(s => s.map((x, j) => j === i ? ev.target.checked : x))} /><span><span className="ct">{m.n}{r.a && <> <span className="tag">{aNavn(r.a)}</span></>}</span><br /><span className="cs">{m.t} · {intTxt({ n: m.i[0], enhet: m.i[1] })} · {m.h}</span></span></label>; })}</div>
+        <div className="checks">{rows.map((r, i) => { const m = MALER[r.k]; return <label key={r.k + r.a}><input type="checkbox" checked={sel[i]} onChange={ev => setSel(s => s.map((x, j) => j === i ? ev.target.checked : x))} /><span><span className="ct">{m.n}{r.a && <> <span className="tag">{aNavn(r.a)}</span></>}</span><br /><span className="cs">{(() => { const ek = r.k === 'energivurdering' && r.a ? energikravFor(r.a) : null; return ek ? <>{ek.krav === 'nei' ? tt("Ikke lovkrav her") : ek.krav === 'ukjent' ? tt("Avklar om kravet gjelder") : m.t} · {intTxt({ n: ek.aar, enhet: 'år' })} · {tt(ek.grunn)}</> : <>{m.t} · {intTxt({ n: m.i[0], enhet: m.i[1] })} · {m.h}</>; })()}</span></span></label>; })}</div>
         <div className="form" style={{ marginTop: 14 }}><div className="fld half"><label>{tt("Første frist")}</label><input type="date" value={d} onChange={ev => setD(ev.target.value)} /></div><div className="fld half"><label>&nbsp;</label><div className="hint">{tt("Har du dato for sist utførte kontroll, registrer den etterpå med «Utført», så beregnes neste frist automatisk.")}</div></div></div>
       </> : <div className="empty"><b>{tt("Ingen nye forslag")}</b>{tt("Alle standardkontroller finnes allerede.")}</div>}
     </div>

@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-28', dato: '2026-11-28', tittel: 'Riktigere lovkrav for heis og energivurdering', punkter: [
+    'Sikkerhetskontroll av heis er nå satt til hvert 2. år, utført av uavhengig kontrollorgan (ikke heisfirmaets service). Kontroller du allerede har lagt inn må du selv endre intervallet på.',
+    'Energivurdering av varme- og klimaanlegg regnes bare som lovkrav når bygget er over grensene: varmeanlegg over 20 kW samlet (over 100 kW: hvert 2. år), ventilasjon/kjøling over 12 kW samlet eller mer enn 500 m². Registrer «Installert effekt (kW)» på systemet, så avgjør appen det for deg.',
+    'For varme-, ventilasjons- og kjøleanlegg som er 15 år eller eldre foreslår appen en energi- og utskiftingsvurdering, også når den ikke er lovpålagt.',
+  ] },
   { id: '2026-11-27', dato: '2026-11-27', tittel: 'Lovkrav: se om alt er på plass', punkter: [
     'Forsiden viser nå trafikklys per eiendom og område (kontroller, dokumenter, avvik, tilsyn, brannvern og leietakere), og en teller for lovpålagte kontroller som mangler i kontrollplanen.',
     'Øverst på hver eiendom står «Samsvar med lov og forskrift» med de viktigste tiltakene i prioritert rekkefølge.',

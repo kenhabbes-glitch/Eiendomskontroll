@@ -1,3 +1,4 @@
+import { energikrav } from './energikrav';
 import { KOMP, TFM_KODER, AV_LUKKET, TYPE_TAGGER, NS_TAGG } from './catalog';
 import { S, ARKIV } from './store';
 import { lokale, sprak, utSprak } from './i18n';
@@ -93,9 +94,15 @@ export function pliktStatus(p: Rec): { c: string; t: string; o: number; nx?: str
   const nx = addInt(p.sist, p.frekvens || { n: 1, enhet: 'år' }); const d = dUntil(nx)!;
   if (d < 0) return { c: 'red', t: 'Forfalt', o: 2, nx }; if (d <= 30) return { c: 'amber', t: 'Fornyes snart', o: 1, nx }; return { c: 'green', t: 'OK', o: 0, nx };
 }
+/** Gjelder lovkravet om energivurdering for dette systemet? null når systemet ikke finnes. */
+export function energikravFor(anleggId: string) { const a = S.anlegg.find(x => x.id === anleggId); if (!a) return null;
+  return energikrav(S.eiendommer.find(e => e.id === a.eiendomId), S.anlegg.filter(x => x.eiendomId === a.eiendomId), a); }
 export function taskFromMal(k: string, MALER: any, eiendomId: string, anleggId: string, frist: string) {
   const m = MALER[k];
   const alto = k === 'mx_simulacro' && S.eiendommer.find(e => e.id === eiendomId)?.grado === 'alto';
+  // Energivurdering: lovkrav bare over effekt-/arealgrensene, og hvert 2. år for store varmeanlegg
+  const ek = k === 'energivurdering' && anleggId ? energikravFor(anleggId) : null;
+  if (ek) return { malKey: k, eiendomId, anleggId, navn: m.n, kategori: m.k, type: ek.krav === 'nei' ? 'Anbefalt' : m.t, hjemmel: m.h, intervall: { n: ek.aar, enhet: 'år' }, utfores: m.u, ansvar: 'Eier', nesteFrist: frist, aktiv: true, historikk: [] };
   return { malKey: k, eiendomId, anleggId: anleggId || '', navn: m.n, kategori: m.k, type: m.t, hjemmel: m.h, intervall: alto ? { n: 6, enhet: 'mnd' } : { n: m.i[0], enhet: m.i[1] }, utfores: m.u, ansvar: 'Eier', nesteFrist: frist, aktiv: true, historikk: [] };
 }
 
