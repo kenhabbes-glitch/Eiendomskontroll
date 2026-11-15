@@ -49,7 +49,7 @@ export const MALER: Record<string, Mal> = {
   termografi:{n:"Termografering av el-tavler",k:"Elektro",t:"Forsikringskrav",h:"Forsikringsvilkår / FG",i:[1,"år"],u:"Sertifisert termograf",lvl:"a"},
   nodstrom:{n:"Nødstrømsaggregat/UPS – test og service",k:"Elektro",t:"Service",h:"FEL; leverandørens FDV",i:[6,"mnd"],u:"Servicefirma",lvl:"a"},
   lynvern:{n:"Lynvernanlegg – kontroll",k:"Elektro",t:"Anbefalt",h:"NEK EN 62305",i:[3,"år"],u:"Elektroinstallatør",lvl:"a"},
-  heis_periodisk:{n:"Heis/løfteinnretning – periodisk kontroll (akkreditert kontrollforetak)",k:"Heis",t:"Lovpålagt",h:"Plan- og bygningsloven § 29-9; TEK17 § 16-1 (sikkerhetskontroll minst hvert annet år); NS-EN 13015",i:[1,"år"],u:"Akkreditert kontrollforetak",lvl:"a"},
+  heis_periodisk:{n:"Heis/løfteinnretning – sikkerhetskontroll (uavhengig kontrollorgan)",k:"Heis",t:"Lovpålagt",h:"Plan- og bygningsloven § 29-9; TEK17 § 16-1 første ledd bokstav f – sikkerhetskontroll minst hvert annet år, utført av godkjent sikkerhetskontrollorgan (ikke heisfirmaets service)",i:[2,"år"],u:"Sikkerhetskontrollorgan (f.eks. Norsk Heiskontroll, Kiwa)",lvl:"a"},
   heis_service:{n:"Heis – service iht. serviceavtale",k:"Heis",t:"Service",h:"Pbl. § 29-9; NS-EN 13015",i:[1,"mnd"],u:"Heisfirma",lvl:"a"},
   port_kontroll:{n:"Motoriserte porter – årlig sikkerhetskontroll",k:"Bygg",t:"Lovpålagt",h:"Maskinforskriften; NS-EN 12453 / NS-EN 12604",i:[1,"år"],u:"Portleverandør",lvl:"a"},
   fallsikring:{n:"Fallsikring og forankringspunkter på tak – årlig kontroll",k:"Bygg",t:"Lovpålagt",h:"Forskrift om utførelse av arbeid; NS-EN 795",i:[1,"år"],u:"Sertifisert kontrollør",lvl:"a"},
