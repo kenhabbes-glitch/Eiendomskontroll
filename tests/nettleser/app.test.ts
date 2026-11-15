@@ -179,12 +179,16 @@ test('uten nett: kontroll kvitteres med bilde av rapporten, og alt lastes opp n�
     await a.side.locator('.modal').last().getByRole('button', { name: 'Registrer utført' }).click();
     const m = a.side.locator('.modal').last();
     await m.locator('input[type=file]').first().setInputFiles({ name: 'rapport.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
+    // bilde tatt med kameraet under kontrollen
+    await m.locator('input[capture]').setInputFiles({ name: 'foto.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
+    await m.locator('img').first().waitFor();
     await m.locator('.mf button.pri, .mf .btn.pri').last().click(); await m.waitFor({ state: 'detached', timeout: 8000 });
     let d = await a.db(); assert.equal(d.dokumenter.length, 0); assert.equal(d.oppgaver[0].data.historikk.length, 0, 'ingenting sendt uten nett');
     await a.kontekst.setOffline(false);
     await a.side.waitForFunction(() => { const x = JSON.parse(localStorage.getItem('mockdb') || '{}'); return x.dokumenter.length === 1 && x.oppgaver[0].data.historikk.length === 1; }, null, { timeout: 15000 });
     d = await a.db(); const dok = d.dokumenter[0].data, o = d.oppgaver[0].data;
     assert.ok(dok.fil.path && !dok.fil.path.startsWith('lokal:') && !dok.fil.lokal, 'filen skal være lastet opp: ' + JSON.stringify(dok.fil));
+    assert.equal(o.historikk[0].bilder.length, 1); assert.ok(o.historikk[0].bilder[0].path && !o.historikk[0].bilder[0].lokal, 'bildet skal være lastet opp');
     assert.equal(o.historikk[0].dokId, d.dokumenter[0].id); assert.ok(o.nesteFrist > '2026-06-01', 'neste frist flyttet'); assert.deepEqual(a.feil, []);
   } finally { await a.lukk(); }
 });

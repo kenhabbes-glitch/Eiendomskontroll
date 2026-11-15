@@ -1,7 +1,7 @@
 // Katalog: kontrollmaler, systemtyper med levetid, TFM-koder, leietakerplikter m.m.
 // Hjemler og intervaller er veiledende – kontroller mot gjeldende regelverk.
 export type Intervall = { n: number; enhet: 'uke' | 'mnd' | 'år' };
-export type Mal = { n: string; k: string; t: string; h: string; i: [number, 'uke' | 'mnd' | 'år']; u: string; lvl: 'e' | 'a'; b?: string; pl?: string[] | 'alle' };
+export type Mal = { n: string; k: string; t: string; h: string; i: [number, 'uke' | 'mnd' | 'år']; u: string; lvl: 'e' | 'a'; /** Sesong [fra måned, til måned] – kontrollen har bare frister i sesongen */ s?: [number, number]; b?: string; pl?: string[] | 'alle' };
 export type KompType = { n: string; g: string; l: number; m?: string[]; enh?: 'm2' };
 
 export const MALER: Record<string, Mal> = {
@@ -25,7 +25,7 @@ export const MALER: Record<string, Mal> = {
   energiattest:{n:"Energiattest – fornyelse",k:"Energi",t:"Lovpålagt",h:"Energiloven § 8-2 og energimerkeforskriften for bygninger – eier skal ha gyldig energiattest ved utleie og salg, uansett størrelse (plikten for alle yrkesbygg over 1000 m² er opphevet; offentlige bygg over 250 m² har egen plikt); attest gyldig i 10 år",i:[10,"år"],u:"Energirådgiver",lvl:"e"},
   tilstand:{n:"Tilstandsvurdering (NS 3424) og revisjon av vedlikeholdsplan",k:"Bygg",t:"Anbefalt",h:"NS 3424 / NS 3454",i:[5,"år"],u:"Rådgiver",lvl:"e"},
   uteomrade:{n:"Utvendig vernerunde (fasade, tak, adkomst, belysning, skilt)",k:"Bygg",t:"Egenkontroll",h:"Eiers aktsomhets- og vedlikeholdsplikt",i:[6,"mnd"],u:"Driftsansvarlig",lvl:"e"},
-  snoeis:{n:"Snø og is på tak – sesongplan og kontroll",k:"Bygg",t:"Egenkontroll",h:"Eiers aktsomhetsplikt (erstatningsansvar)",i:[1,"år"],u:"Driftsansvarlig",lvl:"e"},
+  snoeis:{n:"Snø og is på tak – kontroll i vintersesongen",k:"Bygg",t:"Egenkontroll",h:"Eiers aktsomhetsplikt (erstatningsansvar ved takras og istapper); politivedtektene i kommunen",i:[1,"mnd"],s:[11,4],u:"Driftsansvarlig",lvl:"e"},
   radon:{n:"Radonmåling (ved behov / etter ombygging)",k:"Miljø",t:"Anbefalt",h:"Strålevernforskriften – tiltaksnivå 100 Bq/m³ på arbeidsplasser",i:[10,"år"],u:"Rådgiver",lvl:"e"},
   // --- Anleggsnivå ---
   fasade_kontroll:{n:"Fasade – visuell kontroll (kledning, fuger, beslag, nedfallsfare)",k:"Bygg",t:"Egenkontroll",h:"Eiers aktsomhets- og vedlikeholdsplikt; leverandørens FDV",i:[1,"år"],u:"Driftsansvarlig",lvl:"a"},

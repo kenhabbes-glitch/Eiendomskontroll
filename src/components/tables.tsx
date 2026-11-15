@@ -1,3 +1,4 @@
+import { sesongTxt } from '../lib/sesong';
 import { gjentattTelling, gjentattAntall, GJENTATT_MIN, GJENTATT_MND } from '../lib/avvikLenker';
 import { harModul } from '../lib/moduler';
 import { bvStatus } from '../lib/brannvern';
@@ -46,7 +47,7 @@ export function TaskTable({ list, showE = true, group = true }: { list: Rec[]; s
       <td><b style={{ fontWeight: 500 }}>{o.navn}</b>{o.usynket && <> <Chip c="amber" title={tt("Lagret på enheten – sendes når du er på nett")}>{tt("Ikke sendt")}</Chip></>}{o.innrapport && <> <Chip c="blue">{tt("Rapport til godkjenning")}</Chip></>}{o.runde?.kp && Object.keys(o.runde.kp).length > 0 && !o.innrapport && <> <Chip c="amber" title={tt("Komponentvis kontroll pågår – trykk Utført for å fortsette")}>{tt("Pågår:")} {Object.keys(o.runde.kp).length} {tt("kontrollert")}</Chip></>}{o.aoSendt && o.aoSendt.frist === o.nesteFrist && !o.innrapport && <span className="small muted" title={tt("Arbeidsordre sendt {0} til {1}", fd(o.aoSendt.dato), o.aoSendt.til)}> ✉</span>}{o.ao?.auto && !(o.aoSendt && o.aoSendt.frist === o.nesteFrist) && <span className="small muted" title={tt("Arbeidsordre sendes automatisk {0} dager før frist til {1}", o.ao.dager || 0, o.ao.epost)}> ⏱</span>}{o.anleggId && <div className="small muted">{aNavn(o.anleggId)}</div>}{(() => { const d = ikDekning(o, MALER); return d && d.n > 0 ? <div className="small" style={{ color: d.nOk === d.n ? 'var(--green)' : 'var(--amber)' }}>{d.nOk} {tt("av")} {d.n} {tt("leietakere dokumentert")}</div> : null; })()}</td>
       {showE && <td>{eNavn(o.eiendomId)}</td>}
       <td><span className="tag">{o.type}</span><div className="small muted">{o.kategori}</div></td>
-      <td className="small">{intTxt(o.intervall)}</td>
+      <td className="small">{intTxt(o.intervall)}{o.sesong && <div className="muted">{tt("Sesong")} {sesongTxt(o.sesong)}</div>}</td>
       <td className="small">{o.ansvar === 'Leietaker' ? tt("Leietaker") + (o.leietakerId && lNavn(o.leietakerId) ? ': ' + lNavn(o.leietakerId) : '') : o.utfores || tt("Eier")}<div className="muted">{tt("Sist:")} {fd(o.sistUtfort)}</div></td>
       <td><button className="btn sm" onClick={e => { stop(e); utfor(o.id); }}>{tt("Utført")}</button></td>
     </tr>);

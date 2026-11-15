@@ -64,7 +64,7 @@ export function eierStatus(eid: string): EierStatus {
   const kontroller: KontrollRad[] = sortBy(T.filter(o => LOVTYPER.includes(o.type) && (o.ansvar || 'Eier') !== 'Leietaker'), o => o.nesteFrist || '').map(o => {
     const [lys, status] = kontrollLys(o); const h = (o.historikk || [])[0]; // nyeste først
     const nDok = h ? (h.dokIds?.length || (h.dokId ? 1 : 0)) : 0;
-    const bevis = !h ? '' : nDok ? (nDok > 1 ? tt("{0} dokumenter", nDok) : tt("Rapport vedlagt")) : h.sjekk ? tt("Sjekkliste") : h.auto ? tt("Automatisk registrert") : '';
+    const bevis = !h ? '' : nDok ? (nDok > 1 ? tt("{0} dokumenter", nDok) : tt("Rapport vedlagt")) : h.bilder?.length ? tt("{0} bilder", h.bilder.length) : h.sjekk ? tt("Sjekkliste") : h.auto ? tt("Automatisk registrert") : '';
     return { utenDok: !!h && !bevis, bevis, id: o.id, navn: o.navn, system: o.anleggId ? aNavn(o.anleggId) : 'Eiendommen', hjemmel: MALER[o.malKey]?.h || o.hjemmel || '', intervall: intTxt(o.intervall), sist: o.sistUtfort || h?.dato || '', frist: o.nesteFrist || '', lys, status, type: o.type };
   });
   const har = (k: string, a: string) => S.oppgaver.some(o => o.eiendomId === eid && o.malKey === k && (o.anleggId || '') === a && o.aktiv !== false);

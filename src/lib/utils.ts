@@ -1,3 +1,4 @@
+import { tilSesong } from './sesong';
 import { energikrav } from './energikrav';
 import { KOMP, TFM_KODER, AV_LUKKET, TYPE_TAGGER, NS_TAGG } from './catalog';
 import { S, ARKIV } from './store';
@@ -22,6 +23,8 @@ export function fd(s?: string) { if (!s) return '–'; const [y, m, d] = s.slice
 /** Dato på dokumentets språk (se medUtSprak) */
 export function fdU(s?: string) { if (!s) return '–'; const [y, m, d] = s.slice(0, 10).split('-'); const sp = utSprak(); return sp === 'nb' || sp === 'da' ? `${d}.${m}.${y}` : sp === 'sv' ? `${y}-${m}-${d}` : `${d}/${m}/${y}`; }
 export function fdt(s?: string) { if (!s) return '–'; return new Date(s).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' }); }
+/** Neste frist for en kontroll etter at den er utført «fra»: intervallet lagt til, og flyttet inn i sesongen når kontrollen er sesongavhengig. */
+export const nesteFrist = (o: any, fra: string) => tilSesong(addInt(fra, o.intervall), o.sesong);
 export function intTxt(i?: { n?: number; enhet?: string }) {
   if (!i) return '–'; const n = +(i.n || 1);
   if (i.enhet === 'uke') return n === 1 ? 'Ukentlig' : `Hver ${n}. uke`;
@@ -103,7 +106,7 @@ export function taskFromMal(k: string, MALER: any, eiendomId: string, anleggId: 
   // Energivurdering: lovkrav bare over effekt-/arealgrensene, og hvert 2. år for store varmeanlegg
   const ek = k === 'energivurdering' && anleggId ? energikravFor(anleggId) : null;
   if (ek) return { malKey: k, eiendomId, anleggId, navn: m.n, kategori: m.k, type: ek.krav === 'nei' ? 'Anbefalt' : m.t, hjemmel: m.h, intervall: { n: ek.aar, enhet: 'år' }, utfores: m.u, ansvar: 'Eier', nesteFrist: frist, aktiv: true, historikk: [] };
-  return { malKey: k, eiendomId, anleggId: anleggId || '', navn: m.n, kategori: m.k, type: m.t, hjemmel: m.h, intervall: alto ? { n: 6, enhet: 'mnd' } : { n: m.i[0], enhet: m.i[1] }, utfores: m.u, ansvar: 'Eier', nesteFrist: frist, aktiv: true, historikk: [] };
+  return { malKey: k, eiendomId, anleggId: anleggId || '', navn: m.n, kategori: m.k, type: m.t, hjemmel: m.h, intervall: alto ? { n: 6, enhet: 'mnd' } : { n: m.i[0], enhet: m.i[1] }, utfores: m.u, ansvar: 'Eier', nesteFrist: tilSesong(frist, m.s ? { fra: m.s[0], til: m.s[1] } : null), aktiv: true, historikk: [], ...(m.s ? { sesong: { fra: m.s[0], til: m.s[1] } } : {}) };
 }
 
 // ---- arealer

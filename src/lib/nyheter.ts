@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-11-30', dato: '2026-11-30', tittel: 'Bilder på kontroller og sesongavhengige kontroller', punkter: [
+    'Når du registrerer en kontroll som utført, kan du nå ta bilder med kameraet eller velge flere fra bildebiblioteket. Bildene lagres på utførelsen og vises i historikken.',
+    'Kontroller kan ha sesong, f.eks. november–april for snø og is på tak. Utenfor sesongen får de ingen frist – neste frist settes til første dag i neste sesong. Velg «Sesong fra/til» når du redigerer kontrollen.',
+    'Malen «Snø og is på tak» er nå månedlig i vintersesongen (november–april). Kontroller du allerede har, setter du sesong på selv.',
+  ] },
   { id: '2026-11-29', dato: '2026-11-29', tittel: 'Appen kan brukes uten nett', punkter: [
     'I kjeller, teknisk rom og andre steder uten dekning kan du nå kvittere kontroller, melde og oppdatere avvik, ta bilder og lese av målere. Alt lagres på telefonen og sendes av seg selv når nettet er tilbake.',
     'Rader som ikke er sendt ennå er merket «Ikke sendt», og et gult felt øverst viser hvor mange endringer som venter.',

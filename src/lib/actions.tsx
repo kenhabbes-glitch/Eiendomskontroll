@@ -1,4 +1,5 @@
 // Skjemaer og handlinger (opprett/rediger/slett) som brukes fra flere visninger.
+import { MND_KORT, tilSesong, sesongTxt } from './sesong';
 import { Hjelp } from '../components/Hjelp';
 import React, { useState } from 'react';
 import { SERVICEAVTALE, TG_DEF, KG_DEF, NS_DOK } from './catalog';
@@ -23,7 +24,7 @@ import { SysSjekkVelger, SysSjekkKort } from '../components/SysSjekk';
 import { alleMaler, finnMal, kopi, kontraktKey, fordeling, pliktKeysFor, OMR, ANS_VALG } from './kontrakt';
 import { YEAR, beregnetAar, kostJustert, kpiFor, kpiInnst, knok, nok, kostNaa, compYear, egetAar, naaverdi, renteInnst, standardTagger, taggerFor } from './utils';
 import { ikDekning } from './utils';
-import { MAL_DOK, energikravFor, addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
+import { nesteFrist, MAL_DOK, energikravFor, addDays, addInt, aNavn, byId, eNavn, fd, intTxt, kNavn, lNavn, nextKompLop, nextSysLop, openAvvik, pad, pliktStatus, sortBy, taskFromMal, tfmSys, today, activeTasks, dUntil, saStatus, type Rec } from './utils';
 import { AdresseSok, EnhetSok } from '../components/Oppslag';
 import { openPlan, plasserteFor } from '../views/Arealer';
 import { AoPanel, HendelseListe, aoSnapshot } from './arbeidsordre';
@@ -491,13 +492,15 @@ export function generatePlan(eid: string, isNew?: boolean) { openModal({ wide: t
 
 export function editOppgave(id?: string, preset: any = {}) {
   const o: Rec = id ? byId('oppgaver', id)! : { aktiv: true, ansvar: 'Eier', type: 'Egenkontroll', kategori: 'Bygg', intervall: { n: 1, enhet: 'år' }, nesteFrist: addDays(today(), 30), eiendomId: S.eiendommer[0]?.id, ...preset } as any;
-  const v = { ...o, in: o.intervall?.n || 1, ie: o.intervall?.enhet || 'år' };
+  const v = { ...o, in: o.intervall?.n || 1, ie: o.intervall?.enhet || 'år', sFra: o.sesong?.fra ? String(o.sesong.fra) : '', sTil: o.sesong?.til ? String(o.sesong.til) : '' };
   const fields: Field[] = [
     { k: 'navn', label: tt("Kontroll / oppgave"), req: true },
     { k: 'eiendomId', label: tt("Eiendom"), type: 'select', options: eOptsSkriv, req: true, half: true },
     { k: 'anleggId', label: tt("System"), type: 'select', options: () => S.anlegg.filter(a => !(v as any).eiendomId || a.eiendomId === (v as any).eiendomId).map(a => [a.id, eNavn(a.eiendomId) + ' – ' + aNavn(a.id)] as [string, string]), empty: tt("(Hele eiendommen)"), half: true },
     { k: 'kategori', label: tt("Fagområde"), type: 'select', options: KATS, half: true }, { k: 'type', label: tt("Type"), type: 'select', options: TYPER, half: true },
     { k: 'in', label: tt("Intervall"), type: 'number', half: true }, { k: 'ie', label: tt("Enhet"), type: 'select', options: ENH, half: true },
+    { k: 'sFra', label: tt("Sesong fra (valgfritt)"), type: 'select', options: MND_KORT.map((m, i) => [String(i + 1), tt(m)] as [string, string]), empty: tt("Hele året"), half: true, hint: tt("For kontroller som bare er aktuelle deler av året, f.eks. snø og is på tak") },
+    { k: 'sTil', label: tt("Sesong til"), type: 'select', options: MND_KORT.map((m, i) => [String(i + 1), tt(m)] as [string, string]), empty: tt("Hele året"), half: true, show: x => !!x.sFra },
     { k: 'nesteFrist', label: tt("Neste frist"), type: 'date', req: true, half: true }, { k: 'utfores', label: tt("Utføres av / leverandør"), half: true },
     { k: 'ansvar', label: tt("Ansvarlig part"), type: 'select', options: ['Eier', 'Leietaker'], half: true },
     { k: 'leietakerId', label: tt("Leietaker"), type: 'select', options: () => S.leietakere.map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true, show: x => x.ansvar === 'Leietaker' },
@@ -519,7 +522,7 @@ export function editOppgave(id?: string, preset: any = {}) {
   formModal({
     title: id ? tt("Rediger kontroll") : tt("Ny kontroll/oppgave"), fields, values: v,
     extraFoot: close => id ? <button className="btn danger" onClick={async () => { if (await confirmBox(tt("Slette kontrollen med historikk?"))) { await removeDoc('oppgaver', id); close(); } }}>{tt("Slett")}</button> : null,
-    onSave: async x => { x.intervall = { n: +x.in || 1, enhet: x.ie }; delete x.in; delete x.ie;
+    onSave: async x => { x.intervall = { n: +x.in || 1, enhet: x.ie }; delete x.in; delete x.ie; x.sesong = +x.sFra && +x.sTil ? { fra: +x.sFra, til: +x.sTil } : null; delete x.sFra; delete x.sTil; if (x.sesong && x.nesteFrist) x.nesteFrist = tilSesong(x.nesteFrist, x.sesong);
       const ep = String(x.aoEpost || '').trim(); if (x.aoAuto && !/^\S+@\S+\.\S+$/.test(ep)) { toast(tt("Fyll inn gyldig e-post til servicefirmaet for automatisk sending")); return false; }
       x.ao = { epost: ep, auto: !!x.aoAuto, dager: Math.max(0, Math.min(365, +x.aoDager || 0)), melding: x.aoMelding || '' }; delete x.aoEpost; delete x.aoAuto; delete x.aoDager; delete x.aoMelding; delete x.aoInfo; if (x.anleggId) { const a = byId('anlegg', x.anleggId); if (a) x.eiendomId = a.eiendomId; } const kid = await save('oppgaver', { ...o, ...x }); toast(tt("Kontroll lagret")); if (x.ao?.epost) import('../views/KontrollAo').then(m => m.sikreLokasjonsbilder(kid)); },
   });
@@ -570,6 +573,7 @@ export function utfor(id: string, pre?: UtforPreset) {
       {tgAvviker(x.tl, tgMaal) && <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={x.tlBruk !== false} onChange={e => set({ tlBruk: e.target.checked })} style={{ width: 'auto' }} />{tt("Oppdater tilstanden på")} {o.komponentId ? tt("komponenten") : tt("systemet")} {tt("til")} {tgTekst(x.tl)}</label>}</> } as Field] : []),
     ...(pre?.filer?.length ? [{ k: 'filerInfo', type: 'custom', label: tt("Rapport og vedlegg fra servicefirmaet"), render: () => <div className="small">{pre.filer!.map((f: any) => <div key={f.path}><FileLink fil={f} /></div>)}<div className="muted">{tt("Lagres som dokumenter på kontrollen.")}</div></div> } as Field] : []),
     { k: 'fil', label: pre?.filer?.length ? tt("Ekstra rapport / sjekkliste (valgfritt)") : tt("Rapport / sjekkliste"), type: 'file' },
+    { k: 'bilder', type: 'custom', label: tt("Bilder fra kontrollen"), def: [], render: (v: any, set: any) => <BildeVelger filer={v.bilder || []} set={f => set({ bilder: f })} /> },
     { k: 'les', type: 'custom', render: (v: any, set: any) => { const K = pdfKilder(v.fil, pre?.filer); if (!K.length || !harModul('dokumentlesing', o.eiendomId)) return null;
       return <div className="note small" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', color: 'var(--ink)' }}><span style={{ flex: 1 }}>{tt("Appen kan lese rapporten (PDF eller bilde) og foreslå avvik. Rapporten leses her i nettleseren.")}</span>
         <button type="button" className="btn sm pri" onClick={() => lesRapport(o, K, (avs, ok) => { const eks = (v.avs || []).filter((r: any) => r.t?.trim());
@@ -591,6 +595,9 @@ export function utfor(id: string, pre?: UtforPreset) {
       let dokId = '';
       if (x.fil) { const f = await uploadFile(x.fil, o.eiendomId); if (f) dokId = await save('dokumenter', { eiendomId: o.eiendomId, leietakerId: '', type: MAL_DOK[o.malKey] || (o.type === 'Egenkontroll' ? 'Egenkontrollskjema' : 'Servicerapport'), gyldigTil: o.malKey === 'energiattest' ? addInt(x.dato, o.intervall) : undefined, tittel: o.navn + ' – ' + fd(x.dato), dato: x.dato, fil: f, oppgaveId: o.id }); }
       const dokIds: string[] = [];
+      // Bilder tatt under kontrollen: skaleres ned og lagres på utførelsen (uten nett legges de på enheten og lastes opp senere)
+      const bilder: any[] = []; const { komprimer } = await import('./offline');
+      for (const b of (x.bilder || []) as File[]) { const f = await uploadFile(await komprimer(b), o.eiendomId, undefined, b.name || 'bilde.jpg'); if (f) bilder.push(f); }
       for (const f of pre?.filer || []) dokIds.push(await save('dokumenter', { eiendomId: o.eiendomId, leietakerId: '', type: MAL_DOK[o.malKey] || (o.type === 'Egenkontroll' ? 'Egenkontrollskjema' : 'Servicerapport'), gyldigTil: o.malKey === 'energiattest' ? addInt(x.dato, o.intervall) : undefined, tittel: o.navn + ' – ' + fd(x.dato) + (pre!.filer!.length > 1 ? ' – ' + f.navn : ''), dato: x.dato, fil: f, oppgaveId: o.id, anleggIds: o.anleggId ? [o.anleggId] : [] }));
       if (!dokId && dokIds.length) dokId = dokIds[0];
       const ids: string[] = [];
@@ -608,11 +615,11 @@ export function utfor(id: string, pre?: UtforPreset) {
         ids.push(aid); kpNy[kid] = { ...s, avvikIds: [aid] };
       }
       for (const { k, v } of avlV) await save('avlesninger', { eiendomId: k.eiendomId, komponentId: k.id, dato: x.dato, verdi: v, t: new Date().toISOString(), av: x.av || state.me?.navn || '', kilde: pre?.kilde ? 'servicefirma' : 'kontroll', oppgaveId: o.id, komm: o.navn });
-      const h = [{ dato: x.dato, av: x.av, res: x.res, avl: avlV.length ? Object.fromEntries(avlV.map(r => [r.k.id, r.v])) : undefined, komm: x.komm, dokId, dokIds: dokIds.length ? dokIds : undefined, avvik: ids, regAv: state.me?.id, kilde: pre?.kilde, runde: R ? { ...R, kp: kpNy } : undefined, sjekk: sj || undefined }, ...(o.historikk || [])].slice(0, 80);
+      const h = [{ dato: x.dato, av: x.av, res: x.res, avl: avlV.length ? Object.fromEntries(avlV.map(r => [r.k.id, r.v])) : undefined, komm: x.komm, dokId, dokIds: dokIds.length ? dokIds : undefined, bilder: bilder.length ? bilder : undefined, avvik: ids, regAv: state.me?.id, kilde: pre?.kilde, runde: R ? { ...R, kp: kpNy } : undefined, sjekk: sj || undefined }, ...(o.historikk || [])].slice(0, 80);
       const upd: Rec = { ...byId('oppgaver', id)!, historikk: h };
       if (R) delete upd.runde;
       if (pre?.kilde) delete upd.innrapport;
-      if (x.res !== 'Ikke utført / utsatt') { upd.sistUtfort = x.dato; upd.nesteFrist = x.nyFrist || addInt(x.dato, o.intervall); } else if (x.nyFrist) upd.nesteFrist = x.nyFrist;
+      if (x.res !== 'Ikke utført / utsatt') { upd.sistUtfort = x.dato; upd.nesteFrist = x.nyFrist || nesteFrist(o, x.dato); } else if (x.nyFrist) upd.nesteFrist = x.nyFrist;
       await save('oppgaver', upd);
       // Tilstand: oppdater systemet/komponenten hvis vurderingen avviker og brukeren har valgt det
       if (tgMaal && x.tl?.tg && tgAvviker(x.tl, tgMaal) && x.tlBruk !== false && kanRedigereE(o.eiendomId)) {
@@ -631,7 +638,7 @@ export async function registrerOk(id: string, komm = 'Kvittert i kontrollrunde')
   const d = today(); const sjMal = sysSjekkFor(alleSjekkmaler(), o, o.anleggId ? byId('anlegg', o.anleggId)?.type : '');
   const sjekk = sjMal ? { ...sjMal, svar: Object.fromEntries(sjMal.punkter.map(pt => [pt.id, 'ok'])) } : undefined;
   const h = [{ dato: d, av: state.me?.navn || state.me?.epost || '', res: 'OK – ingen avvik', komm, avvik: [], regAv: state.me?.id, sjekk }, ...(o.historikk || [])].slice(0, 80);
-  await save('oppgaver', { ...o, historikk: h, sistUtfort: d, nesteFrist: addInt(d, o.intervall) });
+  await save('oppgaver', { ...o, historikk: h, sistUtfort: d, nesteFrist: nesteFrist(o, d) });
 }
 // Settes av views/KomponentRunde (unngår sirkulær import)
 export const RundeRef: { start: (id: string) => boolean; Oppsummering: (p: { r: any }) => any } = { start: () => false, Oppsummering: () => null };
@@ -672,7 +679,7 @@ export async function autoKvitterIK() {
       const dato = d.rader.flatMap(r => r.pl.map(x => x.p.sist)).filter(Boolean).sort().pop() || today();
       const komm = `Kvittert ut automatisk: alle ${d.n} leietakere har dokumentert (${d.rader.map(r => r.l.navn).join(', ')}).`;
       const h = [{ dato, av: 'Automatisk', res: 'OK – ingen avvik', komm, auto: true }, ...(o.historikk || [])].slice(0, 80);
-      await save('oppgaver', { ...o, historikk: h, sistUtfort: dato, nesteFrist: addInt(dato, o.intervall) });
+      await save('oppgaver', { ...o, historikk: h, sistUtfort: dato, nesteFrist: nesteFrist(o, dato) });
       toast(tt("«{0}» er kvittert ut automatisk – alle leietakere har dokumentert", o.navn));
     }
   } finally { autoKjorer = false; }
@@ -695,7 +702,7 @@ export function redigerHistorikk(oid: string, idx: number) {
       const f = byId('oppgaver', oid)!; const L = (f.historikk || []).slice(); L[idx] = { ...L[idx], dato: x.dato, av: x.av, res: x.res, komm: x.komm, endret: { t: new Date().toISOString(), av: state.me?.navn || state.me?.epost } };
       L.sort((a: any, b: any) => String(b.dato).localeCompare(String(a.dato)));
       const sist = L.find((y: any) => y.res !== 'Ikke utført / utsatt'); const upd: Rec = { ...f, historikk: L, sistUtfort: sist?.dato || '' };
-      if (x.nyFrist && sist) upd.nesteFrist = addInt(sist.dato, f.intervall);
+      if (x.nyFrist && sist) upd.nesteFrist = nesteFrist(f, sist.dato);
       await save('oppgaver', upd); toast(x.nyFrist ? tt("Lagret – ny frist ") + fd(upd.nesteFrist) : tt("Lagret"));
     },
   });
@@ -707,7 +714,7 @@ export function visOppgave(id: string) {
     <KoPanelRef.C o={o} close={close} />
     <IkUnderpunkter o={o} close={close} />
     <h3 style={{ marginTop: 18 }}>{tt("Historikk")}</h3>
-    {(o.historikk || []).length ? <div className="log">{o.historikk.map((h: any, i: number) => { const d = h.dokId && byId('dokumenter', h.dokId); return <div key={i}><span className="lt">{fd(h.dato)}</span> · <b>{h.res}</b>{h.av ? ' · ' + h.av : ''}{kanDrifteE(o.eiendomId) && <> · <a href="#" className="small" onClick={e => { e.preventDefault(); redigerHistorikk(o.id, i); }}>{tt("rediger")}</a></>}{h.komm && <><br />{h.komm}</>}{h.runde && <div style={{ marginTop: 4 }}><RundeRef.Oppsummering r={h.runde} /></div>}{h.sjekk && <SysSjekkKort s={h.sjekk} />}{d?.fil && <><br /><FileLink fil={d.fil} /></>}{(() => { const n = Math.max((h.avvik || []).length, S.avvik.filter(a => a.oppgaveId === o.id && a.oppdaget === h.dato).length); return n > 0 ? <><br /><span className="muted small">{n} {tt("avvik registrert")}</span></> : null; })()}{!(h.avvik || []).length && !S.avvik.some(a => a.oppgaveId === o.id && a.oppdaget === h.dato) && h.res === 'Avvik funnet' && <><br /><a href="#" className="small" onClick={e => { e.preventDefault(); close(); editAvvik(undefined, { eiendomId: o.eiendomId, anleggId: o.anleggId || '', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, oppdaget: h.dato, beskrivelse: h.komm || '', ansvar: o.ansvar || 'Eier', leietakerId: o.leietakerId || '' }); }}>{tt("Ingen avvik ble opprettet – registrer avvik fra denne kontrollen")}</a></>}</div>; })}</div> : <p className="muted">{tt("Ikke registrert utført ennå.")}</p>}
+    {(o.historikk || []).length ? <div className="log">{o.historikk.map((h: any, i: number) => { const d = h.dokId && byId('dokumenter', h.dokId); return <div key={i}><span className="lt">{fd(h.dato)}</span> · <b>{h.res}</b>{h.av ? ' · ' + h.av : ''}{kanDrifteE(o.eiendomId) && <> · <a href="#" className="small" onClick={e => { e.preventDefault(); redigerHistorikk(o.id, i); }}>{tt("rediger")}</a></>}{h.komm && <><br />{h.komm}</>}{h.runde && <div style={{ marginTop: 4 }}><RundeRef.Oppsummering r={h.runde} /></div>}{h.sjekk && <SysSjekkKort s={h.sjekk} />}{d?.fil && <><br /><FileLink fil={d.fil} /></>}{(h.bilder || []).length > 0 && <div className="small">{h.bilder.map((b: any, j: number) => <span key={j}>{j ? ' · ' : ''}<FileLink fil={b}>{tt("Bilde {0}", j + 1)}</FileLink></span>)}</div>}{(() => { const n = Math.max((h.avvik || []).length, S.avvik.filter(a => a.oppgaveId === o.id && a.oppdaget === h.dato).length); return n > 0 ? <><br /><span className="muted small">{n} {tt("avvik registrert")}</span></> : null; })()}{!(h.avvik || []).length && !S.avvik.some(a => a.oppgaveId === o.id && a.oppdaget === h.dato) && h.res === 'Avvik funnet' && <><br /><a href="#" className="small" onClick={e => { e.preventDefault(); close(); editAvvik(undefined, { eiendomId: o.eiendomId, anleggId: o.anleggId || '', kilde: o.type === 'Egenkontroll' ? 'Egenkontroll' : 'Servicerapport', oppgaveId: o.id, oppdaget: h.dato, beskrivelse: h.komm || '', ansvar: o.ansvar || 'Eier', leietakerId: o.leietakerId || '' }); }}>{tt("Ingen avvik ble opprettet – registrer avvik fra denne kontrollen")}</a></>}</div>; })}</div> : <p className="muted">{tt("Ikke registrert utført ennå.")}</p>}
   </>, { foot: close => <>{canEdit() && <button className="btn" onClick={() => { close(); editOppgave(id); }}>{tt("Rediger")}</button>}<span className="grow" /><button className="btn pri" onClick={() => { close(); utfor(id); }}>{tt("Registrer utført")}</button></> });
 }
 
