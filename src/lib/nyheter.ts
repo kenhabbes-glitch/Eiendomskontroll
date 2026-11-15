@@ -6,6 +6,8 @@ export const NYHETER: Nyhet[] = [
     'Øverst på hver eiendom står «Samsvar med lov og forskrift» med de viktigste tiltakene i prioritert rekkefølge.',
     'Ny fane «Lovkrav» på eiendommen: hvert krav med hjemmel, status og hva som dokumenterer det. Manglende kontroller legges inn med ett trykk, eller merkes «Ikke aktuelt» med begrunnelse.',
     'Lovpålagte kontroller som er kvittert uten rapport eller annen dokumentasjon blir flagget, så du kan legge ved det som mangler før et tilsyn.',
+    'Ny eiendom? «Hva finnes i bygget?» spør om heis, sprinkler, brannalarm og lignende, og foreslår de lovpålagte kontrollene. Knappen finnes også under «Lovkrav» på eksisterende eiendommer.',
+    'Menyen er ryddet: det du bruker daglig står øverst, mens målere, TFM, tegninger, nøkler, vedlikehold og prosjekter ligger under «Bygg og teknikk». Appen starter også raskere.',
   ] },
   { id: '2026-11-26', dato: '2026-11-26', tittel: 'Store 3D-modeller bruker mindre minne', punkter: [
     'Nye 3D-modeller blir mye lettere: like punkter slås sammen ved opplasting, så modellen bruker rundt en tredjedel av minnet. Modeller som er lastet opp tidligere kan gjøres lettere med ett trykk på PC («Gjør modellene lettere») – uten ny opplasting.',

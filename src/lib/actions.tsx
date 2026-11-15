@@ -10,6 +10,7 @@ import { byggTillegg, harModul, orgPris } from './moduler';
 import { TgKgVelger, tgAvviker, tgTekst } from '../components/TgKg';
 import { PosVelger, BildeVelger, VedleggGalleri } from '../components/PosVelger';
 import { ServiceHistorikk } from '../views/Servicehistorikk';
+import { byggVeiviser } from '../views/Veiviser';
 import { alleSjekkmaler } from '../views/Sjekkmaler';
 import { sysSjekkFor, sysSjekkAvvik } from './komponentsjekk';
 import { aktivtProsjektFor, opprettUtskifting } from './prosjekt';
@@ -109,7 +110,7 @@ export function editEiendom(id?: string, etter?: (nid: string) => void, preset?:
       if (v.eierOrgnr && rensOrgnr(v.eierOrgnr).length === 9 && v.eierBrreg?.orgnr !== rensOrgnr(v.eierOrgnr)) { const b = await brregData(v.eierOrgnr).catch(() => null); if (b) { v.eierBrreg = b; if (!v.eierNavn) v.eierNavn = b.navn; } }
       const bOrg = !id ? (v.eierOrgId || e.eierOrgId) : null; const bTillegg = bOrg ? byggTillegg(bOrg) : 0; const bGml = bOrg && bTillegg ? orgPris(bOrg) : 0;
       const nid = await save('eiendommer', { ...e, ...v });
-      if (bOrg && bTillegg > 0) aoApi({ action: 'abonnement_varsel', org_id: bOrg, type: 'bygg', navn: v.navn || e.navn, gml: bGml, ny: bGml + bTillegg }).catch(() => {}); toast(flyttet ? tt("Eiendommen er flyttet") : tt("Eiendom lagret")); if (flyttet) await oppdaterNiva(); if (!id) { await oppdaterNiva(); if (etter) etter(nid); else { go('eiendom/' + nid); setTimeout(() => generatePlan(nid, true), 300); } } },
+      if (bOrg && bTillegg > 0) aoApi({ action: 'abonnement_varsel', org_id: bOrg, type: 'bygg', navn: v.navn || e.navn, gml: bGml, ny: bGml + bTillegg }).catch(() => {}); toast(flyttet ? tt("Eiendommen er flyttet") : tt("Eiendom lagret")); if (flyttet) await oppdaterNiva(); if (!id) { await oppdaterNiva(); if (etter) etter(nid); else { go('eiendom/' + nid); setTimeout(() => byggVeiviser(nid, true), 300); } } },
   });
 }
 
@@ -476,7 +477,7 @@ function GenPlanBody({ eid, isNew, close }: { eid: string; isNew?: boolean; clos
   return <>
     <div className="mh"><h2>{tt("Kontrollplan –")} {e.navn}</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
     <div className="mb">
-      <p className="muted" style={{ marginTop: 0 }}>{isNew ? tt("Eiendommen er opprettet. Her er de faste kontrollene som gjelder alle næringseiendommer. Kontroller for tekniske anlegg legges til når du registrerer systemene.") : tt("Forslag basert på eiendommen og registrerte systemer. Kontroller som allerede finnes, vises ikke.")}</p>
+      <p className="muted" style={{ marginTop: 0 }}>{isNew ? tt("Her er kontrollene som gjelder eiendommen og systemene du krysset av for. Fjern krysset for det som ikke er aktuelt.") : tt("Forslag basert på eiendommen og registrerte systemer. Kontroller som allerede finnes, vises ikke.")}</p>
       {rows.length ? <>
         <div className="checks">{rows.map((r, i) => { const m = MALER[r.k]; return <label key={r.k + r.a}><input type="checkbox" checked={sel[i]} onChange={ev => setSel(s => s.map((x, j) => j === i ? ev.target.checked : x))} /><span><span className="ct">{m.n}{r.a && <> <span className="tag">{aNavn(r.a)}</span></>}</span><br /><span className="cs">{m.t} · {intTxt({ n: m.i[0], enhet: m.i[1] })} · {m.h}</span></span></label>; })}</div>
         <div className="form" style={{ marginTop: 14 }}><div className="fld half"><label>{tt("Første frist")}</label><input type="date" value={d} onChange={ev => setD(ev.target.value)} /></div><div className="fld half"><label>&nbsp;</label><div className="hint">{tt("Har du dato for sist utførte kontroll, registrer den etterpå med «Utført», så beregnes neste frist automatisk.")}</div></div></div>

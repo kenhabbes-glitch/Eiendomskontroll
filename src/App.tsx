@@ -123,13 +123,18 @@ function navFor(): [string, string][] {
   return n;
 }
 
-const ADMIN_NAV = ['innstillinger', 'logg', 'arkiv', 'brukere', 'data'];
+/** Grupper i menyen: [nøkkel, navn, ikon, sider]. Sidene vises bare når gruppen er åpnet. */
+const NAV_GRUPPER: [string, string, string, string[]][] = [
+  ['teknikk', 'Bygg og teknikk', 'tfm', ['maalere', 'tfm', 'arealer', 'nokler', 'vedlikehold', 'prosjekter', 'tilsynsanalyser']],
+  ['kunnskap', 'Håndbok og regelverk', 'handbok', ['handbok', 'regelverk']],
+  ['admin', 'Administrasjon', 'admin', ['innstillinger', 'logg', 'arkiv', 'brukere', 'data']],
+];
 export default function App() {
   useEffect(() => { initAuth(); const t = setTimeout(hentSeneSider, 4000); return () => clearTimeout(t); }, []);
   // Befaringer gjort uten nett: last inn fra enheten og synk når appen er klar
   useEffect(() => { if (state.ready && state.me) { lastLokale(); const t = setTimeout(() => { synkAlle(); sendKo(); }, 2500); return () => clearTimeout(t); } }, [state.ready, state.me?.id]);
-  const [admApen, setAdmApen] = useState(() => { try { return localStorage.getItem('navAdmin') === '1'; } catch { return false; } });
-  const settAdmApen = (b: boolean) => { setAdmApen(b); try { localStorage.setItem('navAdmin', b ? '1' : '0'); } catch { } };
+  const [navApen, setNavApen] = useState<Record<string, boolean>>(() => { try { return { ...JSON.parse(localStorage.getItem('navApen') || '{}'), ...(localStorage.getItem('navAdmin') === '1' ? { admin: true } : {}) }; } catch { return {}; } });
+  const settNavApen = (g: string, b: boolean) => { const n = { ...navApen, [g]: b }; setNavApen(n); try { localStorage.setItem('navApen', JSON.stringify(n)); localStorage.removeItem('navAdmin'); } catch { } };
   useStore();
   const ibN = useInnboksAntall(); const mldN = useUlesteMeldinger();
   const r = useRoute();
@@ -214,14 +219,17 @@ export default function App() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={I[k]} /></svg>{tt(l)}
           {k === 'kontroller' && forf > 0 && <span className="n">{forf}</span>}{k === 'avvik' && avv > 0 && <span className="n">{avv}</span>}{k === 'meldinger' && mldN > 0 && <span className="n">{mldN}</span>}{k === 'innboks' && ibN > 0 && <span className="n">{ibN}</span>}{k === 'tilsyn' && svarfristSnart(14).length > 0 && <span className="n">{svarfristSnart(14).length}</span>}{k === 'arbeidsordre' && mineAo().length > 0 && <span className="n">{mineAo().length}</span>}
         </a>;
-        const adm = nav.filter(n => ADMIN_NAV.includes(n[0])); const vanlig = nav.filter(n => !ADMIN_NAV.includes(n[0]));
-        const iAdm = adm.some(n => n[0] === cur); const apen = admApen || iAdm;
-        const hjelp = vanlig.filter(n => n[0] === 'hjelp'), ovr = vanlig.filter(n => n[0] !== 'hjelp');
+        // Menyen er delt i det man bruker daglig (øverst) og grupper som åpnes ved behov
+        const grupper = isTenant() || isUtforer() ? [] : NAV_GRUPPER.filter(g => nav.filter(n => g[3].includes(n[0])).length > 1);
+        const iGruppe = new Set(grupper.flatMap(g => g[3]));
+        const hjelp = nav.filter(n => n[0] === 'hjelp'), ovr = nav.filter(n => n[0] !== 'hjelp' && !iGruppe.has(n[0]));
         return <>{ovr.map(n => lenke(n))}
-          {adm.length > 0 && <><a href="#" className={'grp' + (iAdm && !apen ? ' on' : '')} onClick={e => { e.preventDefault(); if (!iAdm) settAdmApen(!admApen); }} aria-expanded={apen}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={I.admin} /></svg>{tt("Administrasjon")}
-            <svg className="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginLeft: 'auto', transform: apen ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}><path d="M9 6l6 6-6 6" /></svg></a>
-            {apen && adm.map(n => lenke(n, true))}</>}
+          {grupper.map(([gk, gl, ikon, medl]) => { const sider = nav.filter(n => medl.includes(n[0]));
+            const her = sider.some(n => n[0] === cur); const apen = !!navApen[gk] || her;
+            return <React.Fragment key={gk}><a href="#" className={'grp' + (her && !apen ? ' on' : '')} onClick={e => { e.preventDefault(); if (!her) settNavApen(gk, !navApen[gk]); }} aria-expanded={apen}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={I[ikon]} /></svg>{tt(gl)}
+              <svg className="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginLeft: 'auto', transform: apen ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}><path d="M9 6l6 6-6 6" /></svg></a>
+              {apen && sider.map(n => lenke(n, true))}</React.Fragment>; })}
           {hjelp.map(n => lenke(n))}</>;
       })()}</nav>
       <div className="sidefoot">

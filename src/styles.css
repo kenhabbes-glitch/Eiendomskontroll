@@ -425,3 +425,4 @@ h1 .hjelp-q{position:relative;top:-2px}
 .krav-uten{color:var(--amber);font-weight:500}
 .krav-h{white-space:nowrap;text-align:right}
 table.krav td{vertical-align:top}
+.checks.veiv{max-height:none}

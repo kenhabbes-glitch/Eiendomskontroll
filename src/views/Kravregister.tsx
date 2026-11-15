@@ -7,6 +7,7 @@ import { tt } from '../lib/i18n';
 import { eierStatus, kontrollNA, type KontrollRad, type Lys } from '../lib/eierRapport';
 import { editDok, fjernKontrollNA, generatePlan, settKontrollNA, toggleDokNA, visOppgave } from '../lib/actions';
 import { Lyspunkt } from '../components/Samsvar';
+import { byggVeiviser } from './Veiviser';
 
 const St = ({ lys, t }: { lys: Lys; t: string }) => <span className="krav-st"><Lyspunkt lys={lys} /> {tt(t)}</span>;
 
@@ -23,6 +24,7 @@ export function Kravregister({ id }: { id: string }) {
     <div className="toolbar">
       <p className="small muted" style={{ margin: 0 }}><b>{alle.length}</b> {tt("krav gjelder eiendommen")} · <b style={{ color: 'var(--green)' }}>{ok}</b> {tt("i orden og dokumentert")} · <b style={rod ? { color: 'var(--red)' } : undefined}>{rod}</b> {tt("krever tiltak")}</p>
       <label className="small" style={{ marginLeft: 'auto' }}><input type="checkbox" checked={bare} onChange={e => setBare(e.target.checked)} /> {tt("Vis bare det som ikke er i orden")}</label>
+      <button className="btn sm" onClick={() => byggVeiviser(id)}>{tt("Hva finnes i bygget?")}</button>
       {mangler.length > 1 && <button className="btn pri sm" onClick={() => generatePlan(id)}>{tt("Legg inn {0} manglende lovpålagte kontroller", mangler.length)}</button>}
     </div>
     <div className="sec"><h2>{tt("Kontroller, tilsyn og service eier skal sørge for")}</h2>

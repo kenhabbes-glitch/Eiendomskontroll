@@ -122,3 +122,19 @@ test('lovkrav: manglende kontroll kan legges inn eller merkes «ikke aktuelt» m
     assert.deepEqual(a.feil, []);
   } finally { await a.lukk(); }
 });
+
+test('veiviser: «Hva finnes i bygget?» registrerer systemer og foreslår de lovpålagte kontrollene', async () => {
+  const a = await aapne('#/eiendom/e1'); try {
+    await a.side.locator('.tabs a, .tabs button', { hasText: 'Lovkrav' }).click();
+    await a.side.locator('button', { hasText: 'Hva finnes i bygget?' }).click();
+    const m = a.side.locator('.modal').last();
+    assert.match(await m.locator('label', { hasText: 'Brannalarmanlegg' }).innerText(), /Allerede registrert/);
+    await m.locator('label', { hasText: /^Heis/ }).first().locator('input').check();
+    await m.locator('button', { hasText: 'Registrer 1 og vis kontrollene' }).click();
+    await a.side.locator('.modal h2', { hasText: 'Kontrollplan –' }).waitFor();
+    const d = await a.db(); assert.equal(d.systemer.length, 2); assert.equal(d.systemer[1].data.type, 'heis'); assert.ok(d.systemer[1].data.tfmSys, 'TFM-kode satt');
+    assert.match(await a.side.locator('.modal').last().innerText(), /[Hh]eis/);
+    if (process.env.EK_BILDE) await a.side.screenshot({ path: process.env.EK_BILDE });
+    assert.deepEqual(a.feil, []);
+  } finally { await a.lukk(); }
+});
