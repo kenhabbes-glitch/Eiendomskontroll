@@ -235,11 +235,15 @@ function Visning({ eid, modeller, hovedId, last }: { eid: string; modeller: Rec[
   // --- avvik som markører
   const avvikM = openAvvik().filter(a => a.eiendomId === eid && a.modell?.x != null);
   // Etasje for et punkt: laveste Y per etasje fra geometrien; punktet hører til øverste etasje som starter under det
-  const etgMinY = useMemo(() => { const t = T.current; const h = t.mod?.hode; if (!h) return [] as number[]; const mn: number[] = h.etasjer.map(() => Infinity);
-    t.mod.grupper.forEach((g: any, gi: number) => { const e = h.grupper[gi]?.etasje; if (e == null || h.etasjer[e]?.kote <= -1e3 || h.etasjer[e]?.terreng) return; const P = g.pos; for (let i = 1; i < P.length; i += 3) if (P[i] < mn[e]) mn[e] = P[i]; }); return mn; }, [lastet]);
+  const etgMinY = useMemo(() => { const t = T.current; const h = t.mod?.hode; if (!h) return [] as number[]; const ys: number[][] = h.etasjer.map(() => []);
+    t.mod.grupper.forEach((g: any, gi: number) => { const e = h.grupper[gi]?.etasje; if (e == null || h.etasjer[e]?.kote <= -1e3 || h.etasjer[e]?.terreng) return; const P = g.pos; const steg = Math.max(3, Math.floor(P.length / 3 / 4000) * 3); for (let i = 1; i < P.length; i += steg) ys[e].push(P[i]); });
+    // Hver etasjes nivå er kotene fra modellen + én felles forskyvning (median av nedre persentil − kote), så enkeltelementer som går over flere etasjer ikke flytter grensene
+    const diff: number[] = []; ys.forEach((a, i) => { if (a.length > 20) { a.sort((x, y) => x - y); diff.push(a[Math.floor(a.length * 0.05)] - h.etasjer[i].kote); } });
+    if (!diff.length) return h.etasjer.map(() => Infinity); diff.sort((x, y) => x - y); const off = diff[Math.floor(diff.length / 2)];
+    return h.etasjer.map((e: any) => e.kote <= -1e3 || e.terreng ? Infinity : e.kote + off); }, [lastet]);
   const etgAvY = (y: number, navn?: string) => { const h = T.current.mod?.hode; if (!h) return -1; if (navn) { const i = h.etasjer.findIndex((e: any) => e.navn === navn); if (i >= 0) return i; }
     let best = -1, bm = -Infinity; etgMinY.forEach((m, i) => { if (m !== Infinity && m <= y + 0.4 && m > bm) { bm = m; best = i; } }); if (best < 0) { let lo = Infinity; etgMinY.forEach((m, i) => { if (m < lo) { lo = m; best = i; } }); } return best; };
-  const etgSyn = (y: number, navn?: string) => { const i = etgAvY(y, navn); return i < 0 || vis[i] !== false; };
+  const etgSyn = (y: number, navn?: string) => { const i = etgAvY(y, navn); return i < 0 || vis[i] !== false; }; // usikker etasje = vis alltid
   const sokOrd = sok.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const treffer = (col: string, o: Rec) => { if (!sokOrd.length) return true; const a = col === 'anlegg' ? o : byId('anlegg', o.anleggId); const tekst = [o.navn, o.tittel, o.type, o.tfmSys, a?.navn, a?.type, ...taggerFor(a || o, 'a')].filter(Boolean).join(' ').toLowerCase(); return sokOrd.every(w => tekst.includes(w)); };
   const avvikSyn = avvikM.filter(a => etgSyn(a.modell.y, a.modell.etasje) && treffer('avvik', a));
