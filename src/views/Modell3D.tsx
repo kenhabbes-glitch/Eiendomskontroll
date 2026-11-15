@@ -265,9 +265,11 @@ function Visning({ eid, modeller, hovedId, last }: { eid: string; modeller: Rec[
 
   // --- plasseringer fra 2D-tegninger vist i 3D (etter kalibrering)
   const kalEff = useMemo(() => ksteg >= 4 && kt ? { ...kal, [kt]: { p: kp, m: km, sp: ksp } as Kal } : kal, [kal, ksteg, kt, kp, km, ksp]);
+  // Punkter fra tegninger legges ca. 1,5 m over gulvet i etasjen de hører til
+  const legg15 = (p: V3): V3 => { const i = etgAvY(p[1]); const g = i >= 0 ? etgMinY[i] : Infinity; return g === Infinity ? p : [p[0], g + 1.5, p[2]]; };
   const plassert = useMemo(() => { const ut: { col: string; id: string; p: V3; farge: string }[] = []; if (!visPl) return ut;
     for (const tid of Object.keys(kalEff)) { const M = kalMat(kalEff[tid]); if (!M) continue;
-      const tilf = (col: string, L: Rec[], farge: (o: Rec) => string) => L.filter(o => o.eiendomId === eid && !o.arkivert && o.pos?.tegningId === tid).forEach(o => ut.push({ col, id: o.id, p: tilModell(M, o.pos.x, o.pos.y), farge: farge(o) }));
+      const tilf = (col: string, L: Rec[], farge: (o: Rec) => string) => L.filter(o => o.eiendomId === eid && !o.arkivert && o.pos?.tegningId === tid).forEach(o => ut.push({ col, id: o.id, p: legg15(tilModell(M, o.pos.x, o.pos.y)), farge: farge(o) }));
       tilf('anlegg', S.anlegg, o => ST[statusAnlegg(o.id)]); tilf('komponenter', S.komponenter, o => ST[o.anleggId ? statusAnlegg(o.anleggId) : 'ingen']); tilf('avvik', openAvvik(), o => o.alv === 'Kritisk' || o.alv === 'Høy' ? ST.rod : ST.snart); }
     return ut.filter(m => etgSyn(m.p[1]) && treffer(m.col, byId(m.col as any, m.id) || ({} as Rec))); }, [kalEff, visPl, S.anlegg, S.komponenter, S.avvik, S.oppgaver, eid, vis, sok, etgMinY]);
   useEffect(() => { const t = T.current; if (!t.mod) return; tomGruppe(t.plass); const r = t.str * 0.009;
