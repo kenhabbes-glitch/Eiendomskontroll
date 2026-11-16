@@ -33,10 +33,15 @@ export async function pushTilBrukere(admin: any, userIds: string[], typer: strin
   } catch (e: any) { console.error('push', e?.message || e); return 0; }
 }
 
-/** Sender til administratorer og forvaltere i en organisasjon */
-export async function pushTilOrg(admin: any, orgId: string, typer: string[], inn: PushInnhold, roller = ['admin', 'forvalter']): Promise<number> {
+/** Sender til ansatte i en organisasjon (administratorer, forvaltere og gårdeiere). Med eiendomId får bare de som har tilgang til byggene beskjed. */
+export async function pushTilOrg(admin: any, orgId: string, typer: string[], inn: PushInnhold, roller = ['admin', 'forvalter', 'gardeier'], eiendomId?: string): Promise<number> {
   try {
     const { data: m } = await admin.from('org_medlem').select('user_id, rolle, aktiv').eq('org_id', orgId).eq('aktiv', true);
-    return await pushTilBrukere(admin, (m || []).filter((x: any) => roller.includes(x.rolle)).map((x: any) => x.user_id), typer, inn);
+    let ider: string[] = [];
+    for (const x of (m || []).filter((x: any) => roller.includes(x.rolle))) {
+      if (eiendomId && x.rolle !== 'admin') { const { data: n } = await admin.rpc('niva_for', { p_uid: x.user_id, eid: eiendomId }); if (!n) continue; }
+      ider.push(x.user_id);
+    }
+    return await pushTilBrukere(admin, ider, typer, inn);
   } catch { return 0; }
 }

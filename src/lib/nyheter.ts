@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-11', dato: '2026-12-11', tittel: 'Ny rolle: Gårdeier', punkter: [
+    'Under Organisasjon og tilgang kan du nå legge til brukere som Gårdeier. En gårdeier eier ett bygg, en portefølje eller flere, og ser bare de byggene du tildeler (eller alle). Vedkommende kan se oversikt, avvik, kontroller og dokumenter, men ikke endre noe.',
+    'Gårdeieren får sin egen ukeoversikt på e-post med bare sine bygg, og kan slå på push-varsler for kritiske saker på sin profilside.',
+  ] },
   { id: '2026-12-10', dato: '2026-12-10', tittel: 'Ny mobilmeny', punkter: [
     'På mobil har appen nå en meny nederst med fem store knapper som følger rollen din: eier, forvalter, vaktmester, utførende og leietaker får hver sin. Resten av sidene ligger under «Mer», med søk, sist brukte sider og store fliser.',
     'På forsiden ligger store knapper for Nytt avvik, Skann QR og Kontrollrunde, så du slipper å lete når du er ute på eiendommen. PC-menyen er uendret.',

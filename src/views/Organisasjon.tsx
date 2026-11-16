@@ -15,7 +15,8 @@ export const ORG_ROLLER: [string, string, string][] = [
   ['admin', 'Administrator', 'Styrer organisasjonen: brukere, tildeling av bygg, porteføljer og oppdrag. Ser alle bygg organisasjonen har.'],
   ['forvalter', 'Forvalter', 'Redigerer bygg de er tildelt: systemer, kontroller, avvik, dokumenter, leietakere, arealer og økonomi.'],
   ['tekniker', 'Driftstekniker', 'Ser tildelte bygg, registrerer utførte kontroller og avvik. Ser ikke leietakere eller leieavtaler.'],
-  ['leser', 'Leser', 'Ser tildelte bygg uten å kunne endre (f.eks. eier, styre eller revisor).'],
+  ['leser', 'Leser', 'Ser tildelte bygg uten å kunne endre (f.eks. styre eller revisor).'],
+  ['gardeier', 'Gårdeier', 'Eier av ett bygg, en portefølje eller flere. Ser eieroversikt (forfalt, avvik, samsvar, dokumenter) for sine bygg, uten å kunne endre noe. Får ukeoversikt og varsler for kritiske saker. Velg byggene eller porteføljene under «Tildel bygg / porteføljer».'],
 ];
 export const OPPDRAG_ROLLER: [string, string, string][] = [
   ['forvalter', 'Forvaltning', 'Firmaet forvalter bygget: kan redigere alt (som egen forvalter). Firmaets administrator fordeler byggene på sine ansatte.'],
@@ -255,7 +256,7 @@ export function Organisasjon() {
       </div>
       <div className="tbl-wrap"><table><thead><tr><th>{tt("Navn")}</th><th>{tt("E-post")}</th><th>{tt("Rolle")}</th><th>{tt("Tilgang til bygg")}</th><th>{tt("Tofaktor")}</th><th>{tt("Status")}</th></tr></thead><tbody>
         {M.map(m => { const p = profil(m.user_id); return <tr key={m.user_id} className="click" onClick={() => redigerMedlem(m)}><td><b style={{ fontWeight: 500 }}>{p.navn || '–'}</b>{m.user_id === state.me?.id && <span className="muted small"> {tt("(deg)")}</span>}</td><td className="small">{p.epost}</td>
-          <td><Chip c={m.rolle === 'admin' ? 'blue' : m.rolle === 'leser' ? '' : 'green'}>{rolleNavn(m.rolle)}</Chip></td>
+          <td><Chip c={m.rolle === 'admin' ? 'blue' : m.rolle === 'leser' || m.rolle === 'gardeier' ? '' : 'green'}>{rolleNavn(m.rolle)}</Chip></td>
           <td className="small">{m.rolle === 'admin' || m.alle_bygg ? tt("Alle organisasjonens bygg") : tildelingTekst(m.user_id, org) || <span style={{ color: 'var(--amber)' }}>{tt("Ingen bygg tildelt")}</span>}</td>
           <td>{mf[m.user_id] === undefined ? <span className="muted small">–</span> : mf[m.user_id] ? <Chip c="green">{tt("På")}</Chip> : krev && ['admin', 'forvalter'].includes(m.rolle) ? <Chip c="amber">{tt("Må settes opp")}</Chip> : <Chip>{tt("Av")}</Chip>}</td>
           <td>{m.aktiv ? <Chip c="green">{tt("Aktiv")}</Chip> : <Chip>{tt("Deaktivert")}</Chip>}</td></tr>; })}

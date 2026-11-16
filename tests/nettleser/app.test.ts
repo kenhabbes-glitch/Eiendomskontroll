@@ -247,3 +247,15 @@ test('lenke fra e-post (nytt passord): knapp først, koden brukes først ved try
     if (a.feil.length) assert.fail(a.feil[0]);
   } finally { await a.lukk(); }
 });
+
+test('gårdeier: egen meny uten redigering, rollenavn vises, mobilmeny uten «Nytt avvik»-knapper', async () => {
+  const a = await aapne('#/oversikt', { lager: { mockRolle: 'gardeier' }, mobil: true }); try {
+    await a.side.waitForTimeout(600); if (a.feil.length) assert.fail(a.feil[0]);
+    const knapper = (await a.side.locator('#bunnmeny .bm-tekst').allInnerTexts()).join('|');
+    assert.equal(knapper, 'Oversikt|Avvik|Kontroll|Dokumenter|Mer', 'feil knapper i gårdeierens bunnmeny: ' + knapper);
+    assert.equal(await a.side.locator('.mob-snarvei').count(), 0, 'gårdeier skal ikke ha snarveier for å registrere');
+    await a.side.evaluate(() => { location.hash = '#/profil'; }); await a.side.waitForTimeout(500);
+    const t = await tekst(a); assert.ok(t.includes('Gårdeier'), 'rollen «Gårdeier» vises ikke i profilen');
+    assert.ok(t.includes('Varsler på denne enheten'), 'varselkortet mangler i profilen');
+  } finally { await a.lukk(); }
+});

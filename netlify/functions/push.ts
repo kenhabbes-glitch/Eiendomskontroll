@@ -63,7 +63,7 @@ const handler = async (req: Request) => {
     if (a.data?.pushSendt) return json(200, { sendt: 0 });
     const { data: e } = await admin.from('eiendommer').select('eier_org_id, data').eq('id', a.eiendom_id).maybeSingle(); if (!e?.eier_org_id) return json(200, { sendt: 0 });
     const kritisk = a.data?.alv === 'Kritisk';
-    const n = await pushTilOrg(admin, e.eier_org_id, kritisk ? ['kritisk', 'melding'] : ['melding'], { tittel: (kritisk ? 'KRITISK sak: ' : 'Ny sak: ') + String(a.data?.tittel || '').slice(0, 80), tekst: [e.data?.navn || e.data?.adresse, 'Meldt av leietaker'].filter(Boolean).join(' – '), url: '/#/avvik', tag: 'avvik-' + a.id });
+    const n = await pushTilOrg(admin, e.eier_org_id, kritisk ? ['kritisk', 'melding'] : ['melding'], { tittel: (kritisk ? 'KRITISK sak: ' : 'Ny sak: ') + String(a.data?.tittel || '').slice(0, 80), tekst: [e.data?.navn || e.data?.adresse, 'Meldt av leietaker'].filter(Boolean).join(' – '), url: '/#/avvik', tag: 'avvik-' + a.id }, undefined, a.eiendom_id);
     await admin.from('avvik').update({ data: { ...a.data, pushSendt: true } }).eq('id', a.id);
     return json(200, { sendt: n });
   }

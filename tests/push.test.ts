@@ -20,7 +20,7 @@ beforeEach(() => {
   db = { eiendommer: [{ id: 'e1', eier_org_id: 'o1', data: { navn: 'Bygg 1' } }], org_medlem: [{ org_id: 'o1', user_id: 'u1', rolle: 'admin', aktiv: true }, { org_id: 'o1', user_id: 'u2', rolle: 'utforer', aktiv: true }],
     push_abonnement: [], push_noekler: [], avvik: [], hendelseslogg: [], profiles: [{ id: 'u1', aktiv: true, rolle: 'admin' }],
     qr_punkter: [{ id: 'q1', token: 'meldepunkt-token-0123456789', eiendom_id: 'e1', navn: 'Inngang A', data: {} }] };
-  falsk = lagFalsk(db, { u1: { id: 'u1', email: 'a@b.no' } }, { 'tok-admin': 'u1' });
+  falsk = lagFalsk(db, { u1: { id: 'u1', email: 'a@b.no' } }, { 'tok-admin': 'u1' }, { niva: { u3: { e1: 'les' } } });
 });
 
 test('Push: krever innlogging, og nøkkelen lages én gang', async () => {
@@ -46,4 +46,11 @@ test('Push: kritisk QR-melding varsler administratorer som har slått på kritis
   const r = await post(qr, { t: 'meldepunkt-token-0123456789', action: 'meld', tittel: 'Det ryker fra tavlen', beskrivelse: '', alv: 'Lav' }, '');
   assert.equal(r.status, 200); assert.equal(sendt.length, 1); assert.equal(sendt[0].endpoint, ABO.endpoint); assert.match(sendt[0].last.tittel, /^KRITISK/);
   sendt = []; await post(qr, { t: 'meldepunkt-token-0123456789', action: 'meld', tittel: 'Pære er ødelagt', beskrivelse: '', alv: 'Lav' }, ''); assert.equal(sendt.length, 0); // bare «kritisk» er på
+});
+
+test('Push: gårdeier får varsel bare for byggene vedkommende har tilgang til', async () => {
+  db.org_medlem.push({ org_id: 'o1', user_id: 'u3', rolle: 'gardeier', aktiv: true }, { org_id: 'o1', user_id: 'u4', rolle: 'gardeier', aktiv: true });
+  db.push_abonnement.push({ id: 'g3', user_id: 'u3', endpoint: 'https://push.example/u3', p256dh: 'p', auth: 'a', typer: ['kritisk'] }, { id: 'g4', user_id: 'u4', endpoint: 'https://push.example/u4', p256dh: 'p', auth: 'a', typer: ['kritisk'] });
+  await post(qr, { t: 'meldepunkt-token-0123456789', action: 'meld', tittel: 'Det ryker fra tavlen', beskrivelse: '', alv: 'Lav' }, '');
+  assert.deepEqual(sendt.map(x => x.endpoint), ['https://push.example/u3']); // u3 har tilgang til e1, u4 har ingen tildeling
 });

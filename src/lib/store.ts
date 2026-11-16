@@ -379,6 +379,9 @@ export const mineOrg = (roller?: string[]): any[] => S.fullTilgang && state.me?.
   ? S.orgs.filter(o => o.aktiv !== false).map(o => { const m = S.medlemmer.find(x => x.org_id === o.id && x.user_id === state.me?.id && x.aktiv); return { ...o, minRolle: 'admin', alleBygg: true, ekteRolle: m?.rolle || '' }; })
   : S.medlemmer.filter(m => m.user_id === state.me?.id && m.aktiv && (!roller || roller.includes(m.rolle))).map(m => ({ ...(S.orgs.find(o => o.id === m.org_id) || { id: m.org_id, navn: '?' }), minRolle: m.rolle, alleBygg: m.alle_bygg })).filter(o => o.aktiv !== false);
 export const orgNavn = (id?: string) => S.orgs.find(o => o.id === id)?.navn || '';
+/** Gårdeier: bare lesetilgang til tildelte bygg, ingen annen rolle i noen organisasjon */
+export const erGardeier = () => { if (state.me?.plattform) return false; const m = mineOrg(); return m.length > 0 && m.every(o => o.minRolle === 'gardeier'); };
+export const rolleVis = () => erGardeier() ? 'Gårdeier' : rolleNavn(state.me?.rolle);
 export const isTenant = () => role() === 'leietaker';
 export const isUtforer = () => role() === 'utforer';
 

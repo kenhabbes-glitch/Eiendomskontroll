@@ -6,10 +6,10 @@ const db = saved || { profiles: [], eiendom_tilgang: [] }; let nr = +(localStora
 const persist = () => { localStorage.setItem('mockdb', JSON.stringify(db)); localStorage.setItem('mocknr', nr); }; const files = {};
 const now = () => new Date().toISOString();
 const ROLE = localStorage.getItem('mockRolle') || 'admin';
-const me = { id: 'u-me', epost: 'test@example.no', navn: 'Test Bruker', rolle: ROLE, aktiv: true, leietaker_id: localStorage.getItem('mockLt') || null, created_at: now() };
+const me = { id: 'u-me', epost: 'test@example.no', navn: 'Test Bruker', rolle: ROLE === 'gardeier' ? 'tekniker' : ROLE, aktiv: true, leietaker_id: localStorage.getItem('mockLt') || null, created_at: now() };
 db.profiles = db.profiles.filter(p => p.id !== me.id); db.profiles.push({ ...me, plattform_admin: ROLE === 'admin' });
 if (!db.organisasjoner) { db.organisasjoner = [{ id: 'org-eier', navn: 'Testeier AS', type: 'eier', aktiv: true, opprettet: now() }, { id: 'org-fv', navn: 'Forvalter AS', type: 'forvalter', orgnr: '999888777', aktiv: true, opprettet: now() }]; }
-if (!db.org_medlem) { db.org_medlem = ROLE === 'admin' || ROLE === 'forvalter' ? [{ org_id: 'org-eier', user_id: me.id, rolle: ROLE === 'admin' ? 'admin' : 'forvalter', alle_bygg: true, aktiv: true }] : []; }
+if (!db.org_medlem) { db.org_medlem = ROLE === 'admin' || ROLE === 'forvalter' || ROLE === 'gardeier' ? [{ org_id: 'org-eier', user_id: me.id, rolle: ROLE === 'admin' ? 'admin' : ROLE === 'gardeier' ? 'gardeier' : 'forvalter', alle_bygg: true, aktiv: true }] : []; }
 db.portefoljer = db.portefoljer || []; db.oppdrag = db.oppdrag || [];
 let session = localStorage.getItem('mockLogout') ? null : { user: { id: me.id, email: me.epost }, access_token: 'x' };
 const listeners = [];

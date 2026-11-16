@@ -19,7 +19,7 @@ import { ModulSperret } from './views/Abonnement';
 import React, { useEffect, useState } from 'react';
 import { mineOrg, kanDrifteE, sendKo, ko, forkastKo } from './lib/store';
 import { autoKvitterIK } from './lib/actions';
-import { LENKE, canEdit, configured, initAuth, isAdmin, isStaff, isTenant, isUtforer, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
+import { LENKE, rolleVis, erGardeier, canEdit, configured, initAuth, isAdmin, isStaff, isTenant, isUtforer, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
 import { activeTasks, dUntil, openAvvik } from './lib/utils';
 import { ModalHost, Tip, Toast, confirmBox } from './components/ui';
 import { Oversikt } from './views/Oversikt';
@@ -105,6 +105,7 @@ const I: Record<string, string> = {
 function navFor(): [string, string][] {
   if (isTenant()) return [['portal', 'Mitt leieforhold'], ['regelverk', 'Plikter og regelverk'], ['hjelp', 'Hjelp']];
   if (isUtforer()) return [['arbeidsordre', 'Mine arbeidsordre'], ['meldinger', 'Meldinger'], ['hjelp', 'Hjelp']];
+  if (erGardeier()) { const g: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['avvik', 'Avvik'], ['kontroller', 'Kontrollplan'], ['dokumenter', 'Dokumenter']]; if (harModul('vedlikehold')) g.push(['vedlikehold', 'Vedlikeholdsplan']); g.push(['arealer', 'Tegninger og arealer'], ['regelverk', 'Regelverk og plikter'], ['hjelp', 'Hjelp']); return g; }
   const n: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['kontroller', 'Kontrollplan'], ['runde', 'Kontrollrunde'], ['avvik', 'Avvik'], ['arbeidsordre', 'Mine arbeidsordre']];
   if (canEdit() && harModul('tilsyn')) n.splice(5, 0, ['tilsyn', 'Tilsynssaker']);
   if (S.eiendommer.some(e => kanDrifteE(e.id) && harModul('befaring', e.id))) { n.splice(4, 0, ['befaringer', 'Befaringer']); n.splice(5, 0, ['tilsynsanalyser', 'Tilsynsanalyser']); }
@@ -236,7 +237,7 @@ export default function App() {
           {hjelp.map(n => lenke(n))}</>;
       })()}</nav>
       <div className="sidefoot">
-        <a className="userbox" href="#/profil" style={{ textDecoration: 'none' }}><span className="av">{ini}</span><span><div style={{ color: '#fff' }}>{me.navn || me.epost}</div><div className="r">{rolleNavn(me.rolle)}</div></span></a>
+        <a className="userbox" href="#/profil" style={{ textDecoration: 'none' }}><span className="av">{ini}</span><span><div style={{ color: '#fff' }}>{me.navn || me.epost}</div><div className="r">{tt(rolleVis())}</div></span></a>
         <button onClick={() => skannQr()}>{tt("Skann QR-kode")}</button>
         <InstallerApp />
         <AppVersjon />

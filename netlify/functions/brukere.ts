@@ -7,7 +7,7 @@ import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js kr
 const svakt = (pw: string) => pw.length < 10 || !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/\d/.test(pw);
 const aalFra = (t: string) => { try { return JSON.parse(Buffer.from(t.split('.')[1] || '', 'base64url').toString()).aal || ''; } catch { return ''; } };
 const json = (status: number, body: any) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
-const ORG_ROLLER = ['admin', 'forvalter', 'tekniker', 'leser'];
+const ORG_ROLLER = ['admin', 'forvalter', 'tekniker', 'leser', 'gardeier'];
 const ORG_TYPER = ['eier', 'forvalter', 'drift', 'service', 'annet'];
 
 export default async (req: Request) => {

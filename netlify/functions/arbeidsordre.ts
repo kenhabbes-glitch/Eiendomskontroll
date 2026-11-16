@@ -11,7 +11,7 @@ import svOrd from '../../src/i18n/sv.json';
 import daOrd from '../../src/i18n/da.json';
 import esMxOrd from '../../src/i18n/es-MX.json';
 import esEsOrd from '../../src/i18n/es-ES.json';
-import { pushTilOrg } from '../../src/lib/serverPush';
+import { pushTilOrg, pushTilBrukere } from '../../src/lib/serverPush';
 import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 // Lagringen godtar bare ASCII i filbanen
 const asciiNavn = (n: any) => String(n || 'fil').replace(/[æÆ]/g, m => m === 'æ' ? 'ae' : 'Ae').replace(/[øØ]/g, m => m === 'ø' ? 'o' : 'O').replace(/[åÅ]/g, m => m === 'å' ? 'a' : 'A')
@@ -813,21 +813,38 @@ const handler = async (req: Request) => {
       const dok = (D || []).filter((d: any) => d.data?.gyldigTil && !d.data?.arkivert && dagerTil(d.data.gyldigTil) <= dager).map((d: any) => ({ id: d.id, eid: d.eiendom_id, navn: d.data.tittel || d.data.type || '', type: d.data.type || '', frist: d.data.gyldigTil, d: dagerTil(d.data.gyldigTil) })).sort((x: any, y: any) => x.frist.localeCompare(y.frist));
       const av = (A || []).filter((a: any) => !AV_LUKKET_S.includes(a.data?.status) && a.data?.frist && dagerTil(a.data.frist) <= 14).map((a: any) => ({ id: a.id, eid: a.eiendom_id, navn: `#${a.data.nr} ${a.data.tittel || ''}`, frist: a.data.frist, d: dagerTil(a.data.frist) })).sort((x: any, y: any) => x.frist.localeCompare(y.frist));
       const til = epostListe(c.epost).length ? epostListe(c.epost) : await (async () => { const { data: m } = await admin.from('org_medlem').select('rolle, profiles(epost)').eq('org_id', org.id).eq('rolle', 'admin').eq('aktiv', true); return (m || []).map((x: any) => x.profiles?.epost).filter(Boolean); })();
-      if (!til.length || !(kontr.length || dok.length || av.length)) { rapport.push({ org: org.navn, sendt: 0, til, tomt: !til.length ? 'ingen mottaker' : 'ingenting å melde' }); continue; }
+      // Mottakere: administratorer (eller valgt liste) får alt; hver gårdeier får bare byggene vedkommende har tilgang til
+      const grupper: { til: string[]; K: any[]; D: any[]; A: any[]; uid?: string }[] = [];
+      if (til.length && (kontr.length || dok.length || av.length)) grupper.push({ til, K: kontr, D: dok, A: av });
+      const { data: gm } = await admin.from('org_medlem').select('user_id, profiles(epost)').eq('org_id', org.id).eq('rolle', 'gardeier').eq('aktiv', true);
+      for (const g of gm || []) {
+        const epost = String((g as any).profiles?.epost || '').toLowerCase(); if (!epost || til.map((x: string) => x.toLowerCase()).includes(epost)) continue;
+        const tilg = new Set<string>(); for (const id of eids) { const { data: n } = await admin.rpc('niva_for', { p_uid: (g as any).user_id, eid: id }); if (n) tilg.add(id); }
+        const K = kontr.filter((x: any) => tilg.has(x.eid)), D = dok.filter((x: any) => tilg.has(x.eid)), A = av.filter((x: any) => tilg.has(x.eid));
+        if (K.length || D.length || A.length) grupper.push({ til: [epost], K, D, A, uid: (g as any).user_id });
+      }
+      if (!grupper.length) { rapport.push({ org: org.navn, sendt: 0, til, tomt: !til.length ? 'ingen mottaker' : 'ingenting å melde' }); continue; }
       const Lo = await sprakForOrg(org.id); const to = Lo.t; const over = (L: any[]) => L.filter(x => x.d < 0).length;
       const tab = (hode: string[], rader: string[][]) => `<table style="border-collapse:collapse;font-size:13px;width:100%"><tr style="background:#f4f5f2">${hode.map(h => `<th align="left" style="padding:4px">${esc(to(h))}</th>`).join('')}</tr>${rader.map(r => `<tr>${r.map(x => `<td style="padding:4px;border-top:1px solid #e3e6e1">${x}</td>`).join('')}</tr>`).join('')}</table>`;
       const fristTd = (x: any) => `<span style="color:${x.d < 0 ? '#c0392b' : '#333'}">${esc(Lo.dato(x.frist))} (${x.d < 0 ? esc(to('{0} d over', -x.d)) : x.d === 0 ? esc(to('i dag')) : esc(to('om {0} d', x.d))})</span>`;
+      const lagMelding = (kontr: any[], dok: any[], av: any[]) => {
       const emne = to('Ukeoversikt eiendom: {0} forfalt, {1} kommende', over(kontr) + over(dok) + over(av), kontr.length + dok.length + av.length - over(kontr) - over(dok) - over(av));
       const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:780px"><h2>${esc(emne)}</h2>`
         + (kontr.length ? `<h3>${esc(to('Kontroller og service'))} (${kontr.length})</h3>${tab(['Kontroll', 'Eiendom', 'System', 'Frist'], kontr.slice(0, 40).map((k: any) => [`${k.lov ? '<b>' : ''}${esc(k.navn)}${k.lov ? '</b>' : ''}`, esc(eNavn[k.eid] || ''), esc(k.sys), fristTd(k)]))}${kontr.length > 40 ? `<p>${esc(to('… og {0} til', kontr.length - 40))}</p>` : ''}` : '')
         + (dok.length ? `<h3>${esc(to('Dokumenter som utløper'))} (${dok.length})</h3>${tab(['Dokument', 'Eiendom', 'Utløper'], dok.slice(0, 40).map((d: any) => [esc(d.navn), esc(eNavn[d.eid] || ''), fristTd(d)]))}` : '')
         + (av.length ? `<h3>${esc(to('Avvik over frist eller med frist innen 14 dager'))} (${av.length})</h3>${tab(['Avvik', 'Eiendom', 'Frist'], av.slice(0, 40).map((a: any) => [esc(a.navn), esc(eNavn[a.eid] || ''), fristTd(a)]))}` : '')
         + `<p><a href="${base}/#/">${esc(to('Åpne appen'))}</a></p><p style="font-size:12px;color:#6b736d">${esc(to('Du kan slå av denne e-posten under Innstillinger → Ukeoversikt til eier.'))}</p></div>`;
+      return { emne, html }; };
       const o = await oppsettFor(null, org.id); let ok = 0;
-      for (const t of til) { const r = await sendEpost(t, emne, html, emne, undefined, undefined, o).catch(() => null); if ((r as any)?.sendt) ok++; }
-      await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: SYS.navn, tabell: 'hendelse', rad_id: null, eiendom_id: null, org_id: org.id, handling: 'purring', tekst: `Ukeoversikt til eier sendt til ${til.join(', ')} (${kontr.length} kontroller, ${dok.length} dokumenter, ${av.length} avvik)` });
-      await pushTilOrg(admin, org.id, ['oversikt'], { tittel: emne, tekst: to('{0} forfalt, {1} kommende', over(kontr) + over(dok) + over(av), kontr.length + dok.length + av.length - over(kontr) - over(dok) - over(av)), url: '/#/', tag: 'ukeoversikt' });
-      rapport.push({ org: org.navn, sendt: ok, til });
+      for (const g of grupper) {
+        const { emne, html } = lagMelding(g.K, g.D, g.A);
+        for (const t of g.til) { const r = await sendEpost(t, emne, html, emne, undefined, undefined, o).catch(() => null); if ((r as any)?.sendt) ok++; }
+        await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: SYS.navn, tabell: 'hendelse', rad_id: null, eiendom_id: null, org_id: org.id, handling: 'purring', tekst: `Ukeoversikt til eier sendt til ${g.til.join(', ')} (${g.K.length} kontroller, ${g.D.length} dokumenter, ${g.A.length} avvik)` });
+        const kort = to('{0} forfalt, {1} kommende', over(g.K) + over(g.D) + over(g.A), g.K.length + g.D.length + g.A.length - over(g.K) - over(g.D) - over(g.A));
+        const innh = { tittel: emne, tekst: kort, url: '/#/', tag: 'ukeoversikt' };
+        if (g.uid) await pushTilBrukere(admin, [g.uid], ['oversikt'], innh); else await pushTilOrg(admin, org.id, ['oversikt'], innh, ['admin', 'forvalter']);
+      }
+      rapport.push({ org: org.navn, sendt: ok, til: grupper.flatMap(g => g.til) });
     }
     return json(200, { ok: true, rapport });
   }

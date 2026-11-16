@@ -78,7 +78,7 @@ const handler = async (req: Request) => {
   if (error) { console.error('qr-avvik', error); return json(500, { error: 'Meldingen kunne ikke lagres. Prøv igjen.' }); }
   try { // push til eiendommens ansatte (feil her stopper aldri meldingen)
     const { data: e } = await admin.from('eiendommer').select('eier_org_id, data').eq('id', p.eiendom_id).maybeSingle();
-    if (e?.eier_org_id) await pushTilOrg(admin, e.eier_org_id, alv === 'Kritisk' ? ['kritisk', 'melding'] : ['melding'], { tittel: (alv === 'Kritisk' ? 'KRITISK melding: ' : 'Ny melding: ') + tittel.slice(0, 80), tekst: [e.data?.navn || e.data?.adresse, p.navn].filter(Boolean).join(' – '), url: '/#/avvik', tag: 'avvik-' + ny.id });
+    if (e?.eier_org_id) await pushTilOrg(admin, e.eier_org_id, alv === 'Kritisk' ? ['kritisk', 'melding'] : ['melding'], { tittel: (alv === 'Kritisk' ? 'KRITISK melding: ' : 'Ny melding: ') + tittel.slice(0, 80), tekst: [e.data?.navn || e.data?.adresse, p.navn].filter(Boolean).join(' – '), url: '/#/avvik', tag: 'avvik-' + ny.id }, undefined, p.eiendom_id);
   } catch { }
   return json(200, { ok: true, nr: ny.nr });
 };

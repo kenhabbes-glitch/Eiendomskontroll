@@ -1,7 +1,7 @@
 // Menyen på mobil: bunnmeny med fem knapper som følger rollen, og «Mer»-siden med søk, sist brukt og store fliser.
 // På bred skjerm brukes fortsatt sidemenyen (se App.tsx).
 import React, { useEffect, useMemo, useState } from 'react';
-import { canEdit, isAdmin, isStaff, isTenant, isUtforer, signOut, state } from '../lib/store';
+import { erGardeier, canEdit, isAdmin, isStaff, isTenant, isUtforer, signOut, state } from '../lib/store';
 import { tt } from '../lib/i18n';
 import { InstallerApp, skannQr } from './Felt';
 import { editAvvik } from '../lib/actions';
@@ -23,6 +23,7 @@ export function bunnKnapper(nav: Nav, I: Record<string, string>, antall: Record<
   let L: Knapp[];
   if (isTenant()) L = [side('portal', 'Mitt leieforhold'), side('regelverk', 'Plikter'), mer];
   else if (isUtforer()) L = [side('arbeidsordre', 'Arbeidsordre'), side('meldinger', 'Meldinger'), mer];
+  else if (erGardeier()) L = [side('oversikt', 'Oversikt'), side('avvik', 'Avvik'), side('kontroller', 'Kontroll'), side('dokumenter', 'Dokumenter'), mer];
   else if (state.me?.rolle === 'tekniker') L = [{ ...side('oversikt', 'Min dag') }, side('runde', 'Runde'), qr, side('avvik', 'Avvik'), mer];
   else if (isAdmin() && !state.me?.plattform) L = [side('oversikt', 'Oversikt'), side('avvik', 'Avvik'), side('dokumenter', 'Dokumenter'), har('vedlikehold') ? side('vedlikehold', 'Plan') : side('eiendommer', 'Eiendommer'), mer];
   else L = [side('oversikt', 'Oversikt'), side('kontroller', 'Kontroll'), side('avvik', 'Avvik'), har('meldinger') ? side('meldinger', 'Meldinger') : side('eiendommer', 'Eiendommer'), mer];
@@ -44,7 +45,7 @@ export function BunnMeny({ nav, I, antall, aktiv }: { nav: Nav; I: Record<string
 
 /** Store knapper øverst på forsiden (mobil): det man gjør ute på eiendommen */
 export function MobilSnarveier() {
-  if (isTenant() || isUtforer() || !isStaff()) return null;
+  if (isTenant() || isUtforer() || !isStaff() || erGardeier()) return null;
   return <div className="mob-snarvei">
     <button type="button" className="ms pri" onClick={() => editAvvik()}><Ikon d="M12 3l10 18H2zM12 10v5M12 18h.01" s={26} />{tt("Nytt avvik")}</button>
     <button type="button" className="ms mork" onClick={() => skannQr()}><Ikon d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3M7 12h10" s={26} />{tt("Skann QR")}</button>
