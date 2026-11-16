@@ -8,7 +8,7 @@ import { finnLeverandor, norm, pdfLinjer } from './rapportLesing';
 
 export type Tolkning = {
   type: string; typeScore: number; typeGrunn: string[]; alt: [string, number][];
-  eiendomId: string; eGrunn: string; anleggId: string; aGrunn: string; leietakerId: string; lGrunn: string;
+  eiendomId: string; eGrunn: string; anleggId: string; aGrunn: string; /** Systemene som er valgt (starter med hovedsystemet) */ anleggIds: string[]; /** Andre systemer som nevnes i dokumentet – foreslås bare, må godkjennes */ foreslatt: string[]; leietakerId: string; lGrunn: string;
   dato: string; gyldigTil: string; tittel: string; leverandor: string; tfm: string[];
 };
 
@@ -108,15 +108,17 @@ export function tolk(filnavn: string, linjer: string[], valgtEiendom = ''): Tolk
     if (!eiendomId && valgtEiendom) { eiendomId = valgtEiendom; eGrunn = 'valgt eiendom'; } }
 
   // 4) System uten TFM-kode: lært fra leverandøren, systemnavn, leverandør på systemet, eller systemtype som bare finnes én gang
-  if (!anleggId && eiendomId) { const E = A.filter(a => a.eiendomId === eiendomId); let bestA = 0;
+  const aFunnet = !!anleggId; const flere: string[] = [];
+  if (eiendomId) { const E = A.filter(a => a.eiendomId === eiendomId); let bestA = 0;
     for (const a of E) { let s = 0; let g = '';
       if (laert?.anleggId === a.id) { s += 4; g = 'tidligere fra samme leverandør'; }
       if (a.navn && norm(a.navn).length >= 4 && (tekst.includes(norm(a.navn)) || fn.includes(norm(a.navn)))) { s += 4; g ||= 'systemnavn'; }
       if (a.leverandor && norm(a.leverandor).length >= 4 && tekst.includes(norm(a.leverandor).replace(/\s+(as|asa)$/, ''))) { s += 3; g ||= 'leverandør på systemet'; }
       const kn = norm(KOMP[a.type]?.n || ''); const kord = kn.split(/[ /,()-]+/).filter(w => w.length >= 6);
       if (kord.some(w => tekst.includes(w) || fn.includes(w))) { s += E.filter(b => b.type === a.type).length === 1 ? 3 : 1; g ||= 'systemtype «' + KOMP[a.type]?.n + '»'; }
-      if (s > bestA) { bestA = s; anleggId = a.id; aGrunn = g; } }
-    if (bestA < 3) { anleggId = ''; aGrunn = ''; } }
+      if (s >= 3) flere.push(a.id);
+      if (!anleggId && s > bestA) { bestA = s; anleggId = a.id; aGrunn = g; } }
+    if (!aFunnet && bestA < 3) { anleggId = ''; aGrunn = ''; } }
 
   // 5) Leietaker
   let leietakerId = '', lGrunn = '';
@@ -130,7 +132,7 @@ export function tolk(filnavn: string, linjer: string[], valgtEiendom = ''): Tolk
   const a = anleggId ? S.anlegg.find(x => x.id === anleggId) : null;
   const pent = filnavn.replace(/\.[a-z0-9]+$/i, '').replace(/[_]+/g, ' ').replace(/^\d{6,}[-\s]*/, '').trim();
   const tittel = (pent.length >= 6 && !/^(scan|skann|img|dok|document|file)\w*\s*\d*$/i.test(pent) ? pent : type + (a ? ' – ' + (a.navn || KOMP[a.type]?.n || '') : '')) + (dato && !/\d{4}/.test(pent) ? ' ' + dato.slice(0, 4) : '');
-  return { type: best.s ? type : 'Annet', typeScore, typeGrunn: best.g, alt: rang.slice(1, 4).map(([t, x]) => [t, x.s]), eiendomId, eGrunn, anleggId, aGrunn, leietakerId, lGrunn, dato, gyldigTil, tittel: tittel.slice(0, 140), leverandor: lev, tfm };
+  return { type: best.s ? type : 'Annet', typeScore, typeGrunn: best.g, alt: rang.slice(1, 4).map(([t, x]) => [t, x.s]), eiendomId, eGrunn, anleggId, aGrunn, anleggIds: anleggId ? [anleggId] : [], foreslatt: flere.filter(i => i !== anleggId).slice(0, 8), leietakerId, lGrunn, dato, gyldigTil, tittel: tittel.slice(0, 140), leverandor: lev, tfm };
 }
 
 /** Kontroller på systemet, rangert etter hvor godt de passer rapporten (ord i navnet som står i rapporten, type, frist) */
