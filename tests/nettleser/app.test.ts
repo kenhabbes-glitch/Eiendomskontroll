@@ -42,19 +42,19 @@ test('registrere avvik: skjemaet lagrer, og avviket vises i listen', async () =>
   } finally { await a.lukk(); }
 });
 
-test('avvik med bilde: «Foreslå fra bilde» gir forslag fra ordene, og fyller ikke ut før «Bruk forslag»', async () => {
+test('avvik med knapper: «Hva er feil / Hvor» setter tittel og alvorlighet, og skriver ikke over egen tekst', async () => {
   const a = await aapne('#/eiendom/e1'); try {
     await a.side.getByRole('button', { name: '+ Avvik' }).click(); const modal = a.side.locator('.modal');
-    await modal.locator('input[type=text], input:not([type])').first().fill('Lekkasje fra rør i teknisk rom');
-    assert.equal(await modal.getByRole('button', { name: 'Foreslå fra bilde' }).count(), 0, 'knappen skal ikke vises uten bilde');
-    await modal.locator('input[capture]').setInputFiles({ name: 'rom 2.14.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
-    await modal.getByRole('button', { name: 'Foreslå fra bilde' }).click();
-    await modal.getByRole('button', { name: 'Bruk forslag' }).waitFor({ timeout: 60000 });
-    const txt = await modal.innerText(); assert.ok(/Alvorlighet:\s*Høy/.test(txt), 'forslaget skal være Høy (lekkasje)'); assert.ok(txt.includes('rom 2.14'), 'rommet fra filnavnet mangler');
-    await modal.getByRole('button', { name: 'Bruk forslag' }).click();
+    await modal.getByRole('button', { name: 'Lekkasje', exact: true }).click(); await modal.getByRole('button', { name: 'Tak/himling' }).click();
+    const tittel = modal.locator('input[type=text], input:not([type])').first(); assert.equal(await tittel.inputValue(), 'Lekkasje i tak');
     assert.equal(await modal.locator('select').filter({ hasText: 'Høy' }).count() > 0, true, 'alvorlighet ble ikke satt til Høy');
+    await modal.getByRole('button', { name: 'Flekk', exact: true }).click(); assert.equal(await tittel.inputValue(), 'Flekk i tak', 'tittel som appen selv satte skal følge valget');
+    assert.ok((await modal.innerText()).includes('lekkasje eller fukt'), 'merknad om flekk i tak mangler');
+    await tittel.fill('Min egen tittel'); await modal.getByRole('button', { name: 'Vegg', exact: true }).click(); assert.equal(await tittel.inputValue(), 'Min egen tittel', 'egen tekst ble overskrevet');
+    await modal.locator('input[capture]').setInputFiles({ name: 'rom 2.14.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
+    assert.equal(await modal.getByRole('button', { name: /Les tekst på bildet/ }).count(), 1, 'knappen for tekst på bildet skal vises med bilde');
     await modal.getByRole('button', { name: 'Lagre' }).click(); await a.side.waitForTimeout(800);
-    const ny = (await a.db()).avvik.find(x => x.data.tittel === 'Lekkasje fra rør i teknisk rom'); assert.ok(ny, 'avviket ble ikke lagret'); assert.equal(ny.data.alv, 'Høy'); assert.deepEqual(a.feil, []);
+    const ny = (await a.db()).avvik.find(x => x.data.tittel === 'Min egen tittel'); assert.ok(ny, 'avviket ble ikke lagret'); assert.deepEqual(a.feil, []);
   } finally { await a.lukk(); }
 });
 

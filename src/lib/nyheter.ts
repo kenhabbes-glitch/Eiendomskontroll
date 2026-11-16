@@ -1,8 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
-  { id: '2026-12-07', dato: '2026-12-07', tittel: 'Foreslå avvik fra bilde', punkter: [
-    'I «Nytt avvik»: ta eller velg et bilde og trykk «Foreslå fra bilde». Appen leser teksten på bildet (skilt, typeskilt, etiketter) og foreslår system, alvorlighet, tittel og rom/etasje. Ingenting fylles ut før du trykker «Bruk forslag».',
+  { id: '2026-12-07', dato: '2026-12-07', tittel: 'Raskere avvik med to trykk', punkter: [
+    'I «Nytt avvik» trykker du nå to ganger: hva som er feil (flekk, hakk, sprekk, lekkasje, løs …) og hvor (tak, vegg, gulv, list, dør …). Appen setter tittel, alvorlighet og system for deg. Det du selv har skrevet blir ikke overskrevet.',
+    'Har bildet tekst på seg (skilt, typeskilt), kan du også trykke «Les tekst på bildet» for forslag til system og rom. Ingenting fylles ut før du trykker «Bruk forslag».',
     'Dette er ordgjenkjenning, ikke bildetolkning: appen ser ikke selve motivet. Skriv derfor gjerne noen ord om hva som er feil, så blir forslaget bedre. Alt skjer i nettleseren, og bildet sendes ikke til noen AI-tjeneste.',
   ] },
   { id: '2026-12-06', dato: '2026-12-06', tittel: 'Systemer foreslått fra 3D-modellen', punkter: [
