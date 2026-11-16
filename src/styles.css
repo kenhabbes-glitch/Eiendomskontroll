@@ -427,3 +427,30 @@ h1 .hjelp-q{position:relative;top:-2px}
 table.krav td{vertical-align:top}
 .checks.veiv{max-height:none}
 .ko-feil{margin-top:4px;font-weight:400}.ko-feil>div{margin-top:3px}
+
+/* --- mobilmeny: bunnmeny, snarveier og Mer-siden (bred skjerm bruker sidemenyen) --- */
+#bunnmeny,.mob-snarvei{display:none}
+@media (max-width:860px){
+  #side{display:none}
+  #main{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
+  #bunnmeny{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding:4px 4px calc(6px + env(safe-area-inset-bottom));box-shadow:0 -4px 16px rgba(20,30,25,.06)}
+  #bunnmeny .bm{position:relative;flex:1;min-width:0;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--muted);text-decoration:none;background:none;border:0;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  #bunnmeny .bm.on{color:var(--acc)}
+  #bunnmeny .bm-ikon{display:flex;padding:4px 16px;border-radius:14px}
+  #bunnmeny .bm-ikon.on{background:var(--acc2)}
+  #bunnmeny .bm-tekst{font-size:11.5px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bm-badge{position:absolute;top:2px;left:calc(50% + 6px);background:var(--red);color:#fff;font-size:11px;font-weight:600;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;box-sizing:border-box}
+  .mob-snarvei{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:16px}
+  .mob-snarvei .ms{min-height:84px;border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:flex;flex-direction:column;justify-content:space-between;padding:14px;font:inherit;font-size:16px;font-weight:700;text-decoration:none;text-align:left;cursor:pointer;box-sizing:border-box}
+  .mob-snarvei .ms svg{color:var(--acc)}
+  .mob-snarvei .ms.pri{background:var(--acc);color:#fff;border-color:var(--acc)}.mob-snarvei .ms.mork{background:var(--side);color:#fff;border-color:var(--side)}
+  .mob-snarvei .ms.pri svg,.mob-snarvei .ms.mork svg{color:#fff}
+}
+.mer-side{max-width:640px}
+.mer-sok{width:100%;box-sizing:border-box;min-height:48px;border-radius:12px;font-size:16px;padding:0 14px}
+.mer-sek{margin-top:18px}.mer-tit{display:block;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.mer-sist{display:flex;gap:8px;flex-wrap:wrap}.mer-pille{min-height:44px;padding:0 16px;border-radius:22px;background:var(--acc2);color:var(--accink);font-weight:600;display:flex;align-items:center;text-decoration:none}
+.mer-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.mer-flis{position:relative;min-height:84px;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;color:var(--ink);text-decoration:none;font:inherit;text-align:left;cursor:pointer}
+.mer-flis .mf-ikon{color:var(--acc);display:flex}.mer-flis .mf-navn{font-size:14.5px;font-weight:600;line-height:1.2}
+.mer-flis .mf-b{top:10px;right:10px;left:auto}

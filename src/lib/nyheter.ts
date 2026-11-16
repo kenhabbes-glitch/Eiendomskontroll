@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-10', dato: '2026-12-10', tittel: 'Ny mobilmeny', punkter: [
+    'På mobil har appen nå en meny nederst med fem store knapper som følger rollen din: eier, forvalter, vaktmester, utførende og leietaker får hver sin. Resten av sidene ligger under «Mer», med søk, sist brukte sider og store fliser.',
+    'På forsiden ligger store knapper for Nytt avvik, Skann QR og Kontrollrunde, så du slipper å lete når du er ute på eiendommen. PC-menyen er uendret.',
+  ] },
   { id: '2026-12-09', dato: '2026-12-09', tittel: 'Push-varsler på telefon og PC', punkter: [
     'Under Innstillinger → «Varsler på denne enheten» kan du slå på varsler. Da får du beskjed med en gang en sak meldes som kritisk, når leietakere eller QR-koder melder nye saker, og når ukeoversikten er sendt.',
     'Hver enhet slås på for seg, og du velger selv hvilke varsler som skal komme. På iPhone og iPad må appen først legges til på Hjem-skjermen.',

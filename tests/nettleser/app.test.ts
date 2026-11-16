@@ -215,3 +215,26 @@ test('Innstillinger viser kortet for push-varsler', async () => {
     assert.ok((await tekst(a)).includes('Varsler på denne enheten'), 'kortet for push-varsler mangler');
   } finally { await a.lukk(); }
 });
+
+test('mobil: bunnmeny med fem knapper, Mer-siden med søk og fliser', async () => {
+  const a = await aapne('#/oversikt', { mobil: true }); try {
+    await a.side.waitForTimeout(500);
+    assert.equal(await a.side.locator('#bunnmeny .bm').count(), 5, 'forventet fem knapper i bunnmenyen');
+    assert.ok(await a.side.locator('#bunnmeny').isVisible(), 'bunnmenyen er skjult');
+    assert.ok(!(await a.side.locator('#side').isVisible()), 'sidemenyen skal være skjult på mobil');
+    assert.ok(await a.side.locator('.mob-snarvei .ms').first().isVisible(), 'snarveiknappene mangler på forsiden');
+    await a.side.locator('#bunnmeny a[href="#/mer"]').click(); await a.side.waitForTimeout(400);
+    assert.ok(await a.side.locator('.mer-flis').count() >= 4, 'Mer-siden mangler fliser');
+    await a.side.locator('.mer-sok').fill('måler'); await a.side.waitForTimeout(200);
+    assert.ok(await a.side.locator('.mer-flis', { hasText: 'Målere' }).count() === 1, 'søk etter «måler» fant ikke Målere');
+    await a.side.locator('.mer-flis', { hasText: 'Målere' }).first().click(); await a.side.waitForTimeout(400);
+    assert.ok((await a.side.evaluate(() => location.hash)).includes('maalere'), 'flisen åpnet ikke Målere');
+    if (a.feil.length) assert.fail(a.feil[0]);
+  } finally { await a.lukk(); }
+});
+test('PC: sidemenyen vises og bunnmenyen er skjult', async () => {
+  const a = await aapne('#/oversikt'); try {
+    await a.side.waitForTimeout(400);
+    assert.ok(await a.side.locator('#side').isVisible()); assert.ok(!(await a.side.locator('#bunnmeny').isVisible()));
+  } finally { await a.lukk(); }
+});

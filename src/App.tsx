@@ -2,6 +2,7 @@ import { PrLenke } from './views/ProsjektRapport';
 import { Registrer } from './views/Registrer';
 import { OrgnrVarsel } from './components/OrgnrVarsel';
 import { InstallerApp, skannQr } from './components/Felt';
+import { BunnMeny, MerSide, MobilSnarveier } from './components/MobilMeny';
 import { useUlesteMeldinger } from './components/Samtale';
 import { MeldingerView } from './views/Meldinger';
 import { QrLenke } from './views/QrMelding';
@@ -124,7 +125,7 @@ function navFor(): [string, string][] {
 }
 
 /** Grupper i menyen: [nøkkel, navn, ikon, sider]. Sidene vises bare når gruppen er åpnet. */
-const NAV_GRUPPER: [string, string, string, string[]][] = [
+export const NAV_GRUPPER: [string, string, string, string[]][] = [
   ['teknikk', 'Bygg og teknikk', 'tfm', ['maalere', 'tfm', 'arealer', 'nokler', 'vedlikehold', 'prosjekter', 'tilsynsanalyser']],
   ['kunnskap', 'Håndbok og regelverk', 'handbok', ['handbok', 'regelverk']],
   ['admin', 'Administrasjon', 'admin', ['innstillinger', 'logg', 'arkiv', 'brukere', 'data']],
@@ -162,7 +163,7 @@ export default function App() {
   const nav = navFor();
   const def = isTenant() ? 'portal' : isUtforer() ? 'arbeidsordre' : 'oversikt';
   let v = r.v || def;
-  if (!nav.some(n => n[0] === v) && !['eiendom', 'leietaker', 'profil', 'prosjekt', 'befaring'].includes(v)) v = def;
+  if (!nav.some(n => n[0] === v) && !['mer', 'eiendom', 'leietaker', 'profil', 'prosjekt', 'befaring'].includes(v)) v = def;
   if (v === 'prosjekt' && !canEdit()) v = def;
   if (v === 'leietaker' && !canEdit()) v = def;
   if (v === 'eiendom' && !isStaff()) v = def;
@@ -177,7 +178,7 @@ export default function App() {
   const rm = RUTE_MODUL[v]; const rmOk = !rm || (r.id && v === 'prosjekt' ? harModul(rm, S.prosjekter.find(p => p.id === r.id)?.eiendomId) : r.id && v === 'befaring' && S.befaringer.some(b => b.id === r.id) ? harModul(rm, S.befaringer.find(b => b.id === r.id)?.eiendomId) : harModul(rm));
   if (!rmOk) body = <ModulSperret k={rm} />;
   else switch (v) {
-    case 'oversikt': body = <Oversikt />; break;
+    case 'oversikt': body = <><MobilSnarveier /><Oversikt /></>; break;
     case 'eiendommer': body = <Eiendommer />; break;
     case 'eiendom': body = <Eiendom id={r.id!} />; break;
     case 'kontroller': body = <Kontrollplan />; break;
@@ -203,6 +204,7 @@ export default function App() {
     case 'regelverk': body = <Regelverk />; break;
     case 'handbok': body = <Handbok />; break;
     case 'hjelp': body = <HjelpSide id={r.id} />; break;
+    case 'mer': body = <MerSide nav={nav} I={I} grupper={isTenant() || isUtforer() ? [] : NAV_GRUPPER.filter(g => nav.filter(n => g[3].includes(n[0])).length > 1)} antall={{ kontroller: forf, avvik: avv, meldinger: mldN, innboks: ibN }} />; break;
     case 'brukere': body = <Brukere />; break;
     case 'data': body = <DataAdmin />; break;
     case 'portal': body = <Portal />; break;
@@ -251,6 +253,7 @@ export default function App() {
       </div>}
       {state.loading && !S.eiendommer.length ? <div className="empty"><b>{tt("Laster data …")}</b></div> : <React.Suspense fallback={<div className="empty"><b>{tt("Laster …")}</b></div>}>{body}</React.Suspense>}
     </main>
+    <BunnMeny nav={nav} I={I} antall={{ kontroller: forf, avvik: avv, meldinger: mldN }} aktiv={v} />
     <ModalHost /><Toast /><Tip /><NyheterPopup />
   </div>;
 }
