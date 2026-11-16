@@ -10,3 +10,9 @@ lastSprak().then(() => import('./App')).then(({ default: App }) => {
 
 // Appen kan startes uten nett (befaringer). Bare i den publiserte versjonen.
 if ('serviceWorker' in navigator && (import.meta as any).env?.PROD) window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => { }); });
+
+// Trykk på et push-varsel mens appen allerede er åpen: gå til siden varselet gjelder
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => {
+  if (e.data?.type !== 'ek-apne' || typeof e.data.url !== 'string') return;
+  try { const u = new URL(e.data.url); if (u.origin === location.origin) { if (u.hash && u.hash !== location.hash) location.hash = u.hash; else if (u.hash) window.dispatchEvent(new HashChangeEvent('hashchange')); } } catch { }
+});

@@ -24,8 +24,9 @@ self.addEventListener('push', e => {
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close(); const url = new URL((e.notification.data && e.notification.data.url) || '/', self.location.origin).href;
-  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(L => {
-    for (const c of L) { if (c.url.startsWith(self.location.origin) && 'focus' in c) { c.navigate && c.navigate(url).catch(() => { }); return c.focus(); } }
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async L => {
+    const c = L.find(x => x.url.startsWith(self.location.origin));
+    if (c) { c.postMessage({ type: 'ek-apne', url }); try { await c.focus(); } catch { } return; } // åpen app: appen bytter selv side
     return self.clients.openWindow(url);
   }));
 });
