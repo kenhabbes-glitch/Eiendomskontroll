@@ -238,3 +238,12 @@ test('PC: sidemenyen vises og bunnmenyen er skjult', async () => {
     assert.ok(await a.side.locator('#side').isVisible()); assert.ok(!(await a.side.locator('#bunnmeny').isVisible()));
   } finally { await a.lukk(); }
 });
+
+test('lenke fra e-post (nytt passord): knapp først, koden brukes først ved trykk', async () => {
+  const a = await aapne('#token_hash=abc123&type=recovery'); try {
+    await a.side.waitForTimeout(500);
+    assert.ok(await a.side.getByRole('button', { name: 'Fortsett' }).isVisible(), 'knappen «Fortsett» mangler');
+    assert.ok((await tekst(a)).includes('Nytt passord'));
+    if (a.feil.length) assert.fail(a.feil[0]);
+  } finally { await a.lukk(); }
+});

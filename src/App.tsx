@@ -19,7 +19,7 @@ import { ModulSperret } from './views/Abonnement';
 import React, { useEffect, useState } from 'react';
 import { mineOrg, kanDrifteE, sendKo, ko, forkastKo } from './lib/store';
 import { autoKvitterIK } from './lib/actions';
-import { canEdit, configured, initAuth, isAdmin, isStaff, isTenant, isUtforer, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
+import { LENKE, canEdit, configured, initAuth, isAdmin, isStaff, isTenant, isUtforer, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
 import { activeTasks, dUntil, openAvvik } from './lib/utils';
 import { ModalHost, Tip, Toast, confirmBox } from './components/ui';
 import { Oversikt } from './views/Oversikt';
@@ -146,6 +146,7 @@ export default function App() {
   if (!configured) return <Setup />;
   if (!state.ready) return <div className="login"><div className="card"><p>{tt("Laster …")}</p></div></div>;
   if (state.mfa && !['ao', 'lt', 'bb', 'ko', 'pr', 'personvern'].includes(r.v)) return <><MfaSkjerm /><Toast /></>;
+  if (LENKE.token && !state.recovery) return <><LenkeBekreft /><Toast /></>;
   if (state.recovery && state.me) return <SetPassword />;
   if (r.v === 'qr' && r.id) return <><QrLenke token={r.id} /><Toast /></>;
   if (r.v === 'ao' && r.id) return <><AoLenke token={r.id} /><Toast /></>;
@@ -286,12 +287,28 @@ function Login() {
     <h1>{tt("Eiendomskontroll")}</h1><p className="muted" style={{ marginTop: 0 }}>{glemt ? tt("Få tilsendt lenke for å sette nytt passord.") : tt("Logg inn for å fortsette.")}</p>
     <div className="fld"><label>{tt("E-post")}</label><input type="email" value={ep} onChange={e => setEp(e.target.value)} autoFocus required /></div>
     {!glemt && <div className="fld"><label>{tt("Passord")}</label><input type="password" value={pw} onChange={e => setPw(e.target.value)} required /></div>}
+    {LENKE.feil && !err && <div className="err">{tt("Lenken i e-posten er utløpt eller allerede brukt. Velg «Glemt passord?» for å få en ny lenke.")}</div>}
     {err && <div className="err">{err}</div>}
     <button className="btn pri" style={{ width: '100%', justifyContent: 'center' }} disabled={busy}>{busy ? tt("Vent …") : glemt ? tt("Send lenke") : tt("Logg inn")}</button>
     <p className="small" style={{ marginBottom: 0 }}><a href="#" onClick={e => { e.preventDefault(); setGlemt(!glemt); setErr(''); }}>{glemt ? tt("Tilbake til innlogging") : tt("Glemt passord?")}</a></p>
     <p className="small muted" style={{ marginBottom: 0 }}>{tt("Har du ikke bruker? Be administratoren i organisasjonen din om en invitasjon")}{(import.meta as any).env?.VITE_SELVREGISTRERING ? <> {tt("– eller")} <a href="#/registrer">{tt("registrer bedriften din og prøv gratis i 30 dager")}</a></> : null}.</p>
     <Toast />
   <SprakVelger kompakt /></form></div>;
+}
+function LenkeBekreft() {
+  const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const fortsett = async () => {
+    setBusy(true); setErr('');
+    const { error } = await sb.auth.verifyOtp({ token_hash: LENKE.token, type: LENKE.type });
+    if (error) { setBusy(false); return setErr(tt("Lenken er utløpt eller allerede brukt. Gå til innlogging og velg «Glemt passord» for å få en ny.")); }
+    LENKE.token = ''; state.recovery = true; history.replaceState(null, '', location.pathname); setTimeout(() => location.reload(), 50);
+  };
+  return <div className="login"><div className="card"><h1>{LENKE.type === 'invite' ? tt("Velg passord") : tt("Nytt passord")}</h1>
+    <p className="muted" style={{ marginTop: 0 }}>{tt("Trykk på knappen for å fortsette og velge passord.")}</p>
+    {err && <div className="err">{err}</div>}
+    <button className="btn pri" style={{ width: '100%', justifyContent: 'center' }} disabled={busy} onClick={fortsett}>{busy ? tt("Laster …") : tt("Fortsett")}</button>
+    {err && <p className="small" style={{ marginTop: 12 }}><a href="#/" onClick={() => { LENKE.token = ''; history.replaceState(null, '', location.pathname); location.reload(); }}>{tt("Til innlogging")}</a></p>}
+    <SprakVelger kompakt /></div></div>;
 }
 function SetPassword() {
   const [pw, setPw] = useState(''); const [pw2, setPw2] = useState(''); const [err, setErr] = useState('');

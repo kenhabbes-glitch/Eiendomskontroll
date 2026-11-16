@@ -23,15 +23,16 @@ const T = {
 const ANDRE = ['en', 'sv', 'da', 'es-MX', 'es-ES'];
 // printf gjør verdien til tekst også når brukeren mangler språk (eldre brukere), så malen aldri feiler
 const velg = (f) => ANDRE.map((s, i) => `{{ ${i ? 'else if' : 'if'} eq (printf "%v" .Data.sprak) "${s}" }}${f(s)}`).join('') + `{{ else }}${f('nb')}{{ end }}`;
-const kropp = (t) => `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1d2320;max-width:560px">
+const lenke = (type) => `{{ if .RedirectTo }}{{ .RedirectTo }}{{ else }}{{ .SiteURL }}{{ end }}#token_hash={{ .TokenHash }}&type=${type}`;
+const kropp = (t, type) => `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#1d2320;max-width:560px">
   <h2 style="margin:0 0 12px">${t[1]}</h2><p>${t[2]}</p>
-  <p style="margin:20px 0"><a href="{{ .ConfirmationURL }}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${t[3]}</a></p>
+  <p style="margin:20px 0"><a href="${lenke(type)}" style="background:#1f6f5c;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">${t[3]}</a></p>
   <p style="font-size:12px;color:#6b736d">${t[4]}</p></div>`;
 // Emnefeltet i Supabase tåler maks 255 tegn: korte ord per språk, felles « – Eiendomskontroll»
 const EMNE = { invite: ['Invitation', 'Inbjudan', 'Invitation', 'Invitación', 'Invitasjon'], recovery: ['New password', 'Nytt lösenord', 'Ny adgangskode', 'Nueva contraseña', 'Nytt passord'] };
 let emner = 'Lim inn bare linjen UNDER navnet (ikke «invite:»/«recovery:»).\n\n';
 for (const [mal, S] of Object.entries(T)) {
-  fs.writeFileSync(path.join(__dirname, mal + '.html'), velg(s => '\n' + kropp(S[s]) + '\n') + '\n');
+  fs.writeFileSync(path.join(__dirname, mal + '.html'), velg(s => '\n' + kropp(S[s], mal) + '\n') + '\n');
   const e = EMNE[mal]; const linje = `{{$s:=printf "%v" .Data.sprak}}{{if eq $s "en"}}${e[0]}{{else if eq $s "sv"}}${e[1]}{{else if eq $s "da"}}${e[2]}{{else if eq $s "es-MX" "es-ES"}}${e[3]}{{else}}${e[4]}{{end}} – Eiendomskontroll`;
   if (linje.length > 255) throw new Error('Emnet er for langt: ' + mal);
   emner += `${mal}:\n${linje}\n\n`;

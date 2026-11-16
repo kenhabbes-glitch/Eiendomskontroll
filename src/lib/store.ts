@@ -9,7 +9,12 @@ const URL_ = rensUrl(import.meta.env.VITE_SUPABASE_URL as string | undefined) ||
 const KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
 export const configured = !!(URL_ && KEY);
 // Må leses før Supabase-klienten fjerner token fra adressen
-const FRA_LENKE = /type=(recovery|invite)/.test(location.hash + location.search);
+const FRA_LENKE = /type=(recovery|invite)/.test(location.hash + location.search) && !/token_hash=/.test(location.hash + location.search);
+// Nyere lenker i e-post har engangskoden i adressen (#token_hash=…) og brukes først når brukeren trykker på knappen,
+// slik at e-postprogrammer som forhåndsåpner lenker ikke bruker opp koden. Feil fra gamle lenker (#error=…) vises også.
+const _lh = new URLSearchParams(location.hash.replace(/^#\/?/, '')); const _ls = new URLSearchParams(location.search);
+const _th = _lh.get('token_hash') || _ls.get('token_hash'); const _lt = _lh.get('type') || _ls.get('type');
+export const LENKE = { token: _th && (_lt === 'recovery' || _lt === 'invite') ? _th : '', type: (_lt === 'invite' ? 'invite' : 'recovery') as 'invite' | 'recovery', feil: _lh.get('error_description') || _lh.get('error_code') || '' };
 export const sb: SupabaseClient = createClient(URL_ || 'http://localhost', KEY || 'mangler', {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
 });
