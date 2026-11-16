@@ -20,3 +20,10 @@ test('tittel bygges av system og feil', () => {
   assert.equal(foreslaAvvik('lekkasje').tittel, 'Lekkasje');
   assert.equal(foreslaAvvik('').tittel, '');
 });
+
+test('vanlige funn: hakk i vegg, flekk i tak, løs list', () => {
+  const a = foreslaAvvik('hakk i vegg'); assert.equal(a.tittel, 'Hakk i vegg'); assert.equal(a.alv.alv, 'Lav'); assert.deepEqual(a.typer, ['innv']);
+  const b = foreslaAvvik('flekk i tak'); assert.equal(b.tittel, 'Flekk i tak'); assert.ok(b.merknad.includes('lekkasje'), 'flekk i tak skal gi en merknad om fukt');
+  const c = foreslaAvvik('Løs list ved døra'); assert.equal(c.feil, 'løs'); assert.equal(c.del, 'list'); assert.equal(c.tittel, 'Løs list');
+  assert.equal(foreslaAvvik('lekkasje i tak').alv.alv, 'Høy'); assert.equal(foreslaAvvik('lekkasje i tak').merknad, '');
+});
