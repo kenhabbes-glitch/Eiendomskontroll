@@ -35,3 +35,14 @@ export function foreslaAvvik(tekst: string, systemNavn = ''): AvvikForslag {
   let merknad = ''; if (/flekk|misfarging|fukt/i.test(t) && /himling|\btak\b|undertak|takplate/i.test(t) && alv.alv !== 'Kritisk' && alv.alv !== 'Høy') { merknad = 'Flekk i tak eller himling kan være tegn på lekkasje eller fukt. Se etter vannkilde (rør, tak, ventilasjon) og vurder å sette alvorlighet til Høy.'; }
   return { tittel, alv, plassering: plasseringFra(t), feil, del: d?.del || '', typer: d?.typer || [], merknad };
 }
+
+// ---- Automatisk heving av alvorlighet på meldinger fra leietakere/QR. Hever bare opp, aldri ned, og bruker snevre ord for å unngå falske alarmer
+// (f.eks. «brannslukker utløpt» skal ikke bli Kritisk).
+const HAST_KRITISK = /\bdet brenner\b|brann i |brenner i |røykutvikling|røyk fra|det ryker|lukter brent|brent lukt|brannlukt|gnist|gasslukt|gasslekkasje|strømførende|blottlagte ledninger|elektrisk støt|fare for liv|personskade|skadet person|vann fra taket|vann i tavle|oversvømmelse|rømningsvei.{0,25}(blokkert|sperret|låst)/i;
+const HAST_HOY = /lekkasje|lekker|vannskade|nødlys.{0,20}(lyser ikke|virker ikke|dødt)|brannalarm.{0,20}(feil|virker ikke|ute av drift|piper)|heis.{0,20}(står|stopp|fast|ute av drift)|innestengt|ingen varme|strømbrudd|sprinkler.{0,20}(lekk|utløst)|branndør.{0,20}(står åpen|lukker ikke)|kokende vann/i;
+const RANG: Record<string, number> = { Lav: 0, Middels: 1, 'Høy': 2, Kritisk: 3 };
+export function hevAlvorlighet(tekst: string, valgt: string): { alv: string; ord: string } | null {
+  const t = tekst || ''; const k = t.match(HAST_KRITISK); if (k && (RANG[valgt] ?? 1) < 3) return { alv: 'Kritisk', ord: k[0].trim().toLowerCase() };
+  const h = t.match(HAST_HOY); if (h && (RANG[valgt] ?? 1) < 2) return { alv: 'Høy', ord: h[0].trim().toLowerCase() };
+  return null;
+}

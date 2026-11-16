@@ -7,7 +7,7 @@ import { lagFalsk, type Db } from './falsk-supabase.ts';
 let falsk: ReturnType<typeof lagFalsk>;
 mock.module('@supabase/supabase-js', { namedExports: { createClient: () => falsk.klient } });
 process.env.SUPABASE_URL = 'http://test'; process.env.SUPABASE_SERVICE_ROLE_KEY = 'test';
-const { default: qr } = await import('../netlify/functions/qr-meld.ts');
+const { default: qr } = await import('./.bygg/qr-meld.mjs');
 const { default: registrer } = await import('../netlify/functions/registrer.ts');
 const post = async (fn: any, body: any) => { const r = await fn(new Request('http://x/', { method: 'POST', body: JSON.stringify(body) })); return { status: r.status, ...(await r.json()) }; };
 
@@ -40,10 +40,18 @@ test('QR: info gir bare navn på eiendom og sted', async () => {
 });
 
 test('QR: melding blir et vanlig avvik med status Ny, og lange tekster kuttes', async () => {
-  const r = await post(qr, { t: TOK, action: 'meld', tittel: 'Lekkasje ' + 'x'.repeat(500), beskrivelse: 'y'.repeat(5000), alv: 'Finnes ikke', navn: 'Kari', kontakt: '99999999', status: 'Lukket', eiendom_id: 'annen' });
+  const r = await post(qr, { t: TOK, action: 'meld', tittel: 'Skapdør ' + 'x'.repeat(500), beskrivelse: 'y'.repeat(5000), alv: 'Finnes ikke', navn: 'Kari', kontakt: '99999999', status: 'Lukket', eiendom_id: 'annen' });
   assert.equal(r.status, 200); const a = db.avvik[0];
   assert.equal(a.eiendom_id, 'e1'); assert.equal(a.data.status, 'Ny'); assert.equal(a.data.kilde, 'QR-melding'); assert.equal(a.data.alv, 'Middels'); assert.equal(a.data.qrId, 'q1'); assert.equal(a.data.anleggId, 's1');
   assert.equal(a.data.tittel.length, 150); assert.ok(a.data.beskrivelse.length <= 2000 + 40); assert.equal(a.data.meldtAv, 'Kari');
+});
+
+test('QR: faresignaler i teksten hever alvorligheten automatisk (aldri ned) og logges', async () => {
+  let r = await post(qr, { t: TOK, action: 'meld', tittel: 'Det lukter brent fra tavlen', alv: 'Lav' }); assert.equal(r.status, 200);
+  const a = db.avvik[0]; assert.equal(a.data.alv, 'Kritisk'); assert.deepEqual(a.data.alvAuto, { fra: 'Lav', ord: 'lukter brent' });
+  assert.ok(a.data.logg.some((l: any) => /hevet automatisk fra Lav til Kritisk/.test(l.k)), 'hevingen mangler i loggen'); assert.equal(a.data.status, 'Ny');
+  r = await post(qr, { t: TOK, action: 'meld', tittel: 'Røyk fra aggregatet', alv: 'Kritisk' }); assert.equal(db.avvik[1].data.alv, 'Kritisk'); assert.equal(db.avvik[1].data.alvAuto, undefined, 'allerede kritisk: ingen heving');
+  r = await post(qr, { t: TOK, action: 'meld', tittel: 'Brannslukker mangler i gangen', alv: 'Middels' }); assert.equal(db.avvik[2].data.alv, 'Middels', '«brann» alene skal ikke heve');
 });
 
 test('QR: for kort tittel avvises, og roboter (skjult felt utfylt) får «ok» uten at noe lagres', async () => {

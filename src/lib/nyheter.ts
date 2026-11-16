@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-08', dato: '2026-12-08', tittel: 'Hastemeldinger heves automatisk', punkter: [
+    'Når en leietaker eller en QR-melding nevner tydelige faresignaler (røyk, brent lukt, gasslukt, vann fra taket, blokkert rømningsvei …) hever appen alvorligheten til Kritisk. Ord som lekkasje, nødlys som ikke virker og heis som står gir minst Høy.',
+    'Appen hever bare opp, aldri ned, og skriver det i loggen og som en advarsel i avviket, så du kan rette det hvis det ble feil.',
+  ] },
   { id: '2026-12-07', dato: '2026-12-07', tittel: 'Raskere avvik med to trykk', punkter: [
     'I «Nytt avvik» trykker du nå to ganger: hva som er feil (flekk, hakk, sprekk, lekkasje, løs …) og hvor (tak, vegg, gulv, list, dør …). Appen setter tittel, alvorlighet og system for deg. Det du selv har skrevet blir ikke overskrevet.',
     'Har bildet tekst på seg (skilt, typeskilt), kan du også trykke «Les tekst på bildet» for forslag til system og rom. Ingenting fylles ut før du trykker «Bruk forslag».',

@@ -6,6 +6,7 @@
 // meldepunkt og per eiendom per time. Service-nøkkelen brukes bare her på serveren.
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
+import { hevAlvorlighet } from '../../src/lib/avvikFoto';
 
 const json = (status: number, body: any) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 const MAKS_PUNKT = 15, MAKS_EIENDOM = 60, MAKS_BILDE = 4e6;
@@ -38,7 +39,8 @@ const handler = async (req: Request) => {
 
   if (b.nettside) return json(200, { ok: true }); // honningkrukke
   const tittel = String(b.tittel || '').trim().slice(0, 150); const beskr = String(b.beskrivelse || '').trim().slice(0, 2000);
-  const alv = FRIST[b.alv] ? String(b.alv) : 'Middels';
+  const alvValgt = FRIST[b.alv] ? String(b.alv) : 'Middels';
+  const heving = hevAlvorlighet(tittel + ' ' + beskr, alvValgt); const alv = heving?.alv || alvValgt; // hever bare opp, aldri ned
   const navn = String(b.navn || '').trim().slice(0, 80); const kontakt = String(b.kontakt || '').trim().slice(0, 120);
   if (tittel.length < 3) return json(400, { error: 'Skriv kort hva som er galt' });
 
@@ -68,7 +70,8 @@ const handler = async (req: Request) => {
     tittel, beskrivelse: [beskr, sted ? 'Sted: ' + sted : ''].filter(Boolean).join('\n'), alv, status: 'Ny', kilde: 'QR-melding', ansvar: 'Eier',
     meldtAv: av, meldtKontakt: kontakt || undefined, qrId: p.id, oppdaget: idag, frist: fr,
     anleggId: p.data?.systemId || '', komponentId: '', ...(vedlegg.length ? { vedlegg } : {}),
-    logg: [{ t: new Date().toISOString(), s: 'Ny', k: `Meldt via QR-kode (${p.navn})`, av }],
+    ...(heving ? { alvAuto: { fra: alvValgt, ord: heving.ord } } : {}),
+    logg: [{ t: new Date().toISOString(), s: 'Ny', k: `Meldt via QR-kode (${p.navn})`, av }, ...(heving ? [{ t: new Date().toISOString(), s: 'Ny', k: `Alvorlighet hevet automatisk fra ${alvValgt} til ${heving.alv} (meldingen nevner «${heving.ord}»). Kontroller.`, av: 'System' }] : [])],
   };
   const { data: ny, error } = await admin.from('avvik').insert({ eiendom_id: p.eiendom_id, data }).select('id, nr').single();
   if (error) { console.error('qr-avvik', error); return json(500, { error: 'Meldingen kunne ikke lagres. Prøv igjen.' }); }

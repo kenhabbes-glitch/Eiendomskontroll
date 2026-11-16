@@ -777,7 +777,7 @@ export function editAvvik(id?: string, preset: any = {}) {
   let touchedFrist = false; const lukkRef: { c?: () => void } = {};
   lukkRef.c = formModal({
     title: id ? tt("Avvik #{0}", a.nr || '') : tt("Nytt avvik"), fields, values: { ...a, komm: '', bilder: [] }, wide: true, readOnly: !staff,
-    top: id ? <div style={{ marginBottom: 10 }}><AvvikKoblinger id={id} lukk={() => lukkRef.c?.()} /></div> : undefined,
+    top: id ? <div style={{ marginBottom: 10 }}>{a.alvAuto && <div className="note small" style={{ color: 'var(--ink)', marginBottom: 8 }}>⚠ {tt("Alvorlighet hevet automatisk fra {0} fordi meldingen nevner «{1}». Endre hvis det er feil.", a.alvAuto.fra, a.alvAuto.ord)}</div>}<AvvikKoblinger id={id} lukk={() => lukkRef.c?.()} /></div> : undefined,
     onChange: (k, v) => { if (k === 'frist') touchedFrist = true; if (k === 'komponentId' && v.komponentId) { const c = byId('komponenter', v.komponentId); if (c) return { anleggId: c.anleggId, eiendomId: c.eiendomId }; } if (!id && !touchedFrist && (k === 'alv' || k === 'oppdaget')) return { frist: addDays(v.oppdaget || today(), AV_FRIST[v.alv]) }; },
     bottom: () => <>
       {id && staff && <AoPanel id={id} lukk={() => lukkRef.c?.()} />}

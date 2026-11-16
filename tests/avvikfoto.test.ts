@@ -27,3 +27,14 @@ test('vanlige funn: hakk i vegg, flekk i tak, løs list', () => {
   const c = foreslaAvvik('Løs list ved døra'); assert.equal(c.feil, 'løs'); assert.equal(c.del, 'list'); assert.equal(c.tittel, 'Løs list');
   assert.equal(foreslaAvvik('lekkasje i tak').alv.alv, 'Høy'); assert.equal(foreslaAvvik('lekkasje i tak').merknad, '');
 });
+
+import { hevAlvorlighet } from '../src/lib/avvikFoto.ts';
+test('automatisk heving: bare opp, og ikke på harmløse ord', () => {
+  assert.deepEqual(hevAlvorlighet('Det lukter brent fra tavlen', 'Middels'), { alv: 'Kritisk', ord: 'lukter brent' });
+  assert.equal(hevAlvorlighet('Lekkasje under vasken', 'Lav')?.alv, 'Høy');
+  assert.equal(hevAlvorlighet('Lekkasje under vasken', 'Høy'), null, 'allerede høy nok');
+  assert.equal(hevAlvorlighet('Røyk fra aggregatet', 'Kritisk'), null, 'aldri ned eller likt');
+  assert.equal(hevAlvorlighet('Brannslukker mangler på 2. etasje', 'Middels'), null, '«brann» alene er ikke nok');
+  assert.equal(hevAlvorlighet('Lyspære er gått i kontoret', 'Lav'), null);
+  assert.equal(hevAlvorlighet('Heis står stille mellom etasjene', 'Middels')?.alv, 'Høy');
+});

@@ -8,6 +8,7 @@ import { PortalBrannvern } from '../lib/brannvern';
 import { S, bump, feiltekst, save, sb, state, toast, uploadFile, useStore } from '../lib/store';
 import { addDays, byId, fd, intTxt, pliktStatus, pliktVis, sortBy, today, leieAreal, m2 } from '../lib/utils';
 import { AlvChip, Chip, Empty, FileLink, StChip, formModal, showModal } from '../components/ui';
+import { hevAlvorlighet } from '../lib/avvikFoto';
 import { tt, lokale } from '../lib/i18n';
 
 async function refreshMine() {
@@ -27,7 +28,8 @@ function meldAvvik(l: any) {
       { k: 'beskrivelse', label: tt("Beskrivelse"), type: 'textarea' },
       { k: 'fil', label: tt("Bilde eller dokument (valgfritt)"), type: 'file' }],
     onSave: async v => {
-      const o: any = { tittel: v.tittel, beskrivelse: [v.beskrivelse, v.plassering ? 'Sted: ' + v.plassering : ''].filter(Boolean).join('\n'), eiendomId: l.eiendomId, leietakerId: l.id, alv: v.alv, status: 'Ny', kilde: 'Leietaker', ansvar: 'Eier', meldtAv: state.me?.navn || state.me?.epost, oppdaget: today(), frist: addDays(today(), ({ Kritisk: 7, 'Høy': 30, Middels: 90, Lav: 365 } as any)[v.alv]), logg: [{ t: new Date().toISOString(), s: 'Ny', k: 'Meldt av leietaker', av: state.me?.navn || state.me?.epost }] };
+      const heving = hevAlvorlighet([v.tittel, v.beskrivelse, v.plassering].filter(Boolean).join(' '), v.alv); const alvEnd = heving?.alv || v.alv;
+      const o: any = { tittel: v.tittel, beskrivelse: [v.beskrivelse, v.plassering ? 'Sted: ' + v.plassering : ''].filter(Boolean).join('\n'), eiendomId: l.eiendomId, leietakerId: l.id, alv: alvEnd, ...(heving ? { alvAuto: { fra: v.alv, ord: heving.ord } } : {}), status: 'Ny', kilde: 'Leietaker', ansvar: 'Eier', meldtAv: state.me?.navn || state.me?.epost, oppdaget: today(), frist: addDays(today(), ({ Kritisk: 7, 'Høy': 30, Middels: 90, Lav: 365 } as any)[alvEnd]), logg: [{ t: new Date().toISOString(), s: 'Ny', k: 'Meldt av leietaker', av: state.me?.navn || state.me?.epost }, ...(heving ? [{ t: new Date().toISOString(), s: 'Ny', k: `Alvorlighet hevet automatisk fra ${v.alv} til ${heving.alv} (meldingen nevner «${heving.ord}»). Kontroller.`, av: 'System' }] : [])] };
       if (v.fil) { const f = await uploadFile(v.fil, l.eiendomId, l.id); if (f) o.vedlegg = [f]; }
       const nyId = await save('avvik', o); toast(tt("Takk! Saken er registrert."));
       // Beskrivelsen blir første melding i samtalen, så utleier ser den i Meldinger og får den som ulest
