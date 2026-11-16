@@ -2,10 +2,12 @@
 // Brukes av serverfunksjonene push, qr-meld og arbeidsordre. Feil her skal aldri stoppe selve operasjonen.
 export type PushInnhold = { tittel: string; tekst: string; url?: string; tag?: string };
 
+const lastWp = async (): Promise<any> => { const m: any = await import('web-push'); return m.default?.generateVAPIDKeys ? m.default : m; };
+
 export async function vapid(admin: any): Promise<{ offentlig: string; privat: string } | null> {
   const { data } = await admin.from('push_noekler').select('offentlig, privat').eq('id', 1).maybeSingle();
   if (data?.offentlig) return data;
-  const wp: any = (await import('web-push')).default; const k = wp.generateVAPIDKeys();
+  const wp: any = await lastWp(); const k = wp.generateVAPIDKeys();
   await admin.from('push_noekler').insert({ id: 1, offentlig: k.publicKey, privat: k.privateKey });
   const { data: igjen } = await admin.from('push_noekler').select('offentlig, privat').eq('id', 1).maybeSingle(); // en annen samtidig kjøring kan ha vært først
   return igjen || null;
@@ -18,7 +20,7 @@ export async function pushTilBrukere(admin: any, userIds: string[], typer: strin
     const { data: subs } = await admin.from('push_abonnement').select('id, endpoint, p256dh, auth, typer').in('user_id', userIds);
     const mål = (subs || []).filter((s: any) => (s.typer || []).some((t: string) => typer.includes(t))); if (!mål.length) return 0;
     const k = await vapid(admin); if (!k) return 0;
-    const wp: any = (await import('web-push')).default;
+    const wp: any = await lastWp();
     const emne = /^(mailto:|https:\/\/)/.test(process.env.PUSH_KONTAKT || '') ? process.env.PUSH_KONTAKT! : (process.env.URL && /^https:\/\//.test(process.env.URL) ? process.env.URL : 'mailto:post@example.com');
     const nyttelast = JSON.stringify({ tittel: inn.tittel.slice(0, 120), tekst: inn.tekst.slice(0, 300), url: inn.url || '/', tag: inn.tag });
     let ok = 0; const bort: string[] = [];

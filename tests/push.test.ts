@@ -5,7 +5,7 @@ import { lagFalsk, type Db } from './falsk-supabase.ts';
 
 let falsk: ReturnType<typeof lagFalsk>; let sendt: any[] = []; let svar: Record<string, number> = {};
 mock.module('@supabase/supabase-js', { namedExports: { createClient: () => falsk.klient } });
-mock.module('web-push', { defaultExport: {
+mock.module('web-push', { namedExports: {
   generateVAPIDKeys: () => ({ publicKey: 'PUB', privateKey: 'PRIV' }),
   sendNotification: async (s: any, last: string, o: any) => { sendt.push({ endpoint: s.endpoint, last: JSON.parse(last), nokkel: o.vapidDetails.publicKey }); if (svar[s.endpoint]) throw Object.assign(new Error('x'), { statusCode: svar[s.endpoint] }); },
 } });
