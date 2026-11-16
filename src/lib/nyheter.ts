@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-04', dato: '2026-12-04', tittel: 'Ukeoversikt til eier på e-post', punkter: [
+    'Under Innstillinger → Ukeoversikt til eier kan du slå på én samlet e-post med kontroller og service som er forfalt eller forfaller snart, dokumenter som utløper og avvik over frist. Den sendes bare når det er noe å melde, og er av som standard.',
+    'Bruk «Send en nå (test)» for å se hvordan den ser ut. E-posten går via e-postoppsettet du allerede har.',
+  ] },
   { id: '2026-12-03', dato: '2026-12-03', tittel: 'FDV telles per system', punkter: [
     'FDV-dokumentasjon er ikke ett dokument, men dokumentasjon for hvert anlegg som følger bygget gjennom hele levetiden. Lovkravet viser nå «Delvis» og hvor mange systemer som har FDV, og lister hvilke som mangler.',
     'Legg FDV inn på hvert system (fanen Dokumentasjon på systemet) – da blir kravet grønt når alle er dekket.',

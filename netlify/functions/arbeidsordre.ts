@@ -789,6 +789,47 @@ const handler = async (req: Request) => {
     return json(200, { ok: true, rapport });
   }
 
+  // Ukeoversikt til eier: forfalte og kommende kontroller, dokumenter som utløper og avvik over frist – samlet i én e-post per organisasjon
+  if (body.action === 'eier_uke' || body.action === 'eier_uke_na') {
+    const na = body.action === 'eier_uke_na'; let naOrg = '';
+    if (na) { const p = await hvem(); if (!p) return json(401, { error: 'Ikke innlogget' }); naOrg = String(body.org || '');
+      const { data: mm } = await admin.from('org_medlem').select('rolle').eq('org_id', naOrg).eq('user_id', p.id).eq('aktiv', true).maybeSingle(); if (!mm || !['admin', 'forvalter'].includes(mm.rolle)) return json(403, { error: 'Bare administrator eller forvalter kan sende denne' }); }
+    else { const forventet = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('ko-auto:' + key)).then(b => Buffer.from(b).toString('hex'));
+      if (req.headers.get('x-ek-cron') !== forventet) return json(403, { error: 'Ikke tillatt' }); }
+    const base = (process.env.URL || '').replace(/\/+$/, ''); const rapport: any[] = [];
+    const { data: innst0 } = await admin.from('innstillinger').select('org_id, data').eq('nokkel', 'eierOversikt');
+    const innst = na ? (innst0 || []).filter((r: any) => r.org_id === naOrg).concat((innst0 || []).some((r: any) => r.org_id === naOrg) ? [] : [{ org_id: naOrg, data: {} }]) : innst0;
+    for (const r0 of innst || []) {
+      const c = { pa: false, epost: '', dager: 30, ukedag: 1, ...(r0.data || {}) }; if (!c.pa && !na) continue;
+      if (!na && new Date().getUTCDay() !== (+c.ukedag || 0)) continue;
+      const { data: org } = await admin.from('organisasjoner').select('id, navn, aktiv').eq('id', r0.org_id).maybeSingle(); if (!org?.aktiv) continue;
+      const { data: E } = await admin.from('eiendommer').select('id, data').eq('eier_org_id', org.id); const eids = (E || []).map((e: any) => e.id); if (!eids.length) continue;
+      const eNavn: Record<string, string> = Object.fromEntries((E || []).map((e: any) => [e.id, e.data?.navn || e.data?.adresse || '']));
+      const dager = Math.max(7, Math.min(365, +c.dager || 30));
+      const [{ data: O }, { data: D }, { data: A }, { data: AN }] = await Promise.all([admin.from('oppgaver').select('id, eiendom_id, data').in('eiendom_id', eids), admin.from('dokumenter').select('id, eiendom_id, data').in('eiendom_id', eids), admin.from('avvik').select('id, eiendom_id, data').in('eiendom_id', eids), admin.from('anlegg').select('id, data').in('eiendom_id', eids)]);
+      const sysNavn: Record<string, string> = Object.fromEntries((AN || []).map((a: any) => [a.id, a.data?.navn || '']));
+      const kontr = (O || []).filter((o: any) => o.data?.aktiv !== false && !o.data?.arkivert && o.data?.nesteFrist && dagerTil(o.data.nesteFrist) <= dager).map((o: any) => ({ id: o.id, eid: o.eiendom_id, navn: o.data.navn || '', sys: sysNavn[o.data.anleggId] || '', lov: o.data.type === 'Lovpålagt', frist: o.data.nesteFrist, d: dagerTil(o.data.nesteFrist) })).sort((x: any, y: any) => x.frist.localeCompare(y.frist));
+      const dok = (D || []).filter((d: any) => d.data?.gyldigTil && !d.data?.arkivert && dagerTil(d.data.gyldigTil) <= dager).map((d: any) => ({ id: d.id, eid: d.eiendom_id, navn: d.data.tittel || d.data.type || '', type: d.data.type || '', frist: d.data.gyldigTil, d: dagerTil(d.data.gyldigTil) })).sort((x: any, y: any) => x.frist.localeCompare(y.frist));
+      const av = (A || []).filter((a: any) => !AV_LUKKET_S.includes(a.data?.status) && a.data?.frist && dagerTil(a.data.frist) <= 14).map((a: any) => ({ id: a.id, eid: a.eiendom_id, navn: `#${a.data.nr} ${a.data.tittel || ''}`, frist: a.data.frist, d: dagerTil(a.data.frist) })).sort((x: any, y: any) => x.frist.localeCompare(y.frist));
+      const til = epostListe(c.epost).length ? epostListe(c.epost) : await (async () => { const { data: m } = await admin.from('org_medlem').select('rolle, profiles(epost)').eq('org_id', org.id).eq('rolle', 'admin').eq('aktiv', true); return (m || []).map((x: any) => x.profiles?.epost).filter(Boolean); })();
+      if (!til.length || !(kontr.length || dok.length || av.length)) { rapport.push({ org: org.navn, sendt: 0, til, tomt: !til.length ? 'ingen mottaker' : 'ingenting å melde' }); continue; }
+      const Lo = await sprakForOrg(org.id); const to = Lo.t; const over = (L: any[]) => L.filter(x => x.d < 0).length;
+      const tab = (hode: string[], rader: string[][]) => `<table style="border-collapse:collapse;font-size:13px;width:100%"><tr style="background:#f4f5f2">${hode.map(h => `<th align="left" style="padding:4px">${esc(to(h))}</th>`).join('')}</tr>${rader.map(r => `<tr>${r.map(x => `<td style="padding:4px;border-top:1px solid #e3e6e1">${x}</td>`).join('')}</tr>`).join('')}</table>`;
+      const fristTd = (x: any) => `<span style="color:${x.d < 0 ? '#c0392b' : '#333'}">${esc(Lo.dato(x.frist))} (${x.d < 0 ? esc(to('{0} d over', -x.d)) : x.d === 0 ? esc(to('i dag')) : esc(to('om {0} d', x.d))})</span>`;
+      const emne = to('Ukeoversikt eiendom: {0} forfalt, {1} kommende', over(kontr) + over(dok) + over(av), kontr.length + dok.length + av.length - over(kontr) - over(dok) - over(av));
+      const html = `<div style="font-family:system-ui,Arial,sans-serif;max-width:780px"><h2>${esc(emne)}</h2>`
+        + (kontr.length ? `<h3>${esc(to('Kontroller og service'))} (${kontr.length})</h3>${tab(['Kontroll', 'Eiendom', 'System', 'Frist'], kontr.slice(0, 40).map((k: any) => [`${k.lov ? '<b>' : ''}${esc(k.navn)}${k.lov ? '</b>' : ''}`, esc(eNavn[k.eid] || ''), esc(k.sys), fristTd(k)]))}${kontr.length > 40 ? `<p>${esc(to('… og {0} til', kontr.length - 40))}</p>` : ''}` : '')
+        + (dok.length ? `<h3>${esc(to('Dokumenter som utløper'))} (${dok.length})</h3>${tab(['Dokument', 'Eiendom', 'Utløper'], dok.slice(0, 40).map((d: any) => [esc(d.navn), esc(eNavn[d.eid] || ''), fristTd(d)]))}` : '')
+        + (av.length ? `<h3>${esc(to('Avvik over frist eller med frist innen 14 dager'))} (${av.length})</h3>${tab(['Avvik', 'Eiendom', 'Frist'], av.slice(0, 40).map((a: any) => [esc(a.navn), esc(eNavn[a.eid] || ''), fristTd(a)]))}` : '')
+        + `<p><a href="${base}/#/">${esc(to('Åpne appen'))}</a></p><p style="font-size:12px;color:#6b736d">${esc(to('Du kan slå av denne e-posten under Innstillinger → Ukeoversikt til eier.'))}</p></div>`;
+      const o = await oppsettFor(null, org.id); let ok = 0;
+      for (const t of til) { const r = await sendEpost(t, emne, html, emne, undefined, undefined, o).catch(() => null); if ((r as any)?.sendt) ok++; }
+      await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: SYS.navn, tabell: 'hendelse', rad_id: null, eiendom_id: null, org_id: org.id, handling: 'purring', tekst: `Ukeoversikt til eier sendt til ${til.join(', ')} (${kontr.length} kontroller, ${dok.length} dokumenter, ${av.length} avvik)` });
+      rapport.push({ org: org.navn, sendt: ok, til });
+    }
+    return json(200, { ok: true, rapport });
+  }
+
   // Servicefirmaet åpner lenken (ingen innlogging)
   const hentKo = async (token: string) => { if (!/^[0-9a-f-]{36}$/i.test(String(token || ''))) return null; const { data } = await admin.from('ko_invitasjon').select('*').eq('token', token).maybeSingle(); return data; };
   if (body.action === 'ko_info') {

@@ -12,6 +12,7 @@ import { svarfristSnart } from './Tilsyn';
 import { tt } from '../lib/i18n';
 
 export const PURR_STD = { paLogging: true, paLoggingDager: 7, ansvarlig: false, ansvarligFor: 3, ansvarligGjenta: 7, ansvarligMaks: 3, eier: false, eierEtter: 14, eierEpost: '', ukentlig: false, ukentligEpost: '' };
+export const UKE_STD = { pa: false, epost: '', dager: 30, ukedag: 1 };
 export const purrInnst = () => ({ ...PURR_STD, ...(S.innst.avvikPurring || {}) });
 
 // ---------------- Innstillinger
@@ -38,6 +39,24 @@ export function PurringKort() {
     <div className="pu-rad"><Bryter on={c.ukentlig} set={b => setC({ ukentlig: b })} ro={ro}><b>{tt("Ukentlig oversikt på e-post (mandager)")}</b><br /><span className="small muted">{tt("Avvik over frist og med frist innen 14 dager.")}</span></Bryter>
       {c.ukentlig && <div className="pu-under small">{tt("Til")} <input disabled={ro} value={c.ukentligEpost} placeholder={tt("e-post (tom = organisasjonens administratorer)")} style={{ width: 300, display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ ukentligEpost: e.target.value })} /></div>}</div>
     {!ro ? <button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre purreinnstillinger")}</button> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
+  </div>;
+}
+
+// ---------------- Ukeoversikt til eier: kontroller, dokumenter og avvik i én e-post (av som standard)
+export function UkeOversiktKort() {
+  useStore(); const ro = !isAdmin() && state.me?.rolle !== 'forvalter';
+  const [c, setC0] = useState({ ...UKE_STD, ...(S.innst.eierOversikt || {}) }); const [busy, setBusy] = useState(false);
+  useEffect(() => setC0({ ...UKE_STD, ...(S.innst.eierOversikt || {}) }), [JSON.stringify(S.innst.eierOversikt)]);
+  const setC = (x: Partial<typeof UKE_STD>) => setC0(v => ({ ...v, ...x }));
+  const lagre = async () => { setBusy(true); try { await saveInnst('eierOversikt', c); toast(tt("Innstillingene er lagret")); } catch { } setBusy(false); };
+  const sendNa = async () => { if (!S.primarOrg) return; setBusy(true); try { await saveInnst('eierOversikt', c); const r = await aoApi({ action: 'eier_uke_na', org: S.primarOrg }); const x = (r.rapport || [])[0]; toast(x?.sendt ? tt("Oversikt sendt til {0}", (x.til || []).join(', ')) : tt("Ingen e-post sendt: {0}", x?.tomt || tt("sjekk e-postoppsettet"))); } catch (e: any) { toast(e.message); } setBusy(false); };
+  const dager = [tt("søndager"), tt("mandager"), tt("tirsdager"), tt("onsdager"), tt("torsdager"), tt("fredager"), tt("lørdager")];
+  return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}>
+    <h2 style={{ marginTop: 0 }}>{tt("Ukeoversikt til eier")}</h2>
+    <p className="small muted" style={{ marginTop: -4 }}>{tt("Én e-post med kontroller og service som er forfalt eller forfaller snart, dokumenter som utløper og avvik over frist. Sendes bare når det er noe å melde. Av som standard.")}</p>
+    <div className="pu-rad"><Bryter on={c.pa} set={b => setC({ pa: b })} ro={ro}><b>{tt("Send ukeoversikt på e-post")}</b></Bryter>
+      {c.pa && <div className="pu-under small">{tt("Hver")} <select disabled={ro} value={c.ukedag} style={{ width: 'auto', display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ ukedag: +e.target.value })}>{dager.map((d, i) => <option key={i} value={i}>{d}</option>)}</select> · {tt("ta med de neste")} <Tall v={c.dager} set={n => setC({ dager: Math.max(7, n) })} ro={ro} w={50} /> {tt("dagene")} · {tt("til")} <input disabled={ro} value={c.epost} placeholder={tt("e-post (tom = organisasjonens administratorer)")} style={{ width: 300, display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ epost: e.target.value })} /></div>}</div>
+    {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={sendNa}>{tt("Send en nå (test)")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
   </div>;
 }
 
