@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-09', dato: '2026-12-09', tittel: 'Push-varsler på telefon og PC', punkter: [
+    'Under Innstillinger → «Varsler på denne enheten» kan du slå på varsler. Da får du beskjed med en gang en sak meldes som kritisk, når leietakere eller QR-koder melder nye saker, og når ukeoversikten er sendt.',
+    'Hver enhet slås på for seg, og du velger selv hvilke varsler som skal komme. På iPhone og iPad må appen først legges til på Hjem-skjermen.',
+  ] },
   { id: '2026-12-08', dato: '2026-12-08', tittel: 'Hastemeldinger heves automatisk', punkter: [
     'Når en leietaker eller en QR-melding nevner tydelige faresignaler (røyk, brent lukt, gasslukt, vann fra taket, blokkert rømningsvei …) hever appen alvorligheten til Kritisk. Ord som lekkasje, nødlys som ikke virker og heis som står gir minst Høy.',
     'Appen hever bare opp, aldri ned, og skriver det i loggen og som en advarsel i avviket, så du kan rette det hvis det ble feil.',

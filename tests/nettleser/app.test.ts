@@ -208,3 +208,10 @@ test('uten nett: kontroll kvitteres med bilde av rapporten, og alt lastes opp n√
     assert.equal(o.historikk[0].dokId, d.dokumenter[0].id); assert.ok(o.nesteFrist > '2026-06-01', 'neste frist flyttet'); assert.deepEqual(a.feil, []);
   } finally { await a.lukk(); }
 });
+
+test('Innstillinger viser kortet for push-varsler', async () => {
+  const a = await aapne('#/innstillinger'); try {
+    await a.side.waitForTimeout(600); if (a.feil.length) assert.fail(a.feil[0]);
+    assert.ok((await tekst(a)).includes('Varsler p√• denne enheten'), 'kortet for push-varsler mangler');
+  } finally { await a.lukk(); }
+});

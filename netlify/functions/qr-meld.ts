@@ -7,6 +7,7 @@
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 import { hevAlvorlighet } from '../../src/lib/avvikFoto';
+import { pushTilOrg } from '../../src/lib/serverPush';
 
 const json = (status: number, body: any) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 const MAKS_PUNKT = 15, MAKS_EIENDOM = 60, MAKS_BILDE = 4e6;
@@ -75,5 +76,9 @@ const handler = async (req: Request) => {
   };
   const { data: ny, error } = await admin.from('avvik').insert({ eiendom_id: p.eiendom_id, data }).select('id, nr').single();
   if (error) { console.error('qr-avvik', error); return json(500, { error: 'Meldingen kunne ikke lagres. Prøv igjen.' }); }
+  try { // push til eiendommens ansatte (feil her stopper aldri meldingen)
+    const { data: e } = await admin.from('eiendommer').select('eier_org_id, data').eq('id', p.eiendom_id).maybeSingle();
+    if (e?.eier_org_id) await pushTilOrg(admin, e.eier_org_id, alv === 'Kritisk' ? ['kritisk', 'melding'] : ['melding'], { tittel: (alv === 'Kritisk' ? 'KRITISK melding: ' : 'Ny melding: ') + tittel.slice(0, 80), tekst: [e.data?.navn || e.data?.adresse, p.navn].filter(Boolean).join(' – '), url: '/#/avvik', tag: 'avvik-' + ny.id });
+  } catch { }
   return json(200, { ok: true, nr: ny.nr });
 };

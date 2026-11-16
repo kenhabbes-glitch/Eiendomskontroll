@@ -10,6 +10,7 @@ import { mineAo } from './Arbeidsordre';
 import { settFilter } from './common';
 import { svarfristSnart } from './Tilsyn';
 import { tt } from '../lib/i18n';
+import { PUSH_TYPER, pushStotte, erIos, erInstallert, pushStatus, slaPaPush, slaAvPush, endreTyper, testPush } from '../lib/push';
 
 export const PURR_STD = { paLogging: true, paLoggingDager: 7, ansvarlig: false, ansvarligFor: 3, ansvarligGjenta: 7, ansvarligMaks: 3, eier: false, eierEtter: 14, eierEpost: '', ukentlig: false, ukentligEpost: '' };
 export const UKE_STD = { pa: false, epost: '', dager: 30, ukedag: 1 };
@@ -107,4 +108,27 @@ function PurreSkjerm({ close }: { close: () => void }) {
     {L.kontroll.length > 0 && <><h3 style={{ margin: '14px 0 6px' }}>{tt("Utført – venter på din kontroll (")}{L.kontroll.length})</h3>
       <div className="tbl-wrap" style={{ maxHeight: 200 }}><table><tbody>{L.kontroll.slice(0, 20).map(a => <tr key={a.id} className="click" onClick={() => { ferdig(); editAvvik(a.id); }}><td><b style={{ fontWeight: 600 }}>#{a.nr} {a.tittel}</b><div className="small muted">{eNavn(a.eiendomId)}</div></td><td className="small">{a.utfort?.av || ''}{a.utfort?.t ? ' · ' + fd(String(a.utfort.t).slice(0, 10)) : ''}</td></tr>)}</tbody></table></div></>}
   </ModalFrame>;
+}
+
+// ---------------- Push-varsler på denne enheten (telefon/PC). Hver enhet melder seg på selv.
+export function PushKort() {
+  const stotte = pushStotte(); const [st, setSt] = useState<{ pa: boolean; typer: string[]; enheter: number } | null>(null); const [busy, setBusy] = useState(false);
+  const last = () => pushStatus().then(setSt).catch(() => setSt({ pa: false, typer: [], enheter: 0 }));
+  useEffect(() => { if (stotte) last(); }, []);
+  const iosUinst = erIos() && !erInstallert();
+  const kjor = async (f: () => Promise<any>) => { setBusy(true); try { await f(); await last(); } catch (e: any) { toast(tt(e?.message || 'Noe gikk galt')); } setBusy(false); };
+  const slaPa = () => kjor(() => slaPaPush(['kritisk', 'melding', 'oversikt']).then(() => toast(tt("Varsler er slått på for denne enheten"))));
+  const velg = (k: string, b: boolean) => { if (!st) return; const typer = b ? [...new Set([...st.typer, k])] : st.typer.filter(x => x !== k); setSt({ ...st, typer }); endreTyper(typer).catch(() => { }); };
+  const test = () => kjor(async () => { const n = await testPush(); toast(n ? tt("Testvarsel sendt") : tt("Ingen varsel ble sendt. Slå varsler av og på igjen.")); });
+  return <div className="card" style={{ maxWidth: 900, marginTop: 16 }} data-test="push-kort">
+    <h2 style={{ marginTop: 0 }}>{tt("Varsler på denne enheten")}</h2>
+    <p className="small muted" style={{ marginTop: -4 }}>{tt("Få et varsel på telefonen eller PC-en når noe haster, uten å ha appen åpen. Hver enhet slås på for seg, og du velger selv hvilke varsler som skal komme.")}</p>
+    {!stotte ? <div className="note small">{iosUinst ? tt("På iPhone og iPad må appen først legges til på Hjem-skjermen: trykk Del-knappen i Safari, velg «Legg til på Hjem-skjerm», og åpne appen derfra. Da kan du slå på varsler her.") : tt("Denne nettleseren støtter ikke push-varsler. Prøv Chrome, Edge, Firefox eller Safari (iOS 16.4 eller nyere, med appen lagt til på Hjem-skjermen).")}</div>
+      : !st ? <p className="small muted">{tt("Henter …")}</p>
+      : !st.pa ? <div className="toolbar"><button className="btn pri" disabled={busy} onClick={slaPa}>{tt("Slå på varsler på denne enheten")}</button>{st.enheter > 0 && <span className="small muted">{tt("{0} annen enhet er slått på", st.enheter)}</span>}</div>
+      : <>
+        {PUSH_TYPER.map(x => <div className="pu-rad" key={x.k}><Bryter on={st.typer.includes(x.k)} set={b => velg(x.k, b)} ro={busy}><b>{tt(x.navn)}</b><br /><span className="small muted">{tt(x.hjelp)}</span></Bryter></div>)}
+        <div className="toolbar"><button className="btn" disabled={busy} onClick={test}>{tt("Send testvarsel")}</button><button className="btn" disabled={busy} onClick={() => kjor(async () => { await slaAvPush(); toast(tt("Varsler er slått av for denne enheten")); })}>{tt("Slå av på denne enheten")}</button></div>
+      </>}
+  </div>;
 }

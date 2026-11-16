@@ -9,6 +9,7 @@ import { S, bump, feiltekst, save, sb, state, toast, uploadFile, useStore } from
 import { addDays, byId, fd, intTxt, pliktStatus, pliktVis, sortBy, today, leieAreal, m2 } from '../lib/utils';
 import { AlvChip, Chip, Empty, FileLink, StChip, formModal, showModal } from '../components/ui';
 import { hevAlvorlighet } from '../lib/avvikFoto';
+import { meldNySak } from '../lib/push';
 import { tt, lokale } from '../lib/i18n';
 
 async function refreshMine() {
@@ -34,7 +35,7 @@ function meldAvvik(l: any) {
       const nyId = await save('avvik', o); toast(tt("Takk! Saken er registrert."));
       // Beskrivelsen blir første melding i samtalen, så utleier ser den i Meldinger og får den som ulest
       await sb.from('meldinger').insert({ eiendom_id: l.eiendomId, leietaker_id: l.id, avvik_id: nyId, data: { tekst: [v.tittel, v.beskrivelse, v.plassering ? 'Sted: ' + v.plassering : ''].filter(Boolean).join('\n').slice(0, 4000), rolle: 'leietaker', av: state.me?.navn || state.me?.epost, til: 'alle', synlig: true, lest: false, ...(o.vedlegg ? { vedlegg: o.vedlegg } : {}) } });
-      window.dispatchEvent(new Event('ek-meldinger'));
+      window.dispatchEvent(new Event('ek-meldinger')); meldNySak(nyId);
       const na = byId('avvik', nyId); if (na) setTimeout(() => visAvvik(na), 300);
     },
   });

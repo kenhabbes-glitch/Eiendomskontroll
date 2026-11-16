@@ -11,6 +11,7 @@ import svOrd from '../../src/i18n/sv.json';
 import daOrd from '../../src/i18n/da.json';
 import esMxOrd from '../../src/i18n/es-MX.json';
 import esEsOrd from '../../src/i18n/es-ES.json';
+import { pushTilOrg } from '../../src/lib/serverPush';
 import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 // Lagringen godtar bare ASCII i filbanen
 const asciiNavn = (n: any) => String(n || 'fil').replace(/[æÆ]/g, m => m === 'æ' ? 'ae' : 'Ae').replace(/[øØ]/g, m => m === 'ø' ? 'o' : 'O').replace(/[åÅ]/g, m => m === 'å' ? 'a' : 'A')
@@ -825,6 +826,7 @@ const handler = async (req: Request) => {
       const o = await oppsettFor(null, org.id); let ok = 0;
       for (const t of til) { const r = await sendEpost(t, emne, html, emne, undefined, undefined, o).catch(() => null); if ((r as any)?.sendt) ok++; }
       await admin.from('hendelseslogg').insert({ bruker_id: null, bruker: SYS.navn, tabell: 'hendelse', rad_id: null, eiendom_id: null, org_id: org.id, handling: 'purring', tekst: `Ukeoversikt til eier sendt til ${til.join(', ')} (${kontr.length} kontroller, ${dok.length} dokumenter, ${av.length} avvik)` });
+      await pushTilOrg(admin, org.id, ['oversikt'], { tittel: emne, tekst: to('{0} forfalt, {1} kommende', over(kontr) + over(dok) + over(av), kontr.length + dok.length + av.length - over(kontr) - over(dok) - over(av)), url: '/#/', tag: 'ukeoversikt' });
       rapport.push({ org: org.navn, sendt: ok, til });
     }
     return json(200, { ok: true, rapport });
