@@ -3,10 +3,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { S, canEdit, fileUrl, save, sb, state, toast, uploadFile, useStore, feiltekst } from '../lib/store';
-import { byId, taggerFor, aNavn, dUntil, openAvvik, fd, today, tfmKomp, type Rec } from '../lib/utils';
+import { KOMP, TFM_DEF } from '../lib/catalog';
+import { foreslaFraModell } from '../lib/modellForslag';
+import { nextSysLop, byId, taggerFor, aNavn, dUntil, openAvvik, fd, today, tfmKomp, type Rec } from '../lib/utils';
 import { tt } from '../lib/i18n';
 import { Chip, Empty, confirmBox, formModal } from '../components/ui';
-import { editAvvik, editAnlegg, editKomponent } from '../lib/actions';
+import { editAvvik, editAnlegg, editKomponent, generatePlan } from '../lib/actions';
 import { fmt } from '../lib/maaler';
 import { KalPanel, SjekkPanel, type Rad } from './Modell3DVerktoy';
 import { avst, areal, vinkel, lengde, horisontalt, midt, kalMat, tilModell, meterPerPiksel, type V3, type Kal } from '../lib/ifc3d/geom';
@@ -344,6 +346,21 @@ function Visning({ eid, modeller, hovedId, last }: { eid: string; modeller: Rec[
     formModal({ title: tt("Koble til system"), saveTxt: tt("Koble"), top: <p className="small muted" style={{ marginTop: 0 }}>{klNavn(el.k)} «{el.n || '–'}» · {h.etasjer[el.e]?.navn}</p>, values: { alle: false },
       fields: [{ k: 'anleggId', label: tt("System"), type: 'select', options: () => sys.map(a => [a.id, aNavn(a.id)] as [string, string]), req: true }, { k: 'alle', label: tt("Koble alle {0} i {1} ({2} stk) til samme system", klNavn(el.k).toLowerCase(), h.etasjer[el.e]?.navn || '', lik.length), type: 'checkbox' }],
       onSave: async v => { const a = byId('anlegg', v.anleggId)!; const nye = (v.alle ? lik.map(x => x.e.g) : [el.g]); const meta = { ...(a.ifcMeta || {}) }; nye.forEach((g: string) => { const i = T.current.farg.get(g); if (i != null) meta[g] = lagMeta(i); }); await save('anlegg', { ...a, ifcGuider: [...new Set([...(a.ifcGuider || []), ...nye])], ifcMeta: meta }); toast(tt("{0} objekt(er) er koblet til {1}", nye.length, aNavn(a.id))); } }); };
+  // Foreslår systemer ut fra objektene i modellen (heis, sprinkler, brannalarm …). Brukeren godkjenner; de kobles til objektene med en gang.
+  const foreslaSys = () => { const f = foreslaFraModell(h.elementer, new Set(guidAnlegg.keys()));
+    if (!f.length) { toast(tt("Ingen nye systemer å foreslå: objektene er allerede koblet, eller navnene i modellen sier ikke hva de er.")); return; }
+    formModal({ title: tt("Systemer funnet i modellen"), saveTxt: tt("Opprett og koble"), values: { valg: Object.fromEntries(f.map(x => [x.type, true])) },
+      top: <p className="small muted" style={{ marginTop: 0 }}>{tt("Appen har lest klasse og navn på objektene i modellen. Fjern kryss for det som ikke stemmer. Valgte systemer opprettes (eller utvides hvis de finnes) og kobles til objektene, og du får forslag til lovpålagte kontroller etterpå.")}</p>,
+      fields: [{ k: 'valg', type: 'custom', label: '', render: (v: any, set: any) => <div>{f.map(x => { const eks = anl.find(a => a.type === x.type); return <label key={x.type} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '6px 0', borderTop: '1px solid var(--line)' }}>
+        <input type="checkbox" checked={!!v.valg[x.type]} onChange={e => set({ valg: { ...v.valg, [x.type]: e.target.checked } })} />
+        <span><b>{tt(KOMP[x.type]?.n || x.type)}</b> · {x.guider.length} {tt("objekter")} · {x.etasjer.map(i => h.etasjer[i]?.navn).filter(Boolean).join(', ')}<br /><span className="small muted">{eks ? tt("Kobles til eksisterende system «{0}»", aNavn(eks.id)) : tt("Nytt system")}{x.eksempler.length ? ' · ' + x.eksempler.join(', ') : ''}</span></span></label>; })}</div> }],
+      onSave: async v => { let n = 0; let nye = 0;
+        for (const x of f) { if (!v.valg[x.type]) continue; const ex = anl.find(a => a.type === x.type); const meta: Record<string, any> = { ...(ex?.ifcMeta || {}) };
+          x.guider.forEach(g => { const i = T.current.farg.get(g); if (i != null) meta[g] = lagMeta(i); });
+          if (ex) await save('anlegg', { ...ex, ifcGuider: [...new Set([...(ex.ifcGuider || []), ...x.guider])], ifcMeta: meta });
+          else { const sys = TFM_DEF[x.type]?.[0] || ''; await save('anlegg', { eiendomId: eid, type: x.type, navn: KOMP[x.type]?.n || x.type, tfmSys: sys, tfmLop: sys ? nextSysLop(eid, sys) : '', levetid: KOMP[x.type]?.l || '', ifcGuider: x.guider, ifcMeta: meta }); nye++; }
+          n++; }
+        toast(tt("{0} systemer koblet til modellen ({1} nye)", n, nye)); if (nye) setTimeout(() => generatePlan(eid, false), 250); } }); };
   const fjern = async (aid: string) => { const a = byId('anlegg', aid)!; await save('anlegg', { ...a, ifcGuider: (a.ifcGuider || []).filter((g: string) => g !== el!.g) }); };
   const nyttAvvik = () => { if (!el || !sel) return; editAvvik(undefined, { eiendomId: eid, anleggId: koblet[0] || '', tittel: `${klNavn(el.k)}${el.n ? ' «' + el.n + '»' : ''} – ${h.etasjer[el.e]?.navn || ''}: `, modell: { guid: el.g, x: sel.p[0], y: sel.p[1], z: sel.p[2], etasje: h.etasjer[el.e]?.navn || '' } }); };
   const stat = (k: keyof typeof ST) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginRight: 12 }}><i style={{ width: 11, height: 11, borderRadius: 3, background: ST[k], display: 'inline-block' }} />{({ ok: tt("I orden"), snart: tt("Snart / avvik"), rod: tt("Forfalt / alvorlig avvik"), ingen: tt("Uten kontroll") } as any)[k]}</span>;
@@ -397,7 +414,7 @@ function Visning({ eid, modeller, hovedId, last }: { eid: string; modeller: Rec[
           <span className="small muted">{S.oppgaver.filter(o => o.anleggId === a && o.aktiv !== false).length} {tt("kontroller")} · {openAvvik().filter(x => x.anleggId === a).length} {tt("åpne avvik")}</span>{ed && <button className="btn sm ghost" onClick={() => fjern(a)}>{tt("Fjern kobling")}</button>}<button className="btn sm" onClick={() => { setFokus(a); flyTil(new Set((an.ifcGuider || []).map((g: string) => T.current.farg.get(g)).filter((x: any) => x != null))); }}>{tt("Vis alle i modellen")}</button></div>; }) : <p className="small muted" style={{ margin: '0 0 6px' }}>{tt("Ikke koblet til noe system.")}</p>}
         <div className="toolbar">{ed && <button className="btn sm" onClick={koble} disabled={!el.g}>{tt("Koble til system")}</button>}{ed && <button className="btn sm pri" onClick={nyttAvvik}>{tt("Registrer avvik her")}</button>}</div>
       </> : <>
-        <div className="toolbar" style={{ marginBottom: 6 }}><h2 style={{ margin: 0, flex: 1 }}>{tt("Systemer i modellen")}</h2>{fokus && <button className="btn sm" onClick={() => { setFokus(''); setFok(null); }}>{tt("Fjern markering")}</button>}</div>
+        <div className="toolbar" style={{ marginBottom: 6 }}><h2 style={{ margin: 0, flex: 1 }}>{tt("Systemer i modellen")}</h2>{ed && <button className="btn sm" onClick={foreslaSys}>{tt("Foreslå systemer fra modellen")}</button>}{fokus && <button className="btn sm" onClick={() => { setFokus(''); setFok(null); }}>{tt("Fjern markering")}</button>}</div>
         <p className="small muted" style={{ marginTop: 0 }}>{tt("Klikk på en bygningsdel i modellen for å se data, koble den til et system eller registrere avvik. Velg et system under for å se hvor det står i bygget.")}</p>
         {anl.filter(a => (a.ifcGuider || []).length).length ? <div className="tbl-wrap"><table><thead><tr><th>{tt("System")}</th><th>{tt("Objekter")}</th><th>{tt("Status")}</th><th /></tr></thead><tbody>{anl.filter(a => (a.ifcGuider || []).length).map(a => <tr key={a.id}><td><b>{aNavn(a.id)}</b></td><td>{a.ifcGuider.length}</td><td><Chip c={({ ok: 'green', snart: 'amber', rod: 'red', ingen: '' } as any)[statusAnlegg(a.id)]}>{({ ok: tt("I orden"), snart: tt("Snart"), rod: tt("Forfalt"), ingen: tt("Ingen kontroll") } as any)[statusAnlegg(a.id)]}</Chip></td><td><button className="btn sm" onClick={() => { setFokus(a.id); fokusPaa(a.ifcGuider.map((g: string) => T.current.farg.get(g)).filter((x: any) => x != null), a.navn); }}>{tt("Vis i modellen")}</button></td></tr>)}</tbody></table></div> : <p className="small muted">{tt("Ingen systemer er koblet til modellen ennå.")}</p>}
         <div style={{ margin: '6px 0' }}><input type="search" placeholder={tt("Søk i modellen: brann, ventilasjon, system …")} value={sok} onChange={e => setSok(e.target.value)} style={{ width: '100%' }} />

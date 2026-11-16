@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-06', dato: '2026-12-06', tittel: 'Systemer foreslått fra 3D-modellen', punkter: [
+    'I 3D-modellen finner du «Foreslå systemer fra modellen». Appen leser klasse og navn på objektene (heis, sprinkler, brannalarm, branndører, ventilasjon, tavler m.m.) og foreslår systemer. Du godkjenner, og systemene opprettes og kobles til objektene i modellen.',
+    'Du får deretter forslag til lovpålagte kontroller for de nye systemene. Gjenkjenningen avhenger av hvordan objektene er navngitt i modellen.',
+  ] },
   { id: '2026-12-05', dato: '2026-12-05', tittel: 'Ett dokument kan gjelde flere systemer', punkter: [
     'I Dokumentinnboksen kan du nå knytte ett dokument (f.eks. en FDV-perm eller serviceavtale) til flere systemer. Systemer som nevnes i dokumentet foreslås, og du godkjenner dem selv.',
     'Dokumentet teller da som FDV for alle valgte systemer i lovkravoversikten.',
