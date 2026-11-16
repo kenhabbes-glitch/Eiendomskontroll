@@ -42,6 +42,22 @@ test('registrere avvik: skjemaet lagrer, og avviket vises i listen', async () =>
   } finally { await a.lukk(); }
 });
 
+test('avvik med bilde: «Foreslå fra bilde» gir forslag fra ordene, og fyller ikke ut før «Bruk forslag»', async () => {
+  const a = await aapne('#/eiendom/e1'); try {
+    await a.side.getByRole('button', { name: '+ Avvik' }).click(); const modal = a.side.locator('.modal');
+    await modal.locator('input[type=text], input:not([type])').first().fill('Lekkasje fra rør i teknisk rom');
+    assert.equal(await modal.getByRole('button', { name: 'Foreslå fra bilde' }).count(), 0, 'knappen skal ikke vises uten bilde');
+    await modal.locator('input[capture]').setInputFiles({ name: 'rom 2.14.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
+    await modal.getByRole('button', { name: 'Foreslå fra bilde' }).click();
+    await modal.getByRole('button', { name: 'Bruk forslag' }).waitFor({ timeout: 60000 });
+    const txt = await modal.innerText(); assert.ok(/Alvorlighet:\s*Høy/.test(txt), 'forslaget skal være Høy (lekkasje)'); assert.ok(txt.includes('rom 2.14'), 'rommet fra filnavnet mangler');
+    await modal.getByRole('button', { name: 'Bruk forslag' }).click();
+    assert.equal(await modal.locator('select').filter({ hasText: 'Høy' }).count() > 0, true, 'alvorlighet ble ikke satt til Høy');
+    await modal.getByRole('button', { name: 'Lagre' }).click(); await a.side.waitForTimeout(800);
+    const ny = (await a.db()).avvik.find(x => x.data.tittel === 'Lekkasje fra rør i teknisk rom'); assert.ok(ny, 'avviket ble ikke lagret'); assert.equal(ny.data.alv, 'Høy'); assert.deepEqual(a.feil, []);
+  } finally { await a.lukk(); }
+});
+
 test('avvik uten tittel lagres ikke', async () => {
   const a = await aapne('#/eiendom/e1'); try {
     await a.side.getByRole('button', { name: '+ Avvik' }).click(); await a.side.locator('.modal').getByRole('button', { name: 'Lagre' }).click(); await a.side.waitForTimeout(500);

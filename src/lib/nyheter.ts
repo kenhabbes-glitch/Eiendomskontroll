@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-07', dato: '2026-12-07', tittel: 'Foreslå avvik fra bilde', punkter: [
+    'I «Nytt avvik»: ta eller velg et bilde og trykk «Foreslå fra bilde». Appen leser teksten på bildet (skilt, typeskilt, etiketter) og foreslår system, alvorlighet, tittel og rom/etasje. Ingenting fylles ut før du trykker «Bruk forslag».',
+    'Dette er ordgjenkjenning, ikke bildetolkning: appen ser ikke selve motivet. Skriv derfor gjerne noen ord om hva som er feil, så blir forslaget bedre. Alt skjer i nettleseren, og bildet sendes ikke til noen AI-tjeneste.',
+  ] },
   { id: '2026-12-06', dato: '2026-12-06', tittel: 'Systemer foreslått fra 3D-modellen', punkter: [
     'I 3D-modellen finner du «Foreslå systemer fra modellen». Appen leser klasse og navn på objektene (heis, sprinkler, brannalarm, branndører, ventilasjon, tavler m.m.) og foreslår systemer. Du godkjenner, og systemene opprettes og kobles til objektene i modellen.',
     'Du får deretter forslag til lovpålagte kontroller for de nye systemene. Gjenkjenningen avhenger av hvordan objektene er navngitt i modellen.',

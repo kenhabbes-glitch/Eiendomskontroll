@@ -10,6 +10,7 @@ import { leieAreal, m2, FELLES_AVTALE, Obj } from './utils';
 import { byggTillegg, harModul, orgPris } from './moduler';
 import { TgKgVelger, tgAvviker, tgTekst } from '../components/TgKg';
 import { PosVelger, BildeVelger, VedleggGalleri } from '../components/PosVelger';
+import { AvvikFoto } from '../components/AvvikFoto';
 import { ServiceHistorikk } from '../views/Servicehistorikk';
 import { byggVeiviser } from '../views/Veiviser';
 import { alleSjekkmaler } from '../views/Sjekkmaler';
@@ -771,6 +772,7 @@ export function editAvvik(id?: string, preset: any = {}) {
     { k: 'plassering', label: tt("Plassering i tekst (valgfritt)"), ph: tt("F.eks. 2. etg, korridor ved trapp B, i himling") },
     { k: 'secFoto', label: tt("Bilder og vedlegg"), type: 'sec' },
     { k: 'bilder', type: 'custom', def: [], render: (v, set) => <BildeVelger filer={v.bilder || []} set={f => set({ bilder: f })} /> },
+    ...(id ? [] : [{ k: 'fotoHjelp', type: 'custom', render: (v: any, set: any) => <AvvikFoto v={v} set={set} /> } as Field]),
     { k: 'komm', label: id ? tt("Kommentar til denne endringen (legges i loggen)") : tt("Kommentar"), type: 'textarea', ph: id ? tt("F.eks. hvorfor avviket utsettes eller avvises") : '' }];
   let touchedFrist = false; const lukkRef: { c?: () => void } = {};
   lukkRef.c = formModal({
