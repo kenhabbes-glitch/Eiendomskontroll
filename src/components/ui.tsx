@@ -104,7 +104,7 @@ export function DiktatKnapp({ verdi, sett, onFerdig }: { verdi: string; sett: (t
     if (pa) { d.current?.stopp(); return; }
     if (!diktatStotte()) return toast(tt("Diktering støttes ikke her. Bruk mikrofonknappen på tastaturet på telefonen i stedet."));
     sist.current = verdi || '';
-    d.current = startDiktat(verdi || '', t => { sist.current = t; sett(t); }, feil => { setPa(false); d.current = null; onFerdig?.(sist.current); if (feil === 'mikrofon') toast(tt("Mikrofonen er ikke tillatt. Gi nettleseren tilgang til mikrofonen for dette nettstedet.")); else if (feil) toast(tt("Dikteringen stoppet: ") + feil); });
+    d.current = startDiktat(verdi || '', t => { sist.current = t; sett(t); }, feil => { setPa(false); d.current = null; onFerdig?.(sist.current); if (feil === 'mikrofon') toast(tt("Mikrofonen er ikke tillatt. Gi nettleseren tilgang til mikrofonen for dette nettstedet.")); else if (feil === 'ingen-tale') toast(tt("Hørte ingen tale. Trykk på Diktér og prøv igjen, eller bruk mikrofonknappen på tastaturet.")); else if (feil) toast(tt("Dikteringen stoppet: ") + feil); });
     if (d.current) setPa(true);
   };
   return <button type="button" className={'diktat' + (pa ? ' pa' : '')} onClick={klikk} aria-pressed={pa} aria-label={pa ? tt("Stopp diktering") : tt("Diktér")} title={tt("Diktér (lyden behandles av nettleserens talegjenkjenning)")}>
