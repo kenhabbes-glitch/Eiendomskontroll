@@ -454,3 +454,8 @@ table.krav td{vertical-align:top}
 .mer-flis{position:relative;min-height:84px;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;color:var(--ink);text-decoration:none;font:inherit;text-align:left;cursor:pointer}
 .mer-flis .mf-ikon{color:var(--acc);display:flex}.mer-flis .mf-navn{font-size:14.5px;font-weight:600;line-height:1.2}
 .mer-flis .mf-b{top:10px;right:10px;left:auto}
+
+/* diktering: mikrofonknapp under tekstfelt */
+.diktat{margin-top:6px;min-height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:var(--surface);color:var(--acc);font:inherit;font-size:13.5px;font-weight:600;display:inline-flex;align-items:center;gap:8px;cursor:pointer;align-self:flex-start}
+.diktat.pa{background:var(--red);border-color:var(--red);color:#fff;animation:diktatpuls 1.2s ease-in-out infinite}
+@keyframes diktatpuls{50%{opacity:.75}}

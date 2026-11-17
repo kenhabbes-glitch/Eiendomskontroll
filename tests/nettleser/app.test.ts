@@ -259,3 +259,21 @@ test('gårdeier: egen meny uten redigering, rollenavn vises, mobilmeny uten «Ny
     assert.ok(t.includes('Varsler på denne enheten'), 'varselkortet mangler i profilen');
   } finally { await a.lukk(); }
 });
+
+test('diktering: mikrofonknapper i avviksskjemaet legger talt tekst inn i feltene', async () => {
+  const a = await aapne('#/avvik'); try {
+    await a.side.evaluate(() => {
+      (window as any).SpeechRecognition = class { lang = ''; onresult: any; onend: any; onerror: any;
+        start() { setTimeout(() => { this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: 'hull i veggen ved trapp' }], { isFinal: true })] }); }, 30); }
+        stop() { setTimeout(() => this.onend?.(), 10); } };
+    });
+    await a.side.getByRole('button', { name: /Meld avvik|Nytt avvik|\+ Avvik/ }).first().click();
+    const m = a.side.locator('.modal');
+    assert.equal(await m.locator('button.diktat').count(), 4, 'forventet dikteringsknapp ved kort beskrivelse, beskrivelse, plassering og kommentar');
+    await m.locator('button.diktat').first().click(); await a.side.waitForTimeout(200);
+    assert.equal(await m.locator('input[type=text], input:not([type])').first().inputValue(), 'Hull i veggen ved trapp');
+    await m.locator('button.diktat').nth(1).click(); await a.side.waitForTimeout(200);
+    assert.ok((await m.locator('textarea').first().inputValue()).toLowerCase().includes('hull i veggen ved trapp'));
+    if (a.feil.length) assert.fail(a.feil[0]);
+  } finally { await a.lukk(); }
+});

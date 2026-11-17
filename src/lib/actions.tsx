@@ -745,7 +745,7 @@ export function editAvvik(id?: string, preset: any = {}) {
   const a: Rec = id ? byId('avvik', id)! : { status: 'Ny', alv: 'Middels', kilde: 'Eier/drift', ansvar: 'Eier', oppdaget: today(), eiendomId: S.eiendommer[0]?.id, ...preset } as any;
   const staff = isStaff();
   const fields: Field[] = [
-    { k: 'tittel', label: tt("Avvik (kort beskrivelse)"), req: true },
+    { k: 'tittel', label: tt("Avvik (kort beskrivelse)"), req: true, dikter: true },
     { k: 'eiendomId', label: tt("Eiendom"), type: 'select', options: eOptsDrift, req: true, half: true },
     { k: 'anleggId', label: tt("System"), type: 'select', options: () => S.anlegg.map(x => [x.id, eNavn(x.eiendomId) + ' – ' + aNavn(x.id)] as [string, string]), empty: '–', half: true, hint: tt("Hovedsystemet avviket gjelder – følger med i arbeidsordren") },
     { k: 'komponentId', label: tt("Komponent (TFM)"), type: 'select', options: () => sortBy(S.komponenter, c => kNavn(c.id)).map(c => [c.id, eNavn(c.eiendomId) + ' – ' + kNavn(c.id)] as [string, string]), empty: '–' },
@@ -758,22 +758,22 @@ export function editAvvik(id?: string, preset: any = {}) {
     { k: 'tsRef', label: tt("Saksnummer / referanse"), half: true, show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType) },
     { k: 'tsDato', label: tt("Tilsynsdato"), type: 'date', half: true, show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType) },
     { k: 'tsSvarfrist', label: tt("Frist for tilbakemelding til myndigheten"), type: 'date', half: true, show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType) },
-    { k: 'tsTiltak', label: tt("Tiltak (tas med i tilbakemeldingen)"), type: 'textarea', show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType), ph: tt("Hva er gjort eller planlagt, av hvem og når") },
+    { k: 'tsTiltak', label: tt("Tiltak (tas med i tilbakemeldingen)"), type: 'textarea', dikter: true, show: x => harModul('tilsyn', x.eiendomId) && (alleTilsynKilder.includes(x.kilde) || !!x.tsType), ph: tt("Hva er gjort eller planlagt, av hvem og når") },
     { k: 'ansvar', label: tt("Ansvarlig for utbedring"), type: 'select', options: UTBEDRER, half: true },
     { k: 'utbedresAv', label: tt("Serviceselskap / leverandør"), half: true, show: x => x.ansvar === 'Leverandør/entreprenør', ph: tt("Firma som skal rette avviket") },
     ...(canEdit() ? [{ k: 'leietakerId', label: tt("Leietaker"), type: 'select', options: (v?: any) => S.leietakere.filter(l => !v?.eiendomId || l.eiendomId === v.eiendomId).map(l => [l.id, l.navn] as [string, string]), empty: '–', half: true, show: (x: any) => ['Leietaker', 'Felles'].includes(x.ansvar) || !!x.leietakerId, hint: tt("Leietakeren som skal utbedre, eller som deler ansvaret") } as Field] : []),
     { k: 'oppdaget', label: tt("Oppdaget dato"), type: 'date', half: true }, { k: 'frist', label: tt("Frist for utbedring"), type: 'date', half: true, hint: id ? '' : tt("Tom = foreslått frist ut fra alvorlighet") },
     { k: 'planlagt', label: tt("Planlagt utbedret"), type: 'date', half: true, show: x => ['Planlagt', 'Under utbedring', 'Utsatt'].includes(x.status) },
     ...(canEdit() ? [{ k: 'kost', label: tt("Estimert kostnad (kr)"), type: 'number', half: true } as Field] : []),
-    { k: 'beskrivelse', label: tt("Beskrivelse av avviket og tiltak"), type: 'textarea', ph: tt("Hva er feil, hvor, omfang og anbefalt tiltak") },
+    { k: 'beskrivelse', label: tt("Beskrivelse av avviket og tiltak"), type: 'textarea', dikter: true, ph: tt("Hva er feil, hvor, omfang og anbefalt tiltak") },
     { k: 'secPos', label: tt("Plassering på etasjeplan"), type: 'sec' },
     { k: 'pos', type: 'custom', render: (v, set) => v.eiendomId ? <PosVelger eiendomId={v.eiendomId} value={v.pos || null} set={p => set({ pos: p })} ro={!staff}
         merker={(() => { const r = v.komponentId ? byId('komponenter', v.komponentId) : v.anleggId ? byId('anlegg', v.anleggId) : null; return r ? plasserteFor(r).map(x => ({ ...x.pos, t: x.navn || '' })) : []; })()} /> : <div className="small muted">{tt("Velg eiendom først.")}</div> },
-    { k: 'plassering', label: tt("Plassering i tekst (valgfritt)"), ph: tt("F.eks. 2. etg, korridor ved trapp B, i himling") },
+    { k: 'plassering', label: tt("Plassering i tekst (valgfritt)"), dikter: true, ph: tt("F.eks. 2. etg, korridor ved trapp B, i himling") },
     { k: 'secFoto', label: tt("Bilder og vedlegg"), type: 'sec' },
     { k: 'bilder', type: 'custom', def: [], render: (v, set) => <BildeVelger filer={v.bilder || []} set={f => set({ bilder: f })} /> },
     ...(id ? [] : [{ k: 'fotoHjelp', type: 'custom', render: (v: any, set: any) => <AvvikFoto v={v} set={set} /> } as Field]),
-    { k: 'komm', label: id ? tt("Kommentar til denne endringen (legges i loggen)") : tt("Kommentar"), type: 'textarea', ph: id ? tt("F.eks. hvorfor avviket utsettes eller avvises") : '' }];
+    { k: 'komm', label: id ? tt("Kommentar til denne endringen (legges i loggen)") : tt("Kommentar"), type: 'textarea', dikter: true, ph: id ? tt("F.eks. hvorfor avviket utsettes eller avvises") : '' }];
   let touchedFrist = false; const lukkRef: { c?: () => void } = {};
   lukkRef.c = formModal({
     title: id ? tt("Avvik #{0}", a.nr || '') : tt("Nytt avvik"), fields, values: { ...a, komm: '', bilder: [] }, wide: true, readOnly: !staff,

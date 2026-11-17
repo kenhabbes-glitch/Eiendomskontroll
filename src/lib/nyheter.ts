@@ -1,6 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-12', dato: '2026-12-12', tittel: 'Diktering i avviksskjemaet', punkter: [
+    'Ved kort beskrivelse, beskrivelse og tiltak, plassering i tekst og kommentar finnes det nå en mikrofonknapp. Trykk, snakk, og trykk igjen for å stoppe. Teksten legges inn i feltet, og du kan rette den etterpå. Lyden behandles av nettleserens talegjenkjenning (Google i Chrome og Edge, Apple i Safari), ikke av appen.',
+  ] },
   { id: '2026-12-11', dato: '2026-12-11', tittel: 'Ny rolle: Gårdeier', punkter: [
     'Under Organisasjon og tilgang kan du nå legge til brukere som Gårdeier. En gårdeier eier ett bygg, en portefølje eller flere, og ser bare de byggene du tildeler (eller alle). Vedkommende kan se oversikt, avvik, kontroller og dokumenter, men ikke endre noe.',
     'Gårdeieren får sin egen ukeoversikt på e-post med bare sine bygg, og kan slå på push-varsler for kritiske saker på sin profilside.',
