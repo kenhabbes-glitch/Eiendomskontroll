@@ -4,7 +4,8 @@ import type { IfcModell } from '../ifc';
 import { pakkV2 } from './pakk';
 import { lesRaa, skrivRaa, sveis } from './sveis';
 
-export type Ek3dEgenskaper = Record<string, { ns?: string; type?: string; mengder?: Record<string, number>; egenskaper?: Record<string, string> }>;
+/** et = etasje slik IFC-filen selv sier (ikke beregnet ut fra høyde), sys = fagsystem (IfcSystem), de/fo = delobjekter / overordnet objekt (GUID) */
+export type Ek3dEgenskaper = Record<string, { ns?: string; type?: string; mengder?: Record<string, number>; egenskaper?: Record<string, string>; et?: string; sys?: string; de?: string[]; fo?: string }>;
 export type Ek3dFull = Ek3dHode & { egenskaper?: Ek3dEgenskaper };
 export type Modell = { hode: Ek3dFull; grupper: { pos: Float32Array; nor: Int8Array; idx: Uint32Array }[]; seg: Int32Array };
 
@@ -30,7 +31,7 @@ const lesHode = (b: Uint8Array): Ek3dFull => JSON.parse(new TextDecoder().decode
 /** Legger egenskaper (NS 3451, fabrikat, serienummer, mengder) fra IFC-leseren inn i hodet, pr. GUID. */
 function medEgenskaper(b: Uint8Array, m: IfcModell): Uint8Array {
   const dv = new DataView(b.buffer, b.byteOffset); const hl = dv.getUint32(4, true); const hode = lesHode(b);
-  const eg: Ek3dEgenskaper = {}; for (const e of m.elementer) if (e.guid && (Object.keys(e.egenskaper).length || e.ns || Object.keys(e.mengder).length)) eg[e.guid] = { ns: e.ns, type: e.type, mengder: e.mengder, egenskaper: e.egenskaper };
+  const eg: Ek3dEgenskaper = {}; for (const e of m.elementer) if (e.guid && (Object.keys(e.egenskaper).length || e.ns || Object.keys(e.mengder).length || e.etasje || e.system || e.deler?.length)) eg[e.guid] = { ns: e.ns, type: e.type, mengder: e.mengder, egenskaper: e.egenskaper, ...(e.etasje ? { et: e.etasje } : {}), ...(e.system ? { sys: e.system } : {}), ...(e.deler?.length ? { de: e.deler } : {}), ...(e.forelder ? { fo: e.forelder } : {}) };
   const nytt = new TextEncoder().encode(JSON.stringify({ ...hode, egenskaper: eg, program: m.program }));
   const gammelLen = Math.ceil(hl / 4) * 4, nyLen = Math.ceil(nytt.length / 4) * 4;
   const ut = new Uint8Array(8 + nyLen + (b.length - 8 - gammelLen)); ut.set(b.subarray(0, 4), 0); new DataView(ut.buffer).setUint32(4, nytt.length, true); ut.set(nytt, 8); ut.set(b.subarray(8 + gammelLen), 8 + nyLen); return ut;

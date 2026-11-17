@@ -9,7 +9,7 @@ export type IfcEl = { klasse: string; guid: string; navn: string; type: string; 
   system?: string; tfm?: Tfm; fabrikat?: string; serienr?: string;
   /** Delene en samlet bygningsdel består av (glassfelt og profiler i en glassfasade, løp i en trapp) – de har geometrien i 3D */
   deler?: string[]; forelder?: string };
-export type IfcModell = { filnavn: string; schema: string; program: string; byggNavn: string; etasjer: string[]; elementer: IfcEl[]; tellinger: Record<string, number> };
+export type IfcModell = { /** Forklaring til brukeren når data er hentet fra 3D-modeller og ikke fra IFC-filen selv */ merknad?: string; filnavn: string; schema: string; program: string; byggNavn: string; etasjer: string[]; elementer: IfcEl[]; tellinger: Record<string, number> };
 
 // Klasser som leses ut som enkeltobjekter (bygningsdeler og utstyr). Resten telles bare.
 const ELEMENT = new Set(['IFCDOOR', 'IFCWINDOW', 'IFCCURTAINWALL', 'IFCSTAIR', 'IFCSTAIRFLIGHT', 'IFCRAMP', 'IFCRAILING', 'IFCCOVERING', 'IFCFURNISHINGELEMENT', 'IFCFURNITURE', 'IFCBUILDINGELEMENTPROXY', 'IFCTRANSPORTELEMENT',
@@ -94,15 +94,17 @@ function bygg(L: Leser, filnavn: string): IfcModell {
   const etasjer = new Map<number, string>(); let byggNavn = '';
   for (const [id, e] of E) { if (e.k === 'IFCBUILDINGSTOREY') etasjer.set(id, stepTekst(e.a[2])); else if (e.k === 'IFCBUILDING' && !byggNavn) byggNavn = stepTekst(e.a[2]); }
   const sysAv = new Map<number, string>(); const delerAv = new Map<number, number[]>(); const forelderAv = new Map<number, number>();
-  const etasjeAv = new Map<number, string>(); const typeAv = new Map<number, string>(); const psetAv = new Map<number, number[]>(); const nsAv = new Map<number, string>();
+  const etasjeAv = new Map<number, string>(); const inneI = new Map<number, number>(); const etasjers = (id: number) => etasjer.get(id); const typeAv = new Map<number, string>(); const psetAv = new Map<number, number[]>(); const nsAv = new Map<number, string>();
   for (const [, e] of E) {
-    if (e.k === 'IFCRELCONTAINEDINSPATIALSTRUCTURE' || e.k === 'IFCRELAGGREGATES') { const mål = nr(e.k === 'IFCRELAGGREGATES' ? e.a[4] : e.a[5]); const lst = e.k === 'IFCRELAGGREGATES' ? e.a[5] : e.a[4]; const et = etasjer.get(mål); if (et) refs(lst).forEach(x => etasjeAv.set(x, et));
+    if (e.k === 'IFCRELCONTAINEDINSPATIALSTRUCTURE' || e.k === 'IFCRELAGGREGATES') { const mål = nr(e.k === 'IFCRELAGGREGATES' ? e.a[4] : e.a[5]); const lst = e.k === 'IFCRELAGGREGATES' ? e.a[5] : e.a[4]; const et = etasjers(mål); refs(lst).forEach(x => { if (!inneI.has(x)) inneI.set(x, mål); }); if (et) refs(lst).forEach(x => etasjeAv.set(x, et));
       else if (e.k === 'IFCRELAGGREGATES' && ELEMENT.has(get(mål)?.k || '')) { const b = refs(lst); delerAv.set(mål, [...(delerAv.get(mål) || []), ...b]); b.forEach(x => forelderAv.set(x, mål)); } }
     else if (e.k === 'IFCRELDEFINESBYTYPE') { const t = get(nr(e.a[5])); if (t) refs(e.a[4]).forEach(x => typeAv.set(x, stepTekst(t.a[2]))); }
     else if (e.k === 'IFCRELDEFINESBYPROPERTIES') { const p = nr(e.a[5]); refs(e.a[4]).forEach(x => { const l = psetAv.get(x) || []; l.push(p); psetAv.set(x, l); }); }
     else if (e.k === 'IFCRELASSIGNSTOGROUP') { const g = get(nr(e.a[6])); if (g && SYSTEM.has(g.k)) { const n = stepTekst(g.a[5] || '') || stepTekst(g.a[2]) || stepTekst(g.a[4] || ''); if (n) refs(e.a[4]).forEach(x => { if (!sysAv.has(x)) sysAv.set(x, n); }); } }
     else if (e.k === 'IFCRELASSOCIATESCLASSIFICATION') { const r = get(nr(e.a[5])); if (r && r.k === 'IFCCLASSIFICATIONREFERENCE') { const kode = stepTekst(r.a[1]); if (/^\d{2,3}/.test(kode)) refs(e.a[4]).forEach(x => nsAv.set(x, kode)); } }
   }
+  // Objekter som ligger i et rom (IfcSpace) eller en sammenstilling har ikke etasjen direkte – følg kjeden oppover til en etasje
+  const etasjeFor = (id: number): string => { let x = id; for (let i = 0; i < 8 && x; i++) { const et = etasjeAv.get(x); if (et) return et; x = inneI.get(x) || 0; } return ''; };
   const egenskaper = (id: number) => { const eg: Record<string, string> = {}; const mg: Record<string, number> = {};
     for (const pid of psetAv.get(id) || []) { const p = get(pid); if (!p) continue;
       if (p.k === 'IFCPROPERTYSET') for (const x of refs(p.a[4])) { const q = get(x); if (q?.k === 'IFCPROPERTYSINGLEVALUE') { const v = verdi(q.a[2] || ''); const n = stepTekst(q.a[0]); if (v && n && v !== '0' && !(n in eg)) eg[n] = v; } }
@@ -111,7 +113,7 @@ function bygg(L: Leser, filnavn: string): IfcModell {
   const elementer: IfcEl[] = [];
   for (const [id, e] of E) {
     if (!ELEMENT.has(e.k)) continue; const { eg, mg } = egenskaper(id);
-    const navn = stepTekst(e.a[2]), tag = stepTekst(e.a[7] || ''); if (!etasjeAv.has(id) && forelderAv.has(id)) { const f = etasjeAv.get(forelderAv.get(id)!); if (f) etasjeAv.set(id, f); }
+    const navn = stepTekst(e.a[2]), tag = stepTekst(e.a[7] || ''); if (!etasjeAv.has(id)) { const f = etasjeFor(id) || etasjeFor(forelderAv.get(id) || 0); if (f) etasjeAv.set(id, f); }
     elementer.push({ klasse: e.k, guid: stepTekst(e.a[0]), navn, type: typeAv.get(id) || stepTekst(e.a[4]) || '', etasje: etasjeAv.get(id) || '', tag, ns: nsAv.get(id) || '', mengder: mg, egenskaper: eg,
       system: sysAv.get(id), tfm: finnTfm(eg, tag, navn), deler: delerAv.get(id)?.map(x => stepTekst(get(x)?.a[0] || '')).filter(Boolean), forelder: forelderAv.has(id) ? stepTekst(get(forelderAv.get(id)!)?.a[0] || '') : undefined, fabrikat: [forst(eg, 'Manufacturer', 'Produsent', 'Fabrikat', 'Leverandør'), forst(eg, 'ModelReference', 'ModelLabel', 'Modell', 'Model', 'Produkt', 'Produktnavn')].filter(Boolean).join(' '), serienr: forst(eg, 'SerialNumber', 'Serienummer', 'Serial Number') });
   }
@@ -159,7 +161,7 @@ export function ifcTilTabell(m: IfcModell, valgt: Set<string>, perEtasje: boolea
       let key: string, g0: Omit<G, 'areal' | 'ex' | 'el'>;
       if (e.tfm) { const t = e.tfm; const ty = sysType?.(t.sys) || type; key = 'tfm|' + t.sys + '.' + t.lop; g0 = { navn: e.system || `${t.sys}.${t.lop} ${navn}`, kode: t.sys, lop: t.lop, type: ty, etasje: '', kilde: 'TFM-merking i modellen' }; }
       else if (e.system) { key = 'sys|' + e.system + '|' + kat.id; g0 = { navn: e.system, kode, lop: '', type, etasje: '', kilde: 'system i modellen' }; }
-      else { const et = perEtasje ? e.etasje : ''; key = [kat.id, navn, et, e.klasse === 'IFCSTAIRFLIGHT' ? 'x' : ''].join('|'); g0 = { navn: `${navn}${et ? ' – ' + et : ''}`, kode, lop: '', type, etasje: et, kilde: '' }; }
+      else { const et = perEtasje ? e.etasje : ''; key = [kat.id, navn, et, kode, e.klasse === 'IFCSTAIRFLIGHT' ? 'x' : ''].join('|'); g0 = { navn: `${navn}${et ? ' – ' + et : ''}`, kode, lop: '', type, etasje: et, kilde: '' }; }
       const g = grp.get(key) || { ...g0, areal: 0, ex: [], el: [] }; g.areal += e.mengder.Area || 0; if (g.ex.length < 4 && e.navn) g.ex.push(rensNavn(e.navn));
       g.el.push({ e, lev: LEV_KLASSE[e.klasse] || LEV_KAT[kat.id] || 20, kompKode: e.tfm?.komp || '', ent: kat.id === 'dor' && navn === 'Branndører' ? 'Branndør' : kat.id === 'dor' && navn === 'Ytterdører' ? 'Ytterdør' : ENTALL[kat.id] || 'Objekt' }); grp.set(key, g); } }
   for (const g of grp.values()) { const rad = R.length + 1; const n = g.el.length;
@@ -172,18 +174,23 @@ export function ifcTilTabell(m: IfcModell, valgt: Set<string>, perEtasje: boolea
 }
 
 /** Lager en IfcModell av opplastede 3D-modeller (hodene fra .ek3d), slik at systemimporten kan bruke dem uten at IFC-filene må velges på nytt.
- *  Fagsystem (IfcSystem) og oppdeling i delobjekter finnes ikke i 3D-modellen, så trapper telles per trapp (ikke per løp) og systemer grupperes etter TFM-merking, NS 3451, kategori og etasje. */
-export function ifcFraModeller(hoder: { filnavn: string; hode: { etasjer: { navn: string; terreng?: boolean }[]; elementer: { g: string; k: string; n: string; t: string; e: number }[]; egenskaper?: Record<string, { ns?: string; type?: string; mengder?: Record<string, number>; egenskaper?: Record<string, string> }>; program?: string } }[]): IfcModell {
-  const klasser = new Set(IFC_KAT.flatMap(k => k.klasser)); const sett = new Set<string>(); const elementer: IfcEl[] = []; const etasjer: string[] = [];
-  for (const { hode } of hoder) {
+ *  Nye opplastinger har med etasje, fagsystem og delobjekter slik IFC-filen selv oppgir dem (samme resultat som å velge filen direkte).
+ *  Eldre opplastinger har bare etasje beregnet ut fra høyden på objektet, og ingen fagsystem – dem flagges, og kan lastes opp på nytt med «Ny versjon». */
+export function ifcFraModeller(hoder: { filnavn: string; hode: { etasjer: { navn: string; terreng?: boolean }[]; elementer: { g: string; k: string; n: string; t: string; e: number }[]; egenskaper?: Record<string, { ns?: string; type?: string; mengder?: Record<string, number>; egenskaper?: Record<string, string>; et?: string; sys?: string; de?: string[]; fo?: string }>; program?: string } }[]): IfcModell {
+  const klasser = new Set(IFC_KAT.flatMap(k => k.klasser)); const sett = new Set<string>(); const elementer: IfcEl[] = []; const etasjer: string[] = []; const gamle: string[] = [];
+  for (const { filnavn, hode } of hoder) {
     const navnEt = (i: number) => (hode.etasjer[i] && !hode.etasjer[i].terreng && hode.etasjer[i].navn !== 'Alle' ? hode.etasjer[i].navn : '');
+    const harIfcEtasje = Object.values(hode.egenskaper || {}).some(d => d.et !== undefined); if (!harIfcEtasje) gamle.push(filnavn);
     const trapper = new Set(hode.elementer.filter(x => x.k === 'IFCSTAIR').map(x => navnEt(x.e)));
     for (const x of hode.elementer) {
-      if (!x.g || !klasser.has(x.k) || sett.has(x.g)) continue; if (x.k === 'IFCSTAIRFLIGHT' && trapper.has(navnEt(x.e))) continue; // løpene regnes med i trappen
-      sett.add(x.g); const d = hode.egenskaper?.[x.g]; const eg = d?.egenskaper || {}; const et = navnEt(x.e); if (et && !etasjer.includes(et)) etasjer.push(et);
+      if (!x.g || !klasser.has(x.k) || sett.has(x.g)) continue;
+      const d = hode.egenskaper?.[x.g]; if (x.k === 'IFCSTAIRFLIGHT' && !d?.fo && trapper.has(navnEt(x.e))) continue; // løpene regnes med i trappen
+      sett.add(x.g); const eg = d?.egenskaper || {}; const et = harIfcEtasje ? (d?.et || '') : navnEt(x.e); if (et && !etasjer.includes(et)) etasjer.push(et);
       elementer.push({ klasse: x.k, guid: x.g, navn: x.n || '', type: d?.type || '', etasje: et, tag: x.t || '', ns: d?.ns || '', mengder: d?.mengder || {}, egenskaper: eg, tfm: finnTfm(eg, x.t || '', x.n || ''),
+        ...(d?.sys ? { system: d.sys } : {}), ...(d?.de?.length ? { deler: d.de } : {}), ...(d?.fo ? { forelder: d.fo } : {}),
         fabrikat: [forst(eg, 'Manufacturer', 'Produsent', 'Fabrikat', 'Leverandør'), forst(eg, 'ModelReference', 'ModelLabel', 'Modell', 'Model', 'Produkt', 'Produktnavn')].filter(Boolean).join(' '), serienr: forst(eg, 'SerialNumber', 'Serienummer', 'Serial Number') });
     }
   }
-  return { filnavn: hoder.length === 1 ? hoder[0].filnavn : `${hoder.length} opplastede IFC-filer`, schema: 'fra 3D-modellene', program: hoder[0]?.hode.program || '', byggNavn: '', etasjer, elementer, tellinger: { objekter: elementer.length } };
+  return { filnavn: hoder.length === 1 ? hoder[0].filnavn : `${hoder.length} opplastede IFC-filer`, schema: 'fra 3D-modellene', program: hoder[0]?.hode.program || '', byggNavn: '', etasjer, elementer, tellinger: { objekter: elementer.length },
+    ...(gamle.length ? { merknad: `Disse modellene ble lastet opp før appen tok vare på etasje og fagsystem fra IFC-filen: ${gamle.join(', ')}. Etasjen er der regnet ut fra høyden på hvert objekt, og kan bli feil for høye objekter (glassfasader, trapper, sjakter) eller hvis etasjehøydene i modellen er unøyaktige. Fagsystemer fra modellen mangler. For riktig etasje og system: last opp filen på nytt med «Ny versjon» under «Vis filer», eller velg IFC-filen direkte her.` } : {}) };
 }
