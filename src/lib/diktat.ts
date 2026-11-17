@@ -8,12 +8,13 @@ export const diktatStotte = () => !!SR();
 export type Diktat = { stopp: () => void };
 const erIos = () => typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1));
 let aktiv: any = null; // bare én diktering om gangen; en hengende forrige økt avbrytes før ny starter
+let inst: any = null;  // samme objekt gjenbrukes mellom øktene: Safari på iPhone slutter ofte å virke hvis man lager et nytt for hver gang
 /** Starter diktering. `grunn` er teksten som allerede står i feltet; `paaTekst` får hele den nye teksten fortløpende.
  *  `paaSlutt` kalles når økten er over; feil: 'mikrofon' (ikke tillatt), 'ingen-tale' (hørte ingenting), ellers feilkoden. */
 export function startDiktat(grunn: string, paaTekst: (t: string) => void, paaSlutt: (feil?: string) => void): Diktat | null {
   const R = SR(); if (!R) return null;
-  try { aktiv?.abort(); } catch { } aktiv = null;
-  const r = new R(); r.lang = SPRAK[sprak()] || 'nb-NO'; r.interimResults = true;
+  if (aktiv) { try { aktiv.onresult = aktiv.onerror = aktiv.onend = null; aktiv.abort(); } catch { } aktiv = null; inst = null; }
+  const r = inst || (inst = new R()); r.lang = SPRAK[sprak()] || 'nb-NO'; r.interimResults = true;
   r.continuous = !erIos(); // Safari på iPhone er ustabil i kontinuerlig modus: én setning per trykk
   let ferdig = '', fikkTale = false, stoppetAvOss = false, slutt = false, feilKode: string | undefined;
   const settSammen = (a: string, b: string) => (a && b ? a.replace(/\s+$/, '') + ' ' : a) + b;
