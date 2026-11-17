@@ -1,6 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-14', dato: '2026-12-14', tittel: 'Gårdeiere kan opprette egne bygg (valgfritt)', punkter: [
+    'Administrator kan under Organisasjon og tilgang slå på «La gårdeiere opprette egne bygg». Da får gårdeiere knappen «+ Ny eiendom» og full redigering på byggene de selv oppretter. På andre bygg har de fortsatt bare lesetilgang.',
+  ] },
   { id: '2026-12-13', dato: '2026-12-13', tittel: 'Beredskapsplan og risikovurdering', punkter: [
     'Ny fane «Beredskap» på hver eiendom, for eier og drift. Her fyller du ut beredskapsplanen (kontakter, varsling, evakuering, stenging av vann og strøm, tiltak per hendelse) og skriver den ut som PDF.',
     'Risikoregisteret har standardrisikoer for brann, vann og tekniske feil, innbrudd og hærverk, ekstremvær og personsikkerhet. Du vurderer sannsynlighet og konsekvens, og ser alt i en risikomatrise.',

@@ -8,7 +8,7 @@ const now = () => new Date().toISOString();
 const ROLE = localStorage.getItem('mockRolle') || 'admin';
 const me = { id: 'u-me', epost: 'test@example.no', navn: 'Test Bruker', rolle: ROLE === 'gardeier' ? 'tekniker' : ROLE, aktiv: true, leietaker_id: localStorage.getItem('mockLt') || null, created_at: now() };
 db.profiles = db.profiles.filter(p => p.id !== me.id); db.profiles.push({ ...me, plattform_admin: ROLE === 'admin' });
-if (!db.organisasjoner) { db.organisasjoner = [{ id: 'org-eier', navn: 'Testeier AS', type: 'eier', aktiv: true, opprettet: now() }, { id: 'org-fv', navn: 'Forvalter AS', type: 'forvalter', orgnr: '999888777', aktiv: true, opprettet: now() }]; }
+if (!db.organisasjoner) { db.organisasjoner = [{ id: 'org-eier', navn: 'Testeier AS', type: 'eier', aktiv: true, opprettet: now(), gardeier_oppretter: localStorage.getItem('mockGardeierOpprett') === '1' }, { id: 'org-fv', navn: 'Forvalter AS', type: 'forvalter', orgnr: '999888777', aktiv: true, opprettet: now() }]; }
 if (!db.org_medlem) { db.org_medlem = ROLE === 'admin' || ROLE === 'forvalter' || ROLE === 'gardeier' ? [{ org_id: 'org-eier', user_id: me.id, rolle: ROLE === 'admin' ? 'admin' : ROLE === 'gardeier' ? 'gardeier' : 'forvalter', alle_bygg: true, aktiv: true }] : []; }
 db.portefoljer = db.portefoljer || []; db.oppdrag = db.oppdrag || [];
 let session = localStorage.getItem('mockLogout') ? null : { user: { id: me.id, email: me.epost }, access_token: 'x' };
@@ -51,7 +51,7 @@ export function createClient() {
       if (name === 'oppdater_min_profil') me.navn = a.p_navn;
       if (name === 'mfa_status') { const M = mfaS(); return { data: { kreves: M.kreves, har: M.factors.some(f => f.status === 'verified'), aal: M.aal }, error: null }; }
       if (name === 'mfa_oversikt') { const M = mfaS(); return { data: db.org_medlem.filter(m => m.org_id === a.p_org).map(m => ({ user_id: m.user_id, har_mfa: m.user_id === me.id ? M.factors.some(f => f.status === 'verified') : false })), error: null }; }
-      if (name === 'mine_tilganger') return { data: (db.eiendommer || []).map(e => ({ eiendom_id: e.id, niva: ROLE === 'tekniker' ? 'drift' : 'skriv' })), error: null };
+      if (name === 'mine_tilganger') return { data: (db.eiendommer || []).map(e => ({ eiendom_id: e.id, niva: ROLE === 'tekniker' ? 'drift' : ROLE === 'gardeier' ? (localStorage.getItem('mockGardeierOpprett') === '1' ? 'skriv' : 'les') : 'skriv' })), error: null };
       if (name === 'mine_moduler') { if (!db.org_modul) return { data: null, error: { message: 'function mine_moduler does not exist' } }; return { data: db.org_modul.filter(r => r.aktiv !== false), error: null }; }
       if (name === 'min_primar_org') return { data: db.org_medlem.find(m => m.user_id === me.id)?.org_id || null, error: null };
       if (name === 'finn_org') return { data: db.organisasjoner.filter(o => (o.orgnr || '') === String(a.p_orgnr).replace(/\D/g, '')), error: null };

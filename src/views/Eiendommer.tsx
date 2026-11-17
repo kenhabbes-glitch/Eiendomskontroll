@@ -12,7 +12,7 @@ import { qrPunkter } from './QrPunkter';
 import { driftsmeldinger } from './Driftsmeldinger';
 import { verdiModal } from './Verdivurdering';
 import { harModul } from '../lib/moduler';
-import { S, canEdit, isAdmin, isPlattform, orgNavn, useStore, mineOrg, kanDrifteE } from '../lib/store';
+import { S, canEdit, isAdmin, isPlattform, orgNavn, useStore, mineOrg, kanDrifteE, gardeierOppretter } from '../lib/store';
 import { Befaringer, nyBefaringDialog } from './Befaring';
 import { activeTasks, byId, dUntil, openAvvik, sortBy } from '../lib/utils';
 import { autoTfm, editAnlegg, editAvvik, editDok, editEiendom, editKomponent, editLeietaker, editOppgave, generatePlan, importTfm, visOppgave } from '../lib/actions';
@@ -44,7 +44,7 @@ export function Eiendommer() {
     </div>; };
   const grupper: [string, any[]][] = flereKunder && !fk ? [...new Set(L.map(e => e.eierOrgId || ''))].map(k => [k, L.filter(e => (e.eierOrgId || '') === k)]) : [['', L]];
   return <>
-    <div className="head"><div className="grow"><h1>{tt("Eiendommer")}<Hjelp id="side.eiendommer" /></h1><p className="sub">{S.eiendommer.length} {tt("eiendommer")}</p></div>{(isAdmin() || mineOrg(['admin', 'forvalter']).length > 0) && <button className="btn" onClick={() => importerSystemer()}>{tt("Importer systemer fra Excel")}</button>}{isAdmin() && <button className="btn pri" onClick={() => editEiendom()}>{tt("+ Ny eiendom")}</button>}</div>
+    <div className="head"><div className="grow"><h1>{tt("Eiendommer")}<Hjelp id="side.eiendommer" /></h1><p className="sub">{S.eiendommer.length} {tt("eiendommer")}</p></div>{(isAdmin() || mineOrg(['admin', 'forvalter']).length > 0) && <button className="btn" onClick={() => importerSystemer()}>{tt("Importer systemer fra Excel")}</button>}{(isAdmin() || gardeierOppretter()) && <button className="btn pri" onClick={() => editEiendom()}>{tt("+ Ny eiendom")}</button>}</div>
     {(flereKunder || ports.length > 0) && S.eiendommer.length > 0 && <div className="toolbar" style={{ marginBottom: 12, gap: 8 }}>
       {flereKunder && <select value={fk} onChange={e => { setFk(e.target.value); setFp(''); }}><option value="">{tt("Alle kunder (")}{kunder.length})</option>{sortBy(kunder, k => orgNavn(k)).map(k => <option key={k} value={k}>{orgNavn(k) || tt("Uten kunde")} ({S.eiendommer.filter(e => (e.eierOrgId || '') === k).length})</option>)}</select>}
       {(ports.length > 0) && <select value={fp} onChange={e => setFp(e.target.value)}><option value="">{tt("Alle porteføljer")}</option>{ports.map(p => <option key={p.id} value={p.id}>{p.navn}{flereKunder && !fk ? tt(" ({0})", orgNavn(p.eierOrgId || p.eier_org_id)) : ''}</option>)}<option value="-">{tt("Uten portefølje")}</option></select>}

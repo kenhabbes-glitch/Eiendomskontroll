@@ -16,7 +16,7 @@ export const ORG_ROLLER: [string, string, string][] = [
   ['forvalter', 'Forvalter', 'Redigerer bygg de er tildelt: systemer, kontroller, avvik, dokumenter, leietakere, arealer og økonomi.'],
   ['tekniker', 'Driftstekniker', 'Ser tildelte bygg, registrerer utførte kontroller og avvik. Ser ikke leietakere eller leieavtaler.'],
   ['leser', 'Leser', 'Ser tildelte bygg uten å kunne endre (f.eks. styre eller revisor).'],
-  ['gardeier', 'Gårdeier', 'Eier av ett bygg, en portefølje eller flere. Ser eieroversikt (forfalt, avvik, samsvar, dokumenter) for sine bygg, uten å kunne endre noe. Får ukeoversikt og varsler for kritiske saker. Velg byggene eller porteføljene under «Tildel bygg / porteføljer».'],
+  ['gardeier', 'Gårdeier', 'Eier av ett bygg, en portefølje eller flere. Ser eieroversikt (forfalt, avvik, samsvar, dokumenter) for sine bygg, uten å kunne endre noe (med mindre administrator har slått på at gårdeiere kan opprette egne bygg – da kan gårdeieren redigere byggene vedkommende selv oppretter). Får ukeoversikt og varsler for kritiske saker. Velg byggene eller porteføljene under «Tildel bygg / porteføljer».'],
 ];
 export const OPPDRAG_ROLLER: [string, string, string][] = [
   ['forvalter', 'Forvaltning', 'Firmaet forvalter bygget: kan redigere alt (som egen forvalter). Firmaets administrator fordeler byggene på sine ansatte.'],
@@ -248,11 +248,19 @@ export function Organisasjon() {
       const { error } = await sb.from('organisasjoner').update({ krev_mfa: b }).eq('id', org); if (error) return toast(feiltekst(error));
       if (O) O.krev_mfa = b; bump(); toast(b ? tt("Tofaktor kreves nå for administratorer og forvaltere") : tt("Kravet om tofaktor er slått av"));
     };
+    const settGardeierOpprett = async (b: boolean) => {
+      const { error } = await sb.from('organisasjoner').update({ gardeier_oppretter: b }).eq('id', org); if (error) return toast(feiltekst(error));
+      if (O) O.gardeier_oppretter = b; bump(); toast(b ? tt("Gårdeiere kan nå opprette egne bygg") : tt("Gårdeiere kan ikke lenger opprette bygg"));
+    };
     const mangler = M.filter(m => m.aktiv && ['admin', 'forvalter'].includes(m.rolle) && mf[m.user_id] === false);
     c = <><div className="toolbar">{orgVelger(admin, org)}<span className="muted small">{M.length} {tt("brukere ·")} {typeNavn(S.orgs.find(o => o.id === org)?.type)}</span><button className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => leggTilMedlem(org)}>{tt("+ Legg til bruker")}</button></div>
       <div className="card" style={{ marginBottom: 12, padding: '10px 14px' }}>
         <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 500 }}><input type="checkbox" checked={krev} onChange={e => settKrev(e.target.checked)} /> {tt("Krev tofaktorinnlogging for administratorer og forvaltere")}</label>
         <p className="small muted" style={{ margin: '4px 0 0 24px' }}>{krev ? <>{tt("Administratorer og forvaltere må logge inn med passord og kode fra en autentiseringsapp. Uten tofaktor får de ikke tilgang til data – reglen håndheves i databasen.")}{mangler.length > 0 && <> <span style={{ color: 'var(--amber)' }}>{mangler.length} {tt("må sette det opp ved neste innlogging.")}</span></>}</> : tt("Anbefalt å ha på. Andre brukere kan likevel slå på tofaktor selv under «Min profil».")}</p>
+      </div>
+      <div className="card" style={{ marginBottom: 12, padding: '10px 14px' }}>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 500 }}><input type="checkbox" checked={!!O?.gardeier_oppretter} onChange={e => settGardeierOpprett(e.target.checked)} /> {tt("La gårdeiere opprette egne bygg")}</label>
+        <p className="small muted" style={{ margin: '4px 0 0 24px' }}>{tt("Er dette på, kan brukere med rollen Gårdeier legge til nye bygg og får full redigering på byggene de selv oppretter. På andre bygg har de fortsatt bare lesetilgang. Nye bygg øker abonnementet som vanlig. Slår du det av, mister gårdeierne redigeringsretten, men byggene blir værende.")}</p>
       </div>
       <div className="tbl-wrap"><table><thead><tr><th>{tt("Navn")}</th><th>{tt("E-post")}</th><th>{tt("Rolle")}</th><th>{tt("Tilgang til bygg")}</th><th>{tt("Tofaktor")}</th><th>{tt("Status")}</th></tr></thead><tbody>
         {M.map(m => { const p = profil(m.user_id); return <tr key={m.user_id} className="click" onClick={() => redigerMedlem(m)}><td><b style={{ fontWeight: 500 }}>{p.navn || '–'}</b>{m.user_id === state.me?.id && <span className="muted small"> {tt("(deg)")}</span>}</td><td className="small">{p.epost}</td>

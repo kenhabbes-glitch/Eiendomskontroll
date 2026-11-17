@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { SERVICEAVTALE, TG_DEF, KG_DEF, NS_DOK } from './catalog';
 import { levetidRef, midt, spenn } from './ns3451';
 import { MALER, KOMP, TFM_DEF, NS3451, TFM_KODER, PROP_MALER, KATEGORIER, KATS, TYPER, ENH, AV_ALV, AV_STATUS, AV_KILDE, AV_FRIST, AV_LUKKET, DOK_TYPER, PLIKTER, STD_PLIKTER } from './catalog';
-import { S, aoApi, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore, kanRedigereE, kanDrifteE, mineOrg, oppdaterNiva } from './store';
+import { S, aoApi, save, removeDoc, toast, uploadFile, deleteFile, canEdit, isStaff, state, sb, useStore, kanRedigereE, kanDrifteE, mineOrg, opprettOrg, oppdaterNiva } from './store';
 import { leieAreal, m2, FELLES_AVTALE, Obj } from './utils';
 import { byggTillegg, harModul, orgPris } from './moduler';
 import { TgKgVelger, tgAvviker, tgTekst } from '../components/TgKg';
@@ -59,7 +59,7 @@ const tgFelt = (): Field[] => [
 
 // ================= EIENDOM =================
 export function editEiendom(id?: string, etter?: (nid: string) => void, preset?: Obj) {
-  const eierOrg = mineOrg(['admin', 'forvalter']);
+  const eierOrg = opprettOrg();
   const e = id ? byId('eiendommer', id)! : { land: ({ 'es-MX': 'MX', sv: 'SE', da: 'DK' } as Record<string, string>)[sprak()] || hovedLand(), eierOrgId: (eierOrg.find(o => o.id === S.primarOrg) || eierOrg.find(o => o.type === 'eier') || eierOrg[0])?.id, ...(preset || {}) } as unknown as Rec;
   if (!id && !eierOrg.length) { toast(tt("Du må være administrator eller forvalter i en organisasjon for å opprette eiendommer")); return; }
   const kanEie = id ? mineOrg(['admin']).some(o => o.id === e.eierOrgId) : true;

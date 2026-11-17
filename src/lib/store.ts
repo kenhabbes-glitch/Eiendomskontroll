@@ -368,7 +368,13 @@ export const role = () => state.me?.rolle || 'ingen';
 export const isAdmin = () => role() === 'admin' || !!state.me?.plattform;
 export const isPlattform = () => !!state.me?.plattform;
 // Har redigeringstilgang til minst én eiendom (eller er admin/forvalter i en eierorganisasjon og kan opprette)
-export const canEdit = () => (role() === 'admin' || role() === 'forvalter') && (Object.values(S.niva).includes('skriv') || mineOrg(['admin', 'forvalter']).some(o => o.type === 'eier') || !Object.keys(S.niva).length);
+export const canEdit = () => ((role() === 'admin' || role() === 'forvalter') && (Object.values(S.niva).includes('skriv') || mineOrg(['admin', 'forvalter']).some(o => o.type === 'eier') || !Object.keys(S.niva).length))
+  || (gardeierOppretter() && Object.values(S.niva).includes('skriv'));
+/** Organisasjoner der jeg er gårdeier og administrator har slått på at gårdeiere kan opprette egne bygg */
+export const gardeierOrg = (): any[] => mineOrg(['gardeier']).filter(o => o.gardeier_oppretter);
+export const gardeierOppretter = () => gardeierOrg().length > 0;
+/** Organisasjoner jeg kan opprette bygg i (administrator/forvalter, eller gårdeier når valget er på) */
+export const opprettOrg = (): any[] => { const a = mineOrg(['admin', 'forvalter']); return [...a, ...gardeierOrg().filter(o => !a.some(x => x.id === o.id))]; };
 export const isStaff = () => ['admin', 'forvalter', 'tekniker'].includes(role());
 // Tilgangsnivå på en konkret eiendom (databasen håndhever det samme)
 export const nivaE = (eid?: string): Niva | '' => (eid && S.niva[eid]) || '';

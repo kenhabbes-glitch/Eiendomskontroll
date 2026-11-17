@@ -292,3 +292,13 @@ test('beredskap: fanen viser plan, standardrisikoer og lagrer en vurdering', asy
     if (a.feil.length) assert.fail(a.feil[0]);
   } finally { await a.lukk(); }
 });
+
+test('gårdeier: «+ Ny eiendom» vises bare når administrator har slått på valget', async () => {
+  const uten = await aapne('#/eiendommer', { lager: { mockRolle: 'gardeier' } }); try {
+    assert.equal(await uten.side.getByRole('button', { name: /\+ Ny eiendom/ }).count(), 0, 'gårdeier uten valget skal ikke kunne opprette bygg');
+  } finally { await uten.lukk(); }
+  const med = await aapne('#/eiendommer', { lager: { mockRolle: 'gardeier', mockGardeierOpprett: '1' } }); try {
+    assert.equal(await med.side.getByRole('button', { name: /\+ Ny eiendom/ }).count(), 1, 'gårdeier med valget skal få «+ Ny eiendom»');
+    if (med.feil.length) assert.fail(med.feil[0]);
+  } finally { await med.lukk(); }
+});
