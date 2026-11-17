@@ -2,6 +2,8 @@
 // Henter etasjer, bygningsdeler og utstyr med type, etasje, NS 3451-klassifisering og egenskaper (brannklasse, fabrikat, serienummer).
 // Støtter .ifc og .ifczip (strømmer og pakker ut underveis, så store filer ikke havner i minnet på én gang).
 import { Unzip, UnzipInflate } from 'fflate';
+import { typeForElement } from './modellForslag';
+import { KOMP, TFM_DEF } from './catalog';
 
 export type Tfm = { sys: string; lop: string; komp: string; klop: string; tekst: string };
 export type IfcEl = { klasse: string; guid: string; navn: string; type: string; etasje: string; tag: string; ns: string; mengder: Record<string, number>; egenskaper: Record<string, string>;
@@ -129,7 +131,8 @@ export const IFC_KAT: IfcKat[] = [
   { id: 'trapp', navn: 'Trapper og ramper', klasser: ['IFCSTAIR', 'IFCSTAIRFLIGHT', 'IFCRAMP'], kode: '', type: '', standard: true, hint: 'Trenger kontroll av gelender og slitasje' },
   { id: 'rekkverk', navn: 'Rekkverk og gelendere', klasser: ['IFCRAILING'], kode: '', type: '', standard: true, hint: 'Personsikkerhet – kontroll av festepunkter' },
   { id: 'sanitar', navn: 'Sanitærutstyr / armaturer (foreslått)', klasser: ['IFCFLOWTERMINAL', 'IFCSANITARYTERMINAL'], kode: '313', type: 'sanitar', standard: true, hint: 'Arkitektmodeller har ofte bare sanitærutstyr, ikke tekniske anlegg' },
-  { id: 'teknisk', navn: 'Tekniske komponenter (pumper, vifter, tavler …)', klasser: ['IFCPUMP', 'IFCFAN', 'IFCBOILER', 'IFCCHILLER', 'IFCVALVE', 'IFCDAMPER', 'IFCFILTER', 'IFCHEATEXCHANGER', 'IFCTANK', 'IFCLIGHTFIXTURE', 'IFCALARM', 'IFCSENSOR', 'IFCCONTROLLER', 'IFCELECTRICDISTRIBUTIONBOARD', 'IFCUNITARYEQUIPMENT', 'IFCAIRTERMINAL', 'IFCFIRESUPPRESSIONTERMINAL', 'IFCTRANSPORTELEMENT', 'IFCENERGYCONVERSIONDEVICE', 'IFCFLOWMOVINGDEVICE', 'IFCFLOWSTORAGEDEVICE', 'IFCFLOWTREATMENTDEVICE', 'IFCFLOWCONTROLLER', 'IFCDISTRIBUTIONELEMENT'], kode: '', type: '', standard: true, hint: 'Finnes i RIV/RIE-modeller' },
+  { id: 'teknisk', navn: 'Tekniske komponenter (pumper, vifter, tavler …)', klasser: ['IFCPUMP', 'IFCFAN', 'IFCBOILER', 'IFCCHILLER', 'IFCVALVE', 'IFCDAMPER', 'IFCFILTER', 'IFCHEATEXCHANGER', 'IFCTANK', 'IFCLIGHTFIXTURE', 'IFCALARM', 'IFCSENSOR', 'IFCCONTROLLER', 'IFCELECTRICDISTRIBUTIONBOARD', 'IFCUNITARYEQUIPMENT', 'IFCAIRTERMINAL', 'IFCFIRESUPPRESSIONTERMINAL', 'IFCTRANSPORTELEMENT', 'IFCENERGYCONVERSIONDEVICE', 'IFCFLOWMOVINGDEVICE', 'IFCFLOWSTORAGEDEVICE', 'IFCFLOWTREATMENTDEVICE', 'IFCFLOWCONTROLLER', 'IFCDISTRIBUTIONELEMENT', 'IFCDISTRIBUTIONCONTROLELEMENT', 'IFCACTUATOR', 'IFCCOMPRESSOR', 'IFCCOOLINGTOWER', 'IFCELECTRICAPPLIANCE', 'IFCSPACEHEATER', 'IFCSWITCHINGDEVICE', 'IFCTRANSFORMER', 'IFCMOTORCONNECTION', 'IFCCOMMUNICATIONSAPPLIANCE', 'IFCAUDIOVISUALAPPLIANCE'], kode: '', type: '', standard: true, hint: 'Finnes i RIV/RIE-modeller. Heis, sprinkler, brannalarm, ventilasjon m.fl. sorteres i riktig system ut fra klasse og navn' },
+  { id: 'elsmaa', navn: 'Stikkontakter, koblingsbokser og lamper', klasser: ['IFCOUTLET', 'IFCJUNCTIONBOX', 'IFCLAMP'], kode: '433', type: '', standard: false, hint: 'Mange og små – vanligvis ikke egne systemer' },
   { id: 'himling', navn: 'Himlinger og kledning', klasser: ['IFCCOVERING'], kode: '', type: '', standard: false, hint: 'Mange og små – vanligvis ikke egne systemer' },
   { id: 'innredning', navn: 'Innredning og møbler', klasser: ['IFCFURNISHINGELEMENT', 'IFCFURNITURE'], kode: '', type: '', standard: false, hint: 'Leietakers eller løst inventar – vanligvis ikke med' },
   { id: 'annet', navn: 'Uspesifiserte objekter (Proxy)', klasser: ['IFCBUILDINGELEMENTPROXY'], kode: '', type: '', standard: false, hint: 'Sjekk navnene før du tar dem med' },
@@ -139,11 +142,11 @@ export function ifcAntall(m: IfcModell): Record<string, number> { const o: Recor
 export type IfcKomp = { levetid: number; deler?: string[]; guid: string; navn: string; kode: string; lop: string; typekode: string; plassering: string; fabrikat: string; serienr: string; klasse: string; tag: string; etasje: string; brann: string };
 const rensNavn = (n: string) => n.replace(/:\d{5,}$/, '').replace(/:/g, ' · ').replace(/[\s-]+$/, '').trim();
 /** Forventet teknisk levetid (år) per komponent. Bygger på NS 3451-referansen i appen (midt i spennet) og vanlige erfaringstall; brukes når modellen ikke sier noe. */
-const LEV_KAT: Record<string, number> = { vindu: 40, dor: 30, fasade: 35, trapp: 60, rekkverk: 25, sanitar: 20, teknisk: 20, himling: 20, innredning: 15, annet: 20 };
+const LEV_KAT: Record<string, number> = { elsmaa: 30, vindu: 40, dor: 30, fasade: 35, trapp: 60, rekkverk: 25, sanitar: 20, teknisk: 20, himling: 20, innredning: 15, annet: 20 };
 const LEV_KLASSE: Record<string, number> = { IFCPUMP: 15, IFCFAN: 20, IFCBOILER: 20, IFCCHILLER: 20, IFCVALVE: 20, IFCDAMPER: 20, IFCFILTER: 10, IFCHEATEXCHANGER: 20, IFCTANK: 25, IFCLIGHTFIXTURE: 18, IFCLAMP: 15,
   IFCALARM: 15, IFCSENSOR: 15, IFCACTUATOR: 15, IFCCONTROLLER: 15, IFCELECTRICDISTRIBUTIONBOARD: 30, IFCUNITARYEQUIPMENT: 20, IFCAIRTERMINAL: 25, IFCFIRESUPPRESSIONTERMINAL: 30, IFCTRANSPORTELEMENT: 25,
-  IFCSANITARYTERMINAL: 20, IFCFLOWTERMINAL: 20, IFCSTAIRFLIGHT: 60, IFCRAMP: 60 };
-const ENTALL: Record<string, string> = { vindu: 'Vindu', dor: 'Dør', fasade: 'Glassfasade', trapp: 'Trapp', rekkverk: 'Rekkverk', sanitar: 'Sanitærutstyr', teknisk: 'Teknisk komponent', himling: 'Himling', innredning: 'Innredning', annet: 'Objekt' };
+  IFCSANITARYTERMINAL: 20, IFCFLOWTERMINAL: 20, IFCSTAIRFLIGHT: 60, IFCRAMP: 60, IFCSPACEHEATER: 25, IFCCOMPRESSOR: 15, IFCCOOLINGTOWER: 20, IFCTRANSFORMER: 30, IFCSWITCHINGDEVICE: 30, IFCELECTRICAPPLIANCE: 15, IFCCOMMUNICATIONSAPPLIANCE: 15, IFCAUDIOVISUALAPPLIANCE: 12, IFCMOTORCONNECTION: 20, IFCDISTRIBUTIONCONTROLELEMENT: 15, IFCOUTLET: 30, IFCJUNCTIONBOX: 30 };
+const ENTALL: Record<string, string> = { elsmaa: 'Elektrisk småutstyr', vindu: 'Vindu', dor: 'Dør', fasade: 'Glassfasade', trapp: 'Trapp', rekkverk: 'Rekkverk', sanitar: 'Sanitærutstyr', teknisk: 'Teknisk komponent', himling: 'Himling', innredning: 'Innredning', annet: 'Objekt' };
 const brannAv = (e: IfcEl) => { const b = e.egenskaper.FireRating || e.egenskaper.Brannklasse || e.egenskaper.Brannmotstand || ''; return b && !/^(nei|0|-|ingen|none)$/i.test(b) ? b : ''; };
 
 /** Lager en tabell (overskrift + rader) som kan kjøres gjennom den vanlige importen, en type per rad og bygningsdelene (komponentene) per rad.
@@ -158,8 +161,12 @@ export function ifcTilTabell(m: IfcModell, valgt: Set<string>, perEtasje: boolea
     for (const e of m.elementer) { if (!kat.klasser.includes(e.klasse)) continue; if (e.forelder && kat.klasser.includes(klasseAvGuid.get(e.forelder) || '')) continue; // løp i en trapp som selv er med
       let navn = kat.navn.replace(/ \(foreslått\)| \(.*\)/, ''), kode = e.ns && /^\d{3}/.test(e.ns) ? e.ns.slice(0, 3) : kat.kode, type = kat.type;
       if (kat.id === 'dor') { const brann = brannAv(e); const ext = /^ja$/i.test(e.egenskaper.IsExternal || ''); if (brann) { navn = 'Branndører'; type = 'branndorer'; kode = e.ns?.slice(0, 3) || '244'; } else if (ext) { navn = 'Ytterdører'; type = 'ytterdorer'; kode = e.ns?.slice(0, 3) || '234'; } else { navn = 'Innvendige dører'; type = 'annet'; } }
+      // Tekniske komponenter sorteres i riktig system (heis, sprinkler, brannalarm, ventilasjon …) ut fra klasse og navn, og ikke i en samlekasse per etasje
+      let sorter = '';
+      if (kat.id === 'teknisk' || kat.id === 'sanitar') { sorter = typeForElement({ g: e.guid, k: e.klasse, n: `${e.navn} ${e.system || ''}`, t: e.type }); if (sorter && KOMP[sorter]) { type = sorter; navn = KOMP[sorter].n; kode = e.ns && /^\d{3}/.test(e.ns) ? e.ns.slice(0, 3) : TFM_DEF[sorter]?.[0] || kode; } else sorter = ''; }
       let key: string, g0: Omit<G, 'areal' | 'ex' | 'el'>;
       if (e.tfm) { const t = e.tfm; const ty = sysType?.(t.sys) || type; key = 'tfm|' + t.sys + '.' + t.lop; g0 = { navn: e.system || `${t.sys}.${t.lop} ${navn}`, kode: t.sys, lop: t.lop, type: ty, etasje: '', kilde: 'TFM-merking i modellen' }; }
+      else if (sorter) { key = 'type|' + sorter; g0 = { navn, kode, lop: '', type, etasje: '', kilde: 'sortert etter klasse og navn i modellen' }; }
       else if (e.system) { key = 'sys|' + e.system + '|' + kat.id; g0 = { navn: e.system, kode, lop: '', type, etasje: '', kilde: 'system i modellen' }; }
       else { const et = perEtasje ? e.etasje : ''; key = [kat.id, navn, et, kode, e.klasse === 'IFCSTAIRFLIGHT' ? 'x' : ''].join('|'); g0 = { navn: `${navn}${et ? ' – ' + et : ''}`, kode, lop: '', type, etasje: et, kilde: '' }; }
       const g = grp.get(key) || { ...g0, areal: 0, ex: [], el: [] }; g.areal += e.mengder.Area || 0; if (g.ex.length < 4 && e.navn) g.ex.push(rensNavn(e.navn));

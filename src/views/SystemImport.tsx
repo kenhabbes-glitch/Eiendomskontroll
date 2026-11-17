@@ -88,7 +88,7 @@ function Dialog({ eid0, auto, close }: { eid0?: string; auto?: boolean; close: (
     const L = rader.filter(r => r.ta && !(r.finnes && eks === 'hopp')); if (!L.length) return toast(tt("Ingen rader valgt"));
     setBusy(true); let ny = 0, opp = 0;
     try {
-      let nk = 0, i = 0;
+      let nk = 0, i = 0, alleredeK = 0;
       for (const r of L) { i++; const f = r.finnes ? byId('anlegg', r.finnes.id) : null; const K = ifcKomp[r.rad] || [];
         if (K.length) setFase(tt("System {0} av {1}: {2}", i, L.length, r.navn));
         const sys = tilSystem(r, eid, f);
@@ -97,13 +97,14 @@ function Dialog({ eid0, auto, close }: { eid0?: string; auto?: boolean; close: (
           Object.assign(sys, { ifcGuider: [...new Set([...(sys.ifcGuider || []), ...gs])], ifcMeta: meta }); }
         const sid = await save('anlegg', sys); f ? opp++ : ny++;
         if (K.length) { // hver bygningsdel blir en komponent (finnes den fra før – samme IFC-objekt – oppdateres den ikke)
-          const har = new Set(S.komponenter.filter(k => k.anleggId === sid && k.ifcGuid).map(k => k.ifcGuid)); const def = TFM_DEF[sys.type]?.[1] || '';
+          const har = new Set(S.komponenter.filter(k => k.eiendomId === eid && k.ifcGuid).map(k => k.ifcGuid)); /* samme IFC-objekt opprettes aldri to ganger på bygget, heller ikke under et annet system */ const def = TFM_DEF[sys.type]?.[1] || '';
           const brukt = new Map<string, Set<string>>(); const lopFor = (kode: string, ønsket: string) => { const b = brukt.get(kode) || new Set(S.komponenter.filter(k => k.anleggId === sid && (k.kode || '').toUpperCase() === kode).map(k => String(k.lop))); brukt.set(kode, b);
             if (ønsket && !b.has(ønsket)) { b.add(ønsket); return ønsket; } let n = +(nextKompLop(sid, kode)) || 1; while (b.has(String(n).padStart(3, '0'))) n++; const l = String(n).padStart(3, '0'); b.add(l); return l; };
           const nye = K.filter(k => !har.has(k.guid)).map(k => { const kode = (k.kode || def).toUpperCase();
             return { anleggId: sid, eiendomId: eid, kode, lop: lopFor(kode, k.lop), navn: k.navn, plassering: k.plassering, levetid: k.levetid, ...((r.aar || byggeaar) ? { aar: r.aar || byggeaar } : {}), ...(k.fabrikat ? { fabrikat: k.fabrikat } : {}), ...(k.serienr ? { serienr: k.serienr } : {}), ifcGuid: k.guid, ...(k.deler?.length ? { ifcDeler: k.deler } : {}), importKilde: { dato: new Date().toISOString().slice(0, 10), ifc: ifcM?.filnavn || '' } }; });
+          alleredeK += K.length - nye.length;
           if (nye.length) { await saveMange('komponenter', nye, n => setFase(tt("System {0} av {1}: {2} – {3} av {4} komponenter", i, L.length, r.navn, n, nye.length))); nk += nye.length; } } }
-      setFase(''); setRes({ ny, opp, hopp: rader.filter(r => r.ta).length - L.length, nk } as any); setSteg('ferdig');
+      setFase(''); setRes({ ny, opp, hopp: rader.filter(r => r.ta).length - L.length, nk, alleredeK } as any); setSteg('ferdig');
     } catch (e: any) { toast(tt("Importen stoppet: ") + (e?.message || e)); }
     setBusy(false);
   };
@@ -178,7 +179,7 @@ function Dialog({ eid0, auto, close }: { eid0?: string; auto?: boolean; close: (
       <p className="small muted">{tt("Typen bestemmer levetid, kontroller og sjekklister i appen. Rader markert gult har ingen katalogtype. De importeres likevel med NS 3451-koden, men får ikke automatiske kontroller. Kostnad i m² regnes som areal × enhetspris, så den kan måles opp på tegning senere.")}</p>
     </div>}
     {steg === 'ferdig' && res && <div>
-      <p style={{ marginTop: 0 }}><b>{res.ny}</b> {tt("nye systemer og")} <b>{res.opp}</b> {tt("oppdatert på")} <b>{e?.navn}</b>{res.hopp ? tt(", {0} hoppet over", res.hopp) : ''}.{(res as any).nk ? ' ' + tt("{0} komponenter er opprettet og koblet til 3D-modellen.", (res as any).nk) : ''}</p>
+      <p style={{ marginTop: 0 }}><b>{res.ny}</b> {tt("nye systemer og")} <b>{res.opp}</b> {tt("oppdatert på")} <b>{e?.navn}</b>{res.hopp ? tt(", {0} hoppet over", res.hopp) : ''}.{(res as any).nk ? ' ' + tt("{0} komponenter er opprettet og koblet til 3D-modellen.", (res as any).nk) : ''}{(res as any).alleredeK ? ' ' + tt("{0} komponenter fantes fra før (samme IFC-objekt) og ble ikke opprettet på nytt.", (res as any).alleredeK) : ''}</p>
       <p>{tt("Neste steg: lag kontrollplanen. Da foreslås lovpålagte og anbefalte kontroller for systemene, for eksempel brannalarm, nødlys, heis og ventilasjon.")}</p></div>}
   </ModalFrame>;
 }

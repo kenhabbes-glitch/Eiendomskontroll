@@ -20,7 +20,8 @@ test('grupperer per type, hopper over koblede objekter og teller etasjer', () =>
   assert.equal(f[1].type, 'heis');
 });
 
-import { ifcFraModeller, ifcTilTabell } from '../src/lib/ifc.ts';
+// @ts-ignore – bygges av «pretest»
+import { ifcFraModeller, ifcTilTabell, lesIfc } from './.bygg/ifc.mjs';
 test('opplastede 3D-modeller gir en IFC-modell som systemimporten kan bruke', () => {
   const ark = { etasjer: [{ navn: '1. etasje' }, { navn: '2. etasje' }], elementer: [
     { g: 'a', k: 'IFCDOOR', n: 'Enkel dør', t: '', e: 0 }, { g: 'b', k: 'IFCWINDOW', n: 'Vindu', t: '', e: 1 }, { g: 'c', k: 'IFCWALL', n: 'Vegg', t: '', e: 0 },
@@ -34,7 +35,6 @@ test('opplastede 3D-modeller gir en IFC-modell som systemimporten kan bruke', ()
   assert.ok(t.R.length > 1, 'importtabellen skal ha rader');
 });
 
-import { lesIfc } from '../src/lib/ifc.ts';
 const STEP = `ISO-10303-21;
 HEADER;
 FILE_DESCRIPTION(('ViewDefinition [CoordinationView]'),'2;1');
@@ -68,4 +68,22 @@ test('IFC-leseren finner etasje også for objekter i rom og delobjekter, og TFM-
   assert.equal(et('t2'), '2. etasje', 'trappeløp arver etasjen fra trappen');
   assert.equal(m.elementer.find(e => e.guid === 'f1')?.tfm?.sys, '360');
   assert.equal(m.elementer.find(e => e.guid === 't2')?.forelder, 't1');
+});
+
+test('importtabellen sorterer tekniske komponenter i riktig system og tar med elektro- og kjøleutstyr', () => {
+  const el = (g: string, k: string, n: string, e = '1. etasje') => ({ klasse: k, guid: g, navn: n, type: '', etasje: e, tag: '', ns: '', mengder: {}, egenskaper: {} });
+  const m = { filnavn: 'x.ifc', schema: 'IFC4', program: '', byggNavn: '', etasjer: ['1. etasje', '2. etasje'], tellinger: {}, elementer: [
+    el('h1', 'IFCTRANSPORTELEMENT', 'Personheis 1'), el('h2', 'IFCTRANSPORTELEMENT', 'Personheis 2', '2. etasje'),
+    el('s1', 'IFCFIRESUPPRESSIONTERMINAL', 'Sprinklerhode', '1. etasje'), el('s2', 'IFCFIRESUPPRESSIONTERMINAL', 'Sprinklerhode', '2. etasje'),
+    el('v1', 'IFCUNITARYEQUIPMENT', 'Luftbehandlingsaggregat LB01'), el('p1', 'IFCPUMP', 'Sirkulasjonspumpe P1'),
+    el('t1', 'IFCTRANSFORMER', 'Transformator T1'), el('b1', 'IFCSWITCHINGDEVICE', 'Hovedbryter'), el('k1', 'IFCCOMPRESSOR', 'Kompressor K1'), el('o1', 'IFCOUTLET', 'Stikkontakt') ] };
+  const t = ifcTilTabell(m, new Set(['teknisk']), true);
+  const navn = t.R.slice(1).map(r => r[0]);
+  assert.ok(navn.some(n => /heis/i.test(n)) && t.R.slice(1).filter(r => /heis/i.test(r[0])).length === 1, 'heisene i begge etasjer skal i ett system: ' + navn.join(' | '));
+  const heis = Object.entries(t.typer).find(([, v]) => v === 'heis'); assert.ok(heis, 'type heis'); assert.equal(t.komp[+heis![0]].length, 2);
+  assert.ok(Object.values(t.typer).includes('sprinkler') && Object.values(t.typer).includes('ventilasjon'));
+  const rest = Object.entries(t.komp).filter(([r]) => !t.typer[+r]).flatMap(([, k]) => k.map(x => x.guid)).sort();
+  assert.deepEqual(rest, ['b1', 'k1', 'p1', 't1'], 'elektro- og kjøleutstyr skal med, ikke forsvinne');
+  assert.equal(Object.values(t.komp).flat().some(k => k.guid === 'o1'), false, 'småutstyr er ikke valgt som standard');
+  assert.ok(ifcTilTabell(m, new Set(['elsmaa']), true).R.length === 2, 'småutstyr kan velges');
 });
