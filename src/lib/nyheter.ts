@@ -2,6 +2,7 @@
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
   { id: '2026-12-14', dato: '2026-12-14', tittel: 'Gårdeiere kan opprette egne bygg (valgfritt)', punkter: [
+    'Gårdeiere som kan opprette egne bygg får nå full meny (leietakere, målere, TFM-register, kontrollrunde m.m.) og snarveier på mobil, så lenge de har redigeringsrett på minst ett bygg.',
     'Administrator kan under Organisasjon og tilgang slå på «La gårdeiere opprette egne bygg». Da får gårdeiere knappen «+ Ny eiendom» og full redigering på byggene de selv oppretter. På andre bygg har de fortsatt bare lesetilgang.',
   ] },
   { id: '2026-12-13', dato: '2026-12-13', tittel: 'Beredskapsplan og risikovurdering', punkter: [

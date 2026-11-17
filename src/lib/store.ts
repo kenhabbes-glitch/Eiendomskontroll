@@ -387,6 +387,8 @@ export const mineOrg = (roller?: string[]): any[] => S.fullTilgang && state.me?.
 export const orgNavn = (id?: string) => S.orgs.find(o => o.id === id)?.navn || '';
 /** Gårdeier: bare lesetilgang til tildelte bygg, ingen annen rolle i noen organisasjon */
 export const erGardeier = () => { if (state.me?.plattform) return false; const m = mineOrg(); return m.length > 0 && m.every(o => o.minRolle === 'gardeier'); };
+/** Gårdeier som kan redigere egne bygg (valget er på og vedkommende har opprettet minst ett bygg) – får full meny */
+export const gardeierRedigerer = () => erGardeier() && canEdit();
 export const rolleVis = () => erGardeier() ? 'Gårdeier' : rolleNavn(state.me?.rolle);
 export const isTenant = () => role() === 'leietaker';
 export const isUtforer = () => role() === 'utforer';

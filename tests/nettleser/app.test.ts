@@ -302,3 +302,15 @@ test('gårdeier: «+ Ny eiendom» vises bare når administrator har slått på v
     if (med.feil.length) assert.fail(med.feil[0]);
   } finally { await med.lukk(); }
 });
+
+test('gårdeier som kan opprette bygg: full meny med snarveier og redigering', async () => {
+  const a = await aapne('#/oversikt', { lager: { mockRolle: 'gardeier', mockGardeierOpprett: '1' }, mobil: true }); try {
+    const knapper = (await a.side.locator('#bunnmeny .bm').allInnerTexts()).map(t => t.trim().split('\n')[0]).join('|');
+    assert.equal(knapper, 'Oversikt|Kontroll|Avvik|Eiendommer|Mer', 'feil knapper: ' + knapper);
+    assert.ok(await a.side.locator('.mob-snarvei').count() >= 1, 'forventet snarveier for gårdeier med byggrett');
+    await a.side.goto(a.side.url().split('#')[0] + '#/mer'); await a.side.waitForTimeout(500);
+    assert.ok(await a.side.locator('a[href="#/leietakere"]').count() >= 1, 'Leietakere mangler i menyen');
+    assert.equal(await a.side.locator('a[href="#/innstillinger"]').count(), 0, 'Innstillinger skal ikke vises for gårdeier');
+    if (a.feil.length) assert.fail(a.feil[0]);
+  } finally { await a.lukk(); }
+});

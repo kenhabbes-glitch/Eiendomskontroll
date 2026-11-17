@@ -19,7 +19,7 @@ import { ModulSperret } from './views/Abonnement';
 import React, { useEffect, useState } from 'react';
 import { mineOrg, kanDrifteE, sendKo, ko, forkastKo } from './lib/store';
 import { autoKvitterIK } from './lib/actions';
-import { LENKE, rolleVis, erGardeier, canEdit, configured, initAuth, isAdmin, isStaff, isTenant, isUtforer, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
+import { LENKE, rolleVis, erGardeier, gardeierRedigerer, canEdit, configured, initAuth, isAdmin, isStaff, isTenant, isUtforer, rolleNavn, sb, signOut, state, useStore, toast, S } from './lib/store';
 import { activeTasks, dUntil, openAvvik } from './lib/utils';
 import { ModalHost, Tip, Toast, confirmBox } from './components/ui';
 import { Oversikt } from './views/Oversikt';
@@ -105,7 +105,7 @@ const I: Record<string, string> = {
 function navFor(): [string, string][] {
   if (isTenant()) return [['portal', 'Mitt leieforhold'], ['regelverk', 'Plikter og regelverk'], ['hjelp', 'Hjelp']];
   if (isUtforer()) return [['arbeidsordre', 'Mine arbeidsordre'], ['meldinger', 'Meldinger'], ['hjelp', 'Hjelp']];
-  if (erGardeier()) { const g: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['avvik', 'Avvik'], ['kontroller', 'Kontrollplan'], ['dokumenter', 'Dokumenter']]; if (harModul('vedlikehold')) g.push(['vedlikehold', 'Vedlikeholdsplan']); g.push(['arealer', 'Tegninger og arealer'], ['regelverk', 'Regelverk og plikter'], ['hjelp', 'Hjelp']); return g; }
+  if (erGardeier() && !gardeierRedigerer()) { const g: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['avvik', 'Avvik'], ['kontroller', 'Kontrollplan'], ['dokumenter', 'Dokumenter']]; if (harModul('vedlikehold')) g.push(['vedlikehold', 'Vedlikeholdsplan']); g.push(['arealer', 'Tegninger og arealer'], ['regelverk', 'Regelverk og plikter'], ['hjelp', 'Hjelp']); return g; }
   const n: [string, string][] = [['oversikt', 'Oversikt'], ['eiendommer', 'Eiendommer'], ['kontroller', 'Kontrollplan'], ['runde', 'Kontrollrunde'], ['avvik', 'Avvik'], ['arbeidsordre', 'Mine arbeidsordre']];
   if (canEdit() && harModul('tilsyn')) n.splice(5, 0, ['tilsyn', 'Tilsynssaker']);
   if (S.eiendommer.some(e => kanDrifteE(e.id) && harModul('befaring', e.id))) { n.splice(4, 0, ['befaringer', 'Befaringer']); n.splice(5, 0, ['tilsynsanalyser', 'Tilsynsanalyser']); }
@@ -117,7 +117,7 @@ function navFor(): [string, string][] {
   if (canEdit() && harModul('vedlikehold')) n.push(['vedlikehold', 'Vedlikeholdsplan']);
   if (canEdit() && harModul('prosjekter')) n.push(['prosjekter', 'Prosjekter']);
   n.push(['handbok', 'Håndbok'], ['regelverk', 'Regelverk og plikter']);
-  if (canEdit()) n.push(['innstillinger', 'Innstillinger']);
+  if (canEdit() && !erGardeier()) n.push(['innstillinger', 'Innstillinger']);
   if (canEdit()) n.push(['logg', 'Hendelseslogg'], ['arkiv', 'Arkiv']);
   if (isAdmin() || mineOrg(['admin', 'forvalter']).length) n.push(['brukere', 'Organisasjon og tilgang']);
   if (isAdmin()) n.push(['data', 'Import og eksport']);
