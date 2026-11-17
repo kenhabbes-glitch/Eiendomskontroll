@@ -1,4 +1,5 @@
 // Offentlig side som åpnes fra en QR-kode: meld avvik uten innlogging.
+import { DiktatKnapp } from '../components/ui';
 import React, { useEffect, useState } from 'react';
 import { tt } from '../lib/i18n';
 import { SprakVelger } from '../components/SprakVelger';
@@ -41,10 +42,10 @@ export function QrLenke({ token }: { token: string }) {
     <h1>{tt("Meld avvik eller feil")}</h1>
     <p className="sub" style={{ marginTop: 0 }}><b>{info.eiendom}</b>{info.navn ? ' · ' + info.navn : ''}{info.sted ? ' · ' + info.sted : ''}</p>
     <p className="small muted">{tt("Du trenger ikke å logge inn. Meldingen går til eier/driftsansvarlig. Ring 110, 112 eller 113 ved fare for liv og helse.")}</p>
-    <label>{tt("Hva gjelder det?")} *<input style={inp} value={f.tittel} maxLength={150} onChange={e => set('tittel', e.target.value)} placeholder={tt("F.eks. Nødlys lyser ikke")} required /></label>
+    <label>{tt("Hva gjelder det?")} *<input style={inp} value={f.tittel} maxLength={150} onChange={e => set('tittel', e.target.value)} placeholder={tt("F.eks. Nødlys lyser ikke")} required /><DiktatKnapp verdi={f.tittel} sett={t => set('tittel', t.slice(0, 150))} /></label>
     <label>{tt("Hvor alvorlig?")}<select style={inp} value={f.alv} onChange={e => set('alv', e.target.value)}>
       <option value="Kritisk">{tt("Kritisk – fare for liv/helse eller stor skade")}</option><option value="Høy">{tt("Høy – må rettes raskt")}</option><option value="Middels">{tt("Middels")}</option><option value="Lav">{tt("Lav – ikke hastesak")}</option></select></label>
-    <label>{tt("Beskrivelse")}<textarea style={inp} rows={3} maxLength={2000} value={f.beskrivelse} onChange={e => set('beskrivelse', e.target.value)} /></label>
+    <label>{tt("Beskrivelse")}<textarea style={inp} rows={3} maxLength={2000} value={f.beskrivelse} onChange={e => set('beskrivelse', e.target.value)} /><DiktatKnapp verdi={f.beskrivelse} sett={t => set('beskrivelse', t.slice(0, 2000))} /></label>
     <label>{tt("Bilde (valgfritt)")}<input style={inp} type="file" accept="image/*" capture="environment" onChange={e => setBilde(e.target.files?.[0] || null)} /></label>
     <label>{tt("Navn (valgfritt)")}<input style={inp} value={f.navn} maxLength={80} onChange={e => set('navn', e.target.value)} /></label>
     <label>{tt("E-post eller telefon hvis du vil ha svar (valgfritt)")}<input style={inp} value={f.kontakt} maxLength={120} onChange={e => set('kontakt', e.target.value)} /></label>

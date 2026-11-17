@@ -47,7 +47,7 @@ const tgFelt = (): Field[] => [
   { k: 'tgInfo', type: 'custom', render: v => { const d = TG_DEF.find(t => t[0] === v.tg); return d ? <div className="note small" style={{ color: 'var(--ink)', marginTop: -4 }}><b>{d[0]} – {d[1]}:</b> {d[2]}</div> : null; } },
   { k: 'kg', label: tt("Konsekvensgrad (KG)"), type: 'select', options: [['', '–'], ...KG_DEF.map(k => [k[0], `${k[0]} – ${k[1].toLowerCase()}`] as [string, string])], half: true, show: x => ['TG2', 'TG3', 'TGIU'].includes(x.tg), hint: tt("For TG2, TG3 og TGIU: konsekvens for sikkerhet, helse, miljø eller økonomi") },
   { k: 'tgVurdertAv', label: tt("Vurdert av"), half: true, show: x => !!x.tg, ph: tt("Navn / firma") },
-  { k: 'tgKomm', label: tt("Tilstandsbeskrivelse / begrunnelse"), type: 'textarea', show: x => !!x.tg, ph: tt("Hva er observert, årsak og anbefalt tiltak") },
+  { k: 'tgKomm', label: tt("Tilstandsbeskrivelse / begrunnelse"), type: 'textarea', dikter: true, show: x => !!x.tg, ph: tt("Hva er observert, årsak og anbefalt tiltak") },
   { k: 'tgForslagInfo', type: 'custom', show: x => !!x.tgForslag?.tg, render: (x, set) => { const f = x.tgForslag;
     return <div className="note small" style={{ color: 'var(--ink)', borderColor: 'var(--amber)' }}>
       <b>{tt("Forslag til endret tilstand:")} {tgTekst(f)}</b> <span className="muted">{tt("(registrert:")} {tgTekst(f.fra || { tg: x.tg, kg: x.kg })})</span><br />
@@ -568,7 +568,7 @@ export function utfor(id: string, pre?: UtforPreset) {
           </div></div>)}
           <button type="button" className="btn sm" onClick={() => set({ avs: [...L, nyRad()] })}>{tt("+ Legg til avvik")}</button></>; } },
     ...(R ? [{ k: 'rundeInfo', type: 'custom', label: tt("Sjekkliste per komponent"), render: () => <RundeRef.Oppsummering r={R} /> } as Field] : []),
-    { k: 'komm', label: tt("Kommentar"), type: 'textarea', def: pre?.komm || '' },
+    { k: 'komm', label: tt("Kommentar"), type: 'textarea', dikter: true, def: pre?.komm || '' },
     ...(tgMaal ? [{ k: 'tl', type: 'custom', def: pre?.tilstand || {}, render: (x: any, set: any) => <>
       <TgKgVelger v={x.tl || {}} set={t => set({ tl: t })} naa={{ tg: tgMaal.tg, kg: tgMaal.kg }} hva={(o.komponentId ? kNavn(o.komponentId) : aNavn(o.anleggId))} intern />
       {tgAvviker(x.tl, tgMaal) && <label className="small" style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={x.tlBruk !== false} onChange={e => set({ tlBruk: e.target.checked })} style={{ width: 'auto' }} />{tt("Oppdater tilstanden på")} {o.komponentId ? tt("komponenten") : tt("systemet")} {tt("til")} {tgTekst(x.tl)}</label>}</> } as Field] : []),

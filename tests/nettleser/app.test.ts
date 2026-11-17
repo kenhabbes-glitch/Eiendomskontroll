@@ -270,9 +270,9 @@ test('diktering: mikrofonknapper i avviksskjemaet legger talt tekst inn i felten
     await a.side.getByRole('button', { name: /Meld avvik|Nytt avvik|\+ Avvik/ }).first().click();
     const m = a.side.locator('.modal');
     assert.equal(await m.locator('button.diktat').count(), 4, 'forventet dikteringsknapp ved kort beskrivelse, beskrivelse, plassering og kommentar');
-    await m.locator('button.diktat').first().click(); await a.side.waitForTimeout(200);
+    await m.locator('button.diktat').first().click(); await a.side.waitForTimeout(600);
     assert.equal(await m.locator('input[type=text], input:not([type])').first().inputValue(), 'Hull i veggen ved trapp');
-    await m.locator('button.diktat').nth(1).click(); await a.side.waitForTimeout(200);
+    await m.locator('button.diktat').nth(1).click(); await a.side.waitForTimeout(600);
     assert.ok((await m.locator('textarea').first().inputValue()).toLowerCase().includes('hull i veggen ved trapp'));
     if (a.feil.length) assert.fail(a.feil[0]);
   } finally { await a.lukk(); }

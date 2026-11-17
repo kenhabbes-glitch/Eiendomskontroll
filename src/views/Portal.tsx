@@ -23,10 +23,10 @@ function meldAvvik(l: any) {
     title: tt("Meld ny sak"), saveTxt: tt("Send inn sak"),
     top: <p className="small muted" style={{ marginTop: 0 }}>{tt("Meldingen går til eier/forvalter av")} {byId('eiendommer', l.eiendomId)?.navn || tt("eiendommen")}{tt(". Du får et saksnummer og kan følge saken og skrive til utleier her.")}</p>,
     fields: [
-      { k: 'tittel', label: tt("Hva gjelder det?"), req: true, ph: tt("F.eks. Nødlys over utgang i 2. etg lyser ikke") },
-      { k: 'plassering', label: tt("Hvor?"), ph: tt("Etasje, rom, inngang …"), half: true },
+      { k: 'tittel', label: tt("Hva gjelder det?"), req: true, dikter: true, ph: tt("F.eks. Nødlys over utgang i 2. etg lyser ikke") },
+      { k: 'plassering', label: tt("Hvor?"), ph: tt("Etasje, rom, inngang …"), half: true, dikter: true },
       { k: 'alv', label: tt("Hvor alvorlig?"), type: 'select', options: [['Kritisk', 'Kritisk – fare for liv/helse eller stor skade'], ['Høy', 'Høy – må rettes raskt'], ['Middels', 'Middels'], ['Lav', 'Lav – ikke hastesak']], def: 'Middels', half: true },
-      { k: 'beskrivelse', label: tt("Beskrivelse"), type: 'textarea' },
+      { k: 'beskrivelse', label: tt("Beskrivelse"), type: 'textarea', dikter: true },
       { k: 'fil', label: tt("Bilde eller dokument (valgfritt)"), type: 'file' }],
     onSave: async v => {
       const heving = hevAlvorlighet([v.tittel, v.beskrivelse, v.plassering].filter(Boolean).join(' '), v.alv); const alvEnd = heving?.alv || v.alv;

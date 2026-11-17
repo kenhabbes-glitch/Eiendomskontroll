@@ -90,7 +90,7 @@ export function vurderPlikt(lid: string, idx: number) {
   </>, { foot: close => <>
     <button className="btn" onClick={async () => {
       close();
-      formModal({ title: tt("Send tilbake til leietaker"), fields: [{ k: 'tb', label: tt("Hva mangler eller må rettes?"), type: 'textarea', req: true }], saveTxt: tt("Send tilbake"),
+      formModal({ title: tt("Send tilbake til leietaker"), fields: [{ k: 'tb', label: tt("Hva mangler eller må rettes?"), type: 'textarea', dikter: true, req: true }], saveTxt: tt("Send tilbake"),
         onSave: async x => { await lagre({ ...p, status: 'avvist', tilbakemelding: { tekst: x.tb, tid: new Date().toISOString(), av: state.me?.navn || state.me?.epost } }); toast(tt("Sendt tilbake – leietaker ser tilbakemeldingen i portalen")); } });
     }}>{tt("Send tilbake")}</button>
     <span className="grow" />

@@ -32,7 +32,7 @@ export function BrannbokSeksjon({ eid }: { eid: string }) {
   const lastNedPdf = async () => { setBusy(true); try { const blob = await brannbokPdf(bb, { merknader: mk.map(toMk), vedlegg: v => hentFil(v.path) }); lastNedBlob(new Blob([blob as any], { type: 'application/pdf' }), filnavn(bb)); } catch (x: any) { toast(feiltekst(x)); } finally { setBusy(false); } };
   const lagreGjennomgang = () => formModal({ title: tt("Registrer årlig gjennomgang"), saveTxt: tt("Lagre"),
     top: <p className="small muted" style={{ marginTop: 0 }}>{tt("Eier skal gå gjennom brannsikkerheten jevnlig og dokumentere det (FOB § 9). Dette vises i brannboken.")}</p>,
-    fields: [{ k: 'dato', label: tt("Dato"), type: 'date', def: today(), req: true, half: true }, { k: 'av', label: tt("Utført av"), def: state.me?.navn || '', req: true, half: true }, { k: 'merknad', label: tt("Funn og avtalte tiltak"), type: 'textarea' }],
+    fields: [{ k: 'dato', label: tt("Dato"), type: 'date', def: today(), req: true, half: true }, { k: 'av', label: tt("Utført av"), def: state.me?.navn || '', req: true, half: true }, { k: 'merknad', label: tt("Funn og avtalte tiltak"), type: 'textarea', dikter: true }],
     onSave: async v => { const b = bv(e); await save('eiendommer', { ...e, brannvern: { ...b, gjennomgang: [{ dato: v.dato, av: v.av, merknad: v.merknad || '' }, ...(b.gjennomgang || [])] } }); toast(tt("Gjennomgangen er registrert")); } });
 
   const nyLenke = () => formModal({ title: tt("Del brannboken med brannvesenet"), saveTxt: tt("Lag lenke"), wide: true,

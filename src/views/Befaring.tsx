@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { S, state, toast, useStore, kanDrifteE, kanRedigereE, aoApi, sb, uploadFile, fileUrl, removeDoc, isStaff, type Fil } from '../lib/store';
 import { byId, eNavn, fd, fdt, lNavn, sortBy, today, uid, aNavn, kNavn, type Rec } from '../lib/utils';
-import { Chip, Empty, confirmBox, formModal, openModal, ModalFrame, FileLink, useFileUrl, AlvChip } from '../components/ui';
+import { DiktatKnapp, Chip, Empty, confirmBox, formModal, openModal, ModalFrame, FileLink, useFileUrl, AlvChip } from '../components/ui';
 import { AV_ALV, KOMP } from '../lib/catalog';
 import { UTBEDRER, editAvvik } from '../lib/actions';
 import { harModul } from '../lib/moduler';
@@ -186,7 +186,7 @@ function Sjekkpunkter({ b, oppd, ro }: { b: Rec; oppd: (f: (b: Rec) => Rec) => v
           <div className="bf-svar" role="group" aria-label={tt("Svar for ") + p.tekst}>{([['ok', 'OK'], ['avvik', 'Avvik'], ['merk', 'Merknad'], ['ia', 'IA']] as [Punkt['svar'], string][]).map(([k, l]) => <button key={k} type="button" disabled={ro} aria-pressed={p.svar === k} className={'bf-s ' + k + (p.svar === k ? ' on' : '')} onClick={() => svar(p, k)}>{ttc('svar', l)}</button>)}
             <button type="button" className="btn sm ghost" aria-label={tt("Kommentar og bilder")} onClick={() => setApen(apen === p.id ? '' : p.id)}>{p.komm || p.bilder?.length ? '✎•' : '✎'}</button></div></div>
         {(apen === p.id || p.komm || p.bilder?.length) ? <div className="bf-pdet">
-          {apen === p.id && !ro ? <textarea rows={2} defaultValue={p.komm || ''} placeholder={tt("Kommentar")} onBlur={e => { if (e.target.value !== (p.komm || '')) sett(p.id, { komm: e.target.value }); }} /> : p.komm ? <div className="small">{p.komm}</div> : null}
+          {apen === p.id && !ro ? <PunktKomm key={p.id} start={p.komm || ''} lagre={t => { if (t !== (p.komm || '')) sett(p.id, { komm: t }); }} /> : p.komm ? <div className="small">{p.komm}</div> : null}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>{(p.bilder || []).map((f, i) => <Thumb key={i} f={f} onDel={ro ? undefined : () => sett(p.id, { bilder: (p.bilder || []).filter((_, j) => j !== i) })} />)}
             {!ro && apen === p.id && <Kamera liten leggTil={f => sett(p.id, { bilder: [...(p.bilder || []), ...f] })} />}
             {(b.funn || []).filter((f: Funn) => f.punktId === p.id).map((f: Funn) => <a key={f.id} href="#" className="small" onClick={e => { e.preventDefault(); funnDialog(b, oppd, f); }}>{tt("Funn:")} {f.tittel}</a>)}</div>
@@ -426,4 +426,10 @@ export function Leieforlop({ lid, aktiv }: { lid: string; aktiv?: string }) {
         {kan && <a href="#" className="small" onClick={e => { e.preventDefault(); nyBefaringDialog({ eiendomId: l.eiendomId, type: k, leietakerId: lid, lokale: l.lokale || '' }); }}>{L.length ? tt("+ Ny") : tt("Start")}</a>}</div></div>; })}</div>
     {sisteFor(lid, 'overtakelse') && !sisteFor(lid, 'tilbakelevering') && <p className="small muted" style={{ marginBottom: 0 }}>{tt("Ved tilbakelevering hentes rommene og tilstanden fra overtakelsen automatisk, så de kan sammenlignes punkt for punkt.")}</p>}
   </div>;
+}
+
+/** Kommentar til ett punkt: lagres når feltet forlates eller dikteringen stopper */
+function PunktKomm({ start, lagre }: { start: string; lagre: (t: string) => void }) {
+  const [t, setT] = useState(start);
+  return <div><textarea rows={2} value={t} placeholder={tt("Kommentar")} onChange={e => setT(e.target.value)} onBlur={e => lagre(e.target.value)} /><DiktatKnapp verdi={t} sett={x => setT(x)} onFerdig={x => lagre(x)} /></div>;
 }

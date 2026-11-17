@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { S, aoApi, canEdit, kanDrifteE, sb, toast, useStore, fileUrl, uploadFile, type Fil } from '../lib/store';
 import { addDays, byId, fd, today, tfmSys, tfmKomp, type Rec } from '../lib/utils';
 import { plasserteFor } from './Arealer';
-import { Chip, FileLink, openModal, confirmBox } from '../components/ui';
+import { DiktatKnapp, Chip, FileLink, openModal, confirmBox } from '../components/ui';
 import { Hjelp } from '../components/Hjelp';
 import { BildeVelger } from '../components/PosVelger';
 import { SysSjekkVelger } from '../components/SysSjekk';
@@ -283,7 +283,7 @@ export function KoLenke({ token }: { token: string }) {
           </div>
           {f.res === 'Avvik funnet' && <><label>{sj ? tt("Andre avvik (punkter med avvik i sjekklisten tas med automatisk)") : tt("Avvik – ett per linje")}</label>{f.avvik.map((a: string, i: number) => <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 4 }}><input value={a} onChange={e => set({ avvik: f.avvik.map((x: string, j: number) => j === i ? e.target.value : x) })} placeholder={tt("Avvik {0}", i + 1)} style={inp} />{f.avvik.length > 1 && <button type="button" className="btn ghost sm" onClick={() => set({ avvik: f.avvik.filter((_: any, j: number) => j !== i) })}>✕</button>}</div>)}
             <div><button type="button" className="btn sm" onClick={() => set({ avvik: [...f.avvik, ''] })}>{tt("+ Legg til avvik")}</button></div></>}
-          <label>{tt("Kommentar")}</label><textarea value={f.komm} onChange={e => set({ komm: e.target.value })} style={{ ...inp, minHeight: 70 }} placeholder={tt("Utført arbeid, målinger, byttet filter, anbefalinger …")} />
+          <label>{tt("Kommentar")}</label><textarea value={f.komm} onChange={e => set({ komm: e.target.value })} style={{ ...inp, minHeight: 70 }} placeholder={tt("Utført arbeid, målinger, byttet filter, anbefalinger …")} /><DiktatKnapp verdi={f.komm || ''} sett={t => set({ komm: t })} />
           <label>{tt("Anbefalt dato for neste service (valgfritt)")}</label><input type="date" value={f.nesteDato} onChange={e => set({ nesteDato: e.target.value })} style={inp} />
           {info.tilstand && <TgKgVelger v={tl} set={setTl} naa={info.tilstand} hva={[info.tilstand.kode, info.tilstand.navn].filter(Boolean).join(' ')} />}
           <label>{tt("Servicerapport, sjekkliste og bilder")}</label><input type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.heic,.webp,.doc,.docx,.xls,.xlsx,.txt,.csv" onChange={e => setFiler(Array.from(e.target.files || []))} />
