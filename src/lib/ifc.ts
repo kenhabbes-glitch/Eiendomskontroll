@@ -55,7 +55,7 @@ export function finnTfm(eg: Record<string, string>, tag: string, navn: string): 
     return { sys: m[1], lop: m[2].padStart(3, '0').slice(-3), komp: m[3] || '', klop: m[4] ? m[4].padStart(3, '0') : '', tekst: m[0].replace(/^[^\d]/, '').trim() }; }
   return undefined;
 }
-const forst = (eg: Record<string, string>, ...k: string[]) => { for (const n of k) { const f = Object.keys(eg).find(x => x.toLowerCase() === n.toLowerCase()); if (f && eg[f]) return eg[f]; } return ''; };
+export const forst = (eg: Record<string, string>, ...k: string[]) => { for (const n of k) { const f = Object.keys(eg).find(x => x.toLowerCase() === n.toLowerCase()); if (f && eg[f]) return eg[f]; } return ''; };
 
 class Leser {
   buf = ''; ent = new Map<number, Ent>(); tellinger: Record<string, number> = {}; schema = ''; program = '';
@@ -169,4 +169,21 @@ export function ifcTilTabell(m: IfcModell, valgt: Set<string>, perEtasje: boolea
     komp[rad] = g.el.map(({ e, kompKode, ent, lev: kl }) => { const b = brannAv(e); const ok = (x: string) => !!x && x.length >= 3 && !/^(obj\.?|objekt)?[\s.-]*\d*$/i.test(x) && !/^[A-ZÆØÅ]{1,2}-?$/i.test(x); const nv = [rensNavn(e.navn), rensNavn(e.type)].find(ok) || ent;
       return { levetid: kl, guid: e.guid, ...(e.deler?.length ? { deler: e.deler } : {}), navn: nv + (b ? ` (${b})` : ''), kode: kompKode, lop: e.tfm?.klop || '', typekode: '', plassering: [e.etasje, e.egenskaper.Rom || e.egenskaper.Room || e.egenskaper.RoomName || ''].filter(Boolean).join(' · '), fabrikat: e.fabrikat || '', serienr: e.serienr || '', klasse: e.klasse, tag: e.tag, etasje: e.etasje, brann: b }; }); }
   return { R, typer, komp, lev };
+}
+
+/** Lager en IfcModell av opplastede 3D-modeller (hodene fra .ek3d), slik at systemimporten kan bruke dem uten at IFC-filene må velges på nytt.
+ *  Fagsystem (IfcSystem) og oppdeling i delobjekter finnes ikke i 3D-modellen, så trapper telles per trapp (ikke per løp) og systemer grupperes etter TFM-merking, NS 3451, kategori og etasje. */
+export function ifcFraModeller(hoder: { filnavn: string; hode: { etasjer: { navn: string; terreng?: boolean }[]; elementer: { g: string; k: string; n: string; t: string; e: number }[]; egenskaper?: Record<string, { ns?: string; type?: string; mengder?: Record<string, number>; egenskaper?: Record<string, string> }>; program?: string } }[]): IfcModell {
+  const klasser = new Set(IFC_KAT.flatMap(k => k.klasser)); const sett = new Set<string>(); const elementer: IfcEl[] = []; const etasjer: string[] = [];
+  for (const { hode } of hoder) {
+    const navnEt = (i: number) => (hode.etasjer[i] && !hode.etasjer[i].terreng && hode.etasjer[i].navn !== 'Alle' ? hode.etasjer[i].navn : '');
+    const trapper = new Set(hode.elementer.filter(x => x.k === 'IFCSTAIR').map(x => navnEt(x.e)));
+    for (const x of hode.elementer) {
+      if (!x.g || !klasser.has(x.k) || sett.has(x.g)) continue; if (x.k === 'IFCSTAIRFLIGHT' && trapper.has(navnEt(x.e))) continue; // løpene regnes med i trappen
+      sett.add(x.g); const d = hode.egenskaper?.[x.g]; const eg = d?.egenskaper || {}; const et = navnEt(x.e); if (et && !etasjer.includes(et)) etasjer.push(et);
+      elementer.push({ klasse: x.k, guid: x.g, navn: x.n || '', type: d?.type || '', etasje: et, tag: x.t || '', ns: d?.ns || '', mengder: d?.mengder || {}, egenskaper: eg, tfm: finnTfm(eg, x.t || '', x.n || ''),
+        fabrikat: [forst(eg, 'Manufacturer', 'Produsent', 'Fabrikat', 'Leverandør'), forst(eg, 'ModelReference', 'ModelLabel', 'Modell', 'Model', 'Produkt', 'Produktnavn')].filter(Boolean).join(' '), serienr: forst(eg, 'SerialNumber', 'Serienummer', 'Serial Number') });
+    }
+  }
+  return { filnavn: hoder.length === 1 ? hoder[0].filnavn : `${hoder.length} opplastede IFC-filer`, schema: 'fra 3D-modellene', program: hoder[0]?.hode.program || '', byggNavn: '', etasjer, elementer, tellinger: { objekter: elementer.length } };
 }

@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-ignore – bygges av «pretest»
-import { lesModell, lesModellStrom, delStrom, delOpp } from './.bygg/modell.mjs';
+import { lesModell, lesModellStrom, lesHodeStrom, delStrom, delOpp } from './.bygg/modell.mjs';
 // @ts-ignore
 import { pakkV2, lesV2 } from './.bygg/pakk.mjs';
 
@@ -114,4 +114,13 @@ test('sveising av en modell som allerede er sveiset endrer ingenting', () => { c
 test('modell med retninger (lastet opp før sveising) leses fortsatt som før', async () => {
   const m = bokser(); m.grupper[0].nor.fill(7); const r = await lesModell((await gzip(pakkV2(skrivRaa(m)))).buffer);
   assert.equal(r.hode.flat, undefined); assert.equal(r.grupper[0].nor.length, 216); assert.equal(r.grupper[0].nor[5], 7); assert.equal(r.grupper[0].pos.length / 3, 72);
+});
+
+test('bare hodet kan leses uten å laste geometrien, også fra en fil delt på flere deler', async () => {
+  const R = lagRaa(); const gz = await gzip(R.b); const h = await lesHodeStrom(iBiter(gz, 997));
+  assert.deepEqual(h.etasjer, R.hode.etasjer); assert.equal(h.grupper.length, 2);
+  const deler = delOpp(new Blob([gz as BlobPart]));
+  const h2 = await lesHodeStrom(delStrom(['a'], async () => new Response(deler[0])));
+  assert.equal(h2.grupper.length, 2);
+  const rot = await gzip(new Uint8Array(64)); await assert.rejects(() => lesHodeStrom(iBiter(rot, 16)), /Ukjent modellformat/);
 });

@@ -19,3 +19,17 @@ test('grupperer per type, hopper over koblede objekter og teller etasjer', () =>
   assert.equal(f[0].type, 'sprinkler'); assert.deepEqual(f[0].guider, ['a', 'b']); assert.deepEqual(f[0].etasjer, [0, 1]);
   assert.equal(f[1].type, 'heis');
 });
+
+import { ifcFraModeller, ifcTilTabell } from '../src/lib/ifc.ts';
+test('opplastede 3D-modeller gir en IFC-modell som systemimporten kan bruke', () => {
+  const ark = { etasjer: [{ navn: '1. etasje' }, { navn: '2. etasje' }], elementer: [
+    { g: 'a', k: 'IFCDOOR', n: 'Enkel dør', t: '', e: 0 }, { g: 'b', k: 'IFCWINDOW', n: 'Vindu', t: '', e: 1 }, { g: 'c', k: 'IFCWALL', n: 'Vegg', t: '', e: 0 },
+    { g: 's', k: 'IFCSTAIR', n: 'Trapp', t: '', e: 0 }, { g: 'f', k: 'IFCSTAIRFLIGHT', n: 'Løp', t: '', e: 0 }], egenskaper: { a: { ns: '244', egenskaper: { Manufacturer: 'Hörmann' } } } };
+  const riv = { etasjer: [{ navn: '1. etasje' }], elementer: [{ g: 'a', k: 'IFCDOOR', n: 'Samme GUID igjen', t: '', e: 0 }, { g: 'v', k: 'IFCFAN', n: 'Vifte', t: '', e: 0 }] };
+  const m = ifcFraModeller([{ filnavn: 'ARK.ifc', hode: ark }, { filnavn: 'RIV.ifc', hode: riv }]);
+  assert.deepEqual(m.elementer.map(e => e.guid).sort(), ['a', 'b', 's', 'v'], 'vegg og trappeløp skal ikke med, og samme GUID bare én gang');
+  assert.equal(m.elementer.find(e => e.guid === 'a')!.fabrikat, 'Hörmann');
+  assert.equal(m.filnavn, '2 opplastede IFC-filer');
+  const t = ifcTilTabell(m, new Set(['vindu', 'dor', 'trapp', 'teknisk']), true);
+  assert.ok(t.R.length > 1, 'importtabellen skal ha rader');
+});

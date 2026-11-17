@@ -1,6 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-15', dato: '2026-12-15', tittel: 'Importer systemer fra opplastede IFC-filer', punkter: [
+    'Når du har lastet opp IFC-filene til et bygg, trykker du «Importer systemer fra opplastede IFC-filer» på 3D-siden. Appen leser alle fagmodellene på bygget og foreslår systemer og komponenter, så du slipper å velge filene på nytt.',
+  ] },
   { id: '2026-12-14', dato: '2026-12-14', tittel: 'Gårdeiere kan opprette egne bygg (valgfritt)', punkter: [
     'Gårdeiere som kan opprette egne bygg får nå full meny (leietakere, målere, TFM-register, kontrollrunde m.m.) og snarveier på mobil, så lenge de har redigeringsrett på minst ett bygg.',
     'Administrator kan under Organisasjon og tilgang slå på «La gårdeiere opprette egne bygg». Da får gårdeiere knappen «+ Ny eiendom» og full redigering på byggene de selv oppretter. På andre bygg har de fortsatt bare lesetilgang.',

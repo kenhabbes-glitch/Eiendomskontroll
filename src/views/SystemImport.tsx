@@ -1,6 +1,6 @@
 // Import av systemer fra datainnsamlingsfil (Excel). Steg: fil → hvilket bygg (eller ny eiendom) → kontroll av radene → import.
-import React, { useMemo, useState } from 'react';
-import { S, save, saveMange, toast, useStore, kanRedigereE, mineOrg } from '../lib/store';
+import React, { useEffect, useMemo, useState } from 'react';
+import { S, save, saveMange, toast, useStore, kanRedigereE, mineOrg, sb, fileUrl } from '../lib/store';
 import { byId, sortBy, nok, nextKompLop, type Rec } from '../lib/utils';
 import { TFM_DEF } from '../lib/catalog';
 import { ModalFrame, openModal, Chip } from '../components/ui';
@@ -8,18 +8,19 @@ import { editEiendom, generatePlan } from '../lib/actions';
 import { KOMP } from '../lib/catalog';
 import { lesXlsx, lesCsv, tolkData, tolkGenerell, foreslaKolonner, GEN_FELT, tilSystem, type ImportRad } from '../lib/systemImport';
 import { tt, lokale } from '../lib/i18n';
-import { lesIfc, ifcAntall, ifcTilTabell, IFC_KAT, type IfcModell, type IfcKomp } from '../lib/ifc';
+import { lesIfc, ifcFraModeller, ifcAntall, ifcTilTabell, IFC_KAT, type IfcModell, type IfcKomp } from '../lib/ifc';
 
 /** Systemtype i katalogen ut fra TFM-systemkode (360 → ventilasjon osv.) */
 const typeFraTfm = (kode: string) => Object.entries(TFM_DEF).find(([, v]) => v[0] === kode)?.[0] || '';
 
-export function importerSystemer(eid?: string) { openModal({ wide: true, render: close => <Dialog eid0={eid} close={close} /> }); }
+/** auto: les IFC-filene som allerede er lastet opp til bygget (3D-modellene) med en gang */
+export function importerSystemer(eid?: string, auto?: boolean) { openModal({ wide: true, render: close => <Dialog eid0={eid} auto={auto} close={close} /> }); }
 
 const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9æøå]/g, '');
 const filNavn = (n: string) => n.replace(/\.xlsx?$/i, '').replace(/^[0-9a-f]{6,}-/i, '').replace(/_/g, ' ').trim();
 const typeValg = sortBy(Object.entries(KOMP).map(([k, v]) => [k, `${v.g.split(' ')[0]} · ${v.n}`] as [string, string]), x => x[1]);
 
-function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
+function Dialog({ eid0, auto, close }: { eid0?: string; auto?: boolean; close: () => void }) {
   useStore();
   const [ark, setArk] = useState<Record<string, any[][]> | null>(null); const [navn, setNavn] = useState(''); const [feil, setFeil] = useState('');
   const [eid, setEid] = useState(eid0 || ''); const [steg, setSteg] = useState<'fil' | 'ifc' | 'kolonner' | 'bygg' | 'sjekk' | 'ferdig'>('fil');
@@ -65,6 +66,21 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
     catch (e: any) { setFeil(tt("Kunne ikke lese modellen: ") + (e?.message || e)); }
     setBusy(false);
   };
+  // IFC-filer som allerede er lastet opp til bygget (3D-modellene): leser objektlisten og egenskapene, ikke geometrien
+  const [antMod, setAntMod] = useState(0);
+  useEffect(() => { if (!eid0) return; let av = false; sb.from('modeller3d').select('id').eq('eiendom_id', eid0).then(({ data }) => { if (!av) setAntMod((data || []).length); }); return () => { av = true; }; }, [eid0]);
+  const velgOpplastede = async () => {
+    if (!eid0) return; setFeil(''); setBusy(true); setIfcPct(0);
+    try {
+      const { data, error } = await sb.from('modeller3d').select('id,data').eq('eiendom_id', eid0); if (error) throw error;
+      const { lesHodeStrom, delStrom } = await import('../lib/ifc3d/modell'); const hoder: { filnavn: string; hode: any }[] = []; let i = 0;
+      for (const r of data || []) { const hode = await lesHodeStrom(delStrom((r.data.deler as string[]) || [r.data.path], async p => fetch(await fileUrl(p)))); hoder.push({ filnavn: r.data.filnavn || r.data.navn || '', hode }); setIfcPct(++i / (data || []).length); }
+      const m = ifcFraModeller(hoder); if (!m.elementer.length) { setFeil(tt("Fant ingen bygningsdeler eller utstyr i de opplastede modellene.")); setBusy(false); return; }
+      setIfcM(m); setNavn(m.filnavn); setIfcVal(new Set(IFC_KAT.filter(k => k.standard && ifcAntall(m)[k.id] > 0).map(k => k.id))); setSteg('ifc');
+    } catch (e: any) { setFeil(tt("Kunne ikke lese de opplastede modellene: ") + (e?.message || e)); }
+    setBusy(false);
+  };
+  useEffect(() => { if (auto && eid0) velgOpplastede(); }, []);
   const fraIfc = () => { if (!ifcM) return; const { R, typer, komp, lev } = ifcTilTabell(ifcM, ifcVal, ifcEt, typeFraTfm); setIfcTyper(typer); setIfcLev(lev); setIfcKomp(somKomp ? komp : {}); setEndr({}); setArk(null); setGen({ ark: { IFC: R }, ark1: 'IFC', hode: 0, map: { navn: 0, type: 1, kode: 2, plassering: 3, komm: 4, lop: 5 } }); setSteg(eid ? 'sjekk' : 'bygg'); };
   const velgArk = (n: string) => { const fk = foreslaKolonner(gen!.ark[n]); setGen({ ...gen!, ark1: n, hode: fk.hode, map: fk.map }); };
   const nyEiendom = () => editEiendom(undefined, nid => { setEid(nid); setSteg('sjekk'); }, { navn });
@@ -108,6 +124,10 @@ function Dialog({ eid0, close }: { eid0?: string; close: () => void }) {
       <p className="small muted" style={{ marginTop: 0 }}>{tt("Eksporter systemene som Excel eller CSV fra det gamle systemet. Du kobler kolonnene selv i neste steg, og appen foreslår koblingen ut fra overskriftene.")}</p>
       <label className="btn" style={{ display: 'inline-flex' }}>{busy ? tt("Leser filen …") : tt("Velg Excel- eller CSV-fil")}<input type="file" accept=".xlsx,.csv,.txt,text/csv" style={{ display: 'none' }} onChange={x => { velgGenerell(x.target.files?.[0]); x.target.value = ''; }} /></label>
       <hr style={{ margin: '14px 0', border: 0, borderTop: '1px solid var(--line)' }} />
+      {antMod > 0 && <><p style={{ marginBottom: 6 }}><b>{tt("Fra IFC-filene som er lastet opp til bygget")}</b></p>
+      <p className="small muted" style={{ marginTop: 0 }}>{tt("Leser alle {0} opplastede IFC-modeller (alle fag) og foreslår systemer og komponenter. Du slipper å laste opp filene på nytt.", antMod)}</p>
+      <button className="btn pri" disabled={busy} onClick={velgOpplastede}>{busy ? tt("Leser modellene … {0} %", Math.round(ifcPct * 100)) : tt("Importer systemer fra opplastede IFC-filer")}</button>
+      <hr style={{ margin: '14px 0', border: 0, borderTop: '1px solid var(--line)' }} /></>}
       <p style={{ marginBottom: 6 }}><b>{tt("Fra en BIM-modell (IFC)")}</b></p>
       <p className="small muted" style={{ marginTop: 0 }}>{tt("Leser vinduer, dører, fasader, trapper, rekkverk og tekniske komponenter med etasje og klassifisering. Geometrien lastes ikke. Støtter .ifc og .ifczip, også store filer.")}</p>
       <label className="btn" style={{ display: 'inline-flex' }}>{busy ? tt("Leser modellen … {0} %", Math.round(ifcPct * 100)) : tt("Velg IFC-modell (.ifc / .ifczip)")}<input type="file" accept=".ifc,.ifczip,.zip" style={{ display: 'none' }} onChange={x => { velgIfc(x.target.files?.[0]); x.target.value = ''; }} /></label>

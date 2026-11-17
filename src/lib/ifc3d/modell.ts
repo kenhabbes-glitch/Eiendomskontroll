@@ -87,6 +87,15 @@ export async function lesModellStrom(gz: ReadableStream<Uint8Array>, behold?: (g
   }
   return { hode, grupper, seg };
 }
+/** Leser bare hodet (objektliste og egenskaper) og lar resten av filen ligge – brukes når en modell skal gi data, ikke geometri. */
+export async function lesHodeStrom(gz: ReadableStream<Uint8Array>): Promise<Ek3dFull> {
+  const strom = gz.pipeThrough(new DecompressionStream('gzip') as any) as ReadableStream<Uint8Array>; const les = byteLeser(strom);
+  try {
+    const start = await les(8); if (start[0] !== 0x45 || start[1] !== 0x4b || start[2] !== 0x33) throw new Error('Ukjent modellformat');
+    const hl = new DataView(start.buffer).getUint32(4, true);
+    return JSON.parse(new TextDecoder().decode((await les(pad4(hl))).subarray(0, hl)));
+  } finally { strom.cancel().catch(() => { }); }
+}
 /** Som lesModellStrom, for en fil som allerede ligger i minnet. */
 export const lesModell = (gz: ArrayBuffer): Promise<Modell> => lesModellStrom(new Blob([gz]).stream() as ReadableStream<Uint8Array>);
 
