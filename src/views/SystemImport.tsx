@@ -18,7 +18,8 @@ export function importerSystemer(eid?: string, auto?: boolean) { openModal({ wid
 
 const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9æøå]/g, '');
 const filNavn = (n: string) => n.replace(/\.xlsx?$/i, '').replace(/^[0-9a-f]{6,}-/i, '').replace(/_/g, ' ').trim();
-const typeValg = sortBy(Object.entries(KOMP).map(([k, v]) => [k, `${v.g.split(' ')[0]} · ${v.n}`] as [string, string]), x => x[1]);
+/* typelisten grupperes etter hovedgruppe (Bygning, VVS, Elkraft …) så det er lett å finne riktig bygningsdel */
+const typeGrupper = (() => { const g = new Map<string, [string, string][]>(); for (const [k, v] of sortBy(Object.entries(KOMP), ([, v]) => v.g + '|' + v.n)) { if (k === 'annet') continue; (g.get(v.g) || g.set(v.g, []).get(v.g)!).push([k, v.n]); } return [...g]; })();
 
 function Dialog({ eid0, auto, close }: { eid0?: string; auto?: boolean; close: () => void }) {
   useStore();
@@ -168,7 +169,7 @@ function Dialog({ eid0, auto, close }: { eid0?: string; auto?: boolean; close: (
         {rader.map(r => <tr key={r.rad} style={{ opacity: r.ta ? 1 : .45 }}>
           <td><input type="checkbox" style={{ width: 'auto' }} checked={r.ta} onChange={x => settR(r.rad, { ta: x.target.checked })} /></td>
           <td className="mono small" style={{ whiteSpace: 'nowrap' }}>{r.kode ? '=' + r.kode + '.' + r.lop : '–'}<div className="muted" style={{ whiteSpace: 'normal', fontFamily: 'inherit' }}>{(r.del || r.gruppe).replace(/^\d+\s*-\s*/, '')}</div></td>
-          <td><select value={r.type} onChange={x => settR(r.rad, { type: x.target.value })} style={{ maxWidth: 190, borderColor: r.type ? undefined : 'var(--amber)' }}><option value="">{tt("– annet (uten katalogtype) –")}</option>{typeValg.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></td>
+          <td><select value={r.type} onChange={x => settR(r.rad, { type: x.target.value })} style={{ maxWidth: 190, borderColor: r.type ? undefined : 'var(--amber)' }}><option value="">{tt("– annet (uten katalogtype) –")}</option>{typeGrupper.map(([g, L]) => <optgroup key={g} label={tt(g.replace(/^\d+ /, ''))}>{L.map(([k, n]) => <option key={k} value={k}>{tt(n)}</option>)}</optgroup>)}<option value="annet">{tt("Annet")}</option></select></td>
           <td><input value={r.navn} onChange={x => settR(r.rad, { navn: x.target.value })} style={{ minWidth: 140 }} />{r.komm && <div className="small muted">{r.komm}</div>}</td>
           <td>{r.tg ? <Chip c={r.tg === 'TG3' ? 'red' : r.tg === 'TG2' ? 'amber' : 'green'}>{r.tg}</Chip> : <span className="muted">–</span>}</td>
           <td className="small">{r.aar || '–'}</td><td className="small">{r.planAar || (r.levetid ? tt("levetid {0} år", r.levetid) : '–')}</td>

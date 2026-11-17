@@ -22,6 +22,7 @@ test('grupperer per type, hopper over koblede objekter og teller etasjer', () =>
 
 // @ts-ignore – bygges av «pretest»
 import { ifcFraModeller, ifcTilTabell, lesIfc } from './.bygg/ifc.mjs';
+import { KOMP } from '../src/lib/catalog.ts';
 test('opplastede 3D-modeller gir en IFC-modell som systemimporten kan bruke', () => {
   const ark = { etasjer: [{ navn: '1. etasje' }, { navn: '2. etasje' }], elementer: [
     { g: 'a', k: 'IFCDOOR', n: 'Enkel dør', t: '', e: 0 }, { g: 'b', k: 'IFCWINDOW', n: 'Vindu', t: '', e: 1 }, { g: 'c', k: 'IFCWALL', n: 'Vegg', t: '', e: 0 },
@@ -83,7 +84,21 @@ test('importtabellen sorterer tekniske komponenter i riktig system og tar med el
   const heis = Object.entries(t.typer).find(([, v]) => v === 'heis'); assert.ok(heis, 'type heis'); assert.equal(t.komp[+heis![0]].length, 2);
   assert.ok(Object.values(t.typer).includes('sprinkler') && Object.values(t.typer).includes('ventilasjon'));
   const rest = Object.entries(t.komp).filter(([r]) => !t.typer[+r]).flatMap(([, k]) => k.map(x => x.guid)).sort();
-  assert.deepEqual(rest, ['b1', 'k1', 'p1', 't1'], 'elektro- og kjøleutstyr skal med, ikke forsvinne');
+  assert.deepEqual(rest, ['k1'], 'bare det vi ikke kjenner igjen (kompressor) står uten type');
+  const typeAv = (g: string) => t.typer[+Object.entries(t.komp).find(([, k]) => k.some(x => x.guid === g))![0]];
+  assert.equal(typeAv('p1'), 'pumper'); assert.equal(typeAv('t1'), 'eltavle'); assert.equal(typeAv('b1'), 'eltavle');
   assert.equal(Object.values(t.komp).flat().some(k => k.guid === 'o1'), false, 'småutstyr er ikke valgt som standard');
   assert.ok(ifcTilTabell(m, new Set(['elsmaa']), true).R.length === 2, 'småutstyr kan velges');
+});
+
+test('bygningsdeler får egen katalogtype i stedet for «Annet»', () => {
+  const el = (g: string, k: string, n: string, extra: any = {}) => ({ klasse: k, guid: g, navn: n, type: '', etasje: '1. etasje', tag: '', ns: '', mengder: {}, egenskaper: {}, ...extra });
+  const m = { filnavn: 'x.ifc', schema: 'IFC4', program: '', byggNavn: '', etasjer: ['1. etasje'], tellinger: {}, elementer: [
+    el('d1', 'IFCDOOR', 'Dør 1'), el('tr', 'IFCSTAIR', 'Trapp A'), el('r1', 'IFCRAILING', 'Rekkverk'), el('c1', 'IFCCOVERING', 'Himling'), el('f1', 'IFCCURTAINWALL', 'Fasade'), el('m1', 'IFCFURNISHINGELEMENT', 'Skap'),
+    el('x1', 'IFCBUILDINGELEMENTPROXY', 'Servant 2'), el('x2', 'IFCBUILDINGELEMENTPROXY', 'Ukjent greie') ] };
+  const t = ifcTilTabell(m, new Set(['dor', 'trapp', 'rekkverk', 'himling', 'fasade', 'innredning', 'annet']), true);
+  const typeAv = (g: string) => t.typer[+Object.entries(t.komp).find(([, k]) => k.some(x => x.guid === g))![0]];
+  assert.deepEqual(['d1', 'tr', 'r1', 'c1', 'f1', 'm1', 'x1'].map(typeAv), ['innvdorer', 'trapp', 'rekkverk', 'himling', 'glassfasade', 'fastinv', 'sanitarutstyr']);
+  assert.ok(!typeAv('x2'), 'ukjent proxy står uten type så brukeren velger selv');
+  for (const t2 of Object.values(t.typer).filter(Boolean)) assert.ok(KOMP[t2], 'typen finnes i katalogen: ' + t2);
 });

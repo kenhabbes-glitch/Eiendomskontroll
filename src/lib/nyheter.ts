@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-16', dato: '2026-12-16', tittel: 'Flere bygningsdeler å velge mellom', punkter: [
+    'Typelisten har fått 25 nye bygningsdeler, blant annet innvendige dører, trapper, rekkverk, himlinger, glassfasade, innervegger, dekker, fundament, innredning, pumper, vifter, stikkontakter, kamera, terreng og uthus. Færre ting havner i «Annet».',
+    'Ved IFC-import velges riktig type nå automatisk for innvendige dører, trapper, rekkverk, himlinger, innredning, pumper, vifter, lamper og tavler. Uspesifiserte objekter får type ut fra navnet, for eksempel servant eller gelender.',
+    'I importtabellen er typelisten delt inn i grupper (Bygning, VVS, Elkraft …), så det er lettere å finne riktig bygningsdel.',
+  ] },
   { id: '2026-12-15', dato: '2026-12-15', tittel: 'Importer systemer fra opplastede IFC-filer', punkter: [
     'IFC-importen er forbedret: riktig etasje også for objekter inne i rom, tekniske komponenter sorteres i riktig system (heis, sprinkler, ventilasjon, brannalarm …), og elektro- og kjøleutstyr som tidligere ble hoppet over, kommer nå med. Samme IFC-objekt opprettes aldri to ganger på et bygg.',
     'Ny knapp «Fjern IFC-importerte data» på 3D-siden fjerner komponenter og systemer en tidligere IFC-import opprettet, så du kan importere på nytt. Avvik, dokumenter, utførte kontroller og det du har lagt inn selv, blir værende.',
