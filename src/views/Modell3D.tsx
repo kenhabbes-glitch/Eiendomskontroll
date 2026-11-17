@@ -2,7 +2,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { S, canEdit, fileUrl, save, sb, state, toast, uploadFile, useStore, feiltekst } from '../lib/store';
+import { S, canEdit, fileUrl, save, sb, state, toast, uploadFile, useStore, feiltekst, removeMange } from '../lib/store';
+import { planRydding } from '../lib/ifcRydd';
 import { KOMP, TFM_DEF } from '../lib/catalog';
 import { foreslaFraModell } from '../lib/modellForslag';
 import { nextSysLop, byId, taggerFor, aNavn, dUntil, openAvvik, fd, today, tfmKomp, type Rec } from '../lib/utils';
@@ -108,7 +109,7 @@ export default function ModellSeksjon({ eid }: { eid: string }) {
   return <>
     {busy ? <div className="card"><b>{busy} …</b><div style={{ height: 8, background: 'var(--line2)', borderRadius: 4, marginTop: 8 }}><div style={{ height: 8, width: Math.round(pct * 100) + '%', background: '#1E4D57', borderRadius: 4, transition: 'width .3s' }} /></div><p className="small muted" style={{ marginBottom: 0 }}>{tt("Store modeller kan ta et minutt. Ikke lukk siden.")}</p></div>
       : <div className="toolbar" style={{ marginBottom: 10 }}><span className="grow small muted">{L.length ? <>{L.length > 1 ? tt("{0} fagmodeller", L.length) : L[0].data.navn} · {sum} {tt("objekter")} · {(L.reduce((s, r) => s + (r.data.str || 0), 0) / 1e6).toFixed(1)} MB <a href="#" onClick={e => { e.preventDefault(); setVisListe(!visListe); }}>{visListe ? tt("Skjul filer") : tt("Vis filer")}</a></> : ''}</span>
-        {ed && L.length > 0 && <button className="btn" onClick={() => import('./SystemImport').then(m => m.importerSystemer(eid, true))}>{tt("Importer systemer fra opplastede IFC-filer")}</button>}{ed && opp()}</div>}
+        {ed && L.length > 0 && <button className="btn" onClick={() => import('./SystemImport').then(m => m.importerSystemer(eid, true))}>{tt("Importer systemer fra opplastede IFC-filer")}</button>}{ed && S.komponenter.some(k => k.eiendomId === eid && k.importKilde?.ifc) && <button className="btn" title={tt("Fjerner komponenter og systemer som en tidligere IFC-import opprettet, så du kan importere på nytt")} onClick={() => ryddIfc(eid)}>{tt("Fjern IFC-importerte data")}</button>}{ed && opp()}</div>}
     {visListe && !busy && L.length > 0 && <div className="card"><div className="tbl-wrap"><table><thead><tr><th>{tt("Fag")}</th><th>{tt("Fil")}</th><th>{tt("Objekter")}</th><th>{tt("Lastet opp")}</th><th /></tr></thead><tbody>{L.map(r => <tr key={r.id}>
       <td>{ed ? <select value={fagAv(r)} onChange={e => settFag(r, e.target.value)}>{FAG.map(f => <option key={f.k} value={f.k}>{fagNavn(f.k)}</option>)}</select> : fagNavn(fagAv(r))}</td>
       <td className="small">{r.data.filnavn || r.data.navn}{(r.data.versjoner || []).length > 0 && <div className="muted">{tt("{0} tidligere versjon(er)", r.data.versjoner.length)}</div>}</td><td>{r.data.antall}</td><td className="small">{fd(r.data.tid)}{r.data.opprettetAv ? ' · ' + r.data.opprettetAv : ''}</td>
@@ -129,6 +130,23 @@ export default function ModellSeksjon({ eid }: { eid: string }) {
       {stor && valgt && <p className="small muted" style={{ margin: '0 0 8px' }}>{valgt.length < L.length ? tt("Viser {0} av {1} fagmodeller.", valgt.length, L.length) : ''} <a href="#" onClick={e => { e.preventDefault(); setValgt(null); }}>{tt("Velg fag på nytt")}</a></p>}
       <Visning key={nokkel + '|' + (valgt || []).join(',')} eid={eid} modeller={L.map(r => ({ ...r, data: { ...r.data, fag: fagAv(r) } }))} hovedId={hoved(L).id} last={stor ? valgt : null} /></>}
   </>;
+}
+
+/** Fjerner det en tidligere IFC-import opprettet på bygget (komponenter og systemer), slik at importen kan gjøres på nytt. Rører ikke avvik, dokumenter, utførte kontroller eller det du har lagt inn selv. */
+async function ryddIfc(eid: string) {
+  const p = planRydding({ komponenter: S.komponenter, anlegg: S.anlegg, avvik: S.avvik, dokumenter: S.dokumenter, oppgaver: S.oppgaver }, eid);
+  if (!p.komponenter.length && !p.systemer.length) return toast(tt("Fant ingenting fra IFC-importen å fjerne på dette bygget."));
+  const liste = (x: { navn: string; grunn: string }[]) => x.slice(0, 8).map(y => `• ${y.navn} (${tt(y.grunn)})`).join('\n') + (x.length > 8 ? `\n• … ${tt("og {0} til", x.length - 8)}` : '');
+  const tekst = [tt("Fjerne det IFC-importen opprettet på dette bygget?"), '',
+    tt("Slettes: {0} komponenter, {1} systemer og {2} kontroller som ikke er utført.", p.komponenter.length, p.systemer.length, p.kontroller.length),
+    ...(p.systemer.length ? ['', tt("Systemer som slettes:"), p.systemer.slice(0, 12).map(a => '• ' + (a.navn || '?')).join('\n') + (p.systemer.length > 12 ? `\n• … ${tt("og {0} til", p.systemer.length - 12)}` : '')] : []),
+    ...(p.beholdtSys.length || p.beholdtKomp.length ? ['', tt("Beholdes:"), liste([...p.beholdtSys, ...p.beholdtKomp])] : []),
+    '', tt("Avvik, dokumenter, utførte kontroller og det du selv har lagt inn, røres ikke. Dette kan ikke angres.")].join('\n');
+  if (!await confirmBox(tekst, tt("Fjern importerte data"))) return;
+  try {
+    await removeMange('komponenter', p.komponenter.map(k => k.id)); await removeMange('oppgaver', p.kontroller.map(o => o.id)); await removeMange('anlegg', p.systemer.map(a => a.id));
+    toast(tt("Fjernet {0} komponenter og {1} systemer. Du kan importere på nytt.", p.komponenter.length, p.systemer.length));
+  } catch { /* feilmelding er vist */ }
 }
 
 // ------------------------------------------------------------------ visning

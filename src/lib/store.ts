@@ -178,6 +178,15 @@ export async function removeDoc(col: Col, id: string) {
   if (error) { toast('Sletting feilet: ' + feiltekst(error)); throw error; }
   apply(col, 'delete', { id });
 }
+/** Sletter mange rader i en operasjon (i biter), og fjerner dem fra visningen. */
+export async function removeMange(col: Col, ids: string[], fremdrift?: (n: number) => void) {
+  if (utenNett()) { toast(tt("Sletting krever nett")); throw new Error('uten nett'); }
+  for (let i = 0; i < ids.length; i += 200) {
+    const del = ids.slice(i, i + 200); const { error } = await sb.from(TABLES[col].table).delete().in('id', del);
+    if (error) { toast('Sletting feilet: ' + feiltekst(error)); throw error; }
+    del.forEach(id => apply(col, 'delete', { id })); fremdrift?.(Math.min(ids.length, i + 200));
+  }
+}
 export function feiltekst(e: any) {
   const m = String(e?.message || e || '');
   if (/row-level security|permission denied|violates row-level/i.test(m)) return 'Du har ikke tilgang til å gjøre dette';

@@ -3,6 +3,7 @@ export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[
 export const NYHETER: Nyhet[] = [
   { id: '2026-12-15', dato: '2026-12-15', tittel: 'Importer systemer fra opplastede IFC-filer', punkter: [
     'IFC-importen er forbedret: riktig etasje også for objekter inne i rom, tekniske komponenter sorteres i riktig system (heis, sprinkler, ventilasjon, brannalarm …), og elektro- og kjøleutstyr som tidligere ble hoppet over, kommer nå med. Samme IFC-objekt opprettes aldri to ganger på et bygg.',
+    'Ny knapp «Fjern IFC-importerte data» på 3D-siden fjerner komponenter og systemer en tidligere IFC-import opprettet, så du kan importere på nytt. Avvik, dokumenter, utførte kontroller og det du har lagt inn selv, blir værende.',
     'Når du har lastet opp IFC-filene til et bygg, trykker du «Importer systemer fra opplastede IFC-filer» på 3D-siden. Appen leser alle fagmodellene på bygget og foreslår systemer og komponenter, så du slipper å velge filene på nytt.',
   ] },
   { id: '2026-12-14', dato: '2026-12-14', tittel: 'Gårdeiere kan opprette egne bygg (valgfritt)', punkter: [
