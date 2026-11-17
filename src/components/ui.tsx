@@ -4,7 +4,7 @@ import { HJELP } from '../lib/hjelpTekster';
 import { bump, feiltekst, fileUrl, toast, toasts, useStore, type Fil } from '../lib/store';
 import { dUntil, fd } from '../lib/utils';
 import { tt } from '../lib/i18n';
-import { diktatStotte, startDiktat, type Diktat } from '../lib/diktat';
+import { diktatStotte, erIosEnhet, startDiktat, type Diktat } from '../lib/diktat';
 
 // ---------------- små komponenter
 export function Chip({ c = '', plain, children, title }: { c?: string; plain?: boolean; children: ReactNode; title?: string }) {
@@ -99,15 +99,19 @@ export type Field = {
 
 /** Mikrofonknapp ved tekstfelt: trykk, snakk, trykk igjen for å stoppe. Teksten legges til i feltet. */
 export function DiktatKnapp({ verdi, sett, onFerdig }: { verdi: string; sett: (t: string) => void; onFerdig?: (t: string) => void }) {
-  const [pa, setPa] = useState(false); const d = useRef<Diktat | null>(null); const sist = useRef(''); useEffect(() => () => d.current?.stopp(), []);
+  const [pa, setPa] = useState(false); const btn = useRef<HTMLButtonElement>(null); const d = useRef<Diktat | null>(null); const sist = useRef(''); useEffect(() => () => d.current?.stopp(), []);
   const klikk = () => {
     if (pa) { d.current?.stopp(); return; }
+    if (erIosEnhet()) { // Safari på iPhone: talegjenkjenningen i nettsider slutter å virke etter første bruk. Tastaturets egen mikrofon er pålitelig.
+      const f = btn.current?.parentElement?.querySelector('textarea,input:not([type=checkbox]):not([type=file])') as HTMLElement | null; f?.focus();
+      return toast(tt("Trykk på mikrofonen nede til høyre på tastaturet for å diktere."));
+    }
     if (!diktatStotte()) return toast(tt("Diktering støttes ikke her. Bruk mikrofonknappen på tastaturet på telefonen i stedet."));
     sist.current = verdi || '';
     d.current = startDiktat(verdi || '', t => { sist.current = t; sett(t); }, feil => { setPa(false); d.current = null; onFerdig?.(sist.current); if (feil === 'mikrofon') toast(tt("Mikrofonen er ikke tillatt. Gi nettleseren tilgang til mikrofonen for dette nettstedet.")); else if (feil === 'ingen-tale') toast(tt("Hørte ingen tale. Trykk på Diktér og prøv igjen, eller bruk mikrofonknappen på tastaturet.")); else if (feil) toast(tt("Dikteringen stoppet: ") + feil); });
     if (d.current) setPa(true);
   };
-  return <button type="button" className={'diktat' + (pa ? ' pa' : '')} onClick={klikk} aria-pressed={pa} aria-label={pa ? tt("Stopp diktering") : tt("Diktér")} title={tt("Diktér (lyden behandles av nettleserens talegjenkjenning)")}>
+  return <button ref={btn} type="button" className={'diktat' + (pa ? ' pa' : '')} onClick={klikk} aria-pressed={pa} aria-label={pa ? tt("Stopp diktering") : tt("Diktér")} title={tt("Diktér (lyden behandles av nettleserens talegjenkjenning)")}>
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3a3 3 0 00-3 3v6a3 3 0 006 0V6a3 3 0 00-3-3zM5 11a7 7 0 0014 0M12 18v3" /></svg>{pa ? tt("Lytter … trykk for å stoppe") : tt("Diktér")}
   </button>;
 }

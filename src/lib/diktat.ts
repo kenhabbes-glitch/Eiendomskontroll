@@ -6,6 +6,7 @@ const SR = (): any => (typeof window === 'undefined' ? null : (window as any).Sp
 export const diktatStotte = () => !!SR();
 
 export type Diktat = { stopp: () => void };
+export const erIosEnhet = () => erIos();
 const erIos = () => typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1));
 let aktiv: any = null; // bare én diktering om gangen; en hengende forrige økt avbrytes før ny starter
 let inst: any = null;  // samme objekt gjenbrukes mellom øktene: Safari på iPhone slutter ofte å virke hvis man lager et nytt for hver gang
