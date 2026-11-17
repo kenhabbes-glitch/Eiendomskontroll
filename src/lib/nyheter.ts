@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-13', dato: '2026-12-13', tittel: 'Beredskapsplan og risikovurdering', punkter: [
+    'Ny fane «Beredskap» på hver eiendom, for eier og drift. Her fyller du ut beredskapsplanen (kontakter, varsling, evakuering, stenging av vann og strøm, tiltak per hendelse) og skriver den ut som PDF.',
+    'Risikoregisteret har standardrisikoer for brann, vann og tekniske feil, innbrudd og hærverk, ekstremvær og personsikkerhet. Du vurderer sannsynlighet og konsekvens, og ser alt i en risikomatrise.',
+    'Plan, øvelse og risikovurdering har årlig frist. Fanen viser et tall når noe er forfalt eller har høy risiko uten tiltak, og du kan lage en kontroll i kontrollplanen fra hvert tiltak.',
+  ] },
   { id: '2026-12-12', dato: '2026-12-12', tittel: 'Diktering i avviksskjemaet', punkter: [
     'Ved kort beskrivelse, beskrivelse og tiltak, plassering i tekst og kommentar finnes det nå en mikrofonknapp. Trykk, snakk, og trykk igjen for å stoppe. Teksten legges inn i feltet, og du kan rette den etterpå. Lyden behandles av nettleserens talegjenkjenning (Google i Chrome og Edge, Apple i Safari), ikke av appen.',
   ] },

@@ -21,6 +21,7 @@ import { Chip, DueChip, Empty } from '../components/ui';
 import { ArealSection } from './Arealer';
 import { BrannbokSeksjon } from './Brannbok';
 const ModellSeksjon = React.lazy(() => import('./Modell3D'));
+import { BeredskapSection, beredskapOppfolging } from '../lib/beredskap';
 import { BrannvernSection, bvStatus, mangelAnsvarlig, aktiveMidl } from '../lib/brannvern';
 import { kartUrl, seEiendomUrl, enhetStatus } from '../lib/oppslag';
 import { tt } from '../lib/i18n';
@@ -66,6 +67,7 @@ export function Eiendom({ id }: { id: string }) {
   if (ed) { const st = eierStatus(id); tabs.splice(1, 0, ['krav', 'Lovkrav', st.kontroller.filter(k => k.lys === 'red').length + st.dok.filter(d => d.lys === 'red').length || '']); }
   if (harModul('brannvern', id)) tabs.push(['brann', 'Brannvern', ed ? L.filter(l => bvStatus(l).o >= 1 || mangelAnsvarlig(l)).length + aktiveMidl(e).length || '' : aktiveMidl(e).length || '']);
   if (harModul('brannvern', id)) tabs.push(['brannbok', 'Brannbok', '']);
+  if (kanDrifteE(id)) tabs.push(['bered', 'Beredskap', beredskapOppfolging(e) || '']);
   if (ed) tabs.push(['leie', 'Leietakere', L.length]);
   tabs.push(['modell', '3D-modell', '']);
   tabs.push(['areal', 'Tegninger og arealer', S.tegninger.filter(t => t.eiendomId === id).length]);
@@ -100,6 +102,7 @@ export function Eiendom({ id }: { id: string }) {
   if (cur === 'leie') c = <><div className="toolbar"><button className="btn pri" onClick={() => editLeietaker(undefined, { eiendomId: id })}>{tt("+ Leietaker")}</button></div><LeieTable list={L} showE={false} /></>;
   if (cur === 'areal') c = <ArealSection eid={id} />;
   if (cur === 'brann') c = <BrannvernSection eid={id} />;
+  if (cur === 'bered') c = <BeredskapSection eid={id} />;
   if (cur === 'brannbok') c = <BrannbokSeksjon eid={id} />;
   if (cur === 'modell') c = <React.Suspense fallback={<div className="card">{tt("Laster …")}</div>}><ModellSeksjon eid={id} /></React.Suspense>;
   if (cur === 'bef') c = <><div className="toolbar"><button className="btn pri" onClick={() => nyBefaringDialog({ eiendomId: id })}>{tt("+ Ny befaring")}</button></div><Befaringer eiendomId={id} kompakt /></>;

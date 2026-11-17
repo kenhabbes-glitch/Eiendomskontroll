@@ -268,12 +268,27 @@ test('diktering: mikrofonknapper i avviksskjemaet legger talt tekst inn i felten
         stop() { setTimeout(() => this.onend?.(), 10); } };
     });
     await a.side.getByRole('button', { name: /Meld avvik|Nytt avvik|\+ Avvik/ }).first().click();
-    const m = a.side.locator('.modal');
+    const m = a.side.locator('.modal'); await m.locator('button.diktat').first().waitFor({ timeout: 8000 });
     assert.equal(await m.locator('button.diktat').count(), 4, 'forventet dikteringsknapp ved kort beskrivelse, beskrivelse, plassering og kommentar');
     await m.locator('button.diktat').first().click(); await a.side.waitForTimeout(600);
     assert.equal(await m.locator('input[type=text], input:not([type])').first().inputValue(), 'Hull i veggen ved trapp');
     await m.locator('button.diktat').nth(1).click(); await a.side.waitForTimeout(600);
     assert.ok((await m.locator('textarea').first().inputValue()).toLowerCase().includes('hull i veggen ved trapp'));
+    if (a.feil.length) assert.fail(a.feil[0]);
+  } finally { await a.lukk(); }
+});
+
+test('beredskap: fanen viser plan, standardrisikoer og lagrer en vurdering', async () => {
+  const a = await aapne('#/eiendom/e1'); try {
+    await a.side.locator('.tabs a', { hasText: 'Beredskap' }).click();
+    await a.side.getByRole('button', { name: /Legg til standardrisikoer/ }).click();
+    await a.side.waitForTimeout(600);
+    assert.ok(await a.side.locator('tbody tr', { hasText: 'Vannlekkasje' }).count() >= 1, 'standardrisikoene mangler');
+    await a.side.locator('tbody tr', { hasText: 'Vannlekkasje' }).getByRole('button', { name: /Rediger/ }).click();
+    const m = a.side.locator('.modal');
+    await m.locator('select').nth(1).selectOption('4'); await m.locator('select').nth(2).selectOption('4');
+    await m.getByRole('button', { name: /Lagre/ }).click(); await a.side.waitForTimeout(600);
+    assert.ok(await a.side.locator('tbody tr', { hasText: 'Vannlekkasje' }).getByText(/Høy 16/).count() >= 1, 'forventet høy risiko 16');
     if (a.feil.length) assert.fail(a.feil[0]);
   } finally { await a.lukk(); }
 });
