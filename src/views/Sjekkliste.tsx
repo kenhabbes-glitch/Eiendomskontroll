@@ -36,7 +36,7 @@ export function importerPakke(lid: string) {
         const l2 = byId('leietakere', lid)!; const pl = (l2.plikter || []).slice();
         for (const p of r.plikter) {
           const ids: string[] = [];
-          for (const f of p.filer) { const up = await uploadFile(f, l2.eiendomId, l2.id); if (up) ids.push(await save('dokumenter', { eiendomId: l2.eiendomId, leietakerId: l2.id, type: 'Leietakers IK-dokumentasjon', tittel: p.navn + ' – ' + f.name, dato: p.dato || today(), fil: up })); }
+          for (const f of p.filer) { const up = await uploadFile(f, l2.eiendomId, l2.id); if (up) ids.push(await save('dokumenter', { eiendomId: l2.eiendomId, leietakerId: l2.id, type: p.key === 'samordningsavtale' ? 'Samordningsavtale' : 'Leietakers IK-dokumentasjon', tittel: p.navn + ' – ' + f.name, dato: p.dato || today(), fil: up })); }
           pl[p.idx] = { ...pl[p.idx], status: 'til_godkjenning', innsendt: { dato: p.dato || today(), komm: p.komm, sjekk: p.sjekk, dokId: ids[0] || null, dokIds: ids, tid: new Date().toISOString(), av: 'Import fra fil' }, tilbakemelding: null };
         }
         await save('leietakere', { ...l2, plikter: pl }); close(); toast(tt("{0} plikter lest inn – klare til godkjenning", r.plikter.length));

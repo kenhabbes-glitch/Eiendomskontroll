@@ -1,6 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-21', dato: '2026-12-21', tittel: 'Samordningsavtale telles nå i Brannvern', punkter: [
+    'Samordningsavtale som er lastet opp under leietakerens plikter vises nå som «Registrert» i Brannvern og tas med i Brannboken.',
+  ] },
   { id: '2026-12-20', dato: '2026-12-20', tittel: 'Sjekklister for samordning og eiers internkontroll', punkter: [
     'Kontrollene «Samordning med leietakere (brann og HMS) – årlig møte/gjennomgang» og «Eiers internkontroll – årlig gjennomgang» har nå hver sin sjekkliste. Den vises når du kvitterer ut, og punktene svares OK, Avvik eller I.R.',
   ] },

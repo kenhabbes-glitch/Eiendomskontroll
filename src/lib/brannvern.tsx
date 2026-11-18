@@ -360,6 +360,16 @@ function kvitteringer(l: Rec) {
   showModal(tt("Brannverninformasjon – historikk for ") + l.navn, () => K.length ? <div className="log">{K.map((k: Rec, i: number) => <div key={i}><span className="lt">{new Date(k.tid).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' })}</span> · <b>{k.h} v{k.versjon}</b>{k.h === 'Bekreftet' ? tt(" – {0} · {1}", k.navn || '', k.form || '') : tt(" av {0}", k.av || '')}{k.komm && <div className="small muted">{k.komm}</div>}{k.dokId && byId('dokumenter', k.dokId)?.fil && <div className="small"><FileLink fil={byId('dokumenter', k.dokId)!.fil} /></div>}</div>)}</div> : <p className="muted">{tt("Ingen utsendinger eller bekreftelser.")}</p>);
 }
 
+// Samordningsavtalen for en leietaker: dokument av typen «Samordningsavtale», eller dokument knyttet til leietakerens plikt «Samordningsavtale».
+export function samordningDok(l: Rec): Rec | undefined {
+  const direkte = S.dokumenter.find(d => d.leietakerId === l.id && d.type === 'Samordningsavtale');
+  if (direkte) return direkte;
+  const p = (l.plikter || []).find((x: Rec) => x.key === 'samordningsavtale' && !x.ikkeRelevant);
+  if (!p) return undefined;
+  const ids: string[] = [p.dokId, ...(p.innsendt?.dokIds || []), p.innsendt?.dokId].filter(Boolean);
+  return ids.map(id => byId('dokumenter', id)).find((d: any) => d && d.leietakerId === l.id);
+}
+
 // ---------------- visning: fanen «Brannvern» på eiendommen
 export function BrannvernSection({ eid }: { eid: string }) {
   const e = byId('eiendommer', eid)!; const b = bv(e); const v = bvVersjon(e); const ed = canEdit() && kanRedigereE(eid);
@@ -367,7 +377,7 @@ export function BrannvernSection({ eid }: { eid: string }) {
   const midl = b.midlertidig || []; const [visAvsl, setVisAvsl] = useState(false);
   const harKonsept = S.dokumenter.some(d => d.eiendomId === eid && d.type === 'Brannkonsept/brannteknisk dokumentasjon');
   const harPdfKonsept = S.dokumenter.some(d => d.eiendomId === eid && !d.leietakerId && d.type === 'Brannkonsept/brannteknisk dokumentasjon' && /\.pdf$/i.test(d.fil?.navn || d.fil?.path || ''));
-  const samordning = (l: Rec) => S.dokumenter.some(d => d.leietakerId === l.id && d.type === 'Samordningsavtale');
+  const samordning = (l: Rec) => !!samordningDok(l);
   const ovelse = (l: Rec) => (l.plikter || []).find((p: Rec) => p.key === 'brannovelse')?.sist;
   const felles = S.oppgaver.find(o => o.eiendomId === eid && o.aktiv !== false && /felles brannøvelse|samordningsmøte/i.test(o.navn || ''));
   const Z = soner(e);

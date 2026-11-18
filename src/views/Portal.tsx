@@ -50,7 +50,7 @@ function bekreft(l: any, p: any) {
       { k: 'dato', label: tt("Dato (gjennomført/dokumentert)"), type: 'date', def: today(), half: true }, { k: 'komm', label: tt("Kommentar"), type: 'textarea', def: p.innsendt?.komm || '', ph: tt("F.eks. navn på brannvernleder, dato for øvelse, antall deltakere …") }, { k: 'fil', label: tt("Dokumentasjon (PDF, bilde e.l.)"), type: 'file' }],
     onSave: async v => {
       let dokId: string | null = p.innsendt?.dokId || null;
-      if (v.fil) { const f = await uploadFile(v.fil, l.eiendomId, l.id); if (f) dokId = await save('dokumenter', { eiendomId: l.eiendomId, leietakerId: l.id, type: 'Leietakers IK-dokumentasjon', tittel: p.navn + ' – ' + l.navn, dato: v.dato, fil: f }); }
+      if (v.fil) { const f = await uploadFile(v.fil, l.eiendomId, l.id); if (f) dokId = await save('dokumenter', { eiendomId: l.eiendomId, leietakerId: l.id, type: p.key === 'samordningsavtale' ? 'Samordningsavtale' : 'Leietakers IK-dokumentasjon', tittel: p.navn + ' – ' + l.navn, dato: v.dato, fil: f }); }
       const { error } = await sb.rpc('send_inn_plikt', { p_key: p.key, p_dato: v.dato, p_kommentar: v.komm || '', p_dok: dokId, p_sjekk: v.sjekk || [] });
       if (error) { toast(tt("Kunne ikke sende: ") + feiltekst(error)); return false; }
       await refreshMine(); toast(tt("Takk – sendt til utleier for godkjenning"));

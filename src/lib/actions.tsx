@@ -933,7 +933,7 @@ export function bekreftPlikt(lid: string, idx: number) {
     onSave: async x => {
       if (dok.length && !x.ikkeRelevant && (x.sjekk || []).length < dok.length && !(await confirmBox(tt("Bare {0} av {1} punkter i sjekklisten er krysset av. Registrere plikten som dokumentert likevel?", (x.sjekk || []).length, dok.length), tt("Registrer")))) return false;
       const pl = l.plikter.slice(); const np: Rec = { ...p, sist: x.sist, form: x.form, komm: x.komm, sjekk: x.sjekk || [], frekvens: { n: +x.in || 1, enhet: x.ie }, ikkeRelevant: x.ikkeRelevant, bekreftetAvLeietaker: false };
-      if (x.fil) { const f = await uploadFile(x.fil, l.eiendomId, l.id); if (f) np.dokId = await save('dokumenter', { eiendomId: l.eiendomId, leietakerId: l.id, type: 'Leietakers IK-dokumentasjon', tittel: p.navn + ' – ' + l.navn, dato: x.sist, fil: f }); }
+      if (x.fil) { const f = await uploadFile(x.fil, l.eiendomId, l.id); if (f) np.dokId = await save('dokumenter', { eiendomId: l.eiendomId, leietakerId: l.id, type: p.key === 'samordningsavtale' ? 'Samordningsavtale' : 'Leietakers IK-dokumentasjon', tittel: p.navn + ' – ' + l.navn, dato: x.sist, fil: f }); }
       pl[idx] = np; await save('leietakere', { ...l, plikter: pl }); toast(tt("Bekreftelse registrert")); setTimeout(autoKvitterIK, 300);
     },
   });

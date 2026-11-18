@@ -5,7 +5,7 @@ import { S, orgNavn } from './store';
 import { byId, sortBy, today, addDays, dUntil, intTxt, aNavn, type Rec } from './utils';
 import { tt } from './i18n';
 import { AV_LUKKET } from './catalog';
-import { bv, bvVersjon, bvStatus, binfo, brannInstallasjoner, klasseTekst, aktiveMidl } from './brannvern';
+import { samordningDok, bv, bvVersjon, bvStatus, binfo, brannInstallasjoner, klasseTekst, aktiveMidl } from './brannvern';
 
 export type BbStatus = 'ok' | 'folg' | 'mangler' | 'info';
 export type BbTabell = { tittel?: string; hode: string[]; rader: string[][] };
@@ -25,7 +25,7 @@ export function byggBrannbok(eid: string): Brannbok {
   const sek: BbSek[] = [];
 
   // 1 Organisering og ansvar
-  const ltRader = L.map(l => { const a = binfo(l).ansvarlig; const samo = S.dokumenter.find(x => x.leietakerId === l.id && x.type === 'Samordningsavtale');
+  const ltRader = L.map(l => { const a = binfo(l).ansvarlig; const samo = samordningDok(l);
     return [l.navn || '', l.lokale || '', a?.navn ? `${a.navn}${a.tlf ? ', ' + a.tlf : ''}` : l.brannvernleder || tt("Mangler"), samo ? tt("Ja") + (samo.dato ? ' (' + d(samo.dato) + ')' : '') : tt("Mangler")]; });
   const manglerAnsv = ltRader.filter(r => r[2] === tt("Mangler")).length, manglerSamo = ltRader.filter(r => r[3] === tt("Mangler")).length;
   const harKontakt = !!(b.eierAnsvarlig || '').trim();
@@ -34,7 +34,7 @@ export function byggBrannbok(eid: string): Brannbok {
     statusTekst: !harKontakt ? tt("Eiers kontaktperson for brannsikkerhet er ikke registrert") : (manglerAnsv || manglerSamo) ? tt("{0} leietakere mangler brannvernansvarlig, {1} mangler samordningsavtale", manglerAnsv, manglerSamo) : tt("Ansvar og samordning er dokumentert"),
     fakta: [[tt("Eier"), orgNavn(e.eierOrgId) || ''], [tt("Eiers kontaktperson"), [b.eierAnsvarlig, b.eierTlf].filter(Boolean).join(', ') || tt("Mangler")], [tt("Antall leietakere"), String(L.length)]],
     tabeller: L.length ? [{ tittel: tt("Leietakere og samordning"), hode: [tt("Leietaker"), tt("Lokale"), tt("Brannvernansvarlig"), tt("Samordningsavtale")], rader: ltRader }] : [],
-    vedlegg: S.dokumenter.filter(x => x.eiendomId === eid && x.type === 'Samordningsavtale' && x.fil?.path).map(vedl).filter(Boolean) });
+    vedlegg: [...S.dokumenter.filter(x => x.eiendomId === eid && x.type === 'Samordningsavtale' && x.fil?.path), ...L.map(samordningDok).filter((x: any) => x?.fil?.path)].map(vedl).filter(Boolean) });
 
   // 2 Byggets brannsikkerhet
   const konsept = docs.filter(x => x.type === 'Brannkonsept/brannteknisk dokumentasjon'); const tegn = [...docs.filter(x => x.type === 'Branntegninger/rømningsplaner'), ...(b.vedlegg || []).map((id: string) => byId('dokumenter', id)).filter((x: Rec) => x?.fil?.path && x.type !== 'Branntegninger/rømningsplaner')];
