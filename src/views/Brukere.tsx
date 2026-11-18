@@ -44,7 +44,17 @@ const REF_KEYS = ['eiendomId', 'anleggId', 'leietakerId', 'oppgaveId', 'komponen
 export function DataAdmin() {
   useStore();
   const [busy, setBusy] = useState('');
-  const eksport = () => { const d = { versjon: 2, eksportert: new Date().toISOString(), ...Object.fromEntries(COLS.map(c => [c, S[c]])) }; textModal(tt("Eksport (JSON)"), JSON.stringify(d), tt("Lagre teksten i en fil som sikkerhetskopi. Filer (PDF/bilder) ligger i Supabase Storage og er ikke med.")); };
+  /* Lager JSON-filen og åpner lagringsdialogen (Chrome/Edge). Andre nettlesere (Safari, Firefox) laster ned filen direkte, eller spør hvor den skal lagres hvis nettleseren er satt opp slik. */
+  const eksport = async () => {
+    const d = { versjon: 2, eksportert: new Date().toISOString(), ...Object.fromEntries(COLS.map(c => [c, S[c]])) };
+    const navn = `eiendomskontroll-sikkerhetskopi-${new Date().toISOString().slice(0, 10)}.json`; const blob = new Blob([JSON.stringify(d)], { type: 'application/json' });
+    try {
+      const vel = (window as any).showSaveFilePicker;
+      if (vel) { const h = await vel({ suggestedName: navn, types: [{ description: 'JSON-fil', accept: { 'application/json': ['.json'] } }] }); const w = await h.createWritable(); await w.write(blob); await w.close(); toast(tt("Sikkerhetskopien er lagret.")); return; }
+    } catch (e: any) { if (e?.name === 'AbortError') return; /* avbrutt av brukeren */ }
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = navn; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+    toast(tt("Sikkerhetskopien er lastet ned. Se i nedlastingsmappen."));
+  };
   const importer = () => {
     let txt = '';
     openModal({ wide: true, render: close => <>
@@ -68,7 +78,7 @@ export function DataAdmin() {
   return <>
     <div className="head"><div className="grow"><h1>{tt("Import og eksport")}<Hjelp id="side.data" /></h1><p className="sub">{tt("Sikkerhetskopi og flytting av data")}</p></div></div>
     <div className="grid g2">
-      <div className="card"><h2>{tt("Eksporter")}</h2><p className="small muted">{tt("Alle data du har tilgang til som JSON. Supabase tar i tillegg daglig sikkerhetskopi av databasen på betalte planer.")}</p><button className="btn" onClick={eksport}>{tt("Eksporter alle data")}</button></div>
+      <div className="card"><h2>{tt("Eksporter")}</h2><p className="small muted">{tt("Alle data du har tilgang til som en JSON-fil du lagrer på maskinen. Filer (PDF/bilder) er ikke med. Supabase tar i tillegg daglig sikkerhetskopi av databasen på betalte planer.")}</p><button className="btn" onClick={eksport}>{tt("Eksporter alle data")}</button></div>
       <div className="card"><h2>{tt("Importer")}</h2><p className="small muted">{tt("Hent inn data fra prototypen («Sikkerhetskopi og data» → «Kopier alle data») eller fra en eksport. Tegninger må lastes opp på nytt.")}</p><button className="btn pri" disabled={!!busy} onClick={importer}>{busy || tt("Importer data")}</button></div>
     </div>
   </>;

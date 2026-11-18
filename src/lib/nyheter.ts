@@ -1,6 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-17', dato: '2026-12-17', tittel: 'Sikkerhetskopi som fil', punkter: [
+    'Under Import og eksport lager «Eksporter alle data» nå en JSON-fil direkte. I Chrome og Edge åpnes lagringsdialogen, så du velger selv hvor filen skal ligge. I andre nettlesere lastes filen ned til nedlastingsmappen. Du slipper å kopiere tekst.',
+  ] },
   { id: '2026-12-16', dato: '2026-12-16', tittel: 'Flere bygningsdeler å velge mellom', punkter: [
     'Typelisten har fått 25 nye bygningsdeler, blant annet innvendige dører, trapper, rekkverk, himlinger, glassfasade, innervegger, dekker, fundament, innredning, pumper, vifter, stikkontakter, kamera, terreng og uthus. Færre ting havner i «Annet».',
     'Ved IFC-import velges riktig type nå automatisk for innvendige dører, trapper, rekkverk, himlinger, innredning, pumper, vifter, lamper og tavler. Uspesifiserte objekter får type ut fra navnet, for eksempel servant eller gelender.',
