@@ -11,6 +11,7 @@ Den fulle oppskriften steg for steg ligger i PDF-en «Eiendomskontroll på egen 
 | `server/supabase-tillegg.yml` | Tillegg til selvhostet Supabase: e-postmaler og nøkler for edge-funksjonen |
 | `server/oppdater.sh` | Henter ny versjon fra GitHub og bygger på nytt (kjøres hvert 10. minutt) |
 | `server/sikkerhetskopi.sh` | Nattlig kopi av database og filer |
+| `server/nullstill-eiendommer.sh` | Sletter alle eiendommer og filene deres, beholder brukere (kjør først med `--torr`) |
 | `scripts/flytt-filer.mjs` | Kopierer alle filer fra gammel til ny Supabase-lagring |
 
 Appen virker fortsatt på Netlify som før; disse filene brukes bare på egen server.
