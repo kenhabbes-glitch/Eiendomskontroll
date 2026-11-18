@@ -1,6 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-20', dato: '2026-12-20', tittel: 'Sjekklister for samordning og eiers internkontroll', punkter: [
+    'Kontrollene «Samordning med leietakere (brann og HMS) – årlig møte/gjennomgang» og «Eiers internkontroll – årlig gjennomgang» har nå hver sin sjekkliste. Den vises når du kvitterer ut, og punktene svares OK, Avvik eller I.R.',
+  ] },
   { id: '2026-12-19', dato: '2026-12-19', tittel: 'Sjekkliste for branntekniske dokumentasjon', punkter: [
     'Kontrollen «Brannteknisk dokumentasjon og branntegninger – årlig gjennomgang» har nå en sjekkliste med 11 punkter (brannkonsept, branntegninger, rømningsplaner, slokkeutstyr, installasjoner, ansvar, innsatsopplysninger og mer). Den vises både når du kvitterer ut i appen og i lenken til den som utfører.',
     'Hvert punkt svares OK, Avvik eller I.R. Avvik i sjekklisten gjør at resultatet blir «Avvik funnet», og de tas med i avviksoppfølgingen.',

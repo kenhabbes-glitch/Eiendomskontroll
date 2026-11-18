@@ -134,6 +134,33 @@ export const KONTROLL_SJEKK: Record<string, { navn: string; beskr: string; punkt
     p('avvik', 'Avvik fra forrige gjennomgang er lukket'),
     p('arkiv', 'Oppdaterte dokumenter og tegninger er lagt inn under Dokumenter, og gamle versjoner er merket'),
   ] },
+  samordning: { navn: 'Samordning med leietakere (brann og HMS)', beskr: 'Årlig møte/gjennomgang med virksomhetene i bygget, så felles risiko og ansvar er avklart.', punkter: [
+    p('oversikt', 'Oversikten over virksomheter og leietakere er oppdatert (navn, kontaktperson, aktivitet og omtrentlig antall personer)'),
+    p('ansvarlig', 'Det er avklart hvem som samordner HMS og brann i fellesarealene, og leietakerne kjenner kontaktpersonen'),
+    p('avtaler', 'Skriftlig samordningsavtale finnes med hver leietaker (eller felles) og er oppdatert'),
+    p('mote', 'Møte eller gjennomgang er holdt med leietakerne siden sist, og referatet viser dato og deltakere'),
+    p('risiko', 'Aktiviteter som kan påvirke andre er gjennomgått (varme arbeider, brannfarlige stoffer, lager, støy, tilkomst og trafikk)'),
+    p('romning', 'Felles rømningsveier, trapperom og brannskiller holdes frie, og leietakerne er informert om det'),
+    p('evak', 'Varsling og evakuering er samordnet (felles alarm, samlingsplass, rutiner for besøkende), og felles brannøvelse er planlagt eller gjennomført'),
+    p('endringer', 'Endringer hos leietakerne siden sist (bruk, ombygging, nye farer) er meldt og vurdert'),
+    p('kontakt', 'Kontaktlister, nødnumre og varslingsrutiner er oppdatert og delt med alle leietakere'),
+    p('hendelser', 'Hendelser og avvik siden sist som berører flere virksomheter er gjennomgått, og tiltak er fulgt opp'),
+    p('arkiv', 'Referat og oppdaterte avtaler er lagt inn under Dokumenter'),
+  ] },
+  eier_ik: { navn: 'Eiers internkontroll – årlig gjennomgang', beskr: 'Systematisk gjennomgang av om internkontrollen virker som forutsatt: oppfølging, avvik, risiko og dokumentasjon.', punkter: [
+    p('organisasjon', 'Ansvar og organisering er oppdatert: hvem som har ansvar og myndighet for hva, og at de vet det'),
+    p('regelverk', 'Regelverk som gjelder eiendommen er gjennomgått, og endringer siste år er vurdert'),
+    p('risiko', 'Kartlegging av farer og risikovurdering er gjennomgått og oppdatert siste 12 måneder (se Beredskap)'),
+    p('tiltak', 'Tiltak og handlingsplan fra forrige gjennomgang er fulgt opp, og åpne tiltak har ansvarlig og frist'),
+    p('kontroller', 'Lovpålagte kontroller er utført innen fristen, og det finnes ingen forfalte kontroller i kontrollplanen'),
+    p('avvik', 'Avvik siste år er gjennomgått: årsak, tiltak og lukking, og gjentakende avvik er tatt ut som egne tiltak'),
+    p('rutiner', 'Rutinene for å avdekke, rette og forebygge avvik virker (avviksmelding fungerer, og leietakere og driftspersonell vet hvordan de melder)'),
+    p('beredskap', 'Beredskapsplanen er oppdatert, og brannøvelse er gjennomført siste år'),
+    p('avtaler', 'Service- og vedlikeholdsavtaler for lovpålagte systemer er gyldige, og FDV og kontrollrapporter er tilgjengelige'),
+    p('leietakere', 'Leietakernes internkontroll og samordning er innhentet eller oppdatert'),
+    p('opplaering', 'De som har oppgaver i driften (vaktmester, driftsleder, servicefirma) har nødvendig kunnskap og opplæring'),
+    p('dokumentert', 'Gjennomgangen er dokumentert (dato, deltakere, funn og plan) og lagt inn under Dokumenter'),
+  ] },
 };
 /** Lag tom sjekkliste for en kontroll ut fra systemtype og intervall (kopi av punktene).
  *  Finnes ingen mal for systemet, brukes eventuelt standardlisten for selve kontrollen (KONTROLL_SJEKK). */
