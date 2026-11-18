@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-19', dato: '2026-12-19', tittel: 'Sjekkliste for branntekniske dokumentasjon', punkter: [
+    'Kontrollen «Brannteknisk dokumentasjon og branntegninger – årlig gjennomgang» har nå en sjekkliste med 11 punkter (brannkonsept, branntegninger, rømningsplaner, slokkeutstyr, installasjoner, ansvar, innsatsopplysninger og mer). Den vises både når du kvitterer ut i appen og i lenken til den som utfører.',
+    'Hvert punkt svares OK, Avvik eller I.R. Avvik i sjekklisten gjør at resultatet blir «Avvik funnet», og de tas med i avviksoppfølgingen.',
+  ] },
   { id: '2026-12-18', dato: '2026-12-18', tittel: 'Last opp flere dokumenter samtidig', punkter: [
     'Ny knapp «Last opp flere filer» på Dokumenter. Velg eller dra inn mange filer samtidig, velg eiendom og dokumenttype én gang, og hver fil blir et eget dokument. Tittelen foreslås ut fra filnavnet, og du kan rette den før opplasting.',
     'I dokumentdekningen kan du nå legge til flere dokumenter under samme kategori med «+ flere». Når det finnes mer enn ett dokument av en type, vises antallet (for eksempel ×3), og et klikk på cellen viser alle dokumentene i en liste.',

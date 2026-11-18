@@ -522,7 +522,8 @@ const handler = async (req: Request) => {
   };
   // Sjekkliste for hele systemet (når kontrollen ikke kvitteres komponentvis)
   const koSysSjekk = async (o: any) => {
-    const d = o.data || {}; if (!d.anleggId || d.komponentId) return null;
+    const d = o.data || {}; if (d.komponentId) return null;
+    if (!d.anleggId) return sysSjekkFor([], d, undefined); // kontroll på hele eiendommen: standardliste for kontrollen, hvis den finnes
     if (await koRunde(o)) return null;
     const { data: sy } = await admin.from('systemer').select('data').eq('id', d.anleggId).maybeSingle();
     return sysSjekkFor(await malerFor(o.eiendom_id), d, sy?.data?.type);

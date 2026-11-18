@@ -118,3 +118,17 @@ test('prosjektrapport og signering: ugyldige lenker avvises', async () => {
   assert.equal((await kall({ action: 'pr_svar', token: 'kort', beslutning: 'Godkjent', navn: 'X' })).status, 404);
   assert.equal((await kall({ action: 'bef_sign_info', token: 'finnes-ikke' })).status, 404);
 });
+
+test('lenke til kontroll på hele eiendommen: standard sjekkliste følger med, og svarene lagres og gir avvik', async () => {
+  db.oppgaver = [{ id: 'o1', eiendom_id: 'e1', data: { navn: 'Branntekniske dokumentasjon og branntegninger – årlig gjennomgang', malKey: 'brann_dok', intervall: [1, 'år'] } }];
+  const info: any = await kall({ action: 'ko_info', token: T.ko });
+  assert.equal(info.status, 200);
+  assert.equal(info.sjekk?.navn, 'Brannteknisk dokumentasjon og branntegninger');
+  assert.ok(info.sjekk.punkter.length >= 10, 'forventet en full sjekkliste');
+  const svar: Record<string, string> = Object.fromEntries(info.sjekk.punkter.map((p: any) => [p.id, 'ok'])); svar.romning = 'avvik';
+  const r: any = await kall({ action: 'ko_innsend', token: T.ko, ...SAM, dato: '2026-11-18', av: 'Test', res: 'OK – ingen avvik', komm: '', avvik: [], filer: [], sjekk: { ...info.sjekk, svar } });
+  assert.equal(r.status, 200);
+  const lagret = db.ko_invitasjon.find((x: any) => x.token === T.ko)?.svar;
+  assert.equal(lagret?.res, 'Avvik funnet', 'et avvik i sjekklisten skal gi resultat «Avvik funnet»');
+  assert.equal(lagret?.sjekk?.svar?.romning, 'avvik');
+});

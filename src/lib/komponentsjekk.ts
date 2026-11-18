@@ -118,10 +118,29 @@ export const STD_SYSTEMMALER: SjekkMal[] = [
 ];
 export const systemMalFor = (maler: SjekkMal[], sysType?: string) => sysType ? maler.find(m => (m.systemer || []).includes(sysType)) || null : null;
 export type SysSjekk = { malId: string; navn: string; punkter: SjekkPunkt[]; svar: Record<string, Svar>; tekst?: Record<string, string> };
-/** Lag tom sjekkliste for en kontroll ut fra systemtype og intervall (kopi av punktene). */
+/** Sjekklister for kontroller som gjelder hele eiendommen (uten system). Nøkkelen er kontrollens malKey i katalogen.
+ *  Brukes når kontrollen ikke hører til et system som har egen mal. Punktene svares OK / Avvik / I.R. på samme måte som for systemer. */
+export const KONTROLL_SJEKK: Record<string, { navn: string; beskr: string; punkter: SjekkPunkt[] }> = {
+  brann_dok: { navn: 'Brannteknisk dokumentasjon og branntegninger', beskr: 'Årlig gjennomgang: dokumentasjonen skal stemme med bygget slik det brukes i dag.', punkter: [
+    p('konsept', 'Brannkonsept / brannteknisk dokumentasjon finnes i siste versjon og er lett tilgjengelig'),
+    p('bruk', 'Brannkonseptet stemmer med dagens bruk av bygget (ingen bruksendring, nye leietakere eller aktiviteter som ikke er vurdert)'),
+    p('endringer', 'Ombygginger og endringer siden forrige gjennomgang er innarbeidet i tegninger og dokumentasjon'),
+    p('tegninger', 'Branntegningene stemmer med faktisk planløsning i alle etasjer (brannceller, brannskiller, rømningsveier, trapperom)'),
+    p('romning', 'Rømningsplaner henger i alle etasjer og enheter, er oppdatert og har riktig «Du er her»'),
+    p('utstyr', 'Slokkeutstyr (brannslukkere, brannslanger) og manuelle meldere er tegnet inn og står på riktig sted'),
+    p('install', 'Branntekniske installasjoner (brannalarm, nødlys, sprinkler, røykventilasjon) er dokumentert, og siste kontrollrapporter ligger i dokumentasjonen'),
+    p('ansvar', 'Brannansvarlig, kontaktpersoner og leietakernes ansvar er oppdatert i dokumentasjonen'),
+    p('brannvesen', 'Opplysninger brannvesenet trenger (innsatskart, nøkkelboks, tilkomst) er riktige og oppdaterte'),
+    p('avvik', 'Avvik fra forrige gjennomgang er lukket'),
+    p('arkiv', 'Oppdaterte dokumenter og tegninger er lagt inn under Dokumenter, og gamle versjoner er merket'),
+  ] },
+};
+/** Lag tom sjekkliste for en kontroll ut fra systemtype og intervall (kopi av punktene).
+ *  Finnes ingen mal for systemet, brukes eventuelt standardlisten for selve kontrollen (KONTROLL_SJEKK). */
 export function sysSjekkFor(maler: SjekkMal[], o: any, sysType?: string): SysSjekk | null {
   if (!o || o.kompSjekk === 'pa' || o.kompSjekk === 'av' || ['energivurdering', 'tilstand'].includes(o.malKey)) return null;
-  const m = systemMalFor(maler, sysType); if (!m) return null;
+  const m = systemMalFor(maler, sysType);
+  if (!m) { const k = !o.anleggId && !o.komponentId ? KONTROLL_SJEKK[o.malKey] : null; return k ? { malId: 'kontroll:' + o.malKey, navn: k.navn, punkter: k.punkter.map(x => ({ id: x.id, t: x.t })), svar: {} } : null; }
   return { malId: m.id, navn: m.navn, punkter: punkterFor(m, o.intervall).map(x => ({ id: x.id, t: x.t })), svar: {} };
 }
 /** Avvik fra sjekklisten som tekster. */
