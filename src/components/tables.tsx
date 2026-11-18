@@ -15,6 +15,7 @@ const justTip = (a: any) => { const y = Math.max(compYear(a) || YEAR, YEAR); ret
 import { today } from '../lib/utils';
 import { aNavn, byId, compRest, compYear, dUntil, docCoverage, eNavn, fd, intTxt, knok, lNavn, openAvvik, pad, pliktStatus, sortBy, tfmKomp, tfmSys, type Rec } from '../lib/utils';
 import { editAnlegg, editAvvik, editDok, editKomponent, toggleDokNA, utfor, visOppgave } from '../lib/actions';
+import { lastOppFlereDok, visDokumenterAvType } from '../lib/flereDok';
 import { enhetStatus } from '../lib/oppslag';
 import { openPlan, plasserteFor, visPaaTegning } from '../views/Arealer';
 import { tildeltNavn } from '../lib/arbeidsordre';
@@ -185,8 +186,9 @@ function CoverageTable1({ es }: { es: Rec[] }) {
     {es.map(e => { const c = docCoverage(e, PK); const rel = c.filter(x => x.s !== 'na'); const okk = rel.filter(x => x.s === 'ok' || x.s === 'soon').length;
       return <tr key={e.id}><td><a href={'#/eiendom/' + e.id}>{e.navn}</a></td>
         {c.map(x => { const sym = ({ ok: ['ok', '✓'], soon: ['exp', '!'], exp: ['exp', '!'], no: ['no', '✕'], na: ['na', '–'] } as any)[x.s]; const tip = ({ ok: 'Finnes', soon: 'Utløper innen 90 dager', exp: 'Utløpt', no: ok ? 'Mangler – klikk for å registrere' : 'Mangler', na: 'Ikke relevant' } as any)[x.s];
-          const click = () => { if (x.d) editDok(x.d.id); else if (!ok) return; else if (x.s === 'na') toggleDokNA(e.id, x.t); else editDok(undefined, { eiendomId: e.id, type: x.t, tittel: x.t }); };
-          return <td key={x.t}><span className={'dot ' + sym[0]} style={{ cursor: 'pointer' }} data-tip={`${tt(x.t)}: ${tt(tip)}`} onClick={click}>{sym[1]}</span>
+          const n = ((x as any).ds || []).length; const click = () => { if (n > 1) visDokumenterAvType(e.id, x.t); else if (x.d) editDok(x.d.id); else if (!ok) return; else if (x.s === 'na') toggleDokNA(e.id, x.t); else editDok(undefined, { eiendomId: e.id, type: x.t, tittel: x.t }); };
+          return <td key={x.t}><span className={'dot ' + sym[0]} style={{ cursor: 'pointer' }} data-tip={`${tt(x.t)}: ${tt(tip)}${n > 1 ? ' (' + n + ' ' + tt('dokumenter') + ')' : ''}`} onClick={click}>{sym[1]}</span>{n > 1 && <span className="small muted" style={{ fontSize: 10.5 }}> ×{n}</span>}
+            {ok && x.s !== 'na' && <><br /><a href="#" className="small muted" style={{ fontSize: 10.5 }} title={tt("Legg til flere dokumenter av denne typen")} onClick={ev => { ev.preventDefault(); lastOppFlereDok({ eiendomId: e.id, type: x.t }); }}>{tt("+ flere")}</a></>}
             {x.s === 'no' && ok && <><br /><a href="#" className="small muted" style={{ fontSize: 10.5 }} onClick={ev => { ev.preventDefault(); toggleDokNA(e.id, x.t); }}>{tt("ikke rel.")}</a></>}</td>; })}
         <td className="mono">{rel.length ? Math.round(okk / rel.length * 100) : 100}%</td></tr>; })}
   </tbody></table></Wrap>;

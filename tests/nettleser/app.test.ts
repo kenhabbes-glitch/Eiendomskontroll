@@ -314,3 +314,40 @@ test('gårdeier som kan opprette bygg: full meny med snarveier og redigering', a
     if (a.feil.length) assert.fail(a.feil[0]);
   } finally { await a.lukk(); }
 });
+
+test('dokumenter: flere filer lastes opp samtidig, og flere dokumenter kan ligge under samme type', async () => {
+  const a = await aapne('#/dokumenter'); try {
+    await a.side.getByRole('button', { name: /Last opp flere filer/ }).click();
+    const m = a.side.locator('.modal');
+    await m.locator('select').first().selectOption({ label: 'Testgården' });
+    await m.locator('select').nth(1).selectOption('Annet');
+    const f = (navn: string) => ({ name: navn, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 ' + navn) });
+    await m.locator('input[type=file]').setInputFiles([f('Brannrapport_2026.pdf'), f('Tegning 1.pdf'), f('Tegning 2.pdf')]);
+    assert.equal(await m.locator('tbody tr').count(), 3, 'alle tre filene skal stå i listen');
+    assert.equal(await m.locator('tbody input').first().inputValue(), 'Brannrapport 2026', 'tittelen foreslås fra filnavnet');
+    await m.getByRole('button', { name: /Last opp 3 filer/ }).click();
+    await m.getByText('Lagret', { exact: true }).nth(2).waitFor({ timeout: 8000 });
+    assert.equal(await m.getByText('Lagret', { exact: true }).count(), 3);
+    await m.getByRole('button', { name: /^Ferdig$/ }).click(); await a.side.waitForTimeout(400);
+    for (const t of ['Brannrapport 2026', 'Tegning 1', 'Tegning 2']) assert.ok(await a.side.locator('#main').getByText(t).count() >= 1, `«${t}» mangler i dokumentlisten`);
+    if (a.feil.length) assert.fail(a.feil[0]);
+  } finally { await a.lukk(); }
+});
+
+test('dokumentdekning: «+ flere» legger til flere dokumenter av samme type, og cellen viser antallet', async () => {
+  const a = await aapne('#/dokumenter'); try {
+    await a.side.locator('.matrix a', { hasText: '+ flere' }).first().click();
+    const m = a.side.locator('.modal');
+    assert.ok((await m.locator('select').first().inputValue()) !== '', 'eiendommen skal være valgt på forhånd');
+    const f = (navn: string) => ({ name: navn, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 ' + navn) });
+    await m.locator('input[type=file]').setInputFiles([f('Ferdigattest del 1.pdf'), f('Ferdigattest del 2.pdf')]);
+    await m.getByRole('button', { name: /Last opp 2 filer/ }).click();
+    await m.getByText('Lagret', { exact: true }).nth(1).waitFor({ timeout: 8000 });
+    await m.getByRole('button', { name: /^Ferdig$/ }).click(); await a.side.waitForTimeout(400);
+    assert.ok(await a.side.locator('.matrix').getByText('×2').count() >= 1, 'cellen skal vise ×2');
+    await a.side.locator('.matrix td', { hasText: '×2' }).locator('.dot').click(); await a.side.waitForTimeout(300);
+    const l = a.side.locator('.modal');
+    assert.ok(await l.getByText('Ferdigattest del 1', { exact: true }).count() === 1 && await l.getByText('Ferdigattest del 2', { exact: true }).count() === 1, 'listen skal vise begge dokumentene');
+    if (a.feil.length) assert.fail(a.feil[0]);
+  } finally { await a.lukk(); }
+});

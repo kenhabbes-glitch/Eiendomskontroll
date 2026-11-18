@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-18', dato: '2026-12-18', tittel: 'Last opp flere dokumenter samtidig', punkter: [
+    'Ny knapp «Last opp flere filer» på Dokumenter. Velg eller dra inn mange filer samtidig, velg eiendom og dokumenttype én gang, og hver fil blir et eget dokument. Tittelen foreslås ut fra filnavnet, og du kan rette den før opplasting.',
+    'I dokumentdekningen kan du nå legge til flere dokumenter under samme kategori med «+ flere». Når det finnes mer enn ett dokument av en type, vises antallet (for eksempel ×3), og et klikk på cellen viser alle dokumentene i en liste.',
+  ] },
   { id: '2026-12-17', dato: '2026-12-17', tittel: 'Sikkerhetskopi som fil', punkter: [
     'Under Import og eksport lager «Eksporter alle data» nå en JSON-fil direkte. I Chrome og Edge åpnes lagringsdialogen, så du velger selv hvor filen skal ligge. I andre nettlesere lastes filen ned til nedlastingsmappen. Du slipper å kopiere tekst.',
   ] },
