@@ -305,6 +305,18 @@ export async function forhandsvis(lid: string) {
   try { lastNed(await lagPakkePdf(e, l), filnavn(e, l)); } catch (err: any) { toast(tt("Kunne ikke lage PDF: ") + (err?.message || err)); }
 }
 
+/** Åpner brannvernpakken (PDF) i en ny fane uten å lagre eller sende den */
+export async function visPakke(lid: string) {
+  const l = byId('leietakere', lid)!; const e = byId('eiendommer', l.eiendomId)!;
+  if (!bvVersjon(e) && !bv(e).alarm) { toast(tt("Fyll ut brannkortet først")); return; }
+  const w = window.open('', '_blank');
+  try {
+    const bytes = await lagPakkePdf(e, l); const url = URL.createObjectURL(new Blob([bytes as any], { type: 'application/pdf' }));
+    if (w) { w.location.href = url; } else lastNed(bytes, filnavn(e, l));
+    setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
+  } catch (err: any) { w?.close(); toast(tt("Kunne ikke lage PDF: ") + (err?.message || err)); }
+}
+
 /** Eier registrerer bekreftelse mottatt utenfor appen (signert papir, e-post) */
 export function registrerKvittering(lid: string) {
   const l = byId('leietakere', lid)!; const e = byId('eiendommer', l.eiendomId)!; const v = bvVersjon(e);
@@ -410,7 +422,7 @@ export function BrannvernSection({ eid }: { eid: string }) {
           <td className="small">{a?.navn ? <>{a.navn}{a.tlf ? ', ' + a.tlf : ''}{a.stedfortreder && <div className="muted">{tt("Stedfortreder:")} {a.stedfortreder}</div>}</> : l.brannvernleder || <Chip c="amber">{tt("Ikke meldt")}</Chip>}</td>
           <td>{samordning(l) ? <Chip c="green">{tt("Registrert")}</Chip> : <Chip c="amber">{tt("Mangler")}</Chip>}</td>
           <td className="small">{ovelse(l) ? fd(ovelse(l)) : '–'}</td>
-          <td style={{ whiteSpace: 'nowrap' }}>{ed && <>{v > 0 && <button className="btn sm" onClick={async () => { if (await confirmBox(tt("Legge brannvernpakke v{0} i portalen til {1}? Det sendes ingen e-post.", v, l.navn), tt("Send"))) sendPakke(l.id); }}>{tt("Send")}</button>}<button className="btn sm" onClick={() => forhandsvis(l.id)}>{tt("PDF")}</button><button className="btn sm" onClick={() => registrerKvittering(l.id)} title={tt("Registrer signert papir eller bekreftelse på e-post")}>{tt("Registrer bekreftelse")}</button><button className="btn sm" onClick={() => editAnsvarlig(l.id)}>{tt("Ansvarlig")}</button></>}<button className="btn sm ghost" onClick={() => kvitteringer(l)}>{tt("Historikk")}</button></td>
+          <td style={{ whiteSpace: 'nowrap' }}>{ed && <>{v > 0 && <button className="btn sm" onClick={async () => { if (await confirmBox(tt("Legge brannvernpakke v{0} i portalen til {1}? Det sendes ingen e-post.", v, l.navn), tt("Send"))) sendPakke(l.id); }}>{tt("Send")}</button>}<button className="btn sm" onClick={() => visPakke(l.id)} title={tt("Se pakken som leietakeren vil få den, uten å sende")}>{tt("Forhåndsvis")}</button><button className="btn sm" onClick={() => forhandsvis(l.id)}>{tt("PDF")}</button><button className="btn sm" onClick={() => registrerKvittering(l.id)} title={tt("Registrer signert papir eller bekreftelse på e-post")}>{tt("Registrer bekreftelse")}</button><button className="btn sm" onClick={() => editAnsvarlig(l.id)}>{tt("Ansvarlig")}</button></>}<button className="btn sm ghost" onClick={() => kvitteringer(l)}>{tt("Historikk")}</button></td>
         </tr>; })}</tbody></table></div> : <div className="tbl-wrap"><Empty t="Ingen leietakere">{tt("Legg til leietakere på eiendommen.")}</Empty></div>}
     </div>
     <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>{tt("Samordning (FOB § 4)")}</h2>{ed && !felles && <button className="btn sm" onClick={() => editOppgave(undefined, { eiendomId: eid, navn: tt("Felles brannøvelse og samordningsmøte med leietakerne"), kategori: 'Brann', type: 'Lovpålagt', ansvar: 'Eier', intervall: { n: 1, enhet: 'år' }, nesteFrist: addDays(today(), 60), hjemmel: 'Forskrift om brannforebygging § 4 (samordning), §§ 11–12; internkontrollforskriften § 6', notat: 'Gjennomgå alarmorganisering, rømningsveier og oppstillingsplass. Avklar ansvar ved brannalarm, felles evakuering og kontaktpersoner. Før deltakerliste og læringspunkter.' })}>{tt("+ Planlegg felles brannøvelse")}</button>}</div>
@@ -430,7 +442,7 @@ export function BrannvernSection({ eid }: { eid: string }) {
 export function BrannvernKort({ l }: { l: Rec }) {
   const s = bvStatus(l); const e = byId('eiendommer', l.eiendomId); const v = bvVersjon(e); const k = sisteKvittering(l); const a = binfo(l).ansvarlig;
   return <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>{tt("Brannverninformasjon")}<Hjelp id="side.brannvern" /></h2>
-    {v > 0 && <button className="btn sm pri" onClick={async () => { if (await confirmBox(tt("Legge brannvernpakke v{0} i portalen til {1}? Det sendes ingen e-post.", v, l.navn), tt("Send"))) sendPakke(l.id); }}>{tt("Send brannvernpakke v")}{v}</button>}<button className="btn sm" onClick={() => forhandsvis(l.id)}>{tt("Last ned PDF")}</button><button className="btn sm" onClick={() => registrerKvittering(l.id)}>{tt("Registrer bekreftelse")}</button><button className="btn sm" onClick={() => editAnsvarlig(l.id)}>{tt("Brannvernansvarlig")}</button><button className="btn sm ghost" onClick={() => kvitteringer(l)}>{tt("Historikk")}</button></div>
+    {v > 0 && <button className="btn sm pri" onClick={async () => { if (await confirmBox(tt("Legge brannvernpakke v{0} i portalen til {1}? Det sendes ingen e-post.", v, l.navn), tt("Send"))) sendPakke(l.id); }}>{tt("Send brannvernpakke v")}{v}</button>}<button className="btn sm" onClick={() => visPakke(l.id)}>{tt("Forhåndsvis pakke")}</button><button className="btn sm" onClick={() => forhandsvis(l.id)}>{tt("Last ned PDF")}</button><button className="btn sm" onClick={() => registrerKvittering(l.id)}>{tt("Registrer bekreftelse")}</button><button className="btn sm" onClick={() => editAnsvarlig(l.id)}>{tt("Brannvernansvarlig")}</button><button className="btn sm ghost" onClick={() => kvitteringer(l)}>{tt("Historikk")}</button></div>
     <div className="card"><dl className="dl"><dt>{tt("Status")}</dt><dd><Chip c={s.c}>{s.t}</Chip>{s.hint && <span className="small muted"> {s.hint}</span>}</dd>
       <dt>{tt("Sist bekreftet")}</dt><dd>{k ? tt("v{0} {1} – {2} ({3})", k.versjon, fd(k.tid), k.navn || '', k.form || '') : '–'}</dd>
       <dt>{tt("Brannvernansvarlig")}</dt><dd>{a?.navn ? [a.navn, a.tlf, a.epost].filter(Boolean).join(' · ') + (a.stedfortreder ? tt(" · stedfortreder ") + a.stedfortreder : '') : l.brannvernleder || <Chip c="amber">{tt("Ikke meldt")}</Chip>}</dd></dl>

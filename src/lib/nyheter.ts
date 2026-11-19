@@ -1,6 +1,9 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-22', dato: '2026-12-22', tittel: 'Forhåndsvis brannvernpakken', punkter: [
+    'Under Brannvern kan du nå trykke «Forhåndsvis» for å se brannvernpakken til en leietaker i en ny fane før du sender den. Ingenting lagres eller sendes.',
+  ] },
   { id: '2026-12-21', dato: '2026-12-21', tittel: 'Samordningsavtale telles nå i Brannvern', punkter: [
     'Samordningsavtale som er lastet opp under leietakerens plikter vises nå som «Registrert» i Brannvern og tas med i Brannboken.',
   ] },
