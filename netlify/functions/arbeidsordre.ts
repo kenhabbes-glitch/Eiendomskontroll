@@ -12,6 +12,7 @@ import daOrd from '../../src/i18n/da.json';
 import esMxOrd from '../../src/i18n/es-MX.json';
 import esEsOrd from '../../src/i18n/es-ES.json';
 import { pushTilOrg, pushTilBrukere } from '../../src/lib/serverPush';
+import { opplaering } from '../../src/lib/opplaeringServer';
 import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 // Lagringen godtar bare ASCII i filbanen
 const asciiNavn = (n: any) => String(n || 'fil').replace(/[æÆ]/g, m => m === 'æ' ? 'ae' : 'Ae').replace(/[øØ]/g, m => m === 'ø' ? 'o' : 'O').replace(/[åÅ]/g, m => m === 'å' ? 'a' : 'A')
@@ -941,6 +942,7 @@ const handler = async (req: Request) => {
     const { data } = await admin.from('prosjekter').select('*').contains('data', { rapporter: [{ tokenHash: h }] }).limit(1);
     const p = data?.[0]; if (!p) return null; const r = (p.data?.rapporter || []).find((x: any) => x.tokenHash === h); return r ? { p, r } : null;
   };
+  if (String(body.action || '').startsWith('opl_')) { const r = await opplaering({ admin, body, json, esc, hvem, kanRedigere, harEiendom, sendEpost, oppsettFor, minOrg, sprakFor: sprakFor as any }); if (r) return r; }
   if (body.action === 'pr_send') {
     const u = await hvem(); if (!u) return json(401, { error: 'Ikke innlogget' });
     const { data: p } = await admin.from('prosjekter').select('*').eq('id', body.prosjekt_id).maybeSingle(); if (!p) return json(404, { error: 'Fant ikke prosjektet' });

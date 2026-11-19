@@ -12,9 +12,10 @@
 //
 // Data: eiendom.brannvern = byggets brannkort (versjonert). leietaker.brannInfo = utsendinger, bekreftelser og
 // brannvernansvarlig. Leietaker skriver bare gjennom databasefunksjonene i migrering 013.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PDFDocument } from 'pdf-lib';
-import { S, canEdit, fileUrl, kanRedigereE, loggHendelse, save, sb, state, toast, feiltekst , uploadFile } from './store';
+import { S, aoApi, canEdit, fileUrl, kanRedigereE, loggHendelse, save, sb, state, toast, feiltekst , uploadFile } from './store';
+import { byggOpplaering } from './opplaering';
 import { AV_LUKKET } from './catalog';
 import { aNavn, addDays, byId, fd, kNavn, sortBy, taggerFor, today, type Rec } from './utils';
 import { Doc, M, INK, MUTED, ACC, RED, profilFor } from './arealRapport';
@@ -317,6 +318,33 @@ export async function visPakke(lid: string) {
   } catch (err: any) { w?.close(); toast(tt("Kunne ikke lage PDF: ") + (err?.message || err)); }
 }
 
+/** Eier sender den interaktive opplæringen til leietakerens brannvernleder/hovedkontakt (personlig lenke på e-post) */
+export function sendOpplaering(lid: string) {
+  const l = byId('leietakere', lid)!; const e = byId('eiendommer', l.eiendomId)!; const a = binfo(l).ansvarlig || {};
+  if (!bvVersjon(e) && !bv(e).alarm) { toast(tt("Fyll ut brannkortet først")); return; }
+  formModal({
+    title: tt("Send brannvernopplæring – ") + l.navn, saveTxt: tt("Send lenke"),
+    top: <p className="small muted" style={{ marginTop: 0 }}>{tt("Mottakeren får en personlig lenke på e-post og gjennomgår opplæringen med noen enkle spørsmål. Etterpå kan vedkommende invitere egne ansatte og følge opp dem. Du ser bare hvor mange prosent som har gjennomført.")}</p>,
+    fields: [{ k: 'navn', label: tt("Brannvernleder / hovedkontakt"), req: true, def: a.navn || l.brannvernleder?.replace(/\s*\(.*$/, '') || l.kontakt || '', half: true }, { k: 'epost', label: tt("E-post"), type: 'email', req: true, def: a.epost || l.epost || '', half: true },
+      { k: 'melding', label: tt("Egen hilsen (valgfritt)"), type: 'textarea' }],
+    onSave: async x => {
+      try {
+        const r = await aoApi({ action: 'opl_start', leietaker_id: lid, innhold: byggOpplaering(e, l), versjon: bvVersjon(e), navn: x.navn, epost: x.epost, melding: x.melding, lenkeBase: location.origin });
+        if (r.sendt) toast(tt("Lenken er sendt til {0}", x.epost));
+        else { try { await navigator.clipboard.writeText(r.lenke); } catch { } toast(r.grunn || tt("E-post ble ikke sendt")); showModal(tt("Lenke til opplæringen"), () => <><p className="small">{r.grunn}</p><p>{tt("Send denne lenken til {0} selv (den er også kopiert):", x.navn)}</p><p><code style={{ wordBreak: 'break-all' }}>{r.lenke}</code></p></>); }
+        window.dispatchEvent(new Event('opl-oppdatert'));
+      } catch (err: any) { toast(err?.message || String(err)); return false; }
+    },
+  });
+}
+/** Prosent som har gjennomført opplæringen, per leietaker (ingen navn) */
+export function useOpplaeringStatus(eid: string) {
+  const [st, setSt] = useState<Record<string, { invitert: number; fullfort: number }>>({});
+  const last = () => aoApi({ action: 'opl_status', eiendom_id: eid }).then(r => { const m: Record<string, any> = {}; (r.status || []).forEach((x: any) => { m[x.leietaker_id] = x; }); setSt(m); }).catch(() => { });
+  useEffect(() => { last(); const f = () => last(); window.addEventListener('opl-oppdatert', f); return () => window.removeEventListener('opl-oppdatert', f); }, [eid]);
+  return st;
+}
+
 /** Eier registrerer bekreftelse mottatt utenfor appen (signert papir, e-post) */
 export function registrerKvittering(lid: string) {
   const l = byId('leietakere', lid)!; const e = byId('eiendommer', l.eiendomId)!; const v = bvVersjon(e);
@@ -386,7 +414,7 @@ export function samordningDok(l: Rec): Rec | undefined {
 export function BrannvernSection({ eid }: { eid: string }) {
   const e = byId('eiendommer', eid)!; const b = bv(e); const v = bvVersjon(e); const ed = canEdit() && kanRedigereE(eid);
   const L = sortBy(S.leietakere.filter(l => l.eiendomId === eid), l => l.navn); const I = brannInstallasjoner(eid);
-  const midl = b.midlertidig || []; const [visAvsl, setVisAvsl] = useState(false);
+  const midl = b.midlertidig || []; const [visAvsl, setVisAvsl] = useState(false); const opl = useOpplaeringStatus(eid);
   const harKonsept = S.dokumenter.some(d => d.eiendomId === eid && d.type === 'Brannkonsept/brannteknisk dokumentasjon');
   const harPdfKonsept = S.dokumenter.some(d => d.eiendomId === eid && !d.leietakerId && d.type === 'Brannkonsept/brannteknisk dokumentasjon' && /\.pdf$/i.test(d.fil?.navn || d.fil?.path || ''));
   const samordning = (l: Rec) => !!samordningDok(l);
@@ -415,14 +443,15 @@ export function BrannvernSection({ eid }: { eid: string }) {
     </div>
     <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>{tt("Informasjon til leietakerne")}</h2>
       {ed && <><button className="btn sm" onClick={() => midlertidig(eid)}>{tt("Varsle om redusert brannsikkerhet")}</button><button className="btn sm pri" disabled={!v} onClick={() => velgOgSend(eid)}>{tt("Send til leietakere …")}</button></>}</div>
-      {L.length ? <div className="tbl-wrap"><table><thead><tr><th>{tt("Leietaker")}</th><th>{tt("Status")}</th><th>{tt("Brannvernansvarlig")}</th><th>{tt("Samordningsavtale")}</th><th>{tt("Siste brannøvelse")}</th><th /></tr></thead><tbody>
+      {L.length ? <div className="tbl-wrap"><table><thead><tr><th>{tt("Leietaker")}</th><th>{tt("Status")}</th><th>{tt("Brannvernansvarlig")}</th><th>{tt("Samordningsavtale")}</th><th>{tt("Siste brannøvelse")}</th><th>{tt("Opplæring")}</th><th /></tr></thead><tbody>
         {L.map(l => { const s = bvStatus(l); const a = binfo(l).ansvarlig; return <tr key={l.id}>
           <td><a href={'#/leietaker/' + l.id}>{l.navn}</a>{l.lokale && <div className="small muted">{l.lokale}</div>}</td>
           <td><Chip c={s.c}>{s.t}</Chip>{s.hint && <div className="small muted">{s.hint}</div>}</td>
           <td className="small">{a?.navn ? <>{a.navn}{a.tlf ? ', ' + a.tlf : ''}{a.stedfortreder && <div className="muted">{tt("Stedfortreder:")} {a.stedfortreder}</div>}</> : l.brannvernleder || <Chip c="amber">{tt("Ikke meldt")}</Chip>}</td>
           <td>{samordning(l) ? <Chip c="green">{tt("Registrert")}</Chip> : <Chip c="amber">{tt("Mangler")}</Chip>}</td>
           <td className="small">{ovelse(l) ? fd(ovelse(l)) : '–'}</td>
-          <td style={{ whiteSpace: 'nowrap' }}>{ed && <>{v > 0 && <button className="btn sm" onClick={async () => { if (await confirmBox(tt("Legge brannvernpakke v{0} i portalen til {1}? Det sendes ingen e-post.", v, l.navn), tt("Send"))) sendPakke(l.id); }}>{tt("Send")}</button>}<button className="btn sm" onClick={() => visPakke(l.id)} title={tt("Se pakken som leietakeren vil få den, uten å sende")}>{tt("Forhåndsvis")}</button><button className="btn sm" onClick={() => forhandsvis(l.id)}>{tt("PDF")}</button><button className="btn sm" onClick={() => registrerKvittering(l.id)} title={tt("Registrer signert papir eller bekreftelse på e-post")}>{tt("Registrer bekreftelse")}</button><button className="btn sm" onClick={() => editAnsvarlig(l.id)}>{tt("Ansvarlig")}</button></>}<button className="btn sm ghost" onClick={() => kvitteringer(l)}>{tt("Historikk")}</button></td>
+          <td className="small">{opl[l.id] ? <><b>{Math.round(100 * opl[l.id].fullfort / Math.max(1, opl[l.id].invitert))} %</b> <span className="muted">{tt("har gjennomført")}</span></> : <span className="muted">{tt("Ikke sendt")}</span>}</td>
+          <td style={{ whiteSpace: 'nowrap' }}>{ed && <>{v > 0 && <button className="btn sm" onClick={async () => { if (await confirmBox(tt("Legge brannvernpakke v{0} i portalen til {1}? Det sendes ingen e-post.", v, l.navn), tt("Send"))) sendPakke(l.id); }}>{tt("Send")}</button>}<button className="btn sm" onClick={() => sendOpplaering(l.id)} title={tt("Send interaktiv opplæring med spørsmål til brannvernleder/hovedkontakt")}>{tt("Opplæring")}</button><button className="btn sm" onClick={() => visPakke(l.id)} title={tt("Se pakken som leietakeren vil få den, uten å sende")}>{tt("Forhåndsvis")}</button><button className="btn sm" onClick={() => forhandsvis(l.id)}>{tt("PDF")}</button><button className="btn sm" onClick={() => registrerKvittering(l.id)} title={tt("Registrer signert papir eller bekreftelse på e-post")}>{tt("Registrer bekreftelse")}</button><button className="btn sm" onClick={() => editAnsvarlig(l.id)}>{tt("Ansvarlig")}</button></>}<button className="btn sm ghost" onClick={() => kvitteringer(l)}>{tt("Historikk")}</button></td>
         </tr>; })}</tbody></table></div> : <div className="tbl-wrap"><Empty t="Ingen leietakere">{tt("Legg til leietakere på eiendommen.")}</Empty></div>}
     </div>
     <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>{tt("Samordning (FOB § 4)")}</h2>{ed && !felles && <button className="btn sm" onClick={() => editOppgave(undefined, { eiendomId: eid, navn: tt("Felles brannøvelse og samordningsmøte med leietakerne"), kategori: 'Brann', type: 'Lovpålagt', ansvar: 'Eier', intervall: { n: 1, enhet: 'år' }, nesteFrist: addDays(today(), 60), hjemmel: 'Forskrift om brannforebygging § 4 (samordning), §§ 11–12; internkontrollforskriften § 6', notat: 'Gjennomgå alarmorganisering, rømningsveier og oppstillingsplass. Avklar ansvar ved brannalarm, felles evakuering og kontaktpersoner. Før deltakerliste og læringspunkter.' })}>{tt("+ Planlegg felles brannøvelse")}</button>}</div>
