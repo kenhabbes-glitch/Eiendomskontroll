@@ -22,6 +22,10 @@ export function OpLenke({ token }: { token: string }) {
     try { const r = await api('opl_sjekk', token, { spm: s.spm.id, valg }); setSvar(r); if (r.riktig) setRiktige(r.riktige); } catch (e: any) { setErr(e.message); }
     setBusy(false);
   };
+  const apne = async (fil: string) => {
+    const w = window.open('', '_blank');
+    try { const r = await api('opl_fil', token, { fil }); if (w) w.location.href = r.url; else location.href = r.url; } catch (e: any) { w?.close(); setErr(e.message); }
+  };
   const neste = async () => {
     setSvar(null); setValg(null); setErr('');
     if (!sisteSteg) return setI(i + 1);
@@ -44,6 +48,8 @@ export function OpLenke({ token }: { token: string }) {
           <p className="small muted" style={{ margin: 0 }}>{tt("Steg {0} av {1}", i + 1, steg.length)}</p>
           <h2 style={{ margin: '4px 0 8px' }}>{s.tittel}</h2>
           {s.tekst.map((t: string, k: number) => <p key={k} style={{ margin: '0 0 8px', whiteSpace: 'pre-wrap' }}>{t}</p>)}
+          {(s.filer || []).length > 0 && <div style={{ margin: '4px 0 10px' }}><p className="small muted" style={{ margin: '0 0 4px' }}>{tt("Dokumenter – åpnes i ny fane")}</p>
+            {s.filer.map((f: any) => <button key={f.id} type="button" className="btn sm" style={{ margin: '0 6px 6px 0' }} onClick={() => apne(f.id)}>📄 {f.tittel}</button>)}</div>}
           {s.spm && <div className="note" style={{ color: 'var(--ink)', background: 'var(--surface)', marginTop: 10 }}>
             <b>{s.spm.q}</b>
             {s.spm.valg.map((v: string, k: number) => <label key={k} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '8px 0', fontWeight: 400 }}>

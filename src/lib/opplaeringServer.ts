@@ -4,7 +4,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type OplSpm = { id: string; q: string; valg: string[]; riktig: number; forklaring: string; tips?: string };
-export type OplSteg = { id: string; tittel: string; tekst: string[]; spm?: OplSpm };
+export type OplFil = { id: string; tittel: string; path?: string };
+export type OplSteg = { id: string; tittel: string; tekst: string[]; spm?: OplSpm; filer?: OplFil[] };
 export type OplInnhold = { tittel: string; steg: OplSteg[] };
 
 type Ctx = {
@@ -26,6 +27,8 @@ export function renInnhold(x: any): OplInnhold | null {
   for (const st of x.steg) {
     const id = s(st.id, 40); if (!id || ids.has(id)) return null; ids.add(id);
     const o: OplSteg = { id, tittel: s(st.tittel, 140), tekst: (Array.isArray(st.tekst) ? st.tekst : []).slice(0, 30).map((t: any) => s(t, 1200)).filter(Boolean) };
+    o.filer = (Array.isArray(st.filer) ? st.filer : []).slice(0, 12).filter((f: any) => f && typeof f.path === 'string' && f.path).map((f: any, k: number) => ({ id: s(st.id, 40) + '-f' + k, tittel: s(f.tittel, 160) || 'Dokument', path: s(f.path, 400) }));
+    if (!o.filer?.length) delete o.filer;
     if (st.spm) {
       const v = (Array.isArray(st.spm.valg) ? st.spm.valg : []).slice(0, 6).map((t: any) => s(t, 300));
       const r = Number(st.spm.riktig); if (v.length < 2 || !Number.isInteger(r) || r < 0 || r >= v.length) return null;
@@ -38,7 +41,7 @@ export function renInnhold(x: any): OplInnhold | null {
 }
 const spmListe = (k: OplInnhold) => k.steg.map(s => s.spm).filter(Boolean) as OplSpm[];
 /** Innhold uten fasit – det nettleseren får se */
-const utenFasit = (k: OplInnhold) => ({ tittel: k.tittel, steg: k.steg.map(s => ({ id: s.id, tittel: s.tittel, tekst: s.tekst, spm: s.spm ? { id: s.spm.id, q: s.spm.q, valg: s.spm.valg } : undefined })) });
+const utenFasit = (k: OplInnhold) => ({ tittel: k.tittel, steg: k.steg.map(s => ({ id: s.id, tittel: s.tittel, tekst: s.tekst, filer: s.filer?.map(f => ({ id: f.id, tittel: f.tittel })), spm: s.spm ? { id: s.spm.id, q: s.spm.q, valg: s.spm.valg } : undefined })) });
 
 export async function opplaering(c: Ctx): Promise<Response | null> {
   const { admin, body, json, esc } = c; const a = String(body.action || '');
@@ -63,6 +66,8 @@ export async function opplaering(c: Ctx): Promise<Response | null> {
     const { data: lt } = await admin.from('leietakere').select('*').eq('id', body.leietaker_id).maybeSingle(); if (!lt) return json(404, { error: 'Fant ikke leietakeren' });
     if (!(await c.kanRedigere(u, lt.eiendom_id))) return json(403, { error: 'Du har ikke redigeringstilgang til eiendommen' });
     const inn = renInnhold(body.innhold); if (!inn) return json(400, { error: 'Opplæringen er ufullstendig. Fyll ut brannkortet og prøv igjen.' });
+    // filer må ligge i eiendommens egen mappe i lagringen
+    inn.steg.forEach(st => { if (st.filer) { st.filer = st.filer.filter(f => f.path && f.path.startsWith(lt.eiendom_id + '/') && !f.path.includes('..')); if (!st.filer.length) delete st.filer; } });
     const til = String(body.epost || '').trim().toLowerCase(); if (!EPOST.test(til)) return json(400, { error: 'Ugyldig e-postadresse' });
     const navn = String(body.navn || '').trim().slice(0, 80); if (!navn) return json(400, { error: 'Skriv navnet på mottakeren' });
     const versjon = Math.max(0, Math.floor(+body.versjon || 0));
@@ -101,6 +106,11 @@ export async function opplaering(c: Ctx): Promise<Response | null> {
   if (a === 'opl_info') {
     if (!d.startet_tid) await admin.from('opplaering_deltakere').update({ startet_tid: new Date().toISOString() }).eq('id', d.id);
     return json(200, { rolle: d.rolle, navn: d.navn, leietaker: f.leietaker, eiendom: f.eiendom, innhold: utenFasit(innhold), riktige: d.riktige || [], fullfort: d.fullfort_tid || null });
+  }
+  if (a === 'opl_fil') {
+    const fil = innhold.steg.flatMap(s => s.filer || []).find(x => x.id === String(body.fil || '')); if (!fil?.path) return json(404, { error: 'Fant ikke filen' });
+    const { data: u, error } = await admin.storage.from('filer').createSignedUrl(fil.path, 900); if (error || !u) return json(404, { error: 'Fant ikke filen' });
+    return json(200, { url: u.signedUrl });
   }
   if (a === 'opl_sjekk') {
     const s = spm.find(x => x.id === String(body.spm || '')); if (!s) return json(400, { error: 'Ukjent spørsmål' });

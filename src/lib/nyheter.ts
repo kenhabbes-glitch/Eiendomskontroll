@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-25', dato: '2026-12-25', tittel: 'Rømningsplaner og branndokumenter i opplæringen', punkter: [
+    'Brannvernopplæringen har nå egne steg for rømningsplan, varslingsplan og husordens-/trivselsregler, og et steg for annen branndokumentasjon.',
+    'Dokumentene du har valgt som vedlegg i brannkortet kan åpnes direkte fra opplæringen.',
+    'Nye dokumenttyper: «Varslingsplan» og «Husordensregler/trivselsregler».',
+  ] },
   { id: '2026-12-24', dato: '2026-12-24', tittel: 'Chat med leietakere i sanntid', punkter: [
     'Hver leietaker har nå en chat. Nye meldinger vises med en gang, og du ser når den andre skriver.',
     'Meldinger du skriver er interne som standard, så leietakeren ser dem ikke. Du kan dele en intern melding med leietakeren med ett klikk.',

@@ -144,7 +144,7 @@ export function brannInstallasjoner(eid: string, lid?: string) {
   const sisteKontroll = (a: Rec) => sortBy(S.oppgaver.filter(o => o.anleggId === a.id && o.sistUtfort), o => o.sistUtfort).pop()?.sistUtfort;
   return { sys: sys.map(a => ({ a, ansvar: ansvar(a), sist: sisteKontroll(a) })), komp, harSoner: soner.length > 0 };
 }
-export const brannDokumenter = (eid: string) => S.dokumenter.filter(d => d.eiendomId === eid && !d.leietakerId && d.fil && /brann|rømning/i.test((d.type || '') + ' ' + (d.tittel || '')));
+export const brannDokumenter = (eid: string) => S.dokumenter.filter(d => d.eiendomId === eid && !d.leietakerId && d.fil && /brann|rømning|varsling|husorden|trivsel|husregler/i.test((d.type || '') + ' ' + (d.tittel || '')));
 const ikkeUtfylt = (b: Rec) => ['alarm', 'oppstilling'].filter(k => !String(b[k] || '').trim());
 
 // ---------------- eiers handlinger
@@ -171,9 +171,9 @@ export function editBrannkort(eid: string) {
       { k: 'eierAnsvarlig', label: tt("Eiers kontaktperson for brannsikkerhet"), half: true }, { k: 'eierTlf', label: tt("Telefon"), half: true },
       { k: 's3', label: tt("Husregler og vedlegg"), type: 'sec' },
       { k: 'regler', label: tt("Husregler for brannsikkerhet (én per linje)"), type: 'textarea' },
-      { k: 'vedlegg', label: tt("Rømningsplaner og branntegninger som legges ved pakken"), type: 'custom', def: b.vedlegg || [], render: (v, set) => kandidater.length
+      { k: 'vedlegg', label: tt("Rømningsplaner, varslingsplan, husordensregler og annen branndokumentasjon (legges ved pakken og vises i opplæringen)"), type: 'custom', def: b.vedlegg || [], render: (v, set) => kandidater.length
         ? <div className="note small" style={{ color: 'var(--ink)' }}>{kandidater.map(d => { const on = (v.vedlegg || []).includes(d.id); return <label key={d.id} style={{ display: 'flex', gap: 8, margin: '3px 0', fontWeight: 400, cursor: 'pointer' }}><input type="checkbox" checked={on} onChange={() => set({ vedlegg: on ? v.vedlegg.filter((x: string) => x !== d.id) : [...(v.vedlegg || []), d.id] })} />{d.tittel} <span className="muted">· {d.type}{/\.(pdf|png|jpe?g)$/i.test(d.fil?.navn || '') ? '' : tt(" (bare PDF/PNG/JPG kan legges ved)")}</span></label>; })}</div>
-        : <div className="small muted">{tt("Ingen branndokumenter med fil på eiendommen. Last opp «Branntegninger/rømningsplaner» under Dokumenter.")}</div> },
+        : <div className="small muted">{tt("Ingen branndokumenter med fil på eiendommen. Last opp for eksempel «Branntegninger/rømningsplaner», «Varslingsplan» eller «Husordensregler/trivselsregler» under Dokumenter.")}</div> },
     ],
     onSave: async v => {
       const ny: Rec = { ...b }; for (const k of INNHOLD) ny[k] = v[k] ?? ''; ny.maksPersoner = v.maksPersoner === '' ? '' : +v.maksPersoner;
@@ -469,11 +469,12 @@ export function BrannvernSection({ eid }: { eid: string }) {
 
 // ---------------- kort på leietakersiden
 export function BrannvernKort({ l }: { l: Rec }) {
-  const s = bvStatus(l); const e = byId('eiendommer', l.eiendomId); const v = bvVersjon(e); const k = sisteKvittering(l); const a = binfo(l).ansvarlig;
+  const s = bvStatus(l); const e = byId('eiendommer', l.eiendomId); const v = bvVersjon(e); const k = sisteKvittering(l); const a = binfo(l).ansvarlig; const opl = useOpplaeringStatus(l.eiendomId)[l.id];
   return <div className="sec"><div className="toolbar"><h2 style={{ margin: 0, flex: 1 }}>{tt("Brannverninformasjon")}<Hjelp id="side.brannvern" /></h2>
-    {v > 0 && <button className="btn sm pri" onClick={async () => { if (await confirmBox(tt("Legge brannvernpakke v{0} i portalen til {1}? Det sendes ingen e-post.", v, l.navn), tt("Send"))) sendPakke(l.id); }}>{tt("Send brannvernpakke v")}{v}</button>}<button className="btn sm" onClick={() => visPakke(l.id)}>{tt("Forhåndsvis pakke")}</button><button className="btn sm" onClick={() => forhandsvis(l.id)}>{tt("Last ned PDF")}</button><button className="btn sm" onClick={() => registrerKvittering(l.id)}>{tt("Registrer bekreftelse")}</button><button className="btn sm" onClick={() => editAnsvarlig(l.id)}>{tt("Brannvernansvarlig")}</button><button className="btn sm ghost" onClick={() => kvitteringer(l)}>{tt("Historikk")}</button></div>
+    {v > 0 && <button className="btn sm pri" onClick={async () => { if (await confirmBox(tt("Legge brannvernpakke v{0} i portalen til {1}? Det sendes ingen e-post.", v, l.navn), tt("Send"))) sendPakke(l.id); }}>{tt("Send brannvernpakke v")}{v}</button>}<button className="btn sm" onClick={() => sendOpplaering(l.id)} title={tt("Send interaktiv opplæring med spørsmål til brannvernleder/hovedkontakt")}>{tt("Send opplæring")}</button><button className="btn sm" onClick={() => visPakke(l.id)}>{tt("Forhåndsvis pakke")}</button><button className="btn sm" onClick={() => forhandsvis(l.id)}>{tt("Last ned PDF")}</button><button className="btn sm" onClick={() => registrerKvittering(l.id)}>{tt("Registrer bekreftelse")}</button><button className="btn sm" onClick={() => editAnsvarlig(l.id)}>{tt("Brannvernansvarlig")}</button><button className="btn sm ghost" onClick={() => kvitteringer(l)}>{tt("Historikk")}</button></div>
     <div className="card"><dl className="dl"><dt>{tt("Status")}</dt><dd><Chip c={s.c}>{s.t}</Chip>{s.hint && <span className="small muted"> {s.hint}</span>}</dd>
       <dt>{tt("Sist bekreftet")}</dt><dd>{k ? tt("v{0} {1} – {2} ({3})", k.versjon, fd(k.tid), k.navn || '', k.form || '') : '–'}</dd>
+      <dt>{tt("Opplæring")}</dt><dd>{opl ? <><b>{Math.round(100 * opl.fullfort / Math.max(1, opl.invitert))} %</b> <span className="muted">{tt("har gjennomført")}</span></> : <span className="muted">{tt("Ikke sendt – bruk «Send opplæring» for å gi brannvernleder en personlig lenke")}</span>}</dd>
       <dt>{tt("Brannvernansvarlig")}</dt><dd>{a?.navn ? [a.navn, a.tlf, a.epost].filter(Boolean).join(' · ') + (a.stedfortreder ? tt(" · stedfortreder ") + a.stedfortreder : '') : l.brannvernleder || <Chip c="amber">{tt("Ikke meldt")}</Chip>}</dd></dl>
       <p className="small muted" style={{ marginBottom: 0 }}>{tt("Brannkortet og utsending til alle leietakere finner du på eiendommen under fanen")} <a href={'#/eiendom/' + l.eiendomId}>{tt("Brannvern")}</a>.</p></div></div>;
 }
