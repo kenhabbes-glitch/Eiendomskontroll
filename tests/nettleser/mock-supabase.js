@@ -78,7 +78,7 @@ export function createClient() {
       download: async path => files[path] ? { data: await (await fetch(files[path])).blob(), error: null } : { data: null, error: { message: 'not found' } },
       remove: async () => ({ error: null }),
     }) },
-    channel: () => { const c = { on: () => c, subscribe: () => c }; return c; }, removeChannel: () => {},
+    channel: () => { const c = { on: () => c, subscribe: () => c, track: () => {}, presenceState: () => ({}) }; return c; }, removeChannel: () => {},
   };
 }
 window.__mockdb = db;

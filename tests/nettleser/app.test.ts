@@ -351,3 +351,19 @@ test('dokumentdekning: «+ flere» legger til flere dokumenter av samme type, og
     if (a.feil.length) assert.fail(a.feil[0]);
   } finally { await a.lukk(); }
 });
+
+test('chat: ny samtale er intern som standard, og «Fellesmelding» kan åpnes', async () => {
+  const data = grunndata(); data.leietakere = [{ id: 'l1', eiendom_id: 'e1', created_at: NAA, data: { eiendomId: 'e1', navn: 'Firma AS' } }];
+  const a = await aapne('#/meldinger', { data }); try {
+    await a.side.getByRole('button', { name: 'Ny samtale' }).click();
+    const m = a.side.locator('.modal'); await m.locator('#f_lt').selectOption('l1', { force: true });
+    await m.getByRole('button', { name: /Åpne samtale/ }).click(); await a.side.waitForTimeout(500);
+    const s = a.side.locator('.modal').last();
+    assert.ok(await s.getByText(/Bare internt – leietaker ser ikke denne meldingen/).count() === 1, 'standardvalget skal være intern');
+    assert.equal(await s.locator('select').first().inputValue(), 'intern');
+    await a.side.keyboard.press('Escape'); await a.side.waitForTimeout(200);
+    await a.side.getByRole('button', { name: 'Fellesmelding', exact: true }).click(); await a.side.waitForTimeout(400);
+    assert.ok(await a.side.locator('.modal').getByText('Fellesmelding til leietakere').count() >= 1);
+    if (a.feil.length) assert.fail(a.feil[0]);
+  } finally { await a.lukk(); }
+});

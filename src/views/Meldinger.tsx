@@ -1,6 +1,7 @@
 // Utleierens meldingsoversikt: siste samtaler med leietakere, ulest først.
 import { useEffect, useState } from 'react';
-import { S, kanDrifteE, sb, useStore } from '../lib/store';
+import { S, kanDrifteE, sb, state, toast, useStore } from '../lib/store';
+import { formModal } from '../components/ui';
 import { Samtale, malAv, type Melding } from '../components/Samtale';
 import { AlvChip, Empty, FileLink, StChip, showModal } from '../components/ui';
 import { byId, fd } from '../lib/utils';
@@ -16,6 +17,34 @@ export function samtaleModal(m: { eiendom_id: string; leietaker_id: string | nul
       {(a.vedlegg || []).length > 0 && <p style={{ margin: '6px 0 0' }}>{a.vedlegg.map((f: any, i: number) => <span key={i} style={{ marginRight: 10 }}>📎 <FileLink fil={f} /></span>)}</p>}
     </div>}
     <Samtale eiendomId={m.eiendom_id} leietakerId={m.leietaker_id || undefined} avvikId={m.avvik_id || undefined} /></>, { wide: true });
+}
+
+/** Starter en samtale med en leietaker (uten sak) */
+function nySamtale() {
+  const L = S.leietakere.filter(l => kanDrifteE(l.eiendomId)).sort((a, b) => (a.navn || '').localeCompare(b.navn || ''));
+  formModal({ title: tt("Ny samtale"), saveTxt: tt("Åpne samtale"), fields: [{ k: 'lt', label: tt("Leietaker"), type: 'select', req: true, options: L.map(l => [l.id, `${l.navn} – ${byId('eiendommer', l.eiendomId)?.navn || ''}`] as [string, string]) }], values: { lt: '' },
+    onSave: async v => { const l = byId('leietakere', v.lt); if (l) setTimeout(() => samtaleModal({ eiendom_id: l.eiendomId, leietaker_id: l.id, avvik_id: null }), 50); } });
+}
+/** Én melding til flere leietakere samtidig. Lages som en vanlig melding i hver leietakers chat, og er alltid synlig for leietakeren. */
+function fellesmelding() {
+  const E = S.eiendommer.filter(e => kanDrifteE(e.id)); if (!E.length) return toast(tt("Du har ikke tilgang til å sende meldinger"));
+  formModal({ title: tt("Fellesmelding til leietakere"), saveTxt: tt("Send til valgte"), wide: true,
+    top: <p className="small muted" style={{ marginTop: 0 }}>{tt("Meldingen havner i chatten til hver valgt leietaker, og de ser den under «Chat med utleier» i portalen. Den er synlig for leietakerne, og de kan svare hver for seg uten at de andre ser det.")}</p>,
+    values: { eiendom: E[0].id, tekst: '', valgte: null },
+    fields: [{ k: 'eiendom', label: tt("Eiendom"), type: 'select', options: E.map(e => [e.id, e.navn] as [string, string]), req: true },
+      { k: 'valgte', type: 'custom', label: tt("Mottakere"), render: (v: any, set: any) => { const LT = S.leietakere.filter(l => l.eiendomId === v.eiendom); const valgt: string[] = v.valgte ?? LT.map(l => l.id);
+        return <div className="note small" style={{ color: 'var(--ink)', maxHeight: 180, overflow: 'auto' }}>{LT.length ? <><label style={{ display: 'flex', gap: 8, fontWeight: 500 }}><input type="checkbox" checked={valgt.length === LT.length} onChange={e => set({ valgte: e.target.checked ? LT.map(l => l.id) : [] })} style={{ width: 'auto' }} />{tt("Alle leietakere")} ({LT.length})</label>
+          {LT.map(l => <label key={l.id} style={{ display: 'flex', gap: 8, fontWeight: 400, margin: '3px 0' }}><input type="checkbox" checked={valgt.includes(l.id)} onChange={() => set({ valgte: valgt.includes(l.id) ? valgt.filter(x => x !== l.id) : [...valgt, l.id] })} style={{ width: 'auto' }} />{l.navn}{l.lokale ? ' – ' + l.lokale : ''}</label>)}</> : tt("Ingen leietakere på eiendommen")}</div>; } },
+      { k: 'tekst', label: tt("Melding"), type: 'textarea', req: true }],
+    onSave: async v => {
+      const LT = S.leietakere.filter(l => l.eiendomId === v.eiendom); const ids: string[] = v.valgte ?? LT.map(l => l.id); const tekst = String(v.tekst || '').trim().slice(0, 4000);
+      if (!ids.length || !tekst) { toast(tt("Velg mottakere og skriv en melding")); return false; }
+      if (!window.confirm(tt("Sende meldingen til {0} leietaker(e)? De kan se den med en gang.", ids.length))) return false;
+      const felles = crypto.randomUUID(); const av = state.me?.navn || state.me?.epost;
+      const { error } = await sb.from('meldinger').insert(ids.map(id => ({ eiendom_id: v.eiendom, leietaker_id: id, avvik_id: null, data: { tekst, rolle: 'utleier', av, til: 'alle', synlig: true, lest: true, felles } })));
+      if (error) { toast(tt("Meldingen ble ikke sendt: {0}", error.message)); return false; }
+      toast(tt("Fellesmelding sendt til {0} leietaker(e)", ids.length)); window.dispatchEvent(new Event('ek-meldinger'));
+    } });
 }
 
 export function MeldingerView() {
@@ -35,7 +64,7 @@ export function MeldingerView() {
   const T = q ? tr.filter(t => { const a = t.m.avvik_id ? byId('avvik', t.m.avvik_id) : null; const l = t.m.leietaker_id ? byId('leietakere', t.m.leietaker_id) : null;
     return (a && (String(a.nr) === q || (a.tittel || '').toLowerCase().includes(q))) || (l?.navn || '').toLowerCase().includes(q) || (L || []).some(m => (m.avvik_id || '') === (t.m.avvik_id || '') && (m.leietaker_id || '') === (t.m.leietaker_id || '') && m.data.tekst.toLowerCase().includes(q)); }) : tr;
   return <>
-    <div className="head"><div className="grow"><h1>{tt("Meldinger")}</h1><p className="sub">{tt("Samtaler med leietakere og ressurser, sortert etter saksnummer. Du velger selv om en melding skal være synlig for leietakeren.")}</p></div><input placeholder={tt("Søk (saksnr, tittel, leietaker, melding) …")} value={sok} onChange={e => setSok(e.target.value)} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px', width: 300 }} /></div>
+    <div className="head"><div className="grow"><h1>{tt("Meldinger")}</h1><p className="sub">{tt("Samtaler med leietakere og ressurser, sortert etter saksnummer. Nye meldinger er interne som standard. Du velger selv om leietakeren skal se dem.")}</p></div><button className="btn" onClick={nySamtale}>{tt("Ny samtale")}</button><button className="btn pri" onClick={fellesmelding}>{tt("Fellesmelding")}</button><input placeholder={tt("Søk (saksnr, tittel, leietaker, melding) …")} value={sok} onChange={e => setSok(e.target.value)} style={{ border: '1px solid var(--line2)', borderRadius: 8, padding: '7px 10px', width: 300 }} /></div>
     {!L ? <p className="muted">{tt("Laster …")}</p> : T.length ? <div className="tbl-wrap"><table><thead><tr><th className="num">{tt("Sak nr")}</th><th>{tt("Sak")}</th><th>{tt("Leietaker")}</th><th>{tt("Siste melding")}</th><th>{tt("Sist")}</th></tr></thead><tbody>
       {T.map(t => { const l = t.m.leietaker_id ? byId('leietakere', t.m.leietaker_id) : null; const a = t.m.avvik_id ? byId('avvik', t.m.avvik_id) : null;
         return <tr key={t.key} className="click" onClick={() => { samtaleModal(t.m); }}>

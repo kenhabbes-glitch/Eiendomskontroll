@@ -1,6 +1,12 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-24', dato: '2026-12-24', tittel: 'Chat med leietakere i sanntid', punkter: [
+    'Hver leietaker har nå en chat. Nye meldinger vises med en gang, og du ser når den andre skriver.',
+    'Meldinger du skriver er interne som standard, så leietakeren ser dem ikke. Du kan dele en intern melding med leietakeren med ett klikk.',
+    'Leietakere kan starte samtaler selv under «Chat med utleier» i portalen.',
+    'Ny knapp «Fellesmelding» under Meldinger sender én melding til alle eller utvalgte leietakere. Hver leietaker svarer for seg.',
+  ] },
   { id: '2026-12-23', dato: '2026-12-23', tittel: 'Interaktiv brannvernopplæring for leietakere', punkter: [
     'Under Brannvern har hver leietaker en ny knapp «Opplæring». Brannvernleder eller hovedkontakt får en personlig lenke på e-post og går gjennom brannsikkerheten i bygget, med enkle spørsmål underveis.',
     'Etter gjennomgangen kan vedkommende invitere egne ansatte på e-post, se hvem som har gjennomført og sende påminnelser – uten å logge inn i appen.',

@@ -1,7 +1,7 @@
 // Samtale mellom utleier, leietaker og koblede ressurser (vaktmester, servicefirma o.l.), enten generelt eller knyttet til et avvik.
 // Utleiersiden velger per melding målgruppe: alle (også leietaker), utleier og ressurser, eller internt (bare utleier).
 // Samtalen kan overføres til en arbeidsordre (avvik).
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { S, isTenant, kanDrifteE, save, sb, state, toast, uploadFile, useStore, type Fil } from '../lib/store';
 import { FileLink, formModal, useFileUrl } from './ui';
 import { addDays, byId, today } from '../lib/utils';
@@ -25,7 +25,8 @@ const ressursBrukere = () => S.profiles.filter(p => p.aktiv && ['admin', 'forval
 export function Samtale({ eiendomId, leietakerId, avvikId }: { eiendomId: string; leietakerId?: string; avvikId?: string }) {
   useStore();
   const leietaker = isTenant(); const utleier = !leietaker && kanDrifteE(eiendomId); const ressurs = !leietaker && !utleier;
-  const [M, setM] = useState<Melding[] | null>(null); const [D, setD] = useState<Deltaker[]>([]); const [tekst, setTekst] = useState(''); const [mal, setMal] = useState<Mal>(leietakerId ? 'alle' : 'ressurs');
+  const [M, setM] = useState<Melding[] | null>(null); const [D, setD] = useState<Deltaker[]>([]); const [tekst, setTekst] = useState(''); const [mal, setMal] = useState<Mal>(leietakerId ? 'intern' : 'ressurs'); // trygg standard: leietaker ser ikke meldingen før du velger det
+  const [skriver, setSkriver] = useState(''); const [online, setOnline] = useState<string[]>([]);
   const [busy, setBusy] = useState(false); const [filer, setFiler] = useState<File[]>([]);
   const nokkel = SIST_SETT + (leietakerId || '') + (avvikId || '');
   const last = useCallback(async () => {
@@ -41,6 +42,29 @@ export function Samtale({ eiendomId, leietakerId, avvikId }: { eiendomId: string
     } else { try { localStorage.setItem(nokkel, String(Date.now())); } catch { } }
   }, [leietakerId, avvikId, utleier, nokkel, eiendomId]);
   useEffect(() => { last(); const t = setInterval(last, 30000); return () => clearInterval(t); }, [last]);
+  // Sanntid: nye meldinger vises med en gang (databasen sender bare det brukeren har lov å se), og «skriver …» for delte meldinger
+  const kanal = useRef<any>(null); const skriverT = useRef<any>(0);
+  useEffect(() => {
+    if (!state.me) return; const filter = avvikId ? `avvik_id=eq.${avvikId}` : `leietaker_id=eq.${leietakerId || ''}`;
+    const ch = sb.channel('chat-' + (avvikId || leietakerId || eiendomId), { config: { presence: { key: state.me.id } } });
+    ch.on('postgres_changes', { event: '*', schema: 'public', table: 'meldinger', filter }, () => { last(); window.dispatchEvent(new Event('ek-meldinger')); });
+    ch.on('presence', { event: 'sync' }, () => {
+      const st = ch.presenceState() as Record<string, any[]>; const andre = Object.entries(st).filter(([k]) => k !== state.me?.id).map(([, v]) => v[0] || {});
+      setSkriver(andre.filter(x => x.skriver).map(x => x.navn).join(', ')); setOnline(utleier ? andre.map(x => x.navn).filter(Boolean) : []);
+    });
+    ch.subscribe(st => { if (st === 'SUBSCRIBED') ch.track({ navn: leietaker ? (byId('leietakere', leietakerId || '')?.navn || tt("Leietaker")) : (state.me?.navn || state.me?.epost || tt("Utleier")), skriver: false }); });
+    kanal.current = ch; return () => { clearTimeout(skriverT.current); sb.removeChannel(ch); kanal.current = null; };
+  }, [leietakerId, avvikId, eiendomId, last, utleier, leietaker]);
+  /** Viser «skriver …» hos de andre, men aldri mens du skriver et internt notat */
+  const skrivVarsel = (v: string, m: Mal) => {
+    setTekst(v); const ch = kanal.current; if (!ch) return; const navn = leietaker ? (byId('leietakere', leietakerId || '')?.navn || tt("Leietaker")) : (state.me?.navn || state.me?.epost || tt("Utleier"));
+    const synlig = m === 'alle' && !!v.trim(); ch.track({ navn, skriver: synlig }); clearTimeout(skriverT.current); if (synlig) skriverT.current = setTimeout(() => ch.track({ navn, skriver: false }), 3000);
+  };
+  const del = async (m: Melding) => {
+    if (!window.confirm(tt("Dele denne meldingen med leietakeren? Den kan ikke gjøres intern igjen etterpå."))) return;
+    const { error } = await sb.from('meldinger').update({ data: { ...m.data, til: 'alle', synlig: true, delt: new Date().toISOString() } }).eq('id', m.id);
+    if (error) return toast(error.message); await last(); window.dispatchEvent(new Event('ek-meldinger'));
+  };
   const velg = (L: FileList | null) => {
     if (!L) return; const ny = [...filer]; for (const f of Array.from(L)) { if (f.size > MAKS_MB * 1e6) { toast(tt("«{0}» er over {1} MB", f.name, MAKS_MB)); continue; } if (ny.length >= MAKS_FILER) { toast(tt("Maks {0} filer per melding", MAKS_FILER)); break; } ny.push(f); } setFiler(ny);
   };
@@ -56,7 +80,7 @@ export function Samtale({ eiendomId, leietakerId, avvikId }: { eiendomId: string
     const { error } = await sb.from('meldinger').insert({ eiendom_id: eiendomId, leietaker_id: leietakerId || null, avvik_id: avvikId || null,
       data: { tekst: (t || tt("(vedlegg)")).slice(0, 4000), ...(vedlegg.length ? { vedlegg } : {}), rolle: leietaker ? 'leietaker' : ressurs ? 'ressurs' : 'utleier', av: state.me?.navn || state.me?.epost, til, synlig: til === 'alle', lest: !leietaker && !ressurs } });
     setBusy(false); if (error) return toast(tt("Meldingen ble ikke sendt: {0}", error.message));
-    setTekst(''); setFiler([]); await last(); window.dispatchEvent(new Event('ek-meldinger'));
+    setTekst(''); setFiler([]); if (leietakerId && utleier) setMal('intern'); kanal.current?.track({ navn: state.me?.navn || '', skriver: false }); await last(); window.dispatchEvent(new Event('ek-meldinger'));
   };
   const slett = async (m: Melding) => { const { error } = await sb.from('meldinger').delete().eq('id', m.id); if (error) return toast(error.message); last(); };
   const koble = () => {
@@ -98,15 +122,17 @@ export function Samtale({ eiendomId, leietakerId, avvikId }: { eiendomId: string
     </div>}
     {M === null ? <p className="muted small">{tt("Laster …")}</p> : M.length ? <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '45vh', overflow: 'auto', marginBottom: 10 }}>
       {M.map(m => { const egen = m.data.rolle === (leietaker ? 'leietaker' : ressurs ? 'ressurs' : 'utleier'); const ml = malAv(m);
-        return <div key={m.id} style={{ alignSelf: egen ? 'flex-end' : 'flex-start', maxWidth: '85%', background: ml === 'intern' ? 'var(--amber-bg, #fff4d6)' : ml === 'ressurs' ? 'var(--blue-bg, #e6eefb)' : egen ? 'var(--accent-bg, #e3f1ec)' : 'var(--panel2, #f1f1f1)', borderRadius: 10, padding: '7px 11px' }}>
-          <div className="small muted">{m.data.av || (m.data.rolle === 'utleier' ? tt("Utleier") : m.data.rolle === 'leietaker' ? tt("Leietaker") : tt("Ressurs"))} · {new Date(m.created_at).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' })}{ml !== 'alle' && <b> · {ml === 'intern' ? tt("Internt – skjult for leietaker") : tt("Ikke synlig for leietaker")}</b>}</div>
+        return <div key={m.id} style={{ alignSelf: egen ? 'flex-end' : 'flex-start', maxWidth: '85%', background: ml === 'intern' ? 'var(--amber-bg, #fff4d6)' : ml === 'ressurs' ? 'var(--blue-bg, #e6eefb)' : egen ? 'var(--accent-bg, #e3f1ec)' : 'var(--panel2, #f1f1f1)', borderRadius: 10, padding: '7px 11px', ...(ml === 'intern' ? { border: '1px dashed #d9a441' } : {}) }}>
+          <div className="small muted">{m.data.av || (m.data.rolle === 'utleier' ? tt("Utleier") : m.data.rolle === 'leietaker' ? tt("Leietaker") : tt("Ressurs"))} · {new Date(m.created_at).toLocaleString(lokale(), { dateStyle: 'short', timeStyle: 'short' })}{ml !== 'alle' && <b> · {ml === 'intern' ? '🔒 ' + tt("Internt – skjult for leietaker") : tt("Ikke synlig for leietaker")}</b>}{ml === 'alle' && utleier && !!leietakerId && <span> · 👁 {tt("Synlig for leietaker")}</span>}{(m.data as any).felles && <b> · {tt("Fellesmelding")}</b>}</div>
           <div style={{ whiteSpace: 'pre-wrap' }}>{m.data.tekst}</div>
           {(m.data.vedlegg || []).map((f, i) => <Vedlegg key={i} f={f} />)}
-          {utleier && <button className="btn sm ghost" style={{ padding: 0, fontSize: 11 }} onClick={() => slett(m)}>{tt("Slett")}</button>}
+          {utleier && <div style={{ display: 'flex', gap: 10 }}>{ml !== 'alle' && !!leietakerId && !(m.data.vedlegg || []).length && <button className="btn sm ghost" style={{ padding: 0, fontSize: 11 }} onClick={() => del(m)}>{tt("Del med leietaker")}</button>}<button className="btn sm ghost" style={{ padding: 0, fontSize: 11 }} onClick={() => slett(m)}>{tt("Slett")}</button></div>}
         </div>; })}
     </div> : <p className="muted small">{tt("Ingen meldinger ennå.")}</p>}
+    {(skriver || online.length > 0) && <p className="small muted" style={{ margin: '0 0 6px' }}>{skriver ? '… ' + tt("{0} skriver", skriver) : '● ' + tt("Online: {0}", online.join(', '))}</p>}
+    {utleier && !!leietakerId && <div className="small" style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '0 0 6px', padding: '4px 8px', borderRadius: 8, background: mal === 'intern' ? 'var(--amber-bg, #fff4d6)' : 'var(--accent-bg, #e3f1ec)' }}>{mal === 'intern' ? '🔒 ' + tt("Bare internt – leietaker ser ikke denne meldingen") : mal === 'alle' ? '👁 ' + tt("Leietaker ser denne meldingen") : tt("Synlig for utleier og ressurser")}</div>}
     {(leietaker || utleier || ressurs) && <>
-      <textarea style={{ width: '100%' }} rows={3} maxLength={4000} value={tekst} onChange={e => setTekst(e.target.value)} placeholder={leietaker ? tt("Skriv en melding til utleier …") : tt("Skriv en melding …")} />
+      <textarea style={{ width: '100%' }} rows={3} maxLength={4000} value={tekst} onChange={e => skrivVarsel(e.target.value, leietaker ? 'alle' : mal)} placeholder={leietaker ? tt("Skriv en melding til utleier …") : mal === 'intern' && leietakerId ? tt("Skriv en intern melding …") : tt("Skriv en melding …")} />
       {filer.length > 0 && <div className="small" style={{ marginTop: 4 }}>{filer.map((f, i) => <span key={i} className="chip" style={{ marginRight: 4 }}>📎 {f.name} <a href="#" onClick={e => { e.preventDefault(); setFiler(filer.filter((_, j) => j !== i)); }} aria-label={tt("Fjern")}>✕</a></span>)}</div>}
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
         <label className="btn sm">{tt("Legg ved fil")}<input type="file" multiple accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt" style={{ display: 'none' }} onChange={e => velg(e.target.files)} /></label>
