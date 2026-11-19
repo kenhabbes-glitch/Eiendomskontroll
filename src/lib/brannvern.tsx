@@ -306,16 +306,19 @@ export async function forhandsvis(lid: string) {
   try { lastNed(await lagPakkePdf(e, l), filnavn(e, l)); } catch (err: any) { toast(tt("Kunne ikke lage PDF: ") + (err?.message || err)); }
 }
 
-/** Åpner brannvernpakken (PDF) i en ny fane uten å lagre eller sende den */
+/** Viser brannvernpakken (PDF) i et vindu i appen uten å lagre eller sende den. Fungerer uten popup-vinduer. */
 export async function visPakke(lid: string) {
   const l = byId('leietakere', lid)!; const e = byId('eiendommer', l.eiendomId)!;
   if (!bvVersjon(e) && !bv(e).alarm) { toast(tt("Fyll ut brannkortet først")); return; }
-  const w = window.open('', '_blank');
+  toast(tt("Lager forhåndsvisning …"));
   try {
-    const bytes = await lagPakkePdf(e, l); const url = URL.createObjectURL(new Blob([bytes as any], { type: 'application/pdf' }));
-    if (w) { w.location.href = url; } else lastNed(bytes, filnavn(e, l));
-    setTimeout(() => URL.revokeObjectURL(url), 5 * 60 * 1000);
-  } catch (err: any) { w?.close(); toast(tt("Kunne ikke lage PDF: ") + (err?.message || err)); }
+    const bytes = await lagPakkePdf(e, l); const navn = filnavn(e, l);
+    const url = URL.createObjectURL(new Blob([bytes as any], { type: 'application/pdf' }));
+    showModal(tt("Forhåndsvisning – ") + l.navn, () => <>
+      <iframe src={url} title={navn} style={{ width: '100%', height: '70vh', border: '1px solid var(--line2)', borderRadius: 8 }} />
+      <p className="small muted" style={{ marginBottom: 0 }}>{tt("Vises ikke PDF-en over?")} <a href={url} target="_blank" rel="noopener">{tt("Åpne i ny fane")}</a> · <a href={url} download={navn}>{tt("Last ned")}</a></p></>, { wide: true });
+    setTimeout(() => URL.revokeObjectURL(url), 30 * 60 * 1000);
+  } catch (err: any) { toast(tt("Kunne ikke lage PDF: ") + (err?.message || err)); }
 }
 
 /** Eier sender den interaktive opplæringen til leietakerens brannvernleder/hovedkontakt (personlig lenke på e-post) */

@@ -367,3 +367,15 @@ test('chat: ny samtale er intern som standard, og «Fellesmelding» kan åpnes',
     if (a.feil.length) assert.fail(a.feil[0]);
   } finally { await a.lukk(); }
 });
+
+test('brannvern: «Forhåndsvis pakke» viser PDF-en i et vindu i appen', async () => {
+  const data = grunndata(); data.eiendommer[0].data.brannvern = { versjon: 1, alarm: 'Heldekkende brannalarm', oppstilling: 'Parkeringen' };
+  data.leietakere = [{ id: 'l1', eiendom_id: 'e1', created_at: NAA, data: { eiendomId: 'e1', navn: 'Firma AS' } }];
+  const a = await aapne('#/leietaker/l1', { data }); try {
+    await a.side.getByRole('button', { name: /Forhåndsvis pakke/ }).click();
+    await a.side.locator('.modal iframe').waitFor({ timeout: 15000 });
+    assert.match(await a.side.locator('.modal iframe').getAttribute('src') || '', /^blob:/);
+    assert.ok(await a.side.locator('.modal').getByText('Åpne i ny fane').count() >= 1);
+    if (a.feil.length) assert.fail(a.feil[0]);
+  } finally { await a.lukk(); }
+});
