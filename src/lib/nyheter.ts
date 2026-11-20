@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-27', dato: '2026-12-27', tittel: 'Dokumentlenker i opplæringen', punkter: [
+    'Dokumenter i brannvernopplæringen åpnes nå via appens egen adresse, så de åpner seg på alle enheter.',
+    'Interne kontrollrapporter og sjekklister tilbys ikke lenger som vedlegg til brannvernpakken.',
+  ] },
   { id: '2026-12-26', dato: '2026-12-26', tittel: 'Forhåndsvisning av brannvernpakken fungerer bedre', punkter: [
     'Forhåndsvis pakke åpner nå PDF-en i et vindu i appen, i stedet for en ny fane som nettleseren kunne blokkere. Du kan fortsatt åpne den i ny fane eller laste den ned derfra.',
   ] },

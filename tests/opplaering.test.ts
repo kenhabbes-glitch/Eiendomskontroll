@@ -13,7 +13,7 @@ function oppsett() {
   const db: Db = { leietakere: [{ id: 'l1', eiendom_id: 'e1', data: { navn: 'Firma AS' } }], eiendommer: [{ id: 'e1', data: { navn: 'Bygg 1' } }], opplaering_kurs: [], opplaering_deltakere: [], hendelseslogg: [] };
   const falsk = lagFalsk(db, {}, {});
   const sendt: any[] = []; let bruker: any = { id: 'u1', navn: 'Eier', epost: 'eier@x.no' };
-  const kjor = async (body: any) => { const r = await opplaering({ admin: Object.assign(Object.create(falsk.klient as any), { storage: { from: () => ({ list: async (dir: string) => ({ data: dir === 'e1' ? [{ name: 'plan.pdf' }] : [] }), createSignedUrl: async (p: string) => ({ data: { signedUrl: 'https://sig.test/' + p }, error: null }) }) } }), body: { lenkeBase: 'https://app.test', ...body }, json: (s, b) => new Response(JSON.stringify(b), { status: s }), esc: x => String(x),
+  const kjor = async (body: any) => { const r = await opplaering({ admin: Object.assign(Object.create(falsk.klient as any), { storage: { from: () => ({ list: async (dir: string) => ({ data: dir === 'e1' ? [{ name: 'plan.pdf' }] : [] }), createSignedUrl: async (p: string) => ({ data: { signedUrl: 'http://localhost:8000/storage/v1/object/sign/filer/' + p + '?token=abc' }, error: null }) }) } }), body: { lenkeBase: 'https://app.test', ...body }, json: (s, b) => new Response(JSON.stringify(b), { status: s }), esc: x => String(x),
     hvem: async () => bruker, kanRedigere: async () => true, harEiendom: async () => true, sendEpost: async (til, emne) => { sendt.push({ til, emne }); return { sendt: true }; },
     oppsettFor: async () => ({}), minOrg: async () => 'org1', sprakFor: async () => ({ t: (s: any, ...a: any[]) => a.reduce((r: string, v, i) => r.split('{' + i + '}').join(String(v)), String(s)) }) });
     return { status: r!.status, j: await r!.json() }; };
@@ -37,7 +37,7 @@ test('hele løpet: leder gjennomfører, inviterer, ansatt gjennomfører, eier se
   assert.ok(!JSON.stringify(i.j).includes('"riktig"') && !JSON.stringify(i.j).includes('Riktig 110'), 'fasit og forklaring skal ikke følge med før svar');
   assert.ok(!JSON.stringify(i.j).includes('plan.pdf') && !JSON.stringify(i.j).includes('hemmelig'), 'lagringsstien skal ikke sendes til nettleseren');
   const filer = i.j.innhold.steg[1].filer; assert.equal(filer.length, 1, 'bare filer fra egen eiendom beholdes'); assert.equal(filer[0].tittel, 'Rømningsplan 1. etg');
-  const fu = await kjor({ action: 'opl_fil', token: tl, fil: filer[0].id }); assert.equal(fu.status, 200); assert.equal(fu.j.url, 'https://sig.test/e1/plan.pdf');
+  const fu = await kjor({ action: 'opl_fil', token: tl, fil: filer[0].id }); assert.equal(fu.status, 200); assert.equal(fu.j.url, 'https://app.test/storage/v1/object/sign/filer/e1/plan.pdf?token=abc', 'intern lagringsadresse byttes til appens adresse');
   assert.equal((await kjor({ action: 'opl_fil', token: tl, fil: 'finnes-ikke' })).status, 404);
   // leder kan ikke invitere før kurset er tatt
   assert.equal((await kjor({ action: 'opl_inviter', token: tl, personer: [{ navn: 'A', epost: 'a@firma.no' }] })).status, 403);

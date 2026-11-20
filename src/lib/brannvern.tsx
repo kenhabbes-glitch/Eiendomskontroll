@@ -144,7 +144,7 @@ export function brannInstallasjoner(eid: string, lid?: string) {
   const sisteKontroll = (a: Rec) => sortBy(S.oppgaver.filter(o => o.anleggId === a.id && o.sistUtfort), o => o.sistUtfort).pop()?.sistUtfort;
   return { sys: sys.map(a => ({ a, ansvar: ansvar(a), sist: sisteKontroll(a) })), komp, harSoner: soner.length > 0 };
 }
-export const brannDokumenter = (eid: string) => S.dokumenter.filter(d => d.eiendomId === eid && !d.leietakerId && d.fil && /brann|rømning|varsling|husorden|trivsel|husregler/i.test((d.type || '') + ' ' + (d.tittel || '')));
+export const brannDokumenter = (eid: string) => S.dokumenter.filter(d => d.eiendomId === eid && !d.leietakerId && d.fil && !/^(Servicerapport|Egenkontrollskjema|Statusrapport til eier|Tilsynsrapport)$/.test(d.type || '') && !/sjekkliste/i.test(d.tittel || '') && /brann|rømning|varsling|husorden|trivsel|husregler/i.test((d.type || '') + ' ' + (d.tittel || '')));
 const ikkeUtfylt = (b: Rec) => ['alarm', 'oppstilling'].filter(k => !String(b[k] || '').trim());
 
 // ---------------- eiers handlinger

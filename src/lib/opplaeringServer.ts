@@ -113,7 +113,9 @@ export async function opplaering(c: Ctx): Promise<Response | null> {
     const { data: fins } = await admin.storage.from('filer').list(dir, { search: base, limit: 5 });
     if (!(fins || []).some((x: any) => x.name === base)) return json(404, { error: 'Filen finnes ikke i lagringen lenger. Be eier laste den opp på nytt.' });
     const { data: u, error } = await admin.storage.from('filer').createSignedUrl(fil.path, 900); if (error || !u) return json(404, { error: 'Fant ikke filen' });
-    return json(200, { url: u.signedUrl });
+    // Selvhostet Supabase: serveren kan snakke med lagringen på en intern adresse (localhost/kong) som nettleseren ikke når. Bruk da appens egen adresse.
+    let url = u.signedUrl; try { const p = new URL(url); if ((/^(localhost|127\.|kong$)/.test(p.hostname) || !p.hostname.includes('.')) && baseFra()) url = baseFra() + p.pathname + p.search; } catch { }
+    return json(200, { url });
   }
   if (a === 'opl_sjekk') {
     const s = spm.find(x => x.id === String(body.spm || '')); if (!s) return json(400, { error: 'Ukjent spørsmål' });
