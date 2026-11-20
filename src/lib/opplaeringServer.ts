@@ -109,6 +109,9 @@ export async function opplaering(c: Ctx): Promise<Response | null> {
   }
   if (a === 'opl_fil') {
     const fil = innhold.steg.flatMap(s => s.filer || []).find(x => x.id === String(body.fil || '')); if (!fil?.path) return json(404, { error: 'Fant ikke filen' });
+    const dir = fil.path.slice(0, fil.path.lastIndexOf('/')), base = fil.path.slice(fil.path.lastIndexOf('/') + 1);
+    const { data: fins } = await admin.storage.from('filer').list(dir, { search: base, limit: 5 });
+    if (!(fins || []).some((x: any) => x.name === base)) return json(404, { error: 'Filen finnes ikke i lagringen lenger. Be eier laste den opp på nytt.' });
     const { data: u, error } = await admin.storage.from('filer').createSignedUrl(fil.path, 900); if (error || !u) return json(404, { error: 'Fant ikke filen' });
     return json(200, { url: u.signedUrl });
   }

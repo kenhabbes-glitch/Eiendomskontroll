@@ -13,7 +13,7 @@ function oppsett() {
   const db: Db = { leietakere: [{ id: 'l1', eiendom_id: 'e1', data: { navn: 'Firma AS' } }], eiendommer: [{ id: 'e1', data: { navn: 'Bygg 1' } }], opplaering_kurs: [], opplaering_deltakere: [], hendelseslogg: [] };
   const falsk = lagFalsk(db, {}, {});
   const sendt: any[] = []; let bruker: any = { id: 'u1', navn: 'Eier', epost: 'eier@x.no' };
-  const kjor = async (body: any) => { const r = await opplaering({ admin: Object.assign(Object.create(falsk.klient as any), { storage: { from: () => ({ createSignedUrl: async (p: string) => ({ data: { signedUrl: 'https://sig.test/' + p }, error: null }) }) } }), body: { lenkeBase: 'https://app.test', ...body }, json: (s, b) => new Response(JSON.stringify(b), { status: s }), esc: x => String(x),
+  const kjor = async (body: any) => { const r = await opplaering({ admin: Object.assign(Object.create(falsk.klient as any), { storage: { from: () => ({ list: async (dir: string) => ({ data: dir === 'e1' ? [{ name: 'plan.pdf' }] : [] }), createSignedUrl: async (p: string) => ({ data: { signedUrl: 'https://sig.test/' + p }, error: null }) }) } }), body: { lenkeBase: 'https://app.test', ...body }, json: (s, b) => new Response(JSON.stringify(b), { status: s }), esc: x => String(x),
     hvem: async () => bruker, kanRedigere: async () => true, harEiendom: async () => true, sendEpost: async (til, emne) => { sendt.push({ til, emne }); return { sendt: true }; },
     oppsettFor: async () => ({}), minOrg: async () => 'org1', sprakFor: async () => ({ t: (s: any, ...a: any[]) => a.reduce((r: string, v, i) => r.split('{' + i + '}').join(String(v)), String(s)) }) });
     return { status: r!.status, j: await r!.json() }; };
