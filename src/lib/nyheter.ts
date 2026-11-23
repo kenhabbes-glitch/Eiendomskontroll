@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2027-01-06', dato: '2027-01-06', tittel: 'Kart over hvordan appen henger sammen', punkter: [
+    'Under Hjelp finner du nå et diagram som viser dataene i appen, det som skjer automatisk og hva du får ut.',
+    'Bryterne i diagrammet er de samme som i Innstillinger, så du kan slå automatikk av og på direkte der.',
+  ] },
   { id: '2027-01-05', dato: '2027-01-05', tittel: 'Rapporter til oppfølging', punkter: [
     'Servicerapporter (PDF) som kommer inn fra servicefirma, leses nå automatisk i nettleseren. Funnene vises i oversikten og tas med når du godkjenner rapporten.',
     'Du får én samlet påminnelse når rapporter har ventet på godkjenning, og et tydelig varsel hvis noe har høy alvorlighet.',

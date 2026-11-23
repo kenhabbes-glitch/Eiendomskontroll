@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { HJELP, hjelpFor } from '../lib/hjelpTekster';
 import { HjelpTekst } from '../components/Hjelp';
-import { isTenant, isUtforer } from '../lib/store';
+import { isTenant, isUtforer, canEdit } from '../lib/store';
+import { Systemkart } from './Systemkart';
 import { tt } from '../lib/i18n';
 
 const GRUPPER = ['Sider', 'Begreper', 'Skjemafelt'] as const;
@@ -16,6 +17,7 @@ export function HjelpSide({ id }: { id?: string }) {
   const emner = Object.keys(HJELP).map(k => [k, hjelpFor(k)!] as const).filter(([k, e]) => synlig(k) && (!qq || (e.tittel + ' ' + e.tekst).toLowerCase().includes(qq)));
   return <>
     <div className="head"><div className="grow"><h1>{tt("Hjelp")}</h1><p className="sub">{tt("Forklaring av sider, begreper og felt. Du finner også")} <span className="hjelp-q" style={{ width: 15, height: 15, fontSize: 10, cursor: 'default' }}>?</span> {tt("ved overskrifter og felt rundt i appen – trykk på dem for en kort forklaring.")}</p></div></div>
+    {canEdit() && !isTenant() && !isUtforer() && !qq && <Systemkart />}
     <div className="toolbar"><input type="search" placeholder={tt("Søk i hjelpen …")} value={q} onChange={e => setQ(e.target.value)} style={{ width: 300 }} autoFocus={!valgt} /><span className="muted small">{emner.length} {tt("emner")}</span></div>
     {GRUPPER.map(g => { const L = emner.filter(([, e]) => e.gruppe === g); if (!L.length) return null;
       return <div className="sec" key={g}><h2>{tt(g)}</h2>

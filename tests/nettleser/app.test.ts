@@ -379,3 +379,13 @@ test('brannvern: «Forhåndsvis pakke» viser PDF-en i et vindu i appen', async 
     if (a.feil.length) assert.fail(a.feil[0]);
   } finally { await a.lukk(); }
 });
+
+test('Hjelp: systemkartet vises, og bryteren slår automatikk av og på i innstillingene', async () => {
+  const a = await aapne('#/hjelp'); try {
+    await a.side.waitForTimeout(500); assert.ok((await tekst(a)).includes('Slik henger appen sammen'), 'kartet vises ikke');
+    const br = a.side.getByRole('switch', { name: 'Chat-varsler' }); assert.equal(await br.getAttribute('aria-checked'), 'false');
+    await br.click(); await a.side.waitForTimeout(600); assert.equal(await br.getAttribute('aria-checked'), 'true');
+    assert.equal((await a.db()).innstillinger.find((x: any) => x.nokkel === 'chatVarsel')?.data.pa, true, 'innstillingen ble ikke lagret');
+    await br.click(); await a.side.waitForTimeout(600); assert.equal(await br.getAttribute('aria-checked'), 'false'); assert.deepEqual(a.feil, []);
+  } finally { await a.lukk(); }
+});
