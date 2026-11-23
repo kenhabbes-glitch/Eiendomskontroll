@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2027-01-02', dato: '2027-01-02', tittel: 'Brannopplæring på autopilot', punkter: [
+    'Appen kan nå purre brannvernledere og ansatte som ikke har gjennomført brannvernopplæringen. Slå det på under Innstillinger → Brannopplæring på autopilot.',
+    'Opplæringen kan repeteres automatisk hvert år, med nye personlige lenker til lederen og de som var invitert sist.',
+    'Eier ser fortsatt bare prosent per leietaker, aldri navn eller e-post til ansatte.',
+  ] },
   { id: '2027-01-01', dato: '2027-01-01', tittel: 'Anbefalt automatikk', punkter: [
     'Nytt kort øverst i Innstillinger viser hvilke automatikker som er på, og lar deg slå på det som er av med anbefalte standardverdier.',
     'Innstillinger du allerede har justert, beholdes. Alt kan slås av igjen i kortene under.',

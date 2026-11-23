@@ -24,6 +24,9 @@ export default async () => {
   // Leieavtale-vakt: avtaleutløp, oppsigelsesfrist og kommende indeksregulering (styres av Innstillinger → Leieavtale-vakt; av som standard)
   const r6 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'leie_vakt' }) });
   console.log('leie-vakt', r6.status, (await r6.text()).slice(0, 1000));
+  // Brannopplæring på autopilot: purring, årlig repetisjon og eskalering (styres av Innstillinger → Brannopplæring; av som standard)
+  const r7 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'brannauto' }) });
+  console.log('brannauto', r7.status, (await r7.text()).slice(0, 1000));
   // Hjerteslag: forteller driftsvakten (server/vakt.sh) at nattjobbene har kjørt
   await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'jobb_hjerteslag', navn: 'ko-auto' }) }).catch(() => null);
   return new Response(t, { status: r.status });

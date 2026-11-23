@@ -8,6 +8,7 @@ export const AUTOMATIKK: AutoPunkt[] = [
   { id: 'ukeoversikt', nokkel: 'eierOversikt', flagg: 'pa', navn: 'Ukeoversikt til eier', hva: 'Forfalte og kommende kontroller, utløpende dokumenter og avvik over frist', sendtTilAndre: false },
   { id: 'leietakerrunde', nokkel: 'ltRunde', flagg: 'pa', navn: 'Leietaker-runde', hva: 'Sjekkliste til alle leietakere hvert år (15. januar), med purring', sendtTilAndre: true },
   { id: 'fornyelse', nokkel: 'dokFornyelse', flagg: 'pa', navn: 'Fornyelse av dokumenter', hva: 'Ber om nytt dokument 90, 30 og 0 dager før utløp', sendtTilAndre: true },
+  { id: 'brannopplaering', nokkel: 'oplAuto', flagg: 'pa', navn: 'Brannopplæring på autopilot', hva: 'Purrer ledere og ansatte, repeterer opplæringen hvert år og gir deg prosent per leietaker', sendtTilAndre: true },
   { id: 'leievakt', nokkel: 'leieVakt', flagg: 'pa', navn: 'Leieavtale-vakt', hva: 'Varsler om avtaleutløp, oppsigelsesfrist og indeksregulering', sendtTilAndre: false },
 ];
 export type InnstAlle = Record<string, any>;

@@ -13,6 +13,7 @@ import { tt } from '../lib/i18n';
 import { RUNDE_STD, renRundeInnst } from '../lib/rundeServer';
 import { renFornyInnst } from '../lib/fornyelseServer';
 import { renVaktInnst } from '../lib/leieServer';
+import { renOplAuto } from '../lib/opplaeringAuto';
 import { AUTOMATIKK, erPa, slaPa } from '../lib/anbefalt';
 import { PUSH_TYPER, pushStotte, erIos, erInstallert, pushStatus, slaPaPush, slaAvPush, endreTyper, testPush } from '../lib/push';
 
@@ -162,6 +163,28 @@ export function AnbefaltKort() {
       {pa ? <span style={{ color: 'var(--green)' }} aria-label={tt("På")}>✔</span> : <input type="checkbox" disabled={ro} checked={valgt.includes(p.id)} onChange={e => setValgt(v => e.target.checked ? [...v, p.id] : v.filter(x => x !== p.id))} aria-label={tt(p.navn)} />}
       <span><b>{tt(p.navn)}</b>{p.sendtTilAndre && <span className="muted"> · {tt("sender også til leietakere/leverandører")}</span>}<br /><span className="muted">{tt(p.hva)}</span></span></div>; })}
     {av.length > 0 && (!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler || !valgt.length} onClick={slaPaNa}>{busy ? tt("Slår på …") : tt("Slå på valgte")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>)}
+  </div>;
+}
+
+// ---------------- Brannopplæring på autopilot: purring, årlig repetisjon og eskalering (bare prosent til eier)
+export function BrannAutoKort() {
+  useStore(); const ro = !isAdmin() && state.me?.rolle !== 'forvalter';
+  const [c, setC0] = useState(renOplAuto(S.innst.oplAuto)); const [busy, setBusy] = useState(false);
+  useEffect(() => setC0(renOplAuto(S.innst.oplAuto)), [JSON.stringify(S.innst.oplAuto)]);
+  const setC = (x: Partial<ReturnType<typeof renOplAuto>>) => setC0(v => ({ ...v, ...x }));
+  const lagre = async () => { setBusy(true); try { await saveInnst('oplAuto', renOplAuto(c)); toast(tt("Innstillingene er lagret")); } catch { } setBusy(false); };
+  const kjorNa = async () => {
+    if (!S.primarOrg || !confirm(tt("Kjøre nå? Ledere og ansatte som skal purres eller repeteres, får e-post med en gang."))) return; setBusy(true);
+    try { await saveInnst('oplAuto', renOplAuto(c)); const r = await aoApi({ action: 'brannauto_na', org: S.primarOrg }); const x = (r.rapport || [])[0] || {};
+      toast(tt("{0} purret, {1} repetisjoner startet, {2} holdt tilbake", x.purret || 0, x.repetert || 0, x.holdt || 0)); } catch { } setBusy(false); };
+  return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}>
+    <h2 style={{ marginTop: 0 }}>{tt("Brannopplæring på autopilot")}</h2>
+    <p className="small muted" style={{ marginTop: -4 }}>{tt("Purrer brannvernledere og ansatte som ikke har gjennomført opplæringen, og starter en ny runde hvert år. Du ser bare prosent per leietaker, aldri navn eller e-post til ansatte. Av som standard.")}</p>
+    <div className="pu-rad"><Bryter on={c.pa} set={b => setC({ pa: b })} ro={ro}><b>{tt("Purr og repeter automatisk")}</b></Bryter>
+      {c.pa && <div className="pu-under small">{tt("Første purring etter")} <Tall v={c.purrEtter} set={n => setC({ purrEtter: n })} ro={ro} w={46} /> {tt("dager, deretter hver")} <Tall v={c.purrGjenta} set={n => setC({ purrGjenta: n })} ro={ro} w={46} /> {tt("dag, maks")} <Tall v={c.purrMaks} set={n => setC({ purrMaks: n })} ro={ro} w={46} /> {tt("purringer")}<br />
+        <label><input type="checkbox" disabled={ro} checked={c.aarlig} onChange={e => setC({ aarlig: e.target.checked })} /> {tt("Start ny runde når lederen gjennomførte for mer enn")}</label> <Tall v={c.aarligMnd} set={n => setC({ aarligMnd: n })} ro={ro} w={46} /> {tt("måneder siden")}<br />
+        {tt("Varsle meg når purringene er brukt opp og under")} <Tall v={c.terskel} set={n => setC({ terskel: n })} ro={ro} w={46} /> {tt("% har gjennomført, til")} <input disabled={ro} value={c.eierEpost} placeholder={tt("administratorene (tomt = alle)")} style={{ width: 260, display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ eierEpost: e.target.value })} /></div>}</div>
+    {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={kjorNa}>{tt("Kjør nå")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
   </div>;
 }
 
