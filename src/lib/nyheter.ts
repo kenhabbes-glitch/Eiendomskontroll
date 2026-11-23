@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-30', dato: '2026-12-30', tittel: 'Leieavtale-vakt', punkter: [
+    'Appen kan nå varsle deg om avtaleutløp, siste oppsigelsesdato og kommende indeksregulering. Slå det på under Innstillinger → Leieavtale-vakt.',
+    'Legg inn oppsigelsesfrist og reguleringsdato på leietakeren. Under «Avtalefrister» på leietakeren finner du utkast til regulering med beregnet ny leie og et brev du kan kopiere.',
+    'Du godkjenner selv hver regulering, og leietaker får ingenting automatisk.',
+  ] },
   { id: '2026-12-29', dato: '2026-12-29', tittel: 'Automatisk fornyelse av dokumenter', punkter: [
     'Appen kan nå be om nytt dokument selv når «Gyldig til» nærmer seg, for eksempel 90, 30 og 0 dager før. Slå det på under Innstillinger → Fornyelse av dokumenter.',
     'Leietakere, leverandører og du får én samlet e-post per mottaker, og hvert trinn sendes bare én gang.',

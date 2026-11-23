@@ -21,5 +21,8 @@ export default async () => {
   // Fornyelse av utløpende dokumenter (styres av Innstillinger → Fornyelse av dokumenter; av som standard)
   const r5 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'dok_fornyelse' }) });
   console.log('dok-fornyelse', r5.status, (await r5.text()).slice(0, 1000));
+  // Leieavtale-vakt: avtaleutløp, oppsigelsesfrist og kommende indeksregulering (styres av Innstillinger → Leieavtale-vakt; av som standard)
+  const r6 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'leie_vakt' }) });
+  console.log('leie-vakt', r6.status, (await r6.text()).slice(0, 1000));
   return new Response(t, { status: r.status });
 };

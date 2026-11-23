@@ -12,6 +12,7 @@ import { svarfristSnart } from './Tilsyn';
 import { tt } from '../lib/i18n';
 import { RUNDE_STD, renRundeInnst } from '../lib/rundeServer';
 import { renFornyInnst } from '../lib/fornyelseServer';
+import { renVaktInnst } from '../lib/leieServer';
 import { PUSH_TYPER, pushStotte, erIos, erInstallert, pushStatus, slaPaPush, slaAvPush, endreTyper, testPush } from '../lib/push';
 
 export const PURR_STD = { paLogging: true, paLoggingDager: 7, ansvarlig: false, ansvarligFor: 3, ansvarligGjenta: 7, ansvarligMaks: 3, eier: false, eierEtter: 14, eierEpost: '', ukentlig: false, ukentligEpost: '' };
@@ -116,6 +117,30 @@ export function FornyelseKort() {
         <label><input type="checkbox" disabled={ro} checked={c.leietaker} onChange={e => setC({ leietaker: e.target.checked })} /> {tt("Send til leietaker for leietakerens dokumenter")}</label><br />
         <label><input type="checkbox" disabled={ro} checked={c.leverandor} onChange={e => setC({ leverandor: e.target.checked })} /> {tt("Send til leverandør når e-post er lagret på kontrollen eller anlegget")}</label><br />
         {tt("Øvrige dokumenter sendes til")} <input disabled={ro} value={c.eierEpost} placeholder={tt("administratorene (tomt = alle)")} style={{ width: 300, display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ eierEpost: e.target.value })} /></div>}</div>
+    {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={kjorNa}>{tt("Kjør nå")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
+  </div>;
+}
+
+// ---------------- Leieavtale-vakt: varsler til eier om avtaleutløp, oppsigelsesfrist og kommende indeksregulering
+export function LeieVaktInnstKort() {
+  useStore(); const ro = !isAdmin() && state.me?.rolle !== 'forvalter';
+  const [c, setC0] = useState(renVaktInnst(S.innst.leieVakt)); const [t1, setT1] = useState(''); const [t2, setT2] = useState(''); const [busy, setBusy] = useState(false);
+  useEffect(() => { const n = renVaktInnst(S.innst.leieVakt); setC0(n); setT1(n.utlopMnd.join(', ')); setT2(n.oppsigDager.join(', ')); }, [JSON.stringify(S.innst.leieVakt)]);
+  const setC = (x: Partial<ReturnType<typeof renVaktInnst>>) => setC0(v => ({ ...v, ...x }));
+  const ferdig = () => renVaktInnst({ ...c, utlopMnd: t1, oppsigDager: t2 });
+  const lagre = async () => { setBusy(true); try { await saveInnst('leieVakt', ferdig()); toast(tt("Innstillingene er lagret")); } catch { } setBusy(false); };
+  const kjorNa = async () => {
+    if (!S.primarOrg || !confirm(tt("Kjøre nå? Du får e-post med de fristene som er innenfor varselgrensene."))) return; setBusy(true);
+    try { await saveInnst('leieVakt', ferdig()); const r = await aoApi({ action: 'leie_vakt_na', org: S.primarOrg }); const x = (r.rapport || [])[0] || {};
+      toast(x.sendt ? tt("E-post sendt med {0} frister", x.sendt) : x.uten_mottaker ? tt("Ingen mottaker – legg inn e-post eller administrator") : tt("Ingen frister å varsle om nå")); } catch { } setBusy(false); };
+  return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}>
+    <h2 style={{ marginTop: 0 }}>{tt("Leieavtale-vakt")}</h2>
+    <p className="small muted" style={{ marginTop: -4 }}>{tt("Varsler deg om avtaleutløp, siste oppsigelsesdato og kommende indeksregulering. Leietakerne får ingenting automatisk. Fyll ut oppsigelsesfrist og reguleringsdato på hver leietaker. Av som standard.")}</p>
+    <div className="pu-rad"><Bryter on={c.pa} set={b => setC({ pa: b })} ro={ro}><b>{tt("Send varsler om leieavtaler på e-post")}</b></Bryter>
+      {c.pa && <div className="pu-under small">{tt("Avtaleutløp: varsle så mange måneder før")} <input disabled={ro} className="num" style={{ width: 110, display: 'inline-block', padding: '3px 6px' }} value={t1} onChange={e => setT1(e.target.value)} /><br />
+        {tt("Siste oppsigelsesdato: varsle så mange dager før")} <input disabled={ro} className="num" style={{ width: 110, display: 'inline-block', padding: '3px 6px' }} value={t2} onChange={e => setT2(e.target.value)} /><br />
+        {tt("Indeksregulering: varsle")} <Tall v={c.regulerDager} set={n => setC({ regulerDager: n })} ro={ro} w={56} /> {tt("dager før reguleringsdato")}<br />
+        {tt("Send til")} <input disabled={ro} value={c.epost} placeholder={tt("administratorene (tomt = alle)")} style={{ width: 300, display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ epost: e.target.value })} /></div>}</div>
     {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={kjorNa}>{tt("Kjør nå")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
   </div>;
 }

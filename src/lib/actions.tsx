@@ -889,6 +889,8 @@ export function editLeietaker(id?: string, preset: any = {}) {
     { k: 'heleBygget', label: tt("Leietaker leier hele bygget (alle systemer omfattes av kontrakten)"), type: 'checkbox' },
     { k: 'avtaletype', label: tt("Avtalemal / dokument"), half: true, ph: tt("F.eks. Norsk Eiendom bare hus 2023") },
     { k: 'varsel', label: tt("Varslingsfrist fornyelse (mnd før utløp)"), type: 'number', half: true },
+    { k: 'oppsigMnd', label: tt("Oppsigelsesfrist (måneder før utløp)"), type: 'number', half: true, hint: tt("Brukes til å varsle om siste oppsigelsesdato") },
+    { k: 'reguleringDag', label: tt("Reguleringsdato (dd.mm)"), half: true, ph: tt("F.eks. 15.03"), hint: tt("Tom = årsdagen for avtalestart") },
     { k: 'sec2', label: tt("Kontakt"), type: 'sec' },
     { k: 'kontakt', label: tt("Kontaktperson"), half: true }, { k: 'brannvernleder', label: tt("Leietakers brannvernleder"), half: true },
     { k: 'epost', label: tt("E-post"), type: 'email', half: true }, { k: 'tlf', label: tt("Telefon"), half: true },
