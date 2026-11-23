@@ -1,4 +1,4 @@
-# Regelverkssjekk SE 2026-11-16
+# Regelverkssjekk SE 2026-11-23
 
 **1 endring(er)** som kan kreve oppdatering av `src/lib/land/se.ts`:
 

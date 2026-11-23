@@ -1,4 +1,4 @@
-# Regelverkssjekk DK 2026-11-16
+# Regelverkssjekk DK 2026-11-23
 
 Ingen endringer.
 
