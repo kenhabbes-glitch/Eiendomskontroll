@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2027-01-05', dato: '2027-01-05', tittel: 'Rapporter til oppfølging', punkter: [
+    'Servicerapporter (PDF) som kommer inn fra servicefirma, leses nå automatisk i nettleseren. Funnene vises i oversikten og tas med når du godkjenner rapporten.',
+    'Du får én samlet påminnelse når rapporter har ventet på godkjenning, og et tydelig varsel hvis noe har høy alvorlighet.',
+    'Slå det på under Innstillinger → Rapporter til oppfølging. Ingenting sendes ut av appen.',
+  ] },
   { id: '2027-01-04', dato: '2027-01-04', tittel: 'Investeringsvarsler', punkter: [
     'Første mandag i januar, april, juli og oktober får du en samlet oversikt over hva som skal skiftes de nærmeste årene, med kostnad og hvilke opplysninger som mangler.',
     'Du får også varsel med en gang et system passerer levetiden eller får tilstandsgrad TG3.',

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { harModul } from '../lib/moduler';
 import { Hjelp } from '../components/Hjelp';
-import { PurringKort, UkeOversiktKort, LtRundeKort, FornyelseKort, LeieVaktInnstKort, BrannAutoKort, ChatVarselKort, InvestVarselKort, AnbefaltKort, PushKort } from './Purring';
+import { PurringKort, UkeOversiktKort, LtRundeKort, FornyelseKort, LeieVaktInnstKort, BrannAutoKort, ChatVarselKort, InvestVarselKort, RapportVarselKort, AnbefaltKort, PushKort } from './Purring';
 import { RapportLesingKort } from './RapportLeser';
 import { S, aoApi, isAdmin, saveInnst, toast, useStore } from '../lib/store';
 import { confirmBox, showModal } from '../components/ui';
@@ -80,6 +80,7 @@ export function Innstillinger() {
     <BrannAutoKort />
     <ChatVarselKort />
     <InvestVarselKort />
+    <RapportVarselKort />
     <PushKort />
     {harModul('dokumentlesing') && <RapportLesingKort />}
     {isAdmin() && <EpostKort />}

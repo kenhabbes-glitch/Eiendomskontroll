@@ -118,6 +118,6 @@ test('ny organisasjon får anbefalt automatikk på fra første dag', async () =>
   const r = await kall('tok-sjef', { action: 'ny_org', navn: 'Ny Eier AS', admin_epost: 'ny@eier.no' });
   assert.equal(r.status, 200);
   const nokler = (db.innstillinger || []).filter((x: any) => x.org_id === r.org_id).map((x: any) => x.nokkel).sort();
-  assert.deepEqual(nokler, ['avvikPurring', 'chatVarsel', 'dokFornyelse', 'eierOversikt', 'investVarsel', 'leieVakt', 'ltRunde', 'oplAuto']);
+  assert.deepEqual(nokler, ['avvikPurring', 'chatVarsel', 'dokFornyelse', 'eierOversikt', 'investVarsel', 'leieVakt', 'ltRunde', 'oplAuto', 'rapportVarsel']);
   assert.equal((db.innstillinger || []).find((x: any) => x.org_id === r.org_id && x.nokkel === 'avvikPurring').data.ansvarlig, true);
 });

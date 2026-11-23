@@ -2,6 +2,7 @@ import { RegelverkStatus } from '../components/RegelverkStatus';
 import { importerSystemer } from './SystemImport';
 import { tgTekst } from '../components/TgKg';
 import { koTilGodkjenning } from './KontrollAo';
+import { lesNyeRapporter } from '../lib/rapportAuto';
 import React from 'react';
 import { isStaff } from '../lib/store';
 import { PortefoljeStatistikk } from './Portefolje';
@@ -22,7 +23,8 @@ import { Lyspunkt, LysChip, useSamsvar } from '../components/Samsvar';
 const go = (p: string) => { location.hash = '#/' + p; };
 
 export function Oversikt() {
-  useStore();
+  useStore(); const antRapp = canEdit() ? koTilGodkjenning().length : 0;
+  React.useEffect(() => { if (antRapp) lesNyeRapporter().catch(() => { }); }, [antRapp, JSON.stringify(S.innst.rapportVarsel)]);
   const ed = canEdit(); const samsvar = useSamsvar();
   if (!S.eiendommer.length) return <div className="welcome"><h1>{tt("Velkommen")}{state.me?.navn ? ', ' + state.me.navn : ''}</h1>
     {isAdmin() ? <div className="card"><h2>{tt("Kom i gang")}</h2><ol>
@@ -49,7 +51,7 @@ export function Oversikt() {
     ...OA.filter(a => a.alv === 'Kritisk' || (a.frist && (dUntil(a.frist) as number) < 0)).map(a => ({ d: a.frist || '0', el: <div key={a.id} className="li" onClick={() => editAvvik(a.id)}><AlvChip a={a.alv} /><div className="grow"><div className="lt">#{a.nr} {a.tittel}</div><div className="ls">{eNavn(a.eiendomId)} · {a.status} {tt("· frist")} {fd(a.frist)}</div></div></div> })),
     ...(ed ? S.leietakere.filter(l => l.brreg && enhetStatus(l.brreg).c !== 'green').map(l => ({ d: '0', el: <div key={'b' + l.id} className="li" onClick={() => go('leietaker/' + l.id)}><Chip c={enhetStatus(l.brreg).c}>{enhetStatus(l.brreg).t}</Chip><div className="grow"><div className="lt">{l.navn}</div><div className="ls">{eNavn(l.eiendomId)} {tt("· status i Brønnøysundregistrene per")} {fd(l.brreg.sjekket)}</div></div></div> })) : []),
     ...(ed ? [...S.anlegg.map(x => ({ x, k: false })), ...S.komponenter.map(x => ({ x, k: true }))].filter(({ x }) => x.tgForslag?.tg).map(({ x, k }) => ({ d: '0', el: <div key={'tg' + x.id} className="li" onClick={() => k ? editKomponent(x.id) : editAnlegg(x.id)}><Chip c="amber">{tt("Tilstand?")}</Chip><div className="grow"><div className="lt">{k ? kNavn(x.id) : aNavn(x.id)}: {tgTekst(x.tgForslag.fra)} → {tgTekst(x.tgForslag)}</div><div className="ls">{eNavn(x.eiendomId)} {tt("· forslag fra")} {x.tgForslag.av} {fd(x.tgForslag.dato)}</div></div></div> })) : []),
-    ...(ed ? koTilGodkjenning().map(o => ({ d: '0', el: <div key={'k' + o.id} className="li" onClick={() => visOppgave(o.id)}><Chip c="blue">{tt("Rapport mottatt")}</Chip><div className="grow"><div className="lt">{o.navn}</div><div className="ls">{eNavn(o.eiendomId)} · {o.innrapport.firma || o.innrapport.epost} {tt("· utført")} {fd(o.innrapport.dato)}</div></div></div> })) : []),
+    ...(ed ? koTilGodkjenning().map(o => ({ d: '0', el: <div key={'k' + o.id} className="li" onClick={() => visOppgave(o.id)}><Chip c="blue">{tt("Rapport mottatt")}</Chip><div className="grow"><div className="lt">{o.navn}</div><div className="ls">{eNavn(o.eiendomId)} · {o.innrapport.firma || o.innrapport.epost} {tt("· utført")} {fd(o.innrapport.dato)}{o.innrapport.lesing ? (o.innrapport.lesing.n ? tt(" · lest av appen: {0} mulige avvik{1}", o.innrapport.lesing.n, o.innrapport.lesing.hoy ? tt(", høy alvorlighet") : '') : tt(" · lest av appen: ingen nye funn")) : ''}</div></div></div> })) : []),
     ...(ed ? tilGodkjenning().map(x => ({ d: '0', el: <div key={'g' + x.l.id + x.idx} className="li" onClick={() => vurderPlikt(x.l.id, x.idx)}><Chip c="blue">{tt("Til godkjenning")}</Chip><div className="grow"><div className="lt">{x.p.navn}</div><div className="ls">{x.l.navn} · {eNavn(x.l.eiendomId)} {tt("· sendt")} {fd(x.p.innsendt.tid)}</div></div></div> })) : []),
   ].sort((a, b) => String(a.d).localeCompare(String(b.d)));
 

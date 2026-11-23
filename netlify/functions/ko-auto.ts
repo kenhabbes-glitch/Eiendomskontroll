@@ -33,6 +33,9 @@ export default async () => {
   // Levetidsvarsler: haste (etterslep/TG3) daglig og investeringsplan hvert kvartal (styres av Innstillinger → Investeringsvarsler; av som standard)
   const r9 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'invest_varsel' }) });
   console.log('invest-varsel', r9.status, (await r9.text()).slice(0, 1000));
+  // Rapporter til oppfølging: påminnelse om servicerapporter som venter på godkjenning (styres av Innstillinger → Rapporter til oppfølging; av som standard)
+  const r10 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'rapport_paminn' }) });
+  console.log('rapport-paminn', r10.status, (await r10.text()).slice(0, 1000));
   // Hjerteslag: forteller driftsvakten (server/vakt.sh) at nattjobbene har kjørt
   await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'jobb_hjerteslag', navn: 'ko-auto' }) }).catch(() => null);
   return new Response(t, { status: r.status });

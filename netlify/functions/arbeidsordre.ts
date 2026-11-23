@@ -20,6 +20,7 @@ import { driftHandling } from '../../src/lib/driftServer';
 import { brannAuto } from '../../src/lib/opplaeringAuto';
 import { chatVarsel } from '../../src/lib/chatVarselServer';
 import { investVarsel } from '../../src/lib/investVarselServer';
+import { rapportVarsel } from '../../src/lib/rapportVarselServer';
 import { KOMP } from '../../src/lib/catalog';
 import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 // Lagringen godtar bare ASCII i filbanen
@@ -965,6 +966,10 @@ const handler = async (req: Request) => {
   if (body.action === 'brannauto' || body.action === 'brannauto_na') {
     const forventet = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('ko-auto:' + key)).then(b => Buffer.from(b).toString('hex'));
     const r = await brannAuto({ admin, body, json, esc, erCron: req.headers.get('x-ek-cron') === forventet, hvem, sendEpost, oppsettFor, sprakFor: sprakFor as any }); if (r) return r;
+  }
+  if (body.action === 'rapport_paminn' || body.action === 'rapport_paminn_na') {
+    const forventet = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('ko-auto:' + key)).then(b => Buffer.from(b).toString('hex'));
+    const r = await rapportVarsel({ admin, body, json, esc, erCron: req.headers.get('x-ek-cron') === forventet, hvem, sendEpost, oppsettFor, sprakFor: sprakFor as any, pushTilOrg: pushTilOrg as any }); if (r) return r;
   }
   if (body.action === 'invest_varsel' || body.action === 'invest_varsel_na') {
     const forventet = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('ko-auto:' + key)).then(b => Buffer.from(b).toString('hex'));
