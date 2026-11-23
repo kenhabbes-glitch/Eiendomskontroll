@@ -23,6 +23,6 @@ test('ltRunde: eksisterende aktivert-dato overskrives ikke', () => {
   assert.equal(slaPa(['leietakerrunde'], { ltRunde: { pa: false, aktivert: '2026-01-01' } }, '2026-11-23').ltRunde.aktivert, '2026-01-01');
 });
 test('nye organisasjoner: alt på, eller bare interne varsler', () => {
-  const alt = oppsettForNyOrg('2026-11-23'); assert.ok(AUTOMATIKK.every(p => erPa(p, alt))); assert.equal(Object.keys(alt).sort().join(','), 'avvikPurring,chatVarsel,dokFornyelse,eierOversikt,leieVakt,ltRunde,oplAuto');
+  const alt = oppsettForNyOrg('2026-11-23'); assert.ok(AUTOMATIKK.every(p => erPa(p, alt))); assert.equal(Object.keys(alt).sort().join(','), 'avvikPurring,chatVarsel,dokFornyelse,eierOversikt,investVarsel,leieVakt,ltRunde,oplAuto');
   const intern = oppsettForNyOrg('2026-11-23', true); assert.equal(erPa(AUTOMATIKK.find(p => p.id === 'purring')!, intern), false); assert.equal(erPa(AUTOMATIKK.find(p => p.id === 'eskalering')!, intern), true); assert.equal(intern.ltRunde, undefined); assert.equal(intern.dokFornyelse, undefined);
 });

@@ -30,6 +30,9 @@ export default async () => {
   // Chat-varsler: påminnelse om leietakermeldinger uten svar (styres av Innstillinger → Chat-varsler; av som standard)
   const r8 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'chat_varsel_dag' }) });
   console.log('chat-varsel', r8.status, (await r8.text()).slice(0, 1000));
+  // Levetidsvarsler: haste (etterslep/TG3) daglig og investeringsplan hvert kvartal (styres av Innstillinger → Investeringsvarsler; av som standard)
+  const r9 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'invest_varsel' }) });
+  console.log('invest-varsel', r9.status, (await r9.text()).slice(0, 1000));
   // Hjerteslag: forteller driftsvakten (server/vakt.sh) at nattjobbene har kjørt
   await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'jobb_hjerteslag', navn: 'ko-auto' }) }).catch(() => null);
   return new Response(t, { status: r.status });

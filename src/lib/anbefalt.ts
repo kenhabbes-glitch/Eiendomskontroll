@@ -11,6 +11,7 @@ export const AUTOMATIKK: AutoPunkt[] = [
   { id: 'brannopplaering', nokkel: 'oplAuto', flagg: 'pa', navn: 'Brannopplæring på autopilot', hva: 'Purrer ledere og ansatte, repeterer opplæringen hvert år og gir deg prosent per leietaker', sendtTilAndre: true },
   { id: 'leievakt', nokkel: 'leieVakt', flagg: 'pa', navn: 'Leieavtale-vakt', hva: 'Varsler om avtaleutløp, oppsigelsesfrist og indeksregulering', sendtTilAndre: false },
   { id: 'chatvarsel', nokkel: 'chatVarsel', flagg: 'pa', navn: 'Chat-varsler', hva: 'Varsel når det kommer nye meldinger, og påminnelse om leietakermeldinger uten svar', sendtTilAndre: true },
+  { id: 'investvarsel', nokkel: 'investVarsel', flagg: 'pa', navn: 'Investeringsvarsler', hva: 'Kvartalsoversikt over utskiftinger, kostnad og datahull, og varsel når noe passerer levetid eller får TG3', sendtTilAndre: false },
 ];
 export type InnstAlle = Record<string, any>;
 

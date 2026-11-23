@@ -15,6 +15,7 @@ import { renFornyInnst } from '../lib/fornyelseServer';
 import { renVaktInnst } from '../lib/leieServer';
 import { renOplAuto } from '../lib/opplaeringAuto';
 import { renChatInnst } from '../lib/chatVarselServer';
+import { renInvest } from '../lib/investVarselServer';
 import { AUTOMATIKK, erPa, slaPa } from '../lib/anbefalt';
 import { PUSH_TYPER, pushStotte, erIos, erInstallert, pushStatus, slaPaPush, slaAvPush, endreTyper, testPush } from '../lib/push';
 
@@ -208,6 +209,27 @@ export function ChatVarselKort() {
         <label><input type="checkbox" disabled={ro} checked={c.tilLeietaker} onChange={e => setC({ tilLeietaker: e.target.checked })} /> {tt("Send e-post til leietaker når utleier svarer")}</label><br />
         <label><input type="checkbox" disabled={ro} checked={c.paminnelse} onChange={e => setC({ paminnelse: e.target.checked })} /> {tt("Minn meg på meldinger uten svar etter")}</label> <Tall v={c.ubesvartDager} set={n => setC({ ubesvartDager: n })} ro={ro} w={46} /> {tt("dager")}<br />
         {tt("E-post til ansatte går til")} <input disabled={ro} value={c.ansatteEpost} placeholder={tt("administratorene (tomt = alle)")} style={{ width: 260, display: 'inline-block' }} onChange={e => setC({ ansatteEpost: e.target.value })} /></div>}</div>
+    {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={kjorNa}>{tt("Kjør nå")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
+  </div>;
+}
+
+export function InvestVarselKort() {
+  useStore(); const ro = !isAdmin() && state.me?.rolle !== 'forvalter';
+  const [c, setC0] = useState(renInvest(S.innst.investVarsel)); const [busy, setBusy] = useState(false);
+  useEffect(() => setC0(renInvest(S.innst.investVarsel)), [JSON.stringify(S.innst.investVarsel)]);
+  const setC = (x: Partial<ReturnType<typeof renInvest>>) => setC0(v => ({ ...v, ...x }));
+  const lagre = async () => { setBusy(true); try { await saveInnst('investVarsel', renInvest(c)); toast(tt("Innstillingene er lagret")); } catch { } setBusy(false); };
+  const kjorNa = async () => {
+    if (!S.primarOrg || !confirm(tt("Kjøre nå? Du får investeringsoversikten på e-post og push med en gang."))) return; setBusy(true);
+    try { await saveInnst('investVarsel', renInvest(c)); const r = await aoApi({ action: 'invest_varsel_na', org: S.primarOrg }); const x = (r.rapport || [])[0] || {};
+      toast(tt("{0} systemer vurdert, {1} varsler og {2} e-poster sendt", x.poster || 0, x.push || 0, x.epost || 0)); } catch { } setBusy(false); };
+  return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}>
+    <h2 style={{ marginTop: 0 }}>{tt("Investeringsvarsler")}</h2>
+    <p className="small muted" style={{ marginTop: -4 }}>{tt("Første mandag i januar, april, juli og oktober får du én oversikt over utskiftinger de nærmeste årene, med kostnad og datahull. Du får også varsel med en gang noe passerer levetid eller får tilstandsgrad TG3. Av som standard.")}</p>
+    <div className="pu-rad"><Bryter on={c.pa} set={b => setC({ pa: b })} ro={ro}><b>{tt("Send investeringsvarsler")}</b></Bryter>
+      {c.pa && <div className="pu-under small">{tt("Se")} <Tall v={c.aar} set={n => setC({ aar: n })} ro={ro} w={46} /> {tt("år fram i oversikten")}<br />
+        <label><input type="checkbox" disabled={ro} checked={c.haste} onChange={e => setC({ haste: e.target.checked })} /> {tt("Varsle med en gang ved etterslep eller TG3")}</label><br />
+        {tt("E-post går til")} <input disabled={ro} value={c.epost} placeholder={tt("administratorene (tomt = alle)")} style={{ width: 260, display: 'inline-block' }} onChange={e => setC({ epost: e.target.value })} /></div>}</div>
     {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={kjorNa}>{tt("Kjør nå")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
   </div>;
 }

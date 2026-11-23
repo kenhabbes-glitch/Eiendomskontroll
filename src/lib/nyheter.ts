@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2027-01-04', dato: '2027-01-04', tittel: 'Investeringsvarsler', punkter: [
+    'Første mandag i januar, april, juli og oktober får du en samlet oversikt over hva som skal skiftes de nærmeste årene, med kostnad og hvilke opplysninger som mangler.',
+    'Du får også varsel med en gang et system passerer levetiden eller får tilstandsgrad TG3.',
+    'Slå det på under Innstillinger → Investeringsvarsler.',
+  ] },
   { id: '2027-01-03', dato: '2027-01-03', tittel: 'Varsler for chat', punkter: [
     'Du får nå beskjed når en leietaker skriver til deg i chatten, og leietakeren får e-post når du svarer. Slå det på under Innstillinger → Chat-varsler.',
     'Det sendes høyst ett varsel per samtale hvert 30. minutt, og interne notater varsler aldri leietakeren.',
