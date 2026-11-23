@@ -18,5 +18,8 @@ export default async () => {
   // Automatisk leietaker-runde (styres av Innstillinger → Leietaker-runde; av som standard)
   const r4 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'lt_runde' }) });
   console.log('lt-runde', r4.status, (await r4.text()).slice(0, 1000));
+  // Fornyelse av utløpende dokumenter (styres av Innstillinger → Fornyelse av dokumenter; av som standard)
+  const r5 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'dok_fornyelse' }) });
+  console.log('dok-fornyelse', r5.status, (await r5.text()).slice(0, 1000));
   return new Response(t, { status: r.status });
 };

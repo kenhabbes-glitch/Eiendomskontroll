@@ -11,6 +11,7 @@ import { settFilter } from './common';
 import { svarfristSnart } from './Tilsyn';
 import { tt } from '../lib/i18n';
 import { RUNDE_STD, renRundeInnst } from '../lib/rundeServer';
+import { renFornyInnst } from '../lib/fornyelseServer';
 import { PUSH_TYPER, pushStotte, erIos, erInstallert, pushStatus, slaPaPush, slaAvPush, endreTyper, testPush } from '../lib/push';
 
 export const PURR_STD = { paLogging: true, paLoggingDager: 7, ansvarlig: false, ansvarligFor: 3, ansvarligGjenta: 7, ansvarligMaks: 3, eier: false, eierEtter: 14, eierEpost: '', ukentlig: false, ukentligEpost: '' };
@@ -92,6 +93,30 @@ export function LtRundeKort() {
       {c.eskaler && <div className="pu-under small">{tt("Til")} <input disabled={ro} value={c.eskalerEpost} placeholder={tt("administratorene (tomt = alle)")} style={{ width: 300, display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ eskalerEpost: e.target.value })} /></div>}</div>}
     {c.pa && <div className="pu-rad small"><label>{tt("Egen tekst i e-posten (valgfritt)")}<textarea disabled={ro} rows={3} value={c.melding} onChange={e => setC({ melding: e.target.value })} placeholder={tt("Tom = standardtekst")} /></label></div>}
     {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={startNa}>{tt("Start en runde nå")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
+  </div>;
+}
+
+// ---------------- Automatisk fornyelse av utløpende dokumenter (serverjobb hver morgen; status ligger på dokumentet)
+export function FornyelseKort() {
+  useStore(); const ro = !isAdmin() && state.me?.rolle !== 'forvalter';
+  const [c, setC0] = useState(renFornyInnst(S.innst.dokFornyelse)); const [trinnTxt, setTrinn] = useState(renFornyInnst(S.innst.dokFornyelse).trinn.join(', ')); const [busy, setBusy] = useState(false);
+  useEffect(() => { const n = renFornyInnst(S.innst.dokFornyelse); setC0(n); setTrinn(n.trinn.join(', ')); }, [JSON.stringify(S.innst.dokFornyelse)]);
+  const setC = (x: Partial<ReturnType<typeof renFornyInnst>>) => setC0(v => ({ ...v, ...x }));
+  const ferdig = () => renFornyInnst({ ...c, trinn: trinnTxt });
+  const lagre = async () => { setBusy(true); try { await saveInnst('dokFornyelse', ferdig()); toast(tt("Innstillingene er lagret")); } catch { } setBusy(false); };
+  const kjorNa = async () => {
+    if (!S.primarOrg || !confirm(tt("Kjøre nå? Mottakere av dokumenter som utløper snart får e-post med en gang."))) return; setBusy(true);
+    try { await saveInnst('dokFornyelse', ferdig()); const r = await aoApi({ action: 'dok_fornyelse_na', org: S.primarOrg }); const x = (r.rapport || [])[0] || {};
+      toast(tt("{0} mottakere varslet om {1} dokumenter, {2} holdt tilbake", x.mottakere || 0, x.dokumenter || 0, x.holdt || 0)); } catch { } setBusy(false); };
+  return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}>
+    <h2 style={{ marginTop: 0 }}>{tt("Fornyelse av dokumenter")}</h2>
+    <p className="small muted" style={{ marginTop: -4 }}>{tt("Når et dokument med «Gyldig til» nærmer seg utløp, ber appen leietaker, leverandør eller deg om et nytt. Hver mottaker får én samlet e-post, og hvert trinn sendes bare én gang. Dokumenter som allerede har et nyere dokument av samme type, hoppes over. Av som standard.")}</p>
+    <div className="pu-rad"><Bryter on={c.pa} set={b => setC({ pa: b })} ro={ro}><b>{tt("Be om fornyelse automatisk")}</b></Bryter>
+      {c.pa && <div className="pu-under small">{tt("Varsle så mange dager før utløp")} <input disabled={ro} value={trinnTxt} className="num" style={{ width: 130, display: 'inline-block', padding: '3px 6px' }} onChange={e => setTrinn(e.target.value)} /> <span className="muted">{tt("(f.eks. 90, 30, 0)")}</span><br />
+        <label><input type="checkbox" disabled={ro} checked={c.leietaker} onChange={e => setC({ leietaker: e.target.checked })} /> {tt("Send til leietaker for leietakerens dokumenter")}</label><br />
+        <label><input type="checkbox" disabled={ro} checked={c.leverandor} onChange={e => setC({ leverandor: e.target.checked })} /> {tt("Send til leverandør når e-post er lagret på kontrollen eller anlegget")}</label><br />
+        {tt("Øvrige dokumenter sendes til")} <input disabled={ro} value={c.eierEpost} placeholder={tt("administratorene (tomt = alle)")} style={{ width: 300, display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ eierEpost: e.target.value })} /></div>}</div>
+    {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={kjorNa}>{tt("Kjør nå")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
   </div>;
 }
 

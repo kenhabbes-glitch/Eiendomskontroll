@@ -14,6 +14,7 @@ import esEsOrd from '../../src/i18n/es-ES.json';
 import { pushTilOrg, pushTilBrukere } from '../../src/lib/serverPush';
 import { opplaering } from '../../src/lib/opplaeringServer';
 import { leietakerRunde } from '../../src/lib/rundeServer';
+import { dokumentFornyelse } from '../../src/lib/fornyelseServer';
 import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 // Lagringen godtar bare ASCII i filbanen
 const asciiNavn = (n: any) => String(n || 'fil').replace(/[æÆ]/g, m => m === 'æ' ? 'ae' : 'Ae').replace(/[øØ]/g, m => m === 'ø' ? 'o' : 'O').replace(/[åÅ]/g, m => m === 'å' ? 'a' : 'A')
@@ -946,6 +947,10 @@ const handler = async (req: Request) => {
   if (body.action === 'lt_runde' || body.action === 'lt_runde_na') {
     const forventet = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('ko-auto:' + key)).then(b => Buffer.from(b).toString('hex'));
     const r = await leietakerRunde({ admin, body, json, esc, erCron: req.headers.get('x-ek-cron') === forventet, hvem, sendEpost, oppsettFor, sprakFor: sprakFor as any }); if (r) return r;
+  }
+  if (body.action === 'dok_fornyelse' || body.action === 'dok_fornyelse_na') {
+    const forventet = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('ko-auto:' + key)).then(b => Buffer.from(b).toString('hex'));
+    const r = await dokumentFornyelse({ admin, body, json, esc, erCron: req.headers.get('x-ek-cron') === forventet, hvem, sendEpost, oppsettFor, sprakFor: sprakFor as any }); if (r) return r;
   }
   if (String(body.action || '').startsWith('opl_')) { const r = await opplaering({ admin, body, json, esc, hvem, kanRedigere, harEiendom, sendEpost, oppsettFor, minOrg, sprakFor: sprakFor as any }); if (r) return r; }
   if (body.action === 'pr_send') {
