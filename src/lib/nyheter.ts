@@ -1,6 +1,10 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-31', dato: '2026-12-31', tittel: 'Driftsvarsler', punkter: [
+    'Serveren kan nå varsle administratorer ved driftsfeil, for eksempel mislykket sikkerhetskopi, full disk, stoppet tunnel eller nattjobber som ikke har kjørt.',
+    'Slå på «Driftsfeil på serveren» under Innstillinger → Push-varsler. E-post settes opp av den som drifter serveren.',
+  ] },
   { id: '2026-12-30', dato: '2026-12-30', tittel: 'Leieavtale-vakt', punkter: [
     'Appen kan nå varsle deg om avtaleutløp, siste oppsigelsesdato og kommende indeksregulering. Slå det på under Innstillinger → Leieavtale-vakt.',
     'Legg inn oppsigelsesfrist og reguleringsdato på leietakeren. Under «Avtalefrister» på leietakeren finner du utkast til regulering med beregnet ny leie og et brev du kan kopiere.',

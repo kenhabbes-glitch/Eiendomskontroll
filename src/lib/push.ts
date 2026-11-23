@@ -5,6 +5,7 @@ import { sprak } from './i18n';
 export const PUSH_TYPER: { k: string; navn: string; hjelp: string }[] = [
   { k: 'kritisk', navn: 'Kritiske saker', hjelp: 'Straks en sak er meldt som kritisk (f.eks. røyk, vann fra tak, blokkert rømningsvei)' },
   { k: 'melding', navn: 'Nye saker og meldinger', hjelp: 'Hver gang en leietaker eller en QR-kode melder en sak' },
+  { k: 'drift', navn: 'Driftsfeil på serveren', hjelp: 'Når vaktskriptet på serveren melder om feil, for eksempel mislykket sikkerhetskopi, full disk eller stoppede tjenester (bare administratorer)' },
   { k: 'oversikt', navn: 'Ukeoversikten', hjelp: 'Et kort varsel når ukeoversikten er sendt, med antall forfalte og kommende' },
 ];
 export const pushStotte = () => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;

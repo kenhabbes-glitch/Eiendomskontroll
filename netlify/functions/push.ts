@@ -6,7 +6,7 @@ import { vapid, pushTilBrukere, pushTilOrg } from '../../src/lib/serverPush';
 
 const json = (status: number, body: any) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const aalFra = (t: string) => { try { return JSON.parse(Buffer.from(t.split('.')[1] || '', 'base64url').toString()).aal || ''; } catch { return ''; } };
-export const TYPER = ['melding', 'kritisk', 'oversikt'];
+export const TYPER = ['melding', 'kritisk', 'oversikt', 'drift'];
 
 export default async (req: Request) => {
   try { return await handler(req); } catch (e: any) { console.error('push-feil', e); return json(500, { error: 'Serverfeil' }); }
