@@ -10,6 +10,7 @@ import { mineAo } from './Arbeidsordre';
 import { settFilter } from './common';
 import { svarfristSnart } from './Tilsyn';
 import { tt } from '../lib/i18n';
+import { RUNDE_STD, renRundeInnst } from '../lib/rundeServer';
 import { PUSH_TYPER, pushStotte, erIos, erInstallert, pushStatus, slaPaPush, slaAvPush, endreTyper, testPush } from '../lib/push';
 
 export const PURR_STD = { paLogging: true, paLoggingDager: 7, ansvarlig: false, ansvarligFor: 3, ansvarligGjenta: 7, ansvarligMaks: 3, eier: false, eierEtter: 14, eierEpost: '', ukentlig: false, ukentligEpost: '' };
@@ -58,6 +59,39 @@ export function UkeOversiktKort() {
     <div className="pu-rad"><Bryter on={c.pa} set={b => setC({ pa: b })} ro={ro}><b>{tt("Send ukeoversikt på e-post")}</b></Bryter>
       {c.pa && <div className="pu-under small">{tt("Hver")} <select disabled={ro} value={c.ukedag} style={{ width: 'auto', display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ ukedag: +e.target.value })}>{dager.map((d, i) => <option key={i} value={i}>{d}</option>)}</select> · {tt("ta med de neste")} <Tall v={c.dager} set={n => setC({ dager: Math.max(7, n) })} ro={ro} w={50} /> {tt("dagene")} · {tt("til")} <input disabled={ro} value={c.epost} placeholder={tt("e-post (tom = organisasjonens administratorer)")} style={{ width: 300, display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ epost: e.target.value })} /></div>}</div>
     {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={sendNa}>{tt("Send en nå (test)")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
+  </div>;
+}
+
+// ---------------- Automatisk leietaker-runde (serverjobb kl. 07:00 norsk tid; status ligger på hver leietaker)
+export function LtRundeKort() {
+  useStore(); const ro = !isAdmin() && state.me?.rolle !== 'forvalter';
+  const [c, setC0] = useState(renRundeInnst(S.innst.ltRunde)); const [busy, setBusy] = useState(false);
+  useEffect(() => setC0(renRundeInnst(S.innst.ltRunde)), [JSON.stringify(S.innst.ltRunde)]);
+  const setC = (x: Partial<typeof RUNDE_STD>) => setC0(v => ({ ...v, ...x }));
+  const mnd = ['januar', 'februar', 'mars', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'desember'];
+  const [mm, dd] = c.dato.split('-').map(Number);
+  const settDato = (m: number, d: number) => setC({ dato: `${String(m).padStart(2, '0')}-${String(Math.min(28, Math.max(1, d || 1))).padStart(2, '0')}` });
+  const lagre = async () => { setBusy(true); try { const ny = { ...renRundeInnst(c), aktivert: c.pa && !S.innst.ltRunde?.pa ? today() : (S.innst.ltRunde?.aktivert || '') }; await saveInnst('ltRunde', ny); toast(tt("Innstillingene er lagret")); } catch { } setBusy(false); };
+  const startNa = async () => {
+    if (!S.primarOrg || !confirm(tt("Starte en runde nå? Alle aktive leietakere med e-postadresse får sjekklisten per e-post."))) return; setBusy(true);
+    try { await saveInnst('ltRunde', { ...renRundeInnst(c), aktivert: S.innst.ltRunde?.aktivert || today() }); const r = await aoApi({ action: 'lt_runde_na', org: S.primarOrg }); const x = (r.rapport || [])[0] || {};
+      toast(tt("Runde startet: {0} sendt, {1} uten e-postadresse, {2} holdt tilbake", x.startet || 0, x.uten_epost || 0, x.holdt || 0)); } catch { } setBusy(false); };
+  const sel = { width: 'auto', display: 'inline-block', padding: '3px 6px' } as const;
+  return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}>
+    <h2 style={{ marginTop: 0 }}>{tt("Leietaker-runde")}</h2>
+    <p className="small muted" style={{ marginTop: -4 }}>{tt("Appen sender sjekklisten for brann og internkontroll til alle aktive leietakere på et fast tidspunkt, purrer de som ikke har svart, og varsler deg til slutt. Status vises på hver leietaker. Av som standard.")}</p>
+    <div className="pu-rad"><Bryter on={c.pa} set={b => setC({ pa: b })} ro={ro}><b>{tt("Send sjekkliste automatisk til alle leietakere")}</b><br /><span className="small muted">{tt("Leietakere uten e-postadresse, utflyttede og leietakere uten relevante plikter hoppes over. Første runde kommer ved neste planlagte dato.")}</span></Bryter>
+      {c.pa && <div className="pu-under small">
+        <select disabled={ro} value={c.intervall} style={sel} onChange={e => setC({ intervall: e.target.value as any })}><option value="aar">{tt("Hvert år")}</option><option value="halvaar">{tt("Hvert halvår")}</option></select> {tt("fra")}{' '}
+        <input type="number" min={1} max={28} disabled={ro} className="num" style={{ ...sel, width: 56 }} value={dd} onChange={e => settDato(mm, +e.target.value)} />{'. '}
+        <select disabled={ro} value={mm} style={sel} onChange={e => settDato(+e.target.value, dd)}>{mnd.map((m, i) => <option key={i} value={i + 1}>{tt(m)}</option>)}</select>
+        {c.intervall === 'halvaar' && <span> {tt("og seks måneder senere")}</span>}<br />
+        {tt("Frist for svar")} <Tall v={c.frist} set={n => setC({ frist: n })} ro={ro} w={46} /> {tt("dager")}</div>}</div>
+    {c.pa && <div className="pu-rad"><span className="small"><b>{tt("Purring")}</b> {tt("første purring etter")} <Tall v={c.purrEtter} set={n => setC({ purrEtter: n })} ro={ro} w={46} /> {tt("dager, deretter hver")} <Tall v={c.purrGjenta} set={n => setC({ purrGjenta: n })} ro={ro} w={46} /> {tt("dag, maks")} <Tall v={c.purrMaks} set={n => setC({ purrMaks: n })} ro={ro} w={46} /> {tt("purringer")}</span></div>}
+    {c.pa && <div className="pu-rad"><Bryter on={c.eskaler} set={b => setC({ eskaler: b })} ro={ro}><b>{tt("Samlet e-post til eier om de som fortsatt ikke har svart")}</b></Bryter>
+      {c.eskaler && <div className="pu-under small">{tt("Til")} <input disabled={ro} value={c.eskalerEpost} placeholder={tt("administratorene (tomt = alle)")} style={{ width: 300, display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ eskalerEpost: e.target.value })} /></div>}</div>}
+    {c.pa && <div className="pu-rad small"><label>{tt("Egen tekst i e-posten (valgfritt)")}<textarea disabled={ro} rows={3} value={c.melding} onChange={e => setC({ melding: e.target.value })} placeholder={tt("Tom = standardtekst")} /></label></div>}
+    {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={startNa}>{tt("Start en runde nå")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
   </div>;
 }
 

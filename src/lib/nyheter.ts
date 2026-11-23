@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2026-12-28', dato: '2026-12-28', tittel: 'Automatisk leietaker-runde', punkter: [
+    'Appen kan nå sende sjekklisten for brann og internkontroll til alle leietakere på et fast tidspunkt, årlig eller halvårlig. Slå det på under Innstillinger → Leietaker-runde.',
+    'Leietakere som ikke har svart, får automatisk purring. Til slutt får eier én samlet e-post om de som fortsatt mangler.',
+    'På hver leietaker ser du om runden er sendt, purret eller besvart. «Start en runde nå» lar deg prøve med en gang.',
+  ] },
   { id: '2026-12-27', dato: '2026-12-27', tittel: 'Dokumentlenker i opplæringen', punkter: [
     'Dokumenter i brannvernopplæringen åpnes nå via appens egen adresse, så de åpner seg på alle enheter.',
     'Interne kontrollrapporter og sjekklister tilbys ikke lenger som vedlegg til brannvernpakken.',

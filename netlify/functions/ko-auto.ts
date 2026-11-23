@@ -15,5 +15,8 @@ export default async () => {
   // Ukeoversikt til eier (styres av Innstillinger → Ukeoversikt til eier; av som standard)
   const r3 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'eier_uke' }) });
   console.log('eier-uke', r3.status, (await r3.text()).slice(0, 1000));
+  // Automatisk leietaker-runde (styres av Innstillinger → Leietaker-runde; av som standard)
+  const r4 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'lt_runde' }) });
+  console.log('lt-runde', r4.status, (await r4.text()).slice(0, 1000));
   return new Response(t, { status: r.status });
 };
