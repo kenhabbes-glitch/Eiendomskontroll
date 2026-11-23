@@ -13,6 +13,7 @@ import { tt } from '../lib/i18n';
 import { RUNDE_STD, renRundeInnst } from '../lib/rundeServer';
 import { renFornyInnst } from '../lib/fornyelseServer';
 import { renVaktInnst } from '../lib/leieServer';
+import { AUTOMATIKK, erPa, slaPa } from '../lib/anbefalt';
 import { PUSH_TYPER, pushStotte, erIos, erInstallert, pushStatus, slaPaPush, slaAvPush, endreTyper, testPush } from '../lib/push';
 
 export const PURR_STD = { paLogging: true, paLoggingDager: 7, ansvarlig: false, ansvarligFor: 3, ansvarligGjenta: 7, ansvarligMaks: 3, eier: false, eierEtter: 14, eierEpost: '', ukentlig: false, ukentligEpost: '' };
@@ -142,6 +143,25 @@ export function LeieVaktInnstKort() {
         {tt("Indeksregulering: varsle")} <Tall v={c.regulerDager} set={n => setC({ regulerDager: n })} ro={ro} w={56} /> {tt("dager før reguleringsdato")}<br />
         {tt("Send til")} <input disabled={ro} value={c.epost} placeholder={tt("administratorene (tomt = alle)")} style={{ width: 300, display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ epost: e.target.value })} /></div>}</div>
     {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={kjorNa}>{tt("Kjør nå")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
+  </div>;
+}
+
+// ---------------- Anbefalt automatikk: oversikt og én knapp som slår på det som er av (beholder alt du har justert)
+export function AnbefaltKort() {
+  useStore(); const ro = !isAdmin() && state.me?.rolle !== 'forvalter';
+  const av = AUTOMATIKK.filter(p => !erPa(p, S.innst)); const [valgt, setValgt] = useState<string[]>([]); const [busy, setBusy] = useState(false);
+  useEffect(() => setValgt(av.map(p => p.id)), [av.map(p => p.id).join(',')]);
+  const slaPaNa = async () => {
+    const ny = slaPa(valgt, S.innst, today()); const n = valgt.length; if (!n) return;
+    if (!confirm(tt("Slå på {0} automatikker? Du kan slå dem av igjen i kortene under. Mens e-post står i testmodus, holdes e-post til andre tilbake.", n))) return;
+    setBusy(true); try { for (const [nokkel, data] of Object.entries(ny)) await saveInnst(nokkel, data); toast(tt("Anbefalt oppsett er slått på")); } catch { } setBusy(false); };
+  return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}>
+    <h2 style={{ marginTop: 0 }}>{tt("Anbefalt automatikk")}</h2>
+    <p className="small muted" style={{ marginTop: -4 }}>{av.length ? tt("{0} av {1} automatikker er av. Slå på det du vil ha, så bruker appen anbefalte standardverdier. Innstillinger du har justert, beholdes.", av.length, AUTOMATIKK.length) : tt("Alle automatikker er på. Justér dem i kortene under.")}</p>
+    {AUTOMATIKK.map(p => { const pa = erPa(p, S.innst); return <div key={p.id} className="pu-rad small" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+      {pa ? <span style={{ color: 'var(--green)' }} aria-label={tt("På")}>✔</span> : <input type="checkbox" disabled={ro} checked={valgt.includes(p.id)} onChange={e => setValgt(v => e.target.checked ? [...v, p.id] : v.filter(x => x !== p.id))} aria-label={tt(p.navn)} />}
+      <span><b>{tt(p.navn)}</b>{p.sendtTilAndre && <span className="muted"> · {tt("sender også til leietakere/leverandører")}</span>}<br /><span className="muted">{tt(p.hva)}</span></span></div>; })}
+    {av.length > 0 && (!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler || !valgt.length} onClick={slaPaNa}>{busy ? tt("Slår på …") : tt("Slå på valgte")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>)}
   </div>;
 }
 

@@ -4,16 +4,16 @@ import { test, mock, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { lagFalsk, type Db } from './falsk-supabase.ts';
 
-let falsk: ReturnType<typeof lagFalsk>;
+let falsk: ReturnType<typeof lagFalsk>; let db: Db;
 mock.module('@supabase/supabase-js', { namedExports: { createClient: () => falsk.klient } });
 process.env.SUPABASE_URL = 'http://test'; process.env.SUPABASE_SERVICE_ROLE_KEY = 'test';
-const { default: brukere } = await import('../netlify/functions/brukere.ts');
+const { default: brukere } = await import('./.bygg/brukere.mjs');
 
 const kall = async (token: string, body: any) => { const r = await brukere(new Request('http://x/', { method: 'POST', headers: { authorization: 'Bearer ' + token }, body: JSON.stringify(body) })); return { status: r.status, ...(await r.json()) }; };
 const PW = 'Sterkt-Passord-123';
 
 beforeEach(() => {
-  const db: Db = {
+  db = {
     organisasjoner: [{ id: 'org1', navn: 'Angriper AS', aktiv: true }, { id: 'org2', navn: 'Offer AS', aktiv: true }],
     profiles: [
       { id: 'admin1', epost: 'admin@org1.no', navn: 'Admin 1', aktiv: true, plattform_admin: false, rolle: 'ingen' },
@@ -112,4 +112,12 @@ test('TOFAKTOR: plattformadministrator kan nullstille for alle', async () => {
 test('bare plattformadministrator kan slette brukere og opprette organisasjoner', async () => {
   assert.equal((await kall('tok-admin1', { action: 'slett', user_id: 'offer' })).status, 403);
   assert.equal((await kall('tok-admin1', { action: 'ny_org', navn: 'X', admin_epost: 'a@b.no' })).status, 403);
+});
+
+test('ny organisasjon får anbefalt automatikk på fra første dag', async () => {
+  const r = await kall('tok-sjef', { action: 'ny_org', navn: 'Ny Eier AS', admin_epost: 'ny@eier.no' });
+  assert.equal(r.status, 200);
+  const nokler = (db.innstillinger || []).filter((x: any) => x.org_id === r.org_id).map((x: any) => x.nokkel).sort();
+  assert.deepEqual(nokler, ['avvikPurring', 'dokFornyelse', 'eierOversikt', 'leieVakt', 'ltRunde']);
+  assert.equal((db.innstillinger || []).find((x: any) => x.org_id === r.org_id && x.nokkel === 'avvikPurring').data.ansvarlig, true);
 });

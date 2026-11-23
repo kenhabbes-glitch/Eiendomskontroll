@@ -1,6 +1,7 @@
 // Netlify-funksjon for brukeradministrasjon i organisasjonsmodellen. Kjører på serveren med
 // Supabase service-nøkkel (som aldri sendes til nettleseren). Hver handling sjekker at den som
 // kaller er administrator i riktig organisasjon (eller plattformadministrator).
+import { oppsettForNyOrg } from '../../src/lib/anbefalt';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws'; // Node < 22 mangler innebygd WebSocket, som supabase-js krever
 
@@ -151,6 +152,7 @@ const handler = async (req: Request) => {
     if (error) return json(500, { error: error.message });
     try { const b = await finnEllerOpprett(epost, String(body.admin_navn || ''), body.passord ? String(body.passord) : undefined, org.id); await settMedlem(org.id, b.id, 'admin', true, []); }
     catch (e: any) { await admin.from('organisasjoner').delete().eq('id', org.id); return json(400, { error: e.message }); }
+    for (const [nokkel, data] of Object.entries(oppsettForNyOrg(new Date().toISOString().slice(0, 10)))) await admin.from('innstillinger').insert({ org_id: org.id, nokkel, data }).then(() => null, () => null);
     await logg(org.id, `Organisasjon «${navn}» opprettet med administrator ${epost}`);
     return json(200, { ok: true, org_id: org.id });
   }

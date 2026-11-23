@@ -5,6 +5,7 @@
 //  * én organisasjon per org.nr, og en øvre grense for antall registreringer per time,
 //  * brukeren får en invitasjon på e-post og setter passord selv (bekrefter at e-posten er ekte).
 // Prøveperioden (30 dager på alle moduler) gis av databasen (migrasjon 015).
+import { oppsettForNyOrg } from '../../src/lib/anbefalt';
 import { createClient } from '@supabase/supabase-js';
 import ws from 'ws';
 
@@ -67,6 +68,8 @@ const handler = async (req: Request) => {
   const { data: org, error: oe } = await admin.from('organisasjoner').insert({ navn: firmanavn, orgnr: uten ? null : orgnr, type, aktiv: true,
     data: { selvregistrert: true, utenOrgnr: uten, land, registrert: new Date().toISOString(), registrertAv: { navn, epost }, vilkaar: VILKAR_VERSJON, orgform: enhet?.organisasjonsform?.beskrivelse || '', adresse: enhet?.forretningsadresse || null } }).select().single();
   if (oe || !org) return json(500, { error: 'Kunne ikke opprette organisasjonen' });
+  // Anbefalt automatikk på fra første dag (kan slås av under Innstillinger)
+  for (const [nokkel, data] of Object.entries(oppsettForNyOrg(new Date().toISOString().slice(0, 10)))) await admin.from('innstillinger').insert({ org_id: org.id, nokkel, data }).then(() => null, () => null);
   if (uten) await admin.from('org_modul').delete().eq('org_id', org.id); // trigger gir prøveperiode ved opprettelse; den starter først når org.nr. er lagt inn
 
   // Invitasjon på e-post – brukeren setter passord selv

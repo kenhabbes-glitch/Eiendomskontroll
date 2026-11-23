@@ -8,7 +8,7 @@ let falsk: ReturnType<typeof lagFalsk>;
 mock.module('@supabase/supabase-js', { namedExports: { createClient: () => falsk.klient } });
 process.env.SUPABASE_URL = 'http://test'; process.env.SUPABASE_SERVICE_ROLE_KEY = 'test';
 const { default: qr } = await import('./.bygg/qr-meld.mjs');
-const { default: registrer } = await import('../netlify/functions/registrer.ts');
+const { default: registrer } = await import('./.bygg/registrer.mjs');
 const post = async (fn: any, body: any) => { const r = await fn(new Request('http://x/', { method: 'POST', body: JSON.stringify(body) })); return { status: r.status, ...(await r.json()) }; };
 
 const TOK = 'meldepunkt-token-0123456789', AV = 'avslaatt-token-0123456789abc'; let db: Db; const naa = () => new Date().toISOString();
