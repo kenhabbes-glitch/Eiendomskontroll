@@ -1,6 +1,11 @@
 /** Oppdateringshistorikk. Nyeste øverst. Legg til en ny post når noe nytt slippes – da vises «Nytt i appen» én gang for hver bruker. */
 export type Nyhet = { id: string; dato: string; tittel: string; punkter: string[] };
 export const NYHETER: Nyhet[] = [
+  { id: '2027-01-03', dato: '2027-01-03', tittel: 'Varsler for chat', punkter: [
+    'Du får nå beskjed når en leietaker skriver til deg i chatten, og leietakeren får e-post når du svarer. Slå det på under Innstillinger → Chat-varsler.',
+    'Det sendes høyst ett varsel per samtale hvert 30. minutt, og interne notater varsler aldri leietakeren.',
+    'Leietakermeldinger som ikke har fått svar etter to dager, gir én samlet påminnelse til deg.',
+  ] },
   { id: '2027-01-02', dato: '2027-01-02', tittel: 'Brannopplæring på autopilot', punkter: [
     'Appen kan nå purre brannvernledere og ansatte som ikke har gjennomført brannvernopplæringen. Slå det på under Innstillinger → Brannopplæring på autopilot.',
     'Opplæringen kan repeteres automatisk hvert år, med nye personlige lenker til lederen og de som var invitert sist.',

@@ -1,6 +1,6 @@
 // Utleierens meldingsoversikt: siste samtaler med leietakere, ulest først.
 import { useEffect, useState } from 'react';
-import { S, kanDrifteE, sb, state, toast, useStore } from '../lib/store';
+import { S, kanDrifteE, sb, state, toast, useStore, varsleChat } from '../lib/store';
 import { formModal } from '../components/ui';
 import { Samtale, malAv, type Melding } from '../components/Samtale';
 import { AlvChip, Empty, FileLink, StChip, showModal } from '../components/ui';
@@ -43,7 +43,7 @@ function fellesmelding() {
       const felles = crypto.randomUUID(); const av = state.me?.navn || state.me?.epost;
       const { error } = await sb.from('meldinger').insert(ids.map(id => ({ eiendom_id: v.eiendom, leietaker_id: id, avvik_id: null, data: { tekst, rolle: 'utleier', av, til: 'alle', synlig: true, lest: true, felles } })));
       if (error) { toast(tt("Meldingen ble ikke sendt: {0}", error.message)); return false; }
-      toast(tt("Fellesmelding sendt til {0} leietaker(e)", ids.length)); window.dispatchEvent(new Event('ek-meldinger'));
+      toast(tt("Fellesmelding sendt til {0} leietaker(e)", ids.length)); window.dispatchEvent(new Event('ek-meldinger')); ids.forEach(id => varsleChat(v.eiendom, id));
     } });
 }
 

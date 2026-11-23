@@ -110,6 +110,8 @@ export async function aoApi(body: any, medInnlogging = true) {
   if (!r.ok) throw Object.assign(new Error(j.error ? tt(j.error) : tt('Feil {0}', r.status)), j, { status: r.status });
   return j;
 }
+/** Melder fra til serveren at en chat-melding er sendt, så riktige personer varsles. Feil ignoreres; meldingen er allerede lagret. */
+export const varsleChat = (eiendomId: string, leietakerId: string | null | undefined) => { if (eiendomId && leietakerId) aoApi({ action: 'chat_varsel', eiendom_id: eiendomId, leietaker_id: leietakerId }).catch(() => { }); };
 /** Fører en egen hendelse i hendelsesloggen (i tillegg til de automatiske) */
 export async function loggHendelse(tekst: string, radId?: string, eiendomId?: string) {
   try { await sb.from('hendelseslogg').insert({ bruker_id: state.me?.id, bruker: state.me?.navn || state.me?.epost, tabell: 'hendelse', rad_id: radId || null, eiendom_id: eiendomId || null, handling: 'hendelse', tekst }); } catch { }

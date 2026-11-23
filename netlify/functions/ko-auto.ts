@@ -27,6 +27,9 @@ export default async () => {
   // Brannopplæring på autopilot: purring, årlig repetisjon og eskalering (styres av Innstillinger → Brannopplæring; av som standard)
   const r7 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'brannauto' }) });
   console.log('brannauto', r7.status, (await r7.text()).slice(0, 1000));
+  // Chat-varsler: påminnelse om leietakermeldinger uten svar (styres av Innstillinger → Chat-varsler; av som standard)
+  const r8 = await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'chat_varsel_dag' }) });
+  console.log('chat-varsel', r8.status, (await r8.text()).slice(0, 1000));
   // Hjerteslag: forteller driftsvakten (server/vakt.sh) at nattjobbene har kjørt
   await fetch(`${base}/.netlify/functions/arbeidsordre`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-ek-cron': sig }, body: JSON.stringify({ action: 'jobb_hjerteslag', navn: 'ko-auto' }) }).catch(() => null);
   return new Response(t, { status: r.status });

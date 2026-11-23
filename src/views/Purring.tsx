@@ -14,6 +14,7 @@ import { RUNDE_STD, renRundeInnst } from '../lib/rundeServer';
 import { renFornyInnst } from '../lib/fornyelseServer';
 import { renVaktInnst } from '../lib/leieServer';
 import { renOplAuto } from '../lib/opplaeringAuto';
+import { renChatInnst } from '../lib/chatVarselServer';
 import { AUTOMATIKK, erPa, slaPa } from '../lib/anbefalt';
 import { PUSH_TYPER, pushStotte, erIos, erInstallert, pushStatus, slaPaPush, slaAvPush, endreTyper, testPush } from '../lib/push';
 
@@ -184,6 +185,29 @@ export function BrannAutoKort() {
       {c.pa && <div className="pu-under small">{tt("Første purring etter")} <Tall v={c.purrEtter} set={n => setC({ purrEtter: n })} ro={ro} w={46} /> {tt("dager, deretter hver")} <Tall v={c.purrGjenta} set={n => setC({ purrGjenta: n })} ro={ro} w={46} /> {tt("dag, maks")} <Tall v={c.purrMaks} set={n => setC({ purrMaks: n })} ro={ro} w={46} /> {tt("purringer")}<br />
         <label><input type="checkbox" disabled={ro} checked={c.aarlig} onChange={e => setC({ aarlig: e.target.checked })} /> {tt("Start ny runde når lederen gjennomførte for mer enn")}</label> <Tall v={c.aarligMnd} set={n => setC({ aarligMnd: n })} ro={ro} w={46} /> {tt("måneder siden")}<br />
         {tt("Varsle meg når purringene er brukt opp og under")} <Tall v={c.terskel} set={n => setC({ terskel: n })} ro={ro} w={46} /> {tt("% har gjennomført, til")} <input disabled={ro} value={c.eierEpost} placeholder={tt("administratorene (tomt = alle)")} style={{ width: 260, display: 'inline-block', padding: '3px 6px' }} onChange={e => setC({ eierEpost: e.target.value })} /></div>}</div>
+    {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={kjorNa}>{tt("Kjør nå")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
+  </div>;
+}
+
+export function ChatVarselKort() {
+  useStore(); const ro = !isAdmin() && state.me?.rolle !== 'forvalter';
+  const [c, setC0] = useState(renChatInnst(S.innst.chatVarsel)); const [busy, setBusy] = useState(false);
+  useEffect(() => setC0(renChatInnst(S.innst.chatVarsel)), [JSON.stringify(S.innst.chatVarsel)]);
+  const setC = (x: Partial<ReturnType<typeof renChatInnst>>) => setC0(v => ({ ...v, ...x }));
+  const lagre = async () => { setBusy(true); try { await saveInnst('chatVarsel', renChatInnst(c)); toast(tt("Innstillingene er lagret")); } catch { } setBusy(false); };
+  const kjorNa = async () => {
+    if (!S.primarOrg || !confirm(tt("Kjøre nå? Du får en samlet påminnelse om leietakermeldinger som ikke har fått svar."))) return; setBusy(true);
+    try { await saveInnst('chatVarsel', renChatInnst(c)); const r = await aoApi({ action: 'chat_varsel_na', org: S.primarOrg }); const x = (r.rapport || [])[0] || {};
+      toast(tt("{0} meldinger uten svar, {1} varsler og {2} e-poster sendt", x.ubesvarte || 0, x.push || 0, x.epost || 0)); } catch { } setBusy(false); };
+  return <div className="card" style={{ maxWidth: 900, marginTop: 16 }}>
+    <h2 style={{ marginTop: 0 }}>{tt("Chat-varsler")}</h2>
+    <p className="small muted" style={{ marginTop: -4 }}>{tt("Varsler når det kommer nye meldinger i chatten, og minner om leietakermeldinger som ikke har fått svar. Høyst ett varsel per samtale hvert 30. minutt. Interne notater varsler aldri. Av som standard.")}</p>
+    <div className="pu-rad"><Bryter on={c.pa} set={b => setC({ pa: b })} ro={ro}><b>{tt("Send chat-varsler")}</b></Bryter>
+      {c.pa && <div className="pu-under small">
+        <label><input type="checkbox" disabled={ro} checked={c.tilAnsatte} onChange={e => setC({ tilAnsatte: e.target.checked })} /> {tt("Varsle ansatte (push og e-post) når en leietaker skriver")}</label><br />
+        <label><input type="checkbox" disabled={ro} checked={c.tilLeietaker} onChange={e => setC({ tilLeietaker: e.target.checked })} /> {tt("Send e-post til leietaker når utleier svarer")}</label><br />
+        <label><input type="checkbox" disabled={ro} checked={c.paminnelse} onChange={e => setC({ paminnelse: e.target.checked })} /> {tt("Minn meg på meldinger uten svar etter")}</label> <Tall v={c.ubesvartDager} set={n => setC({ ubesvartDager: n })} ro={ro} w={46} /> {tt("dager")}<br />
+        {tt("E-post til ansatte går til")} <input disabled={ro} value={c.ansatteEpost} placeholder={tt("administratorene (tomt = alle)")} style={{ width: 260, display: 'inline-block' }} onChange={e => setC({ ansatteEpost: e.target.value })} /></div>}</div>
     {!ro ? <div className="toolbar"><button className="btn pri" disabled={busy || S.innstMangler} onClick={lagre}>{busy ? tt("Lagrer …") : tt("Lagre")}</button><button className="btn" disabled={busy || S.innstMangler} onClick={kjorNa}>{tt("Kjør nå")}</button></div> : <p className="small muted">{tt("Bare administrator eller forvalter kan endre dette.")}</p>}
   </div>;
 }

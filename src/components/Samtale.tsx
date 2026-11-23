@@ -2,7 +2,7 @@
 // Utleiersiden velger per melding målgruppe: alle (også leietaker), utleier og ressurser, eller internt (bare utleier).
 // Samtalen kan overføres til en arbeidsordre (avvik).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { S, isTenant, kanDrifteE, save, sb, state, toast, uploadFile, useStore, type Fil } from '../lib/store';
+import { S, isTenant, kanDrifteE, save, sb, state, toast, uploadFile, useStore, varsleChat, type Fil } from '../lib/store';
 import { FileLink, formModal, useFileUrl } from './ui';
 import { addDays, byId, today } from '../lib/utils';
 import { tt, lokale } from '../lib/i18n';
@@ -63,7 +63,7 @@ export function Samtale({ eiendomId, leietakerId, avvikId }: { eiendomId: string
   const del = async (m: Melding) => {
     if (!window.confirm(tt("Dele denne meldingen med leietakeren? Den kan ikke gjøres intern igjen etterpå."))) return;
     const { error } = await sb.from('meldinger').update({ data: { ...m.data, til: 'alle', synlig: true, delt: new Date().toISOString() } }).eq('id', m.id);
-    if (error) return toast(error.message); await last(); window.dispatchEvent(new Event('ek-meldinger'));
+    if (error) return toast(error.message); await last(); window.dispatchEvent(new Event('ek-meldinger')); varsleChat(eiendomId, leietakerId);
   };
   const velg = (L: FileList | null) => {
     if (!L) return; const ny = [...filer]; for (const f of Array.from(L)) { if (f.size > MAKS_MB * 1e6) { toast(tt("«{0}» er over {1} MB", f.name, MAKS_MB)); continue; } if (ny.length >= MAKS_FILER) { toast(tt("Maks {0} filer per melding", MAKS_FILER)); break; } ny.push(f); } setFiler(ny);
