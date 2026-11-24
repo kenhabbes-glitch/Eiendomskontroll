@@ -97,6 +97,12 @@ function SysKost({ a }: { a: Rec }) {
 }
 
 /** Merke for system som har et aktivt utskiftingsprosjekt – klikk åpner prosjektet */
+/** Merke på komponent/system med åpne avvik: rødt ved Høy/Kritisk, ellers gult. Klikk åpner avviket (ett) eller avvikslisten. */
+export function AvvikMerke({ komp, anlegg }: { komp?: string; anlegg?: string }) {
+  const L = openAvvik().filter(a => komp ? a.komponentId === komp : (a.anleggId === anlegg || (a.komponentId && S.komponenter.some(k => k.id === a.komponentId && k.anleggId === anlegg))));
+  if (!L.length) return null; const hoy = L.some(a => a.alv === 'Kritisk' || a.alv === 'Høy');
+  return <a href="#/avvik" onClick={e => { e.stopPropagation(); if (L.length === 1) { e.preventDefault(); editAvvik(L[0].id); } }} title={L.map(a => `#${a.nr || ''} ${a.tittel} (${a.alv})`).join('\n')} style={{ textDecoration: 'none' }}><Chip c={hoy ? 'red' : 'amber'}>{'⚠ '}{L.length === 1 ? tt("Åpent avvik") : tt("{0} åpne avvik", L.length)}</Chip></a>;
+}
 export function UtskiftMerke({ aid }: { aid: string }) {
   const p = S.prosjekter.find(x => x.gammeltSystemId === aid && !['Ferdigstilt', 'Avbrutt'].includes(x.status)); if (!p || !harModul('prosjekter', p.eiendomId)) return null;
   return <a href={'#/prosjekt/' + p.id} onClick={e => e.stopPropagation()} title={tt("Utskiftingsprosjekt: {0} · {1}. Klikk for å åpne prosjektet.", p.navn, p.fase || p.status)} style={{ textDecoration: 'none' }}><Chip c="amber">{tt("↻ Utskiftes ·")} {p.fase || p.status}</Chip></a>;
@@ -133,14 +139,14 @@ export function TfmTree({ list, q, onNewKomp, eid, onDok }: { list: Rec[]; q: st
     const sOpen = tving || !!apen['s' + a.id]; if (!tving && !apen['g' + gk]) return;
     rows.push(<tr key={a.id} className="click sysrow" onClick={() => editAnlegg(a.id)}>
       <td className="mono" style={{ fontWeight: 600, whiteSpace: 'nowrap', paddingLeft: 22 }}><span onClick={e => { stop(e); if (kl.length && !tving) toggle('s' + a.id); }} title={kl.length ? (sOpen ? tt("Skjul komponenter") : tt("Vis komponenter")) : ''} style={{ display: 'inline-block', width: 20, cursor: kl.length ? 'pointer' : 'default', color: 'var(--muted)', fontFamily: 'sans-serif' }}>{kl.length ? (sOpen ? '▾' : '▸') : ''}</span>{tfmSys(a) || '–'}<Pin o={a} />{kl.length > 0 && !sOpen && <span className="small muted" style={{ fontWeight: 400, marginLeft: 6, fontFamily: 'sans-serif' }}>({kl.length})</span>}</td>
-      <td><b style={{ fontWeight: 600 }}>{a.navn || k.n}</b> <TaggChips t={taggerFor(a, 'a')} small /> <UtskiftMerke aid={a.id} /><div className="small muted">{[a.navn ? k.n : k.g, a.fabrikat].filter(Boolean).join(' · ')}</div></td>
+      <td><b style={{ fontWeight: 600 }}>{a.navn || k.n}</b> <TaggChips t={taggerFor(a, 'a')} small /> <UtskiftMerke aid={a.id} /> <AvvikMerke anlegg={a.id} /><div className="small muted">{[a.navn ? k.n : k.g, a.fabrikat].filter(Boolean).join(' · ')}</div></td>
       <td className="num">{a.aar || '–'}</td><td className="num">{compYear(a) || '–'}{a.planAar ? <div className="small muted">{tt("overstyrt")}</div> : null}</td><td><RestChip r={compRest(a)} /></td><td><TgChip t={a.tg} /><TgForslagChip o={a} /></td>
       {ok && <SysKost a={a} />}
       <td className="small">{n.length ? <>{n.length} {tt("kontr.")}{due > 0 && <> · <span style={{ color: 'var(--red)' }}>{due} {tt("forfalt")}</span></>}</> : <span className="muted">–</span>}</td>
       <td style={{ whiteSpace: 'nowrap' }}>{ok && onNewKomp && <button className="btn sm" onClick={e => { stop(e); onNewKomp(a.id); }}>{tt("+ Komponent")}</button>}</td></tr>);
     if (sOpen) kl.forEach(c => rows.push(<tr key={c.id} className="click" onClick={() => editKomponent(c.id)}>
       <td className="mono small" style={{ paddingLeft: 58, whiteSpace: 'nowrap' }}>{'-' + (c.kode || '') + pad(c.lop) + (c.typekode ? '%' + c.typekode : '')}<Pin o={c} /></td>
-      <td>{c.navn} {Array.isArray(c.tagger) && <TaggChips t={c.tagger} small />}<div className="small muted">{[c.fabrikat, c.plassering, c.serienr ? 's/n ' + c.serienr : ''].filter(Boolean).join(' · ')}</div></td>
+      <td>{c.navn} {Array.isArray(c.tagger) && <TaggChips t={c.tagger} small />} <AvvikMerke komp={c.id} /><div className="small muted">{[c.fabrikat, c.plassering, c.serienr ? 's/n ' + c.serienr : ''].filter(Boolean).join(' · ')}</div></td>
       <td className="num">{c.aar || '–'}</td><td className="num">{kompAar(c) || '–'}{!egetAar(c) && kompAar(c) ? <div className="small muted">{tt("følger systemet")}</div> : null}</td><td>{egetAar(c) ? <RestChip r={compRest(c)} /> : <span className="muted small">–</span>}</td><td><TgChip t={c.tg} /><TgForslagChip o={c} /></td>
       {ok && <td className="num" data-tip={c.kost ? kostTip(c) : undefined}>{c.kost ? nok(kostNaa(c)) : '–'}{erForslag(c) && <ForslagMerke />}</td>}{ok && <td className="num" data-tip={c.kost ? `${kostTip(c)}. Prisjustert med KPI til ${Math.max(kompAar(c) || YEAR, YEAR)}.` : undefined}>{c.kost && kompAar(c) ? nok(kostJustert(c, kompAar(c))) : '–'}</td>}{ok && <td className="num" data-tip={c.kost && kompAar(c) ? nvTip(kompAar(c)) : undefined}>{c.kost && kompAar(c) ? nok(kompNaaverdi(c)) : '–'}</td>}<td /><td /></tr>));
   });
