@@ -389,3 +389,11 @@ test('Hjelp: systemkartet vises, og bryteren slår automatikk av og på i innsti
     await br.click(); await a.side.waitForTimeout(600); assert.equal(await br.getAttribute('aria-checked'), 'false'); assert.deepEqual(a.feil, []);
   } finally { await a.lukk(); }
 });
+
+test('Dokumenter og eiendom åpner når FDV-dokumentasjonen bare dekker noen av systemene (status «delvis»)', async () => {
+  const d: any = grunndata(); d.systemer.push({ id: 's2', eiendom_id: 'e1', created_at: NAA, data: { eiendomId: 'e1', navn: 'Ventilasjon', type: 'ventilasjon' } });
+  d.dokumenter = [{ id: 'd1', eiendom_id: 'e1', created_at: NAA, data: { eiendomId: 'e1', type: 'FDV-dokumentasjon', tittel: 'FDV brann', anleggId: 's1' } }];
+  const a = await aapne('#/eiendom/e1', { data: d }); try {
+    await gaaGjennom(a, ['eiendom/e1', 'dokumenter', 'eiendommer']); assert.ok((await tekst(a)).length > 50);
+  } finally { await a.lukk(); }
+});
