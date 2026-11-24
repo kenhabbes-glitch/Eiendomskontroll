@@ -380,7 +380,7 @@ function Visning({ eid, modeller, hovedId, last }: { eid: string; modeller: Rec[
           n++; }
         toast(tt("{0} systemer koblet til modellen ({1} nye)", n, nye)); if (nye) setTimeout(() => generatePlan(eid, false), 250); } }); };
   const fjern = async (aid: string) => { const a = byId('anlegg', aid)!; await save('anlegg', { ...a, ifcGuider: (a.ifcGuider || []).filter((g: string) => g !== el!.g) }); };
-  const nyttAvvik = () => { if (!el || !sel) return; editAvvik(undefined, { eiendomId: eid, anleggId: koblet[0] || '', tittel: `${klNavn(el.k)}${el.n ? ' «' + el.n + '»' : ''} – ${h.etasjer[el.e]?.navn || ''}: `, modell: { guid: el.g, x: sel.p[0], y: sel.p[1], z: sel.p[2], etasje: h.etasjer[el.e]?.navn || '' } }); };
+  const nyttAvvik = () => { if (!el || !sel) return; const kmp = S.komponenter.find(k => k.eiendomId === eid && !k.arkivert && (k.ifcGuid === el.g || (k.ifcDeler || []).includes(el.g))); editAvvik(undefined, { eiendomId: eid, anleggId: kmp?.anleggId || koblet[0] || '', ...(kmp ? { komponentId: kmp.id } : {}), tittel: `${klNavn(el.k)}${el.n ? ' «' + el.n + '»' : ''} – ${h.etasjer[el.e]?.navn || ''}: `, modell: { guid: el.g, x: sel.p[0], y: sel.p[1], z: sel.p[2], etasje: h.etasjer[el.e]?.navn || '' } }); };
   const stat = (k: keyof typeof ST) => <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginRight: 12 }}><i style={{ width: 11, height: 11, borderRadius: 3, background: ST[k], display: 'inline-block' }} />{({ ok: tt("I orden"), snart: tt("Snart / avvik"), rod: tt("Forfalt / alvorlig avvik"), ingen: tt("Uten kontroll") } as any)[k]}</span>;
   const sna = h.fokus[1], snb = h.fokus[4] + 1;
   return <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr)', gap: 12 }}>
