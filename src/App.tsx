@@ -16,6 +16,7 @@ import { TilsynView, svarfristSnart } from './views/Tilsyn';
 import { Innboks, useInnboksAntall } from './views/Innboks';
 import { RUTE_MODUL, harModul } from './lib/moduler';
 import { ModulSperret } from './views/Abonnement';
+import { Feilfanger } from './components/Feilfanger';
 import React, { useEffect, useState } from 'react';
 import { mineOrg, kanDrifteE, sendKo, ko, forkastKo } from './lib/store';
 import { autoKvitterIK } from './lib/actions';
@@ -255,7 +256,7 @@ export default function App() {
         {ko.feil.length > 0 && <div className="ko-feil"><b>{tt("{0} endringer kunne ikke sendes:", ko.feil.length)}</b>
           {ko.feil.map(f => <div key={f.key}>{f.navn} – <span className="muted">{tt(f.feil)}</span> <button className="btn sm" onClick={() => sendKo(true)}>{tt("Prøv igjen")}</button> <button className="btn sm" onClick={async () => { if (await confirmBox(tt("Forkaste endringen på «{0}»? Den blir ikke lagret.", f.navn), tt("Forkast"))) forkastKo(f.key); }}>{tt("Forkast")}</button></div>)}</div>}
       </div>}
-      {state.loading && !S.eiendommer.length ? <div className="empty"><b>{tt("Laster data …")}</b></div> : <React.Suspense fallback={<div className="empty"><b>{tt("Laster …")}</b></div>}>{body}</React.Suspense>}
+      {state.loading && !S.eiendommer.length ? <div className="empty"><b>{tt("Laster data …")}</b></div> : <Feilfanger nokkel={location.hash}><React.Suspense fallback={<div className="empty"><b>{tt("Laster …")}</b></div>}>{body}</React.Suspense></Feilfanger>}
     </main>
     <BunnMeny nav={nav} I={I} antall={{ kontroller: forf, avvik: avv, meldinger: mldN }} aktiv={v} />
     <ModalHost /><Toast /><Tip /><NyheterPopup />
