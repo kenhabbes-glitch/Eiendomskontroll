@@ -22,7 +22,7 @@ export function samtaleModal(m: { eiendom_id: string; leietaker_id: string | nul
 /** Starter en samtale med en leietaker (uten sak) */
 function nySamtale() {
   const L = S.leietakere.filter(l => kanDrifteE(l.eiendomId)).sort((a, b) => (a.navn || '').localeCompare(b.navn || ''));
-  formModal({ title: tt("Ny samtale"), saveTxt: tt("Åpne samtale"), fields: [{ k: 'lt', label: tt("Leietaker"), type: 'select', req: true, options: L.map(l => [l.id, `${l.navn} – ${byId('eiendommer', l.eiendomId)?.navn || ''}`] as [string, string]) }], values: { lt: '' },
+  formModal({ title: tt("Ny samtale"), saveTxt: tt("Åpne samtale"), fields: [{ k: 'lt', label: tt("Leietaker"), type: 'select', req: true, empty: tt("Velg leietaker …"), options: L.map(l => [l.id, `${l.navn} – ${byId('eiendommer', l.eiendomId)?.navn || ''}`] as [string, string]) }], values: { lt: L.length === 1 ? L[0].id : '' },
     onSave: async v => { const l = byId('leietakere', v.lt); if (l) setTimeout(() => samtaleModal({ eiendom_id: l.eiendomId, leietaker_id: l.id, avvik_id: null }), 50); } });
 }
 /** Én melding til flere leietakere samtidig. Lages som en vanlig melding i hver leietakers chat, og er alltid synlig for leietakeren. */

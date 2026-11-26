@@ -368,6 +368,22 @@ test('chat: ny samtale er intern som standard, og «Fellesmelding» kan åpnes',
   } finally { await a.lukk(); }
 });
 
+test('chat: «Ny samtale» med flere leietakere starter på «Velg leietaker», og valget blir med', async () => {
+  const data = grunndata(); data.leietakere = [
+    { id: 'l1', eiendom_id: 'e1', created_at: NAA, data: { eiendomId: 'e1', navn: 'Firma AS' } },
+    { id: 'l2', eiendom_id: 'e1', created_at: NAA, data: { eiendomId: 'e1', navn: 'Bedrift AS' } }];
+  const a = await aapne('#/meldinger', { data }); try {
+    await a.side.getByRole('button', { name: 'Ny samtale' }).click();
+    const m = a.side.locator('.modal');
+    assert.equal(await m.locator('#f_lt').inputValue(), '', 'ingen leietaker skal se valgt ut før man velger');
+    assert.equal(await m.locator('#f_lt option:checked').textContent(), 'Velg leietaker …');
+    await m.locator('#f_lt').selectOption('l1', { force: true });
+    await m.getByRole('button', { name: /Åpne samtale/ }).click(); await a.side.waitForTimeout(500);
+    assert.ok(await a.side.locator('.modal').last().getByText(/Bare internt/).count() === 1, 'samtalen skal åpnes');
+    if (a.feil.length) assert.fail(a.feil[0]);
+  } finally { await a.lukk(); }
+});
+
 test('brannvern: «Forhåndsvis pakke» viser PDF-en i et vindu i appen', async () => {
   const data = grunndata(); data.eiendommer[0].data.brannvern = { versjon: 1, alarm: 'Heldekkende brannalarm', oppstilling: 'Parkeringen' };
   data.leietakere = [{ id: 'l1', eiendom_id: 'e1', created_at: NAA, data: { eiendomId: 'e1', navn: 'Firma AS' } }];
