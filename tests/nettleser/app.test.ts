@@ -397,3 +397,10 @@ test('Dokumenter og eiendom åpner når FDV-dokumentasjonen bare dekker noen av 
     await gaaGjennom(a, ['eiendom/e1', 'dokumenter', 'eiendommer']); assert.ok((await tekst(a)).length > 50);
   } finally { await a.lukk(); }
 });
+
+test('Organisasjon og tilgang: «Testleietakere» åpner dialogen for testbrukere', async () => {
+  const a = await aapne('#/brukere'); try {
+    await a.side.getByRole('button', { name: 'Testleietakere' }).click(); await a.side.waitForTimeout(400);
+    const t = await tekst(a); assert.ok(t.includes('Oppretter tre leietakerbrukere') && t.includes('Opprett testbrukere'), 'dialogen mangler'); assert.deepEqual(a.feil, []);
+  } finally { await a.lukk(); }
+});

@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { Hjelp } from '../components/Hjelp';
 import { AbonnementOversikt, Bestillinger, modulAdmin, prisEditor } from './Abonnement';
 import { byggFor, kr, orgPris } from '../lib/moduler';
-import { S, aoApi, adminApi, isPlattform, mineOrg, reloadAdmin, sb, state, toast, useStore, feiltekst, orgNavn, save, bump } from '../lib/store';
+import { testbrukere } from './Brukere';
+import { S, aoApi, adminApi, isAdmin, isPlattform, mineOrg, reloadAdmin, sb, state, toast, useStore, feiltekst, orgNavn, save, bump } from '../lib/store';
 import { eNavn, fd, sortBy, today, aNavn } from '../lib/utils';
 import { Chip, Empty, confirmBox, formModal, type Field } from '../components/ui';
 import { KOMP } from '../lib/catalog';
@@ -253,7 +254,7 @@ export function Organisasjon() {
       if (O) O.gardeier_oppretter = b; bump(); toast(b ? tt("Gårdeiere kan nå opprette egne bygg") : tt("Gårdeiere kan ikke lenger opprette bygg"));
     };
     const mangler = M.filter(m => m.aktiv && ['admin', 'forvalter'].includes(m.rolle) && mf[m.user_id] === false);
-    c = <><div className="toolbar">{orgVelger(admin, org)}<span className="muted small">{M.length} {tt("brukere ·")} {typeNavn(S.orgs.find(o => o.id === org)?.type)}</span><button className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => leggTilMedlem(org)}>{tt("+ Legg til bruker")}</button></div>
+    c = <><div className="toolbar">{orgVelger(admin, org)}<span className="muted small">{M.length} {tt("brukere ·")} {typeNavn(S.orgs.find(o => o.id === org)?.type)}</span>{isAdmin() && <button className="btn" style={{ marginLeft: 'auto' }} onClick={() => testbrukere()}>{tt("Testleietakere")}</button>}<button className="btn pri" style={{ marginLeft: isAdmin() ? 8 : 'auto' }} onClick={() => leggTilMedlem(org)}>{tt("+ Legg til bruker")}</button></div>
       <div className="card" style={{ marginBottom: 12, padding: '10px 14px' }}>
         <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 500 }}><input type="checkbox" checked={krev} onChange={e => settKrev(e.target.checked)} /> {tt("Krev tofaktorinnlogging for administratorer og forvaltere")}</label>
         <p className="small muted" style={{ margin: '4px 0 0 24px' }}>{krev ? <>{tt("Administratorer og forvaltere må logge inn med passord og kode fra en autentiseringsapp. Uten tofaktor får de ikke tilgang til data – reglen håndheves i databasen.")}{mangler.length > 0 && <> <span style={{ color: 'var(--amber)' }}>{mangler.length} {tt("må sette det opp ved neste innlogging.")}</span></>}</> : tt("Anbefalt å ha på. Andre brukere kan likevel slå på tofaktor selv under «Min profil».")}</p>

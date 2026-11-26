@@ -91,7 +91,7 @@ const TEST_LT = [
   { navn: tt("Regnskapshuset Nord AS (test)"), lokale: '2. etasje', kontakt: 'Rune Regnskap', virksomhet: 'Kontor' },
   { navn: tt("Fysio Sentrum AS (test)"), lokale: '1. etasje, vest', kontakt: 'Frida Fysio', virksomhet: 'Helse' },
 ];
-const TEST_BRUKERE: TB[] = [
+const ALLE_TB: TB[] = [
   { slug: 'eier', navn: tt("Ola Eier (test)"), rolle: 'admin', gruppe: 'Eier' },
   { slug: 'driftsleder1', navn: tt("Kari Driftsleder (test)"), rolle: 'forvalter', gruppe: 'Driftsleder' },
   { slug: 'driftsleder2', navn: tt("Per Driftsleder (test)"), rolle: 'forvalter', gruppe: 'Driftsleder' },
@@ -103,10 +103,12 @@ const TEST_BRUKERE: TB[] = [
   { slug: 'leietaker2', navn: tt("Rune Regnskap (test)"), rolle: 'leietaker', gruppe: 'Leietaker', lt: 1 },
   { slug: 'leietaker3', navn: tt("Frida Fysio (test)"), rolle: 'leietaker', gruppe: 'Leietaker', lt: 2 },
 ];
+/** Bare leietakerne tas med: ansatte legges til per organisasjon under «Organisasjon og tilgang». */
+const TEST_BRUKERE: TB[] = ALLE_TB.filter(t => t.rolle === 'leietaker');
 const testEpost = (base: string, slug: string) => { const [u, d] = base.split('@'); return `${u.split('+')[0]}+test-${slug}@${d}`; };
 const erTest = (p: any) => /\+test-/.test(p.epost || '');
 
-function testbrukere() {
+export function testbrukere() {
   openModal({ wide: true, render: close => <TestBody close={close} /> });
 }
 function TestBody({ close }: { close: () => void }) {
@@ -117,7 +119,7 @@ function TestBody({ close }: { close: () => void }) {
   const [valgt, setValgt] = useState<Record<string, boolean>>(() => Object.fromEntries(TEST_BRUKERE.map(t => [t.slug, true])));
   const [logg, setLogg] = useState<string[]>([]); const [busy, setBusy] = useState(false); const [ferdig, setFerdig] = useState(false);
   const eksisterende = S.profiles.filter(erTest);
-  const ok = /^\S+@\S+\.\S+$/.test(base) && pw.length >= 8 && !!eid;
+  const ok = /^\S+@\S+\.\S+$/.test(base) && pw.length >= 10 && /[a-z]/.test(pw) && /[A-Z]/.test(pw) && /\d/.test(pw) && !!eid;
   const log = (t: string) => setLogg(l => [...l, t]);
   const kjør = async () => {
     setBusy(true); setLogg([]);
@@ -150,9 +152,9 @@ function TestBody({ close }: { close: () => void }) {
   return <>
     <div className="mh"><h2>{tt("Testbrukere")}</h2><button className="btn ghost sm" onClick={close}>✕</button></div>
     <div className="mb">
-      <p className="small" style={{ marginTop: 0 }}>{tt("Oppretter innloggingsbrukere for hver rolle med samme passord, slik at du kan logge inn og se programmet slik de ser det. Det sendes")} <b>{tt("ingen e-post")}</b>{tt(". Adressene lages med pluss-adressering av e-posten under (f.eks.")} <span className="mono">{base ? testEpost(base, 'driftstekniker') : tt("navn+test-driftstekniker@…")}</span>{tt("), så de havner i din egen innboks om noe likevel sendes.")}</p>
+      <p className="small" style={{ marginTop: 0 }}>{tt("Oppretter tre leietakerbrukere med samme passord, slik at du kan logge inn og se leietakerportalen slik leietaker ser den. Det sendes")} <b>{tt("ingen e-post")}</b>{tt(". Adressene lages med pluss-adressering av e-posten under (f.eks.")} <span className="mono">{base ? testEpost(base, 'driftstekniker') : tt("navn+test-driftstekniker@…")}</span>{tt("), så de havner i din egen innboks om noe likevel sendes.")}</p>
       <div className="form"><div className="fld half"><label>{tt("Basis-e-post")}</label><input style={inp} value={base} onChange={e => setBase(e.target.value)} /></div>
-        <div className="fld half"><label>{tt("Felles passord (min. 8 tegn)")}</label><input style={inp} className="mono" value={pw} onChange={e => setPw(e.target.value)} /></div>
+        <div className="fld half"><label>{tt("Felles passord (min. 10 tegn, store og små bokstaver og tall)")}</label><input style={inp} className="mono" value={pw} onChange={e => setPw(e.target.value)} /></div>
         <div className="fld"><label>{tt("Eiendom de får tilgang til (leietakerne opprettes her)")}</label><select style={inp} value={eid} onChange={e => setEid(e.target.value)}>{S.eiendommer.map(e => <option key={e.id} value={e.id}>{e.navn}</option>)}</select></div></div>
       <div className="tbl-wrap" style={{ marginTop: 10 }}><table><thead><tr><th /><th>{tt("Hvem")}</th><th>{tt("Navn")}</th><th>{tt("Rolle i programmet")}</th><th>{tt("Innlogging")}</th></tr></thead><tbody>
         {TEST_BRUKERE.map(t => <tr key={t.slug}><td><input type="checkbox" checked={!!valgt[t.slug]} onChange={e => setValgt({ ...valgt, [t.slug]: e.target.checked })} /></td><td>{t.gruppe}</td><td>{t.navn}{t.lt != null && <div className="small muted">{TEST_LT[t.lt].navn}</div>}</td><td><Chip c={t.rolle === 'admin' ? 'blue' : t.rolle === 'leietaker' ? '' : 'green'}>{rolleNavn(t.rolle)}</Chip></td><td className="mono small">{base ? testEpost(base, t.slug) : ''}</td></tr>)}
